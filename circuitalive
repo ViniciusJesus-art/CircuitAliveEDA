@@ -40,6 +40,7 @@ if "$from_build"; then
     executable="$CIRCUITALIVE_WORK/build/circuitalive/$subdir/$app"
 else
     unset KICAD_RUN_FROM_BUILD_DIR
+    export LD_LIBRARY_PATH="$CIRCUITALIVE_WORK/.circuitalive/install/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     executable="$CIRCUITALIVE_WORK/.circuitalive/install/bin/$app"
 fi
 if [[ ! -x "$executable" ]]; then
