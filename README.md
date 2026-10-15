@@ -1,3 +1,40 @@
+# CircuitAliveEDA
+
+Fork do KiCad para desenvolver simulação interativa no esquemático. Esta primeira
+etapa prepara a base original, a compilação no Fedora e o simulador existente.
+Os controles de simulação interativa descritos no mapa são etapas futuras.
+
+- Fork: <https://github.com/ViniciusJesus-art/CircuitAliveEDA>
+- Branch de trabalho: `circuitalive/main`.
+- Base KiCad 10.0: `6809ada8746084720c0093eb484c889afb35d0d4`.
+- Fontes diretamente na raiz deste repositório.
+- [Configuração, compilação e execução](docs/circuitalive/BUILD_FEDORA.md).
+- [Mapa do projeto](docs/circuitalive/Mapa_KiCad_Simulacao_Interativa.md).
+
+Com o ambiente desta máquina preparado:
+
+```bash
+tools/circuitalive/configure.sh
+tools/circuitalive/build.sh
+tools/circuitalive/install.sh
+./circuitalive
+```
+
+Para abrir apenas o editor de esquemáticos ou usar a linha de comando:
+
+```bash
+./circuitalive eeschema
+./circuitalive cli version
+```
+
+Os binários, dependências locais e configurações ficam em `.circuitalive/`;
+os objetos de compilação ficam em `build/circuitalive/`. Esses arquivos gerados
+não são enviados ao Git. As bibliotecas do Fedora em `/usr/share/kicad` são
+reutilizadas. As licenças e os créditos do KiCad e das dependências permanecem
+nos arquivos originais do repositório.
+
+---
+
 # KiCad README
 
 For specific documentation about [building KiCad](https://dev-docs.kicad.org/en/build/), policies

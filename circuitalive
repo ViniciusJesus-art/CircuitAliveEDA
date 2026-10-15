@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source "$(dirname -- "${BASH_SOURCE[0]}")/tools/circuitalive/env.sh"
+source "$CIRCUITALIVE_ROOT/tools/circuitalive/runtime-env.sh"
+from_build=false
+if [[ "${1:-}" == --build ]]; then
+    from_build=true
+    shift
+fi
+app=kicad
+case "${1:-}" in
+    kicad|eeschema|pcbnew|gerbview|bitmap2component|pcb_calculator|pl_editor|cvpcb)
+        app="$1"
+        shift
+        ;;
+    cli)
+        app=kicad-cli
+        shift
+        ;;
+    -h|--help)
+        printf '%s\n' \
+            'Uso: ./circuitalive [--build] [aplicativo] [arquivo/opções]' \
+            'Aplicativos: kicad (padrão), eeschema, pcbnew, gerbview, cli,' \
+            '             bitmap2component, pcb_calculator, pl_editor, cvpcb' \
+            'Exemplos:' \
+            '  ./circuitalive' \
+            '  ./circuitalive eeschema circuito.kicad_sch' \
+            '  ./circuitalive cli version' \
+            '  ./circuitalive --build eeschema circuito.kicad_sch'
+        exit 0
+        ;;
+esac
+if "$from_build"; then
+    export KICAD_RUN_FROM_BUILD_DIR=1
+    subdir="$app"
+    case "$app" in
+        kicad-cli) subdir=kicad ;;
+        pl_editor) subdir=pagelayout_editor ;;
+    esac
+    executable="$CIRCUITALIVE_WORK/build/circuitalive/$subdir/$app"
+else
+    unset KICAD_RUN_FROM_BUILD_DIR
+    executable="$CIRCUITALIVE_WORK/.circuitalive/install/bin/$app"
+fi
+if [[ ! -x "$executable" ]]; then
+    printf 'Executável ainda não disponível: %s\n' "$executable" >&2
+    printf 'Execute tools/circuitalive/build.sh e tools/circuitalive/install.sh.\n' >&2
+    exit 1
+fi
+exec "$executable" "$@"

@@ -1,0 +1,46 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 22, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "circuitalive-fedora",
+      "displayName": "CircuitAliveEDA — Fedora",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/circuitalive",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g1 -DNDEBUG",
+        "CMAKE_C_FLAGS_RELWITHDEBINFO": "-O2 -g1 -DNDEBUG",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/.circuitalive/install",
+        "CMAKE_INSTALL_LIBDIR": "lib64",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "CMAKE_JOB_POOLS": "link=1",
+        "CMAKE_JOB_POOL_LINK": "link",
+        "USE_CCACHE": true,
+        "KICAD_VERSION_EXTRA": "CircuitAliveEDA",
+        "KICAD_CONFIG_DIR": "circuitalive-eda",
+        "KICAD_BUILD_QA_TESTS": true,
+        "KICAD_SPICE_QA": true,
+        "KICAD_SCRIPTING_WXPYTHON": true,
+        "KICAD_IPC_API": true,
+        "KICAD_USE_SENTRY": false,
+        "KICAD_UPDATE_CHECK": false,
+        "KICAD_INSTALL_DEMOS": true
+      }
+    },
+    {
+      "name": "circuitalive-fedora-local",
+      "displayName": "CircuitAliveEDA — dependências locais Fedora 44",
+      "inherits": "circuitalive-fedora",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "${sourceDir}/.circuitalive/deps/usr",
+        "CMAKE_LIBRARY_PATH": "${sourceDir}/.circuitalive/deps/usr/lib64",
+        "CMAKE_INCLUDE_PATH": "${sourceDir}/.circuitalive/deps/usr/include",
+        "wxWidgets_CONFIG_EXECUTABLE": "${sourceDir}/.circuitalive/deps/usr/bin/wx-config",
+        "OCC_INCLUDE_DIR": "${sourceDir}/.circuitalive/deps/usr/include/opencascade",
+        "SWIG_EXECUTABLE": "${sourceDir}/.circuitalive/deps/usr/bin/swig",
+        "Protobuf_PROTOC_EXECUTABLE": "${sourceDir}/.circuitalive/deps/usr/bin/protoc"
+      }
+    }
+  ]
+}
