@@ -73,7 +73,8 @@ Esse modo inclui versões fixadas para combinar com as bibliotecas instaladas
 nesta máquina e depende da disponibilidade desses RPMs nos repositórios. Não
 equivale a um contêiner nem a um SDK independente do sistema. Em outro Fedora,
 prefira `--system`. Checksums dos RPMs usados ficam em
-`.circuitalive/dependencies.sha256`; as versões detectadas ficam no log do CMake.
+`.circuitalive/dependencies.sha256`, com uma cópia da preparação inicial em
+[FEDORA44_RPMS.sha256](FEDORA44_RPMS.sha256); as versões detectadas ficam no log do CMake.
 Os pacotes são extraídos sem executar scripts RPM e sem instalação global.
 
 ## Compilar e instalar
@@ -91,6 +92,9 @@ dependências locais; caso contrário, seleciona `circuitalive-fedora`. Os prese
 estão em `CMakePresets.json` e usam Ninja, `RelWithDebInfo`, `-O2 -g1`, PCH e
 ccache. O limite de ccache é 5 GB. Os comandos de link são serializados para
 reduzir picos de memória.
+O rastreamento adicional de dependências pelo linker é desativado: o linker GNU
+não escapou os espaços nos caminhos de bibliotecas importadas nesta máquina.
+As dependências explícitas do CMake continuam sendo usadas pelo Ninja.
 
 A compilação usa três tarefas simultâneas por padrão, adequadas à memória
 disponível nesta máquina. Para ajustar:
@@ -100,6 +104,7 @@ CIRCUITALIVE_JOBS=2 tools/circuitalive/build.sh
 ```
 
 O build é incremental: após uma interrupção ou correção, repita o comando.
+O script usa um bloqueio para impedir duas compilações simultâneas na mesma árvore.
 Para compilar um alvo específico:
 
 ```bash
@@ -149,8 +154,8 @@ tools/circuitalive/test-spice.sh
 
 O teste usa `.circuitalive/test-config`, separado da configuração normal, e
 salva o resultado em `.circuitalive/logs/test-spice.log`. Os logs de build e
-instalação ficam no mesmo diretório. Resultados e limitações da validação inicial
-serão registrados em `VALIDATION.md` após a execução.
+instalação ficam no mesmo diretório. Os resultados e o escopo da validação inicial
+estão em [VALIDATION.md](VALIDATION.md).
 
 ## Git
 

@@ -9,6 +9,8 @@ Os controles de simulação interativa descritos no mapa são etapas futuras.
 - Base KiCad 10.0: `6809ada8746084720c0093eb484c889afb35d0d4`.
 - Fontes diretamente na raiz deste repositório.
 - [Configuração, compilação e execução](docs/circuitalive/BUILD_FEDORA.md).
+- [Validação da etapa 0](docs/circuitalive/VALIDATION.md): build completo,
+  editor e simulador abertos, 53 casos SPICE aprovados.
 - [Mapa do projeto](docs/circuitalive/Mapa_KiCad_Simulacao_Interativa.md).
 
 Com o ambiente desta máquina preparado:

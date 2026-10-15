@@ -16,6 +16,7 @@
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
         "CMAKE_JOB_POOLS": "link=1",
         "CMAKE_JOB_POOL_LINK": "link",
+        "CMAKE_LINK_DEPENDS_USE_LINKER": false,
         "USE_CCACHE": true,
         "KICAD_VERSION_EXTRA": "CircuitAliveEDA",
         "KICAD_CONFIG_DIR": "circuitalive-eda",
