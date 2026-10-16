@@ -28,6 +28,7 @@
  */
 
 
+#include <circuitalive/branding.h>
 #include <wx/filename.h>
 #include <wx/log.h>
 #include <wx/app.h>
@@ -94,7 +95,7 @@ PGM_KICAD& PgmTop()
 
 bool PGM_KICAD::OnPgmInit()
 {
-    App().SetAppDisplayName( wxT( "KiCad" ) );
+    App().SetAppDisplayName( CIRCUITALIVE::ProductName() );
 
 #if defined(DEBUG)
     wxString absoluteArgv0 = wxStandardPaths::Get().GetExecutablePath();
@@ -112,7 +113,7 @@ bool PGM_KICAD::OnPgmInit()
 
     static const wxCmdLineEntryDesc desc[] = {
         { wxCMD_LINE_OPTION, "f", "frame", "Frame to load", wxCMD_LINE_VAL_STRING, 0 },
-        { wxCMD_LINE_SWITCH, "n", "new", "New instance of KiCad, does not attempt to load previously open files",
+        { wxCMD_LINE_SWITCH, "n", "new", "New instance of CircuitAliveEDA, does not attempt to load previously open files",
           wxCMD_LINE_VAL_NONE, 0 },
 #ifndef __WXOSX__
         { wxCMD_LINE_SWITCH, nullptr, "software-rendering", "Use software rendering instead of OpenGL",
@@ -259,7 +260,7 @@ bool PGM_KICAD::OnPgmInit()
 
     if( appType == KICAD_MAIN_FRAME_T )
     {
-        managerFrame = new KICAD_MANAGER_FRAME( nullptr, wxT( "KiCad" ), wxDefaultPosition,
+        managerFrame = new KICAD_MANAGER_FRAME( nullptr, CIRCUITALIVE::ProductName(), wxDefaultPosition,
                                                 wxWindow::FromDIP( wxSize( 775, -1 ), NULL ) );
         frame = managerFrame;
 

@@ -1,0 +1,758 @@
+(kicad_sch (version 20260306) (generator "eeschema") (generator_version "10.0") (uuid "f2c42bfb-8f95-43f1-93dc-18736d851d83") (paper "A4")
+(lib_symbols
+(symbol "Simulation_SPICE:VDC"
+(pin_numbers
+			(hide yes)
+		)
+(pin_names
+			(offset 0.0254)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "V"
+			(at 2.54 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Value" "1"
+			(at 2.54 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Footprint" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Datasheet" "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#sec_Independent_Sources_for"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Voltage source, DC"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Pins" "1=+ 2=-"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Type" "DC"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Device" "V"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "ki_keywords" "simulation"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "VDC_0_0"
+			(polyline
+				(pts
+					(xy -1.27 0.254) (xy 1.27 0.254)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -0.762 -0.254) (xy -1.27 -0.254)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 0.254 -0.254) (xy -0.254 -0.254)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 1.27 -0.254) (xy 0.762 -0.254)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(text "+"
+				(at 0 1.905 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+		)
+(symbol "VDC_0_1"
+			(circle
+				(center 0 0)
+				(radius 2.54)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+		)
+(symbol "VDC_1_1"
+			(pin passive line
+				(at 0 5.08 270)
+				(length 2.54)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -5.08 90)
+				(length 2.54)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+)
+(symbol "Regulator_Linear:LM317_TO-220"
+(pin_names
+			(offset 0.254)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "U"
+			(at -3.81 3.175 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Value" "LM317_TO-220"
+			(at 0 3.175 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Footprint" "Package_TO_SOT_THT:TO-220-3_Vertical"
+			(at 0 6.35 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+					(italic yes)
+				)
+			)
+		)
+(property "Datasheet" "http://www.ti.com/lit/ds/symlink/lm317.pdf"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "1.5A 35V Adjustable Linear Regulator, TO-220"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_keywords" "Adjustable Voltage Regulator 1A Positive"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_fp_filters" "TO?220*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "LM317_TO-220_0_1"
+			(rectangle
+				(start -5.08 1.905)
+				(end 5.08 -5.08)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+		)
+(symbol "LM317_TO-220_1_1"
+			(pin input line
+				(at 0 -7.62 90)
+				(length 2.54)
+				(name "ADJ"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin power_out line
+				(at 7.62 0 180)
+				(length 2.54)
+				(name "VO"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin power_in line
+				(at -7.62 0 0)
+				(length 2.54)
+				(name "VI"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+)
+(symbol "Device:R"
+(pin_numbers
+			(hide yes)
+		)
+(pin_names
+			(offset 0)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "R"
+			(at 2.032 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Value" "R"
+			(at 0 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Footprint" ""
+			(at -1.778 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Resistor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_keywords" "R res resistor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_fp_filters" "R_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "R_0_1"
+			(rectangle
+				(start -1.016 -2.54)
+				(end 1.016 2.54)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+(symbol "R_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 1.27)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 1.27)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+)
+(symbol "Regulator_Linear:L7805"
+(pin_names
+			(offset 0.254)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "U"
+			(at -3.81 3.175 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Value" "L7805"
+			(at 0 3.175 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Footprint" ""
+			(at 0.635 -3.81 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+					(italic yes)
+				)
+				(justify left)
+			)
+		)
+(property "Datasheet" "http://www.st.com/content/ccc/resource/technical/document/datasheet/41/4f/b3/b0/12/d4/47/88/CD00000444.pdf/files/CD00000444.pdf/jcr:content/translations/en.CD00000444.pdf"
+			(at 0 -1.27 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Positive 1.5A 35V Linear Regulator, Fixed Output 5V, TO-220/TO-263/TO-252"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_keywords" "Voltage Regulator 1.5A Positive"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_fp_filters" "TO?252* TO?263* TO?220*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "L7805_0_1"
+			(rectangle
+				(start -5.08 1.905)
+				(end 5.08 -5.08)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+		)
+(symbol "L7805_1_1"
+			(pin power_in line
+				(at -7.62 0 0)
+				(length 2.54)
+				(name "IN"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin power_in line
+				(at 0 -7.62 90)
+				(length 2.54)
+				(name "GND"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin power_out line
+				(at 7.62 0 180)
+				(length 2.54)
+				(name "OUT"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+))
+(text "LM317 adjustable and 7805 fixed, input 12 V." (at 25 20 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "3752ac31-4519-4f71-948a-ac72be92f4da"))
+(text "R1=240 and R2=720: adjustable output approximately 5.04 V. Fixed output approximately 5 V." (at 25 27 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "35a538dc-b8c3-468e-b3ba-f8245ad64cb0"))
+(text "Edit input/load/model parameters to observe dropout and current limit." (at 25 34 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "467ae455-c654-42cf-b3f6-5649b6a60dec"))
+(wire (pts (xy 30.0 64.92) (xy 30.0 59.84)) (stroke (width 0) (type default)) (uuid "c38a4aa7-5bb7-4318-b9cf-c5f7e0eb8ff2"))
+(wire (pts (xy 30.0 75.08) (xy 30.0 80.16)) (stroke (width 0) (type default)) (uuid "98c1e473-7236-4f86-a81d-261ff5f907df"))
+(wire (pts (xy 95.0 72.62) (xy 95.0 77.7)) (stroke (width 0) (type default)) (uuid "e66c72ec-cf55-46e5-ac5f-186e899d5893"))
+(wire (pts (xy 102.62 65.0) (xy 107.7 65.0)) (stroke (width 0) (type default)) (uuid "cefdd717-e0f8-4792-b76d-57db950e4959"))
+(wire (pts (xy 87.38 65.0) (xy 82.3 65.0)) (stroke (width 0) (type default)) (uuid "40abe420-e7f8-4526-b13b-a55d7c9dba65"))
+(wire (pts (xy 135.0 61.19) (xy 135.0 56.11)) (stroke (width 0) (type default)) (uuid "1c08ffc3-cf7e-4e03-a149-62e5d7f93518"))
+(wire (pts (xy 135.0 68.81) (xy 135.0 73.89)) (stroke (width 0) (type default)) (uuid "11635033-fcf0-44f1-a1fc-55d25265cf86"))
+(wire (pts (xy 135.0 101.19) (xy 135.0 96.11)) (stroke (width 0) (type default)) (uuid "7fd5cd32-e7d0-487a-ad39-da5eac1478ee"))
+(wire (pts (xy 135.0 108.81) (xy 135.0 113.89)) (stroke (width 0) (type default)) (uuid "c14ef99b-a417-496a-9371-cac803bca9a1"))
+(wire (pts (xy 175.0 61.19) (xy 175.0 56.11)) (stroke (width 0) (type default)) (uuid "635df0f9-f1d4-4ec5-8842-b2924c55a382"))
+(wire (pts (xy 175.0 68.81) (xy 175.0 73.89)) (stroke (width 0) (type default)) (uuid "212de697-8a9f-4ae4-9335-274500291e10"))
+(wire (pts (xy 82.38 145.0) (xy 77.3 145.0)) (stroke (width 0) (type default)) (uuid "8ead3484-1f74-4012-aa02-802c3f3a8007"))
+(wire (pts (xy 90.0 152.62) (xy 90.0 157.7)) (stroke (width 0) (type default)) (uuid "06ed3a5c-171a-43c2-82b0-de24749755b8"))
+(wire (pts (xy 97.62 145.0) (xy 102.7 145.0)) (stroke (width 0) (type default)) (uuid "5bccf999-a3f2-4225-9d89-25f4b6b57eb1"))
+(wire (pts (xy 175.0 141.19) (xy 175.0 136.11)) (stroke (width 0) (type default)) (uuid "11bf26e6-110c-43d4-8c18-1d9a0b8076cd"))
+(wire (pts (xy 175.0 148.81) (xy 175.0 153.89)) (stroke (width 0) (type default)) (uuid "8db7e57a-961d-4ea0-95be-125b209103f2"))
+(label "VIN" (at 30.0 59.84 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "6a5cfe7e-c797-453e-be71-1202b348a1b4"))
+(label "GND" (at 30.0 80.16 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "ea0d5df2-1c37-43fd-aebc-01091ef55e99"))
+(label "ADJ" (at 95.0 77.7 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "2e3bd19f-6796-4ca3-ae77-bff58d5d8892"))
+(label "ADJUSTABLE" (at 107.7 65.0 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "813df794-7f7a-4877-af59-2afbd901d8a3"))
+(label "VIN" (at 82.3 65.0 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "9bb9e757-dacc-431a-b632-aad7cc4095a5"))
+(label "ADJUSTABLE" (at 135.0 56.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "c8af78f0-9c15-4372-8942-2e678aebcf56"))
+(label "ADJ" (at 135.0 73.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "a398f3c2-f652-40c5-aa9a-4486c52aaf57"))
+(label "ADJ" (at 135.0 96.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "c1c68bdb-5b2e-4224-8f7f-b755014812aa"))
+(label "GND" (at 135.0 113.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "0b511cbc-cadc-4406-866d-04fdb5f93266"))
+(label "ADJUSTABLE" (at 175.0 56.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "c160bdde-e860-4d6b-a49f-b7ac4c073f50"))
+(label "GND" (at 175.0 73.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "f49e1723-a8d5-4ccd-b11c-c181131de895"))
+(label "VIN" (at 77.3 145.0 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "03d0ad0c-6de0-4468-83ab-0138fa86fe91"))
+(label "GND" (at 90.0 157.7 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "dbb315e6-2b60-4459-84ed-065572ed397a"))
+(label "FIXED" (at 102.7 145.0 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "f8de2af2-9ea0-466c-b940-380f4b0f70ea"))
+(label "FIXED" (at 175.0 136.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "f19b2e08-0902-40e1-bafb-2d1ae0533b0e"))
+(label "GND" (at 175.0 153.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "2a293d1d-22f6-477e-ac97-fedb7839419a"))
+(symbol (lib_id "Simulation_SPICE:VDC") (at 30 70 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "b8328a8d-1e5f-4009-8b47-cdbd8ca625c7")
+(property "Reference" "V1" (at 33 63 0) (effects (font (size 1.27 1.27))))
+(property "Value" "12" (at 33 77 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "84411abe-06d9-418d-8209-0cb1744427ce"))
+(pin "2" (uuid "563806ee-24ce-4f04-948a-865b24002800"))
+(instances (project "linear_regulators" (path "/f2c42bfb-8f95-43f1-93dc-18736d851d83" (reference "V1") (unit 1)))))
+(symbol (lib_id "Regulator_Linear:LM317_TO-220") (at 95 65 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "365931ca-0027-4f75-86b1-fd7fc3398986")
+(property "Reference" "U1" (at 98 58 0) (effects (font (size 1.27 1.27))))
+(property "Value" "LM317" (at 98 72 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "5205cbeb-b624-44c0-8882-0603fb0f4b4a"))
+(pin "2" (uuid "524ec5ad-c6cd-403f-88eb-25038684b11e"))
+(pin "3" (uuid "75891ef0-3ec7-4d75-be63-0354a7cf3f88"))
+(instances (project "linear_regulators" (path "/f2c42bfb-8f95-43f1-93dc-18736d851d83" (reference "U1") (unit 1)))))
+(symbol (lib_id "Device:R") (at 135 65 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "e02ac5f2-cf0a-4b57-880f-80d34f18ed09")
+(property "Reference" "R1" (at 138 58 0) (effects (font (size 1.27 1.27))))
+(property "Value" "240" (at 138 72 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "ebc34802-1cc4-4375-a60d-25f8d7143fd1"))
+(pin "2" (uuid "edcc2c87-0e43-4416-bc11-ff72b8fcfe64"))
+(instances (project "linear_regulators" (path "/f2c42bfb-8f95-43f1-93dc-18736d851d83" (reference "R1") (unit 1)))))
+(symbol (lib_id "Device:R") (at 135 105 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "78544caf-84d9-459f-8852-e6c336979495")
+(property "Reference" "R2" (at 138 98 0) (effects (font (size 1.27 1.27))))
+(property "Value" "720" (at 138 112 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "a0be2e46-9cff-4f02-a6b1-946d46c6223f"))
+(pin "2" (uuid "0e5b966a-1c5a-47b1-b3eb-4368e8d31ea0"))
+(instances (project "linear_regulators" (path "/f2c42bfb-8f95-43f1-93dc-18736d851d83" (reference "R2") (unit 1)))))
+(symbol (lib_id "Device:R") (at 175 65 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "6a9af3ba-3c49-40f0-9e55-635894adcaa0")
+(property "Reference" "R3" (at 178 58 0) (effects (font (size 1.27 1.27))))
+(property "Value" "1k" (at 178 72 0) (effects (font (size 1.27 1.27))))
+(property "CA.Measurements" "{\"voltage\":true,\"current\":true,\"power\":true,\"positive\":\"p\",\"negative\":\"n\"}" (at 175 65 0) (effects (font (size 1 1)) (hide yes)))
+(pin "1" (uuid "596dcc60-8c62-4975-ac77-26cac620ec5a"))
+(pin "2" (uuid "ddc7a48c-ebcf-4096-9a8f-9731766a5df8"))
+(instances (project "linear_regulators" (path "/f2c42bfb-8f95-43f1-93dc-18736d851d83" (reference "R3") (unit 1)))))
+(symbol (lib_id "Regulator_Linear:L7805") (at 90 145 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "b4dd5fda-837b-4b2e-92df-89be761188f3")
+(property "Reference" "U2" (at 93 138 0) (effects (font (size 1.27 1.27))))
+(property "Value" "L7805" (at 93 152 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "9db85acf-a121-44d8-a136-62c44f69ec20"))
+(pin "2" (uuid "2c31fa90-a7fc-41c9-a3a4-1400bdb9c993"))
+(pin "3" (uuid "da86da6d-3bd8-4637-a789-a7b040036033"))
+(instances (project "linear_regulators" (path "/f2c42bfb-8f95-43f1-93dc-18736d851d83" (reference "U2") (unit 1)))))
+(symbol (lib_id "Device:R") (at 175 145 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "ee93316f-c7be-4e68-95ad-14568670daa9")
+(property "Reference" "R4" (at 178 138 0) (effects (font (size 1.27 1.27))))
+(property "Value" "100" (at 178 152 0) (effects (font (size 1.27 1.27))))
+(property "CA.Measurements" "{\"voltage\":true,\"current\":true,\"power\":true,\"positive\":\"p\",\"negative\":\"n\"}" (at 175 145 0) (effects (font (size 1 1)) (hide yes)))
+(pin "1" (uuid "f961de32-8ad8-4a3b-8608-788a57d16262"))
+(pin "2" (uuid "753b6056-aa84-46ba-99ff-b205eb70c142"))
+(instances (project "linear_regulators" (path "/f2c42bfb-8f95-43f1-93dc-18736d851d83" (reference "R4") (unit 1)))))
+(embedded_fonts no))

@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "ne555",
+  "name": "NE555 bipolar timer",
+  "description": "Configurable behavioral approximation; see docs/circuitalive/COMPLEX_MODELS.md for fidelity and limits.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "gnd",
+      "label": "gnd",
+      "role": "reference",
+      "default_pin": "1"
+    },
+    {
+      "id": "trig",
+      "label": "trig",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "out",
+      "label": "out",
+      "role": "output",
+      "default_pin": "3"
+    },
+    {
+      "id": "reset",
+      "label": "reset",
+      "role": "input",
+      "default_pin": "4"
+    },
+    {
+      "id": "ctrl",
+      "label": "ctrl",
+      "role": "passive",
+      "default_pin": "5"
+    },
+    {
+      "id": "thresh",
+      "label": "thresh",
+      "role": "input",
+      "default_pin": "6"
+    },
+    {
+      "id": "discharge",
+      "label": "discharge",
+      "role": "output",
+      "default_pin": "7"
+    },
+    {
+      "id": "vcc",
+      "label": "vcc",
+      "role": "power",
+      "default_pin": "8"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vmin",
+      "label": "Vmin",
+      "default": "4.5",
+      "unit": "V",
+      "min": 1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Vmax",
+      "default": "16",
+      "unit": "V",
+      "min": 1,
+      "max": 40
+    },
+    {
+      "id": "reset_threshold",
+      "label": "Reset threshold",
+      "default": "0.7",
+      "unit": "V",
+      "min": 0.1,
+      "max": 3
+    },
+    {
+      "id": "divider",
+      "label": "Divider",
+      "default": "5000",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000.0
+    },
+    {
+      "id": "delay",
+      "label": "Delay",
+      "default": "100n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Transition",
+      "default": "100n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "10",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000.0
+    },
+    {
+      "id": "high_drop",
+      "label": "High drop",
+      "default": "1.2",
+      "unit": "V",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Low drop",
+      "default": "0.1",
+      "unit": "V",
+      "min": 0,
+      "max": 3
+    },
+    {
+      "id": "imax",
+      "label": "Imax",
+      "default": "0.2",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 10
+    },
+    {
+      "id": "discharge_r",
+      "label": "Discharge r",
+      "default": "10",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000.0
+    },
+    {
+      "id": "iq",
+      "label": "Iq",
+      "default": "3m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "max_step",
+      "label": "Max step",
+      "default": "10u",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 0.01
+    },
+    {
+      "id": "cout",
+      "label": "Output capacitance",
+      "default": "20p",
+      "unit": "F",
+      "min": 1e-15,
+      "max": 1e-06
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Timer:NE555D",
+      "Timer:NE555P"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "max_step_parameter": "max_step",
+  "spice": {
+    "instance": [
+      "Rtop_${id} ${pin:vcc} ${pin:ctrl} ${param:divider}",
+      "Rmid_${id} ${pin:ctrl} half_${id} ${param:divider}",
+      "Rbot_${id} half_${id} ${pin:gnd} ${param:divider}",
+      "Ben_${id} power_${id} 0 V={v(${pin:vcc},${pin:gnd}) >= ${param:vmin} && v(${pin:vcc},${pin:gnd}) <= ${param:vmax}}",
+      "Bset_${id} set_${id} 0 V={v(power_${id}) > .5 && v(${pin:reset},${pin:gnd}) > ${param:reset_threshold} && v(${pin:trig},half_${id}) < 0}",
+      "Breset_${id} reset_${id} 0 V={v(power_${id}) < .5 || v(${pin:reset},${pin:gnd}) <= ${param:reset_threshold} || (v(${pin:thresh},${pin:ctrl}) > 0 && v(${pin:trig},half_${id}) >= 0)}",
+      "Vone_${id} one_${id} 0 1",
+      "Aadc_${id} [set_${id} reset_${id} one_${id}] [s_${id} r_${id} one_d_${id}] adc_${id}",
+      "Alatch_${id} s_${id} r_${id} one_d_${id} NULL NULL q_${id} nq_${id} latch_${id}",
+      "Adac_${id} [q_${id}] [state_${id}] dac_${id}",
+      "Bhigh_${id} ${pin:out} ${pin:vcc} I={v(power_${id}) > .5 ? v(state_${id})*${param:imax}*tanh((v(${pin:out},${pin:vcc})+${param:high_drop})/(${param:rout}*${param:imax})) : 0}",
+      "Blow_${id} ${pin:out} ${pin:gnd} I={v(power_${id}) > .5 ? (1-v(state_${id}))*${param:imax}*tanh((v(${pin:out},${pin:gnd})-${param:low_drop})/(${param:rout}*${param:imax})) : 0}",
+      "Bdis_${id} ${pin:discharge} ${pin:gnd} I={v(power_${id}) > .5 ? (1-v(state_${id}))*max(0,v(${pin:discharge},${pin:gnd}))/${param:discharge_r} : 0}",
+      "Biq_${id} ${pin:vcc} ${pin:gnd} I={v(power_${id}) > .5 ? ${param:iq} : 0}",
+      "Cout_${id} ${pin:out} ${pin:gnd} ${param:cout}"
+    ],
+    "definitions": [
+      ".model adc_${id} adc_bridge(in_low=.3 in_high=.7)",
+      ".model latch_${id} d_srlatch(sr_delay=${param:delay} ic=0 rise_delay=1p fall_delay=1p)",
+      ".model dac_${id} dac_bridge(out_low=0 out_high=1 out_undef=.5 t_rise=${param:transition} t_fall=${param:transition})"
+    ]
+  },
+  "measurement_ports": {
+    "positive": "vcc",
+    "negative": "gnd"
+  }
+}

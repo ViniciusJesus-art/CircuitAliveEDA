@@ -97,6 +97,8 @@ DIALOG_ABOUT::DIALOG_ABOUT( EDA_BASE_FRAME *aParent, ABOUT_APP_INFO& aAppInfo ) 
     m_titleName = aParent->GetAboutTitle();
     m_untranslatedTitleName = aParent->GetUntranslatedAboutTitle();
     m_staticTextAppTitle->SetLabel( m_titleName );
+    m_btCopyVersionInfo->SetToolTip( _( "Copy CircuitAliveEDA version info to the clipboard" ) );
+    m_btReportBug->SetToolTip( _( "Report a problem with CircuitAliveEDA" ) );
 
     // On windows, display the number of GDI objects in use. Can be useful when some GDI objects
     // are not displayed because the max count of GDI objects (usually 10000) is reached

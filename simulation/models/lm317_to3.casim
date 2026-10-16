@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "lm317_to3",
+  "name": "LM317 adjustable regulator (TO3 pinout)",
+  "description": "Configurable behavioral approximation; see docs/circuitalive/COMPLEX_MODELS.md for fidelity and limits.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "in",
+      "label": "in",
+      "role": "power",
+      "default_pin": "2"
+    },
+    {
+      "id": "out",
+      "label": "out",
+      "role": "output",
+      "default_pin": "3"
+    },
+    {
+      "id": "adj",
+      "label": "adj",
+      "role": "reference",
+      "default_pin": "1"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vref",
+      "label": "Vref",
+      "default": "1.25",
+      "unit": "V",
+      "min": 0.1,
+      "max": 40
+    },
+    {
+      "id": "dropout",
+      "label": "Dropout",
+      "default": "2.5",
+      "unit": "V",
+      "min": 0,
+      "max": 10
+    },
+    {
+      "id": "imax",
+      "label": "Imax",
+      "default": "1.5",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 10
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "0.05",
+      "unit": "Ohm",
+      "min": 0.001,
+      "max": 1000
+    },
+    {
+      "id": "response",
+      "label": "Response",
+      "default": "5u",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Iq",
+      "default": "50u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Regulator_Linear:LM317_TO3"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Btarget_${id} target_${id} 0 V={max(0,min(${param:vref},v(${pin:in},${pin:adj})-${param:dropout}))}",
+      "Rresponse_${id} target_${id} response_${id} {${param:response}/1n}",
+      "Cresponse_${id} response_${id} 0 1n ic=0",
+      "Bpass_${id} ${pin:in} ${pin:out} I={v(${pin:in},${pin:adj}) > 0 ? max(0,min(${param:imax},(v(response_${id})-v(${pin:out},${pin:adj}))/${param:rout})) : 0}",
+      "Biq_${id} ${pin:in} ${pin:adj} I={v(${pin:in},${pin:adj}) > 0 ? ${param:iq} : 0}"
+    ]
+  },
+  "measurement_ports": {
+    "positive": "in",
+    "negative": "adj"
+  }
+}

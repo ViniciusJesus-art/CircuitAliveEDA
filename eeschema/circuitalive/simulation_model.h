@@ -49,10 +49,12 @@ struct SIMULATION_MODEL
     std::string warningSignal, warningParameter;
     std::string voltageConstraint;
     std::string frequencyParameter;
+    std::string maxStepParameter;
     // Mixed-signal behavior remains in the file's SPICE/XSPICE templates.
     std::string logicVcc, logicGround, logicLow, logicHigh, logicMinSupply, logicMaxSupply;
     std::map<std::string, std::string> driverEnable;
     std::map<std::string, std::string> driverValue;
+    std::map<std::string, std::string> internalDrive;
 };
 
 struct RESOLVED_MODEL
@@ -74,6 +76,7 @@ public:
     SIMULATION_MODEL SelectModel( const CIRCUIT_COMPONENT& aComponent ) const;
     RESOLVED_MODEL Resolve( const CIRCUIT_COMPONENT& aComponent ) const;
     static SIMULATION_MODEL Load( const std::filesystem::path& aFile );
+    static SIMULATION_MODEL LoadText( const std::string& aJson, const std::filesystem::path& aContext = "model.casim" );
 
 private:
     std::vector<std::filesystem::path> m_directories;

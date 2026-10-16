@@ -23,6 +23,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include <wx/filename.h>
 #include <wx/msgdlg.h>
 #include <wx/string.h>
@@ -105,12 +106,10 @@ EDA_3D_VIEWER_FRAME::EDA_3D_VIEWER_FRAME( KIWAY* aKiway, PCB_BASE_FRAME* aParent
     wxLogTrace( m_logTrace, wxT( "EDA_3D_VIEWER_FRAME::EDA_3D_VIEWER_FRAME %s" ), aTitle );
 
     m_disable_ray_tracing = false;
-    m_aboutTitle = _HKI( "KiCad 3D Viewer" );
+    m_aboutTitle = CIRCUITALIVE::AppTitle( _HKI( "3D Viewer" ) );
 
     // Give it an icon
-    wxIcon icon;
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_3d ) );
-    SetIcon( icon );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     // Create the status line
     static const int status_dims[5] = { -1, 170, 130, 130, 130 };
@@ -637,7 +636,7 @@ void EDA_3D_VIEWER_FRAME::ShowChangedLanguage()
 {
     EDA_BASE_FRAME::ShowChangedLanguage();
 
-    SetTitle( _( "3D Viewer" ) );
+    SetTitle( CIRCUITALIVE::AppTitle( _( "3D Viewer" ) ) );
     RecreateToolbars();
 
     if( m_appearancePanel )

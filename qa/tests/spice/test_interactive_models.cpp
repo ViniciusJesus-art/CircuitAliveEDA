@@ -2,6 +2,7 @@
 #include <boost/test/unit_test.hpp>
 #include <circuitalive/circuit_snapshot.h>
 #include <circuitalive/simulation_model.h>
+#include <circuitalive/model_profiles.h>
 #include <filesystem>
 #include <fstream>
 #include <unistd.h>
@@ -177,4 +178,80 @@ BOOST_AUTO_TEST_CASE( LedForwardVoltageIsCalibratedAtItsConfiguredReferenceCurre
         BOOST_TEST_CONTEXT( "Forward voltage " << value )
             BOOST_CHECK_CLOSE( session.Snapshot().latest.values.at( 0 ), .02, .1 );
     }
+}
+
+BOOST_FIXTURE_TEST_CASE( SavedProfilesCopyDefaultsIntoNewSymbolsWithoutChangingExistingInstances, MODEL_FILES )
+{
+    Write( "divider.casim", dividerModel );
+    auto configured = Divider( directory )[1];
+    configured.modelPins = { { "in", "10" }, { "out", "20" }, { "gnd", "30" } };
+    configured.modelParameters = { { "ratio", "3" } };
+    configured.measurements = { true, true, false, "in", "gnd" };
+    const auto file = directory / "profiles.json";
+    MODEL_PROFILES( file ).Save( configured );
+    auto fresh = configured; fresh.modelFile.clear(); fresh.modelPins.clear(); fresh.modelParameters.clear();
+    fresh.reference = "U99"; fresh.value = "Different value"; fresh.projectDirectory = "/tmp/other-project";
+    BOOST_REQUIRE( MODEL_PROFILES( file ).Apply( fresh ) );
+    BOOST_CHECK_EQUAL( fresh.modelFile, ( directory / "divider.casim" ).string() );
+    BOOST_CHECK_EQUAL( fresh.modelParameters.at( "ratio" ), "3" );
+    BOOST_CHECK_EQUAL( fresh.reference, "U99" ); BOOST_CHECK_EQUAL( fresh.value, "Different value" );
+    BOOST_CHECK( fresh.measurements.current );
+    configured.modelParameters["ratio"] = "2";
+    MODEL_PROFILES( file ).Save( configured );
+    BOOST_CHECK( !MODEL_PROFILES( file ).Apply( fresh ) );
+    BOOST_CHECK_EQUAL( fresh.modelParameters.at( "ratio" ), "3" );
+    fresh.modelFile.clear(); fresh.modelPins.clear(); fresh.modelParameters.clear(); fresh.libraryId = "Other:NeverCompiledIntoCode";
+    BOOST_CHECK( !MODEL_PROFILES( file ).Apply( fresh ) );
+    MODEL_PROFILES( file ).Remove( configured.libraryId );
+    fresh.libraryId = configured.libraryId;
+    BOOST_CHECK( !MODEL_PROFILES( file ).Apply( fresh ) );
+}
+
+BOOST_FIXTURE_TEST_CASE( SavedProfilesKeepValueExpressionsAndRejectCorruptStorage, MODEL_FILES )
+{
+    auto c = Divider( directory )[1]; c.modelFile = "builtin:capacitor";
+    c.modelParameters = { { "capacitance", "$value" } };
+    auto file = directory / "profiles.json";
+    MODEL_PROFILES( file ).Save( c );
+    auto fresh = c; fresh.modelFile.clear(); fresh.modelParameters.clear(); fresh.value = "100n";
+    BOOST_REQUIRE( MODEL_PROFILES( file ).Apply( fresh ) );
+    BOOST_CHECK_EQUAL( fresh.modelParameters.at( "capacitance" ), "$value" );
+    Write( "profiles.json", "{\"schema_version\":99}" );
+    BOOST_CHECK_THROW( MODEL_PROFILES( file ).Save( c ), std::exception );
+    fresh.modelFile.clear(); fresh.modelParameters.clear();
+    BOOST_CHECK_THROW( MODEL_PROFILES( file ).Apply( fresh ), std::exception );
+    BOOST_CHECK( fresh.modelFile.empty() );
+}
+
+BOOST_FIXTURE_TEST_CASE( FileDefinedStateBlocksAreReusableAndRejectUnknownSignals, MODEL_FILES )
+{
+    CIRCUIT_COMPONENT u{ "U1", "74xx:74HC74", "74HC74", {} };
+    auto original = MODEL_REPOSITORY().SelectModel( u );
+    std::ifstream in( original.file ); std::string text( ( std::istreambuf_iterator<char>( in ) ), {} );
+    auto replace = []( std::string& s, const std::string& from, const std::string& to )
+    {
+        std::size_t pos = 0;
+        while( ( pos = s.find( from, pos ) ) != std::string::npos ) { s.replace( pos, from.size(), to ); pos += to.size(); }
+    };
+    for( const auto& p : original.pins ) u.pins[p.defaultPin] = "";
+    u.pins["14"] = "supply"; u.pins["7"] = "0";
+    u.pins["1"] = u.pins["4"] = u.pins["10"] = u.pins["13"] = "supply";
+    u.pins["2"] = "set"; u.pins["3"] = "reset";
+    replace( text, "\"type\": \"dff\"", "\"type\": \"sr_latch\", \"enable\": \"1\"" );
+    replace( text, "\"data\":", "\"s\":" ); replace( text, "\"clock\":", "\"r\":" );
+    u.modelFile = Write( "latches.casim", text ).string();
+    auto c = BuildCircuitSnapshot( {
+        { "VCC", "Simulation_SPICE:VDC", "5", { { "1", "supply" }, { "2", "0" } } },
+        { "VS", "Simulation_SPICE:VDC", "5", { { "1", "set" }, { "2", "0" } } },
+        { "VR", "Simulation_SPICE:VDC", "0", { { "1", "reset" }, { "2", "0" } } }, u } );
+    c.config.signals = { "v(" + c.pinNodes[3].at( "5" ) + ")" };
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER ); session.Configure( c.netlist, c.config );
+    session.AdvanceTo( 1e-6 ); BOOST_CHECK_GT( session.Snapshot().latest.values[0], 4.9 );
+    session.SetSourceValue( "Vca2", 0 ); session.AdvanceTo( 2e-6 ); BOOST_CHECK_GT( session.Snapshot().latest.values[0], 4.9 );
+    session.SetSourceValue( "Vca3", 5 ); session.AdvanceTo( 3e-6 ); BOOST_CHECK_LT( session.Snapshot().latest.values[0], .01 );
+    replace( text, "\"sr_latch\"", "\"unimplemented_cpu\"" );
+    BOOST_CHECK_THROW( MODEL_REPOSITORY::Load( Write( "bad.casim", text ) ), std::runtime_error );
+    replace( text, "\"unimplemented_cpu\"", "\"sr_latch\"" );
+    replace( text, "\"enable\": \"1\"", "\"enable\": \"undefined_net\"" );
+    BOOST_CHECK_THROW( MODEL_REPOSITORY::Load( Write( "bad.casim", text ) ), std::runtime_error );
 }

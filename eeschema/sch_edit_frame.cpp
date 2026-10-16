@@ -22,6 +22,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include <algorithm>
 #include <api/api_handler_sch.h>
 #include <api/api_server.h>
@@ -183,28 +184,14 @@ SCH_EDIT_FRAME::SCH_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_showBorderAndTitleBlock = true;   // true to show sheet references
     m_supportsAutoSave = true;
     m_syncingPcbToSchSelection = false;
-    m_aboutTitle = _HKI( "KiCad Schematic Editor" );
+    m_aboutTitle = CIRCUITALIVE::AppTitle( _HKI( "Schematic Editor" ) );
     m_show_search = false;
     // Ensure timer has an owner before binding so it generates events.
     m_crossProbeFlashTimer.SetOwner( this );
     Bind( wxEVT_TIMER, &SCH_EDIT_FRAME::OnCrossProbeFlashTimer, this, m_crossProbeFlashTimer.GetId() );
 
     // Give an icon
-    wxIcon icon;
-    wxIconBundle icon_bundle;
-
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_eeschema, 48 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_eeschema, 128 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_eeschema, 256 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_eeschema_32 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_eeschema_16 ) );
-    icon_bundle.AddIcon( icon );
-
-    SetIcons( icon_bundle );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     LoadSettings( eeconfig() );
 
@@ -1867,7 +1854,7 @@ void SCH_EDIT_FRAME::updateTitle()
 
     title += wxT( " \u2014 " ) + _( "Schematic Editor" );
 
-    SetTitle( title );
+    SetTitle( CIRCUITALIVE::WindowTitle( title ) );
 }
 
 

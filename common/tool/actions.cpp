@@ -1387,7 +1387,7 @@ TOOL_ACTION ACTIONS::showDesignBlockLibTable( TOOL_ACTION_ARGS()
 TOOL_ACTION ACTIONS::gettingStarted( TOOL_ACTION_ARGS()
         .Name( "common.SuiteControl.gettingStarted" )
         .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Getting Started with KiCad" ) )
+        .FriendlyName( _( "Getting Started" ) )
         .Tooltip( _( "Open \"Getting Started in KiCad\" guide for beginners" ) )
         .Icon( BITMAPS::help ) );
 
@@ -1401,7 +1401,7 @@ TOOL_ACTION ACTIONS::help( TOOL_ACTION_ARGS()
 TOOL_ACTION ACTIONS::about( TOOL_ACTION_ARGS()
         .Name( "common.SuiteControl.about" )
         .Scope( AS_GLOBAL )
-        .FriendlyName( _( "About KiCad" ) )
+        .FriendlyName( _( "About CircuitAliveEDA" ) )
         .UIId( wxID_ABOUT )
         .Icon( BITMAPS::about ) );
 
@@ -1431,7 +1431,7 @@ TOOL_ACTION ACTIONS::reportBug( TOOL_ACTION_ARGS()
         .Name( "common.SuiteControl.reportBug" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Report Bug" ) )
-        .Tooltip( _( "Report a problem with KiCad" ) )
+        .Tooltip( _( "Report a problem with CircuitAliveEDA" ) )
         .Icon( BITMAPS::bug ) );
 
 TOOL_ACTION ACTIONS::ddAddLibrary( TOOL_ACTION_ARGS()

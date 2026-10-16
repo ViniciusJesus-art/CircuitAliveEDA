@@ -43,6 +43,7 @@ public:
 
     static TOOL_ACTION editSchematic;
     static TOOL_ACTION editSymbols;
+    static TOOL_ACTION editSimulationModels;
     static TOOL_ACTION editPCB;
     static TOOL_ACTION editFootprints;
     static TOOL_ACTION viewGerbers;

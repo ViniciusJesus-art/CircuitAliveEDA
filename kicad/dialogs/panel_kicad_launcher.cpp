@@ -105,8 +105,8 @@ void PANEL_KICAD_LAUNCHER::CreateLaunchers()
             [&]( const TOOL_ACTION& aAction, BITMAPS aBitmaps, const wxString& aHelpText, bool enabled = true )
             {
                 BITMAP_BUTTON* btn = new BITMAP_BUTTON( m_scrolledWindow, wxID_ANY );
-                btn->SetBitmap( KiBitmapBundle( aBitmaps ) );
-                btn->SetDisabledBitmap( KiDisabledBitmapBundle( aBitmaps ) );
+                btn->SetBitmap( aBitmaps == BITMAPS::simulator ? KiBitmapBundleDef( aBitmaps, 48 ) : KiBitmapBundle( aBitmaps ) );
+                btn->SetDisabledBitmap( aBitmaps == BITMAPS::simulator ? KiDisabledBitmapBundleDef( aBitmaps, 48 ) : KiDisabledBitmapBundle( aBitmaps ) );
                 btn->SetPadding( 4 );
                 btn->SetToolTip( aAction.GetTooltip() );
 
@@ -150,6 +150,9 @@ void PANEL_KICAD_LAUNCHER::CreateLaunchers()
     addLauncher( KICAD_MANAGER_ACTIONS::editSymbols, BITMAPS::icon_libedit,
                  _( "Edit global and/or project schematic symbol libraries" ) );
 
+    addLauncher( KICAD_MANAGER_ACTIONS::editSimulationModels, BITMAPS::simulator,
+                 _( "Choose a component and build its simulation behavior" ) );
+
     addLauncher( KICAD_MANAGER_ACTIONS::editPCB, BITMAPS::icon_pcbnew,
                  _( "Edit the project PCB design" ) );
 
@@ -169,7 +172,7 @@ void PANEL_KICAD_LAUNCHER::CreateLaunchers()
                  _( "Edit drawing sheet borders and title blocks for use in schematics and PCB designs" ) );
 
     BITMAP_BUTTON* bb = addLauncher( KICAD_MANAGER_ACTIONS::showPluginManager, BITMAPS::icon_pcm,
-                                     _( "Manage downloadable packages from KiCad and 3rd party repositories" ),
+                                     _( "Manage downloadable packages and libraries" ),
                                      KIPLATFORM::POLICY::GetPolicyBool( POLICY_KEY_PCM )
                                             != KIPLATFORM::POLICY::PBOOL::DISABLED );
 

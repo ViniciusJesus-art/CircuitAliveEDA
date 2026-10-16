@@ -20,6 +20,7 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <circuitalive/branding.h>
 #include <algorithm>
 #include <type_traits>
 #include <unordered_map>
@@ -233,7 +234,7 @@ PCB_EDIT_FRAME::PCB_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     // assume dirty
     m_ZoneFillsDirty = true;
 
-    m_aboutTitle = _HKI( "KiCad PCB Editor" );
+    m_aboutTitle = CIRCUITALIVE::AppTitle( _HKI( "PCB Editor" ) );
 
     // Must be created before the menus are created.
     if( ADVANCED_CFG::GetCfg().m_ShowPcbnewExportNetlist )
@@ -251,21 +252,7 @@ PCB_EDIT_FRAME::PCB_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     SetCanvas( canvas );
     SetBoard( new BOARD() );
 
-    wxIcon icon;
-    wxIconBundle icon_bundle;
-
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_pcbnew, 48 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_pcbnew, 128 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_pcbnew, 256 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_pcbnew_32 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_pcbnew_16 ) );
-    icon_bundle.AddIcon( icon );
-
-    SetIcons( icon_bundle );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     // LoadSettings() *after* creating m_LayersManager, because LoadSettings()
     // initialize parameters in m_LayersManager
@@ -2145,7 +2132,7 @@ void PCB_EDIT_FRAME::UpdateTitle()
 
     title += wxT( " \u2014 " ) + _( "PCB Editor" );
 
-    SetTitle( title );
+    SetTitle( CIRCUITALIVE::WindowTitle( title ) );
 }
 
 

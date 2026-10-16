@@ -23,6 +23,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include <3d_viewer/eda_3d_viewer_frame.h>
 #include <bitmaps.h>
 #include <board_commit.h>
@@ -108,7 +109,7 @@ FOOTPRINT_VIEWER_FRAME::FOOTPRINT_VIEWER_FRAME( KIWAY* aKiway, wxWindow* aParent
                     FOOTPRINT_VIEWER_FRAME_NAME ),
    m_comp( LIB_ID(), wxEmptyString, wxEmptyString, KIID_PATH(), {} )
 {
-    m_aboutTitle = _HKI( "KiCad Footprint Library Browser" );
+    m_aboutTitle = CIRCUITALIVE::AppTitle( _HKI( "Footprint Library Browser" ) );
 
     // Force the items to always snap
     m_magneticItems.pads     = MAGNETIC_OPTIONS::CAPTURE_ALWAYS;
@@ -121,9 +122,7 @@ FOOTPRINT_VIEWER_FRAME::FOOTPRINT_VIEWER_FRAME( KIWAY* aKiway, wxWindow* aParent
     m_configName = FOOTPRINT_VIEWER_FRAME_NAME;
 
     // Give an icon
-    wxIcon  icon;
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_footprint_browser ) );
-    SetIcon( icon );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     m_libListWidth = 200;
     m_fpListWidth = 300;
@@ -1007,7 +1006,7 @@ void FOOTPRINT_VIEWER_FRAME::UpdateTitle()
 
     title += wxT( " \u2014 " ) + _( "Footprint Library Browser" );
 
-    SetTitle( title );
+    SetTitle( CIRCUITALIVE::WindowTitle( title ) );
 }
 
 

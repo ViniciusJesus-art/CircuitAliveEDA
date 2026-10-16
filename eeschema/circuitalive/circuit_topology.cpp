@@ -19,7 +19,7 @@ CIRCUIT_TOPOLOGY BuildCircuitTopology( const std::vector<CIRCUIT_COMPONENT>& aCo
         for( const auto& [pin, rawName] : c.pins )
         {
             std::string name = rawName;
-            if( name == "GND" ) name = "0";
+            if( IsSimulationGround( name ) ) name = "0";
             std::string key = "net:" + name;
             if( name.empty() )
             {

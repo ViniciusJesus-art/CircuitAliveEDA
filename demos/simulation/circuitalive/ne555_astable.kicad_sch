@@ -1,0 +1,1188 @@
+(kicad_sch (version 20260306) (generator "eeschema") (generator_version "10.0") (uuid "00612920-da55-480c-88ec-71f3c93d0fb5") (paper "A4")
+(lib_symbols
+(symbol "Simulation_SPICE:VDC"
+(pin_numbers
+			(hide yes)
+		)
+(pin_names
+			(offset 0.0254)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "V"
+			(at 2.54 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Value" "1"
+			(at 2.54 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Footprint" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Datasheet" "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#sec_Independent_Sources_for"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Voltage source, DC"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Pins" "1=+ 2=-"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Type" "DC"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Device" "V"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "ki_keywords" "simulation"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "VDC_0_0"
+			(polyline
+				(pts
+					(xy -1.27 0.254) (xy 1.27 0.254)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -0.762 -0.254) (xy -1.27 -0.254)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 0.254 -0.254) (xy -0.254 -0.254)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 1.27 -0.254) (xy 0.762 -0.254)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(text "+"
+				(at 0 1.905 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+		)
+(symbol "VDC_0_1"
+			(circle
+				(center 0 0)
+				(radius 2.54)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+		)
+(symbol "VDC_1_1"
+			(pin passive line
+				(at 0 5.08 270)
+				(length 2.54)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -5.08 90)
+				(length 2.54)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+)
+(symbol "Timer:NE555P"
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(symbol "NE555P_0_0"
+			(pin power_in line
+				(at 0 -10.16 90)
+				(length 2.54)
+				(name "GND"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin power_in line
+				(at 2.54 10.16 270)
+				(length 2.54)
+				(name "VCC"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "8"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+(symbol "NE555P_0_1"
+			(rectangle
+				(start -7.62 7.62)
+				(end 7.62 -7.62)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+		)
+(symbol "NE555P_1_1"
+			(pin input line
+				(at -10.16 -5.08 0)
+				(length 2.54)
+				(name "TRIG"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin output line
+				(at 10.16 0 180)
+				(length 2.54)
+				(name "OUT"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "3"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input line
+				(at -10.16 5.08 0)
+				(length 2.54)
+				(name "~{RST}"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "4"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 10.16 270)
+				(length 2.54)
+				(name "CONT"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "5"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input line
+				(at -10.16 -2.54 0)
+				(length 2.54)
+				(name "THRES"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "6"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin input line
+				(at -10.16 2.54 0)
+				(length 2.54)
+				(name "DISCH"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "7"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+(property "Reference" "U"
+			(at -10.16 8.89 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Value" "NE555P"
+			(at 2.54 8.89 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Footprint" "Package_DIP:DIP-8_W7.62mm"
+			(at 0 -24.13 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Datasheet" "http://www.ti.com/lit/ds/symlink/ne555.pdf"
+			(at 0 -26.67 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Precision Timers, 555 compatible, PDIP-8"
+			(at 0 -21.59 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_keywords" "single timer 555"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_fp_filters" "DIP*W7.62mm*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+)
+(symbol "Device:R"
+(pin_numbers
+			(hide yes)
+		)
+(pin_names
+			(offset 0)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "R"
+			(at 2.032 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Value" "R"
+			(at 0 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Footprint" ""
+			(at -1.778 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Resistor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_keywords" "R res resistor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_fp_filters" "R_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "R_0_1"
+			(rectangle
+				(start -1.016 -2.54)
+				(end 1.016 2.54)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+(symbol "R_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 1.27)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 1.27)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+)
+(symbol "Device:C"
+(pin_numbers
+			(hide yes)
+		)
+(pin_names
+			(offset 0.254)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "C"
+			(at 0.635 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Value" "C"
+			(at 0.635 -2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Footprint" ""
+			(at 0.9652 -3.81 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Unpolarized capacitor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_keywords" "cap capacitor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_fp_filters" "C_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "C_0_1"
+			(polyline
+				(pts
+					(xy -2.032 0.762) (xy 2.032 0.762)
+				)
+				(stroke
+					(width 0.508)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -2.032 -0.762) (xy 2.032 -0.762)
+				)
+				(stroke
+					(width 0.508)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+(symbol "C_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 2.794)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 2.794)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+)
+(symbol "CircuitAlive_Instruments:Probe_oscilloscope"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom no)
+			(on_board no)
+			(in_pos_files no)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "#P"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "Probe_oscilloscope_1_1"
+				(polyline
+					(pts
+						(xy 0 0) (xy 2.54 2.54)
+					)
+					(stroke
+						(width 0.18)
+						(type solid)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0.8466 2.54) (xy 2.54 2.54)
+					)
+					(stroke
+						(width 0.18)
+						(type solid)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 2.54 2.54) (xy 2.54 0.8466)
+					)
+					(stroke
+						(width 0.18)
+						(type solid)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(text "~"
+					(at 3.81 2.54 0)
+					(effects
+						(font
+							(size 1 1)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 0 0)
+					(length 0)
+					(name ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		))
+(text "NE555 astable: 9 V, 10k + 10k + 1uF, approximately 48 Hz." (at 25 20 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "1640ce59-d2ed-491b-b738-8def66372d89"))
+(text "Play opens Scope (output and timing capacitor) and supply measurements." (at 25 27 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "1e3be36f-6757-43e6-a293-9ae5fc640fb8"))
+(text "Behavioral model: real external RC, thresholds, control input, reset, finite output and discharge." (at 25 34 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "0fff12f2-201b-40d8-b962-667c7eaaba1c"))
+(wire (pts (xy 30.0 59.92) (xy 30.0 54.84)) (stroke (width 0) (type default)) (uuid "1559eca2-8fe7-46bf-9813-c317d3c61179"))
+(wire (pts (xy 30.0 70.08) (xy 30.0 75.16)) (stroke (width 0) (type default)) (uuid "01c98e8e-6536-4751-b9df-ac1ce4a9aa14"))
+(wire (pts (xy 120.0 85.16) (xy 120.0 90.24)) (stroke (width 0) (type default)) (uuid "57dafd80-7220-4877-8838-0b55916daeb0"))
+(wire (pts (xy 122.54 64.84) (xy 122.54 59.76)) (stroke (width 0) (type default)) (uuid "7c426692-f12e-4dd3-841c-046782757798"))
+(wire (pts (xy 109.84 80.08) (xy 104.76 80.08)) (stroke (width 0) (type default)) (uuid "617b521c-f1a9-4792-9a28-4a892a5dae4e"))
+(wire (pts (xy 130.16 75.0) (xy 135.24 75.0)) (stroke (width 0) (type default)) (uuid "290a1a7e-1117-452d-901b-ec042b981498"))
+(wire (pts (xy 109.84 69.92) (xy 104.76 69.92)) (stroke (width 0) (type default)) (uuid "03d2bba1-9461-473e-a7e4-5872debe32ac"))
+(wire (pts (xy 120.0 64.84) (xy 120.0 59.76)) (stroke (width 0) (type default)) (uuid "3d881eb9-79cc-4a0f-822f-c1cd47ff75be"))
+(wire (pts (xy 109.84 77.54) (xy 104.76 77.54)) (stroke (width 0) (type default)) (uuid "9dc23005-b94e-4e83-92e4-f46acd80040c"))
+(wire (pts (xy 109.84 72.46) (xy 104.76 72.46)) (stroke (width 0) (type default)) (uuid "a5c3b44a-3105-4ec4-9902-f6a8c4d22dee"))
+(wire (pts (xy 65.0 56.19) (xy 65.0 51.11)) (stroke (width 0) (type default)) (uuid "53f82b27-cd32-48b1-9169-8f6cd3e72bba"))
+(wire (pts (xy 65.0 63.81) (xy 65.0 68.89)) (stroke (width 0) (type default)) (uuid "a9efcba5-127e-4789-a35f-6348761230d0"))
+(wire (pts (xy 65.0 91.19) (xy 65.0 86.11)) (stroke (width 0) (type default)) (uuid "c5e82627-a615-4f34-8168-3c54895bf431"))
+(wire (pts (xy 65.0 98.81) (xy 65.0 103.89)) (stroke (width 0) (type default)) (uuid "336a7960-206f-4f8b-af8e-34108537d0d7"))
+(wire (pts (xy 180.0 71.19) (xy 180.0 66.11)) (stroke (width 0) (type default)) (uuid "29517011-7961-42c9-90f1-c8a38c25a4d8"))
+(wire (pts (xy 180.0 78.81) (xy 180.0 83.89)) (stroke (width 0) (type default)) (uuid "999df2eb-cc8b-4dc3-a8ce-39af0f5ea69e"))
+(wire (pts (xy 150.0 116.19) (xy 150.0 111.11)) (stroke (width 0) (type default)) (uuid "d894196e-18b5-4105-90bc-729a95249c8d"))
+(wire (pts (xy 150.0 123.81) (xy 150.0 128.89)) (stroke (width 0) (type default)) (uuid "06674902-7a6a-48a2-8969-518ba0bc8096"))
+(wire (pts (xy 220.0 71.19) (xy 220.0 66.11)) (stroke (width 0) (type default)) (uuid "1e098df3-9f76-4a6a-b602-76cf00082300"))
+(wire (pts (xy 220.0 78.81) (xy 220.0 83.89)) (stroke (width 0) (type default)) (uuid "e2d9ce27-608f-4e56-8026-6eb252073b95"))
+(label "VCC" (at 30.0 54.84 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "b6081b0a-34e7-4be8-8482-76efa8d3d541"))
+(label "GND" (at 30.0 75.16 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "04bef82f-ffb4-4f77-940b-71993f3b5057"))
+(label "GND" (at 120.0 90.24 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "94b238cf-4e72-4a37-a994-e69651c3176a"))
+(label "VCC" (at 122.54 59.76 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "803db50d-6ec8-44ab-bdde-9ff56c1bd03e"))
+(label "TIMING" (at 104.76 80.08 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "159c1441-62bf-48c6-ac9a-b1e52d9fac26"))
+(label "OUT" (at 135.24 75.0 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "772b8609-e4bf-40c5-ac2b-479e924bbef9"))
+(label "VCC" (at 104.76 69.92 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "088cb407-e566-4d08-bbf1-e5973aeabc1a"))
+(label "CONTROL" (at 120.0 59.76 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "98683a57-9d02-4285-bf28-5836f573db3c"))
+(label "TIMING" (at 104.76 77.54 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "7be63457-45d3-4cb2-aa0c-568d5c346d93"))
+(label "DISCHARGE" (at 104.76 72.46 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "7032b789-7e18-453c-9773-717dc39285de"))
+(label "VCC" (at 65.0 51.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "fcdb5928-67c2-479a-9a69-223fedfb2647"))
+(label "DISCHARGE" (at 65.0 68.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "ca5c079c-31f0-4855-9d38-22957505ceb2"))
+(label "DISCHARGE" (at 65.0 86.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "532a3702-593b-4711-9f8b-283e217ae318"))
+(label "TIMING" (at 65.0 103.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "4eec621d-8bef-49e0-94d1-7b18d7433362"))
+(label "TIMING" (at 180.0 66.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "b4233884-5fea-4047-8a69-950aa59fd3d9"))
+(label "GND" (at 180.0 83.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "0dee5281-d84a-4bc0-9eae-0e9e20f0a561"))
+(label "CONTROL" (at 150.0 111.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "2006341e-8f52-42a6-a193-f93456c80735"))
+(label "GND" (at 150.0 128.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "6cc4e409-9abe-4292-8cfd-5f9e9ea012dd"))
+(label "OUT" (at 220.0 66.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "0f5777b2-f274-40b7-ad21-f9acee8e200d"))
+(label "GND" (at 220.0 83.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "ab584c0f-fbc2-495e-a9cb-f5f8982bde82"))
+(label "OUT" (at 200 110 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "82c84322-3058-4594-a39a-9763d382a126"))
+(label "TIMING" (at 200 130 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "e2fd52d9-02c7-4a4e-acdb-12722fc082df"))
+(symbol (lib_id "Simulation_SPICE:VDC") (at 30 65 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "5dd933c2-3ffe-43c8-9811-5192bce17e1d")
+(property "Reference" "V1" (at 33 58 0) (effects (font (size 1.27 1.27))))
+(property "Value" "9" (at 33 72 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "7b6bf483-6aa7-4330-9eb0-51999fcdda92"))
+(pin "2" (uuid "deb6d629-ee99-42f8-9d02-641aa29745b3"))
+(instances (project "ne555_astable" (path "/00612920-da55-480c-88ec-71f3c93d0fb5" (reference "V1") (unit 1)))))
+(symbol (lib_id "Timer:NE555P") (at 120 75 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "f1ce96af-05f8-436c-8fc2-2ab42c13e83e")
+(property "Reference" "U1" (at 123 68 0) (effects (font (size 1.27 1.27))))
+(property "Value" "NE555P" (at 123 82 0) (effects (font (size 1.27 1.27))))
+(property "CA.Measurements" "{\"voltage\":true,\"current\":true,\"power\":true,\"positive\":\"vcc\",\"negative\":\"gnd\"}" (at 120 75 0) (effects (font (size 1 1)) (hide yes)))
+(pin "1" (uuid "935733d5-7e86-4e43-b6ee-a4a7f0c150ef"))
+(pin "8" (uuid "4bed1cf2-a46a-46b7-9d4a-d4dc87ce6678"))
+(pin "2" (uuid "e99266e0-2947-4417-9b58-85e0f738a6f4"))
+(pin "3" (uuid "a10030d4-2fd6-4189-9fe4-ba6110edeed5"))
+(pin "4" (uuid "8d525dfd-a3f6-434c-a4de-ee9035f15c3f"))
+(pin "5" (uuid "de81db3c-84bd-4523-932c-8d5917586e50"))
+(pin "6" (uuid "9fd8bca1-00b4-48ce-8ed3-e84832f50e5f"))
+(pin "7" (uuid "1c1e6707-9413-49d1-a24a-76872b31fad5"))
+(instances (project "ne555_astable" (path "/00612920-da55-480c-88ec-71f3c93d0fb5" (reference "U1") (unit 1)))))
+(symbol (lib_id "Device:R") (at 65 60 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "445e72a0-1f66-47f8-8f14-533004fdd5da")
+(property "Reference" "R1" (at 68 53 0) (effects (font (size 1.27 1.27))))
+(property "Value" "10k" (at 68 67 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "c714f3e4-a26b-4cf3-a866-ca0323e0fdd4"))
+(pin "2" (uuid "89e60ef8-385f-4e13-9184-902eba1730b3"))
+(instances (project "ne555_astable" (path "/00612920-da55-480c-88ec-71f3c93d0fb5" (reference "R1") (unit 1)))))
+(symbol (lib_id "Device:R") (at 65 95 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "4946db0b-e4a4-47c5-9812-e4b39255bd91")
+(property "Reference" "R2" (at 68 88 0) (effects (font (size 1.27 1.27))))
+(property "Value" "10k" (at 68 102 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "6d3dbcc0-ea9d-4bff-9214-e78701ab1408"))
+(pin "2" (uuid "2b249919-f172-4702-ab26-fde116d41ec6"))
+(instances (project "ne555_astable" (path "/00612920-da55-480c-88ec-71f3c93d0fb5" (reference "R2") (unit 1)))))
+(symbol (lib_id "Device:C") (at 180 75 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "2d93a87e-3d57-4ae7-abca-91a7a48d9cc1")
+(property "Reference" "C1" (at 183 68 0) (effects (font (size 1.27 1.27))))
+(property "Value" "1u" (at 183 82 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "bd7ec842-b56a-4278-9fd7-e1359d717714"))
+(pin "2" (uuid "5402d5a3-2762-4fae-924e-d5e19e2e6e16"))
+(instances (project "ne555_astable" (path "/00612920-da55-480c-88ec-71f3c93d0fb5" (reference "C1") (unit 1)))))
+(symbol (lib_id "Device:C") (at 150 120 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "c86ac166-fa5b-4f98-80a1-02477d112354")
+(property "Reference" "C2" (at 153 113 0) (effects (font (size 1.27 1.27))))
+(property "Value" "10n" (at 153 127 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "4a714a9b-e473-4a1a-97ee-6f31cf3f62fb"))
+(pin "2" (uuid "a33a9550-1ceb-494d-b348-fd2b8a021654"))
+(instances (project "ne555_astable" (path "/00612920-da55-480c-88ec-71f3c93d0fb5" (reference "C2") (unit 1)))))
+(symbol (lib_id "Device:R") (at 220 75 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "c1bd8e4c-5915-48f9-a3a4-b3035526aaea")
+(property "Reference" "R3" (at 223 68 0) (effects (font (size 1.27 1.27))))
+(property "Value" "10k" (at 223 82 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "4d65be74-8990-49d9-a7b4-f31224769d8a"))
+(pin "2" (uuid "38720365-7faf-4e27-9f9d-83acc9e48894"))
+(instances (project "ne555_astable" (path "/00612920-da55-480c-88ec-71f3c93d0fb5" (reference "R3") (unit 1)))))
+(symbol
+		(lib_id "CircuitAlive_Instruments:Probe_oscilloscope")
+		(at 200.0000 110.0000 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files no)
+		(dnp no)
+		(uuid "18bb4bfe-79ff-473b-898a-a96d04fc50b1")
+		(property "Reference" "#P1"
+			(at 200.0000 110.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "555_OUT"
+			(at 200.0000 110.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 200.0000 110.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 200.0000 110.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 200.0000 110.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "CA.Probe" "oscilloscope"
+			(at 81.8900 30.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "CA.ProbeSequence" "1"
+			(at 81.8900 30.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0ba6986f-d7e6-4857-a693-dfa6feaddd5a")
+		)
+		(instances
+			(project "ne555_astable"
+				(path "/00612920-da55-480c-88ec-71f3c93d0fb5"
+					(reference "#P1")
+					(unit 1)
+				)
+			)
+		)
+	)
+(symbol
+		(lib_id "CircuitAlive_Instruments:Probe_oscilloscope")
+		(at 200.0000 130.0000 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files no)
+		(dnp no)
+		(uuid "a827c34c-ff05-48d5-978a-6c7ca9ff7f4b")
+		(property "Reference" "#P1"
+			(at 200.0000 130.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "TIMING"
+			(at 200.0000 130.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 200.0000 130.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 200.0000 130.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 200.0000 130.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "CA.Probe" "oscilloscope"
+			(at 81.8900 50.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "CA.ProbeSequence" "2"
+			(at 81.8900 50.0000 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e4cbd374-c93b-4011-a6cb-f6351bc19767")
+		)
+		(instances
+			(project "ne555_astable"
+				(path "/00612920-da55-480c-88ec-71f3c93d0fb5"
+					(reference "#P1")
+					(unit 1)
+				)
+			)
+		)
+	)
+(embedded_fonts no))

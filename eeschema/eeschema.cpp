@@ -45,6 +45,7 @@
 #include <dialogs/panel_sym_lib_table.h>
 #include <kiway.h>
 #include <project_sch.h>
+#include <circuitalive/model_author_api.h>
 #include <richio.h>
 #include <settings/settings_manager.h>
 #include <symbol_editor_settings.h>
@@ -398,6 +399,8 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
     {
         switch( aDataId )
         {
+            case CIRCUITALIVE::MODEL_AUTHOR_INTERFACE:
+                return reinterpret_cast<void*>( CIRCUITALIVE::ShowModelAuthor );
             case KIFACE_NETLIST_SCHEMATIC:
                 return (void*) generateSchematicNetlist;
         }

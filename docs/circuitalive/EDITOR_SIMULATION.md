@@ -251,3 +251,9 @@ e `gui-editor-exit.txt`. São artefatos gerados e não fazem parte do Git.
   reabrindo também o gerenciador KiCad: ele mantém o módulo do editor em memória.
 - Evidências: `test-reference-open-pins-session.log`, `test-reference-open-pins-spice.log`,
   `reference-manager-results.json` e `reference-manager-*.png`, em `.circuitalive/logs/`.
+
+## Símbolos de alimentação
+
+Setas com Value numérico, como `+5V` e `-12V`, passam a fornecer alimentação DC
+na simulação interativa. `GND` e `GNDREF` são a referência comum. Veja
+[Alimentação pelos símbolos de potência](POWER_SYMBOLS.md).

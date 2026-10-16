@@ -7,11 +7,15 @@ O programa conhece o backend ngspice e os indicadores/interações disponíveis,
 sem uma lista de componentes permitidos no executável.
 
 O envelope `.casim` v1 atende modelos analógicos e digitais XSPICE no backend
-ngspice. O comportamento fica no arquivo, incluindo portas e atrasos. Uma
-linguagem própria para componentes programáveis permanece uma decisão futura.
+ngspice. O comportamento fica no arquivo, incluindo portas e atrasos. A seção `behavioral` permite compor portas, flip-flops, latch e RAM com interfaces
+elétricas. Veja [Perfis e componentes complexos](COMPLEX_MODELS.md).
 Veja [Componentes básicos e digital](BASIC_AND_DIGITAL_MODELS.md).
 
 ## Configurar no editor
+
+Para criar o arquivo pela interface, abra **Simulation Model Editor** na janela
+principal. O [editor visual de modelos](MODEL_AUTHOR.md) permite escolher um
+símbolo, conectar blocos e configurar parâmetros sem escrever o JSON abaixo.
 
 1. Selecione um símbolo, clique com o botão direito e escolha **Simulation model...**.
    O atalho é **Ctrl+Alt+M**; sobre um símbolo, ele também permite selecioná-lo.
@@ -35,7 +39,9 @@ A associação e os parâmetros ficam em campos ocultos do próprio símbolo:
 Essas alterações usam o histórico de desfazer do KiCad. Cancelar a janela não
 altera o esquema. A confirmação invalida a sessão anterior como qualquer edição.
 Cada instância conserva seus próprios parâmetros; modificar um LED não modifica
-os outros. Arquivos externos ao projeto usam caminho absoluto; arquivos dentro
+os outros já colocados. A opção **Use these settings for new … symbols** guarda
+um perfil por ID de biblioteca para os próximos componentes, conforme
+[Perfis e componentes complexos](COMPLEX_MODELS.md). Arquivos externos ao projeto usam caminho absoluto; arquivos dentro
 do projeto usam caminho relativo à pasta do projeto. Mantenha esses arquivos
 junto do projeto ao compartilhá-lo.
 
@@ -43,6 +49,13 @@ junto do projeto ao compartilhá-lo.
 Uma nova sessão, iniciada após Stop, lê novamente os arquivos. Play durante Pause
 retoma a cópia já carregada. **Reload file** atualiza a descrição na janela de
 configuração. Uma alteração somente no arquivo não modifica uma sessão em curso.
+
+Modelos visuais guardam o diagrama e seus blocos incorporados na seção
+`authoring`. O simulador usa a seção elétrica já gerada. A seção opcional
+`logic.internal_drive` associa portas externas a sinais internos de presença
+de acionamento, preservando pull-ups e outros caminhos analógicos de modelos
+compostos na classificação de pinos digitais. Como em `driver_enable`, cada
+entrada identifica um sinal de tensão salvável, como `v(no_interno_${id})`.
 
 ## Localização e associação automática
 

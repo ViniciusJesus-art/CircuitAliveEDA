@@ -1,6 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "simulation_model.h"
 #include "circuit_snapshot.h"
+#include "behavioral_model.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
@@ -46,13 +47,19 @@ std::vector<fs::path> MODEL_REPOSITORY::DefaultDirectories( const std::string& a
 
 SIMULATION_MODEL MODEL_REPOSITORY::Load( const fs::path& aFile )
 {
+    std::error_code error;
+    const auto size = fs::file_size( aFile, error );
+    if( error || size > 512 * 1024 ) throw std::runtime_error( aFile.string() + ": Missing or oversized model file" );
+    std::ifstream stream( aFile );
+    return LoadText( std::string( std::istreambuf_iterator<char>( stream ), {} ), aFile );
+}
+
+SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::path& aFile )
+{
     try
     {
-        std::error_code error;
-        const auto size = fs::file_size( aFile, error );
-        if( error || size > 512 * 1024 ) throw std::runtime_error( "Missing or oversized model file" );
-        std::ifstream stream( aFile );
-        const auto j = JSON::parse( stream );
+        if( text.size() > 512 * 1024 ) throw std::runtime_error( "Oversized model file" );
+        const auto j = JSON::parse( text );
         if( j.at( "schema_version" ) != 1 || j.at( "backend" ) != "ngspice" )
             throw std::runtime_error( "Unsupported model version/backend; use ngspice for analog or XSPICE models" );
         SIMULATION_MODEL m;
@@ -90,10 +97,15 @@ SIMULATION_MODEL MODEL_REPOSITORY::Load( const fs::path& aFile )
         m.libraryIds = matches.value( "library_ids", std::vector<std::string>{} );
         m.symbolNames = matches.value( "symbol_names", std::vector<std::string>{} );
         m.deviceHints = matches.value( "device_hints", std::vector<std::string>{} );
-        const auto& spice = j.at( "spice" );
-        m.instance = spice.at( "instance" ).get<std::vector<std::string>>();
+        const auto spice = j.value( "spice", JSON::object() );
+        m.instance = spice.value( "instance", std::vector<std::string>{} );
         m.definitions = spice.value( "definitions", std::vector<std::string>{} );
-        if( m.instance.empty() ) throw std::runtime_error( "Model has no SPICE instance" );
+        if( j.contains( "behavioral" ) )
+        {
+            if( j.contains( "logic" ) ) throw std::runtime_error( "Behavioral models generate their own logic interfaces" );
+            CompileBehavioralModel( j.at( "behavioral" ), m );
+        }
+        if( m.instance.empty() ) throw std::runtime_error( "Model has no SPICE instance or behavioral blocks" );
         m.referencePin = j.value( "reference_pin", "" );
         if( !m.referencePin.empty() && !ports.contains( m.referencePin ) )
             throw std::runtime_error( "Unknown reference port" );
@@ -149,6 +161,9 @@ SIMULATION_MODEL MODEL_REPOSITORY::Load( const fs::path& aFile )
         }
         m.voltageConstraint = j.value( "voltage_constraint_parameter", "" );
         m.frequencyParameter = j.value( "frequency_parameter", "" );
+        m.maxStepParameter = j.value( "max_step_parameter", "" );
+        if( !m.maxStepParameter.empty() && !parameters.contains( m.maxStepParameter ) )
+            throw std::runtime_error( "Unknown maximum step parameter" );
         if( !m.frequencyParameter.empty() && !parameters.contains( m.frequencyParameter ) )
             throw std::runtime_error( "Unknown frequency parameter" );
         if( !m.voltageConstraint.empty()
@@ -167,6 +182,9 @@ SIMULATION_MODEL MODEL_REPOSITORY::Load( const fs::path& aFile )
                 if( !parameters.contains( p ) ) throw std::runtime_error( "Unknown logic parameter: " + p );
             m.driverEnable = logic.at( "driver_enable" ).get<std::map<std::string, std::string>>();
             m.driverValue = logic.value( "driver_value", std::map<std::string, std::string>{} );
+            m.internalDrive = logic.value( "internal_drive", std::map<std::string, std::string>{} );
+            for( const auto& [port, expression] : m.internalDrive )
+                if( !ports.contains( port ) || expression.empty() ) throw std::runtime_error( "Invalid internal drive port" );
             for( const auto& [port, expression] : m.driverEnable )
             {
                 auto pin = std::find_if( m.pins.begin(), m.pins.end(), [&]( const auto& p ) { return p.id == port; } );

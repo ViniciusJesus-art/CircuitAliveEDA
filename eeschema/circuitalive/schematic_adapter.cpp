@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "schematic_adapter.h"
+#include "model_profiles.h"
 #include <nlohmann/json.hpp>
 #include <project.h>
 #include <sch_connection.h>
@@ -17,6 +18,15 @@
 
 namespace CIRCUITALIVE
 {
+static std::string SimulationNet( const SCH_PIN& pin, SCH_SHEET_PATH& sheet )
+{
+    const auto* connection = pin.Connection( &sheet );
+    if( !connection || connection->IsUnconnected()
+        || connection->LocalName().StartsWith( "unconnected-(" ) ) return {};
+    if( IsSimulationGround( connection->LocalName().ToStdString() ) ) return "0";
+    return connection->Name().ToStdString();
+}
+
 CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& sheet,
         const wxString& variant, const std::string& projectDirectory )
 {
@@ -88,11 +98,20 @@ void WriteSymbolModelSettings( SCH_SYMBOL& symbol, const CIRCUIT_COMPONENT& sett
     }
 }
 
+void ApplySavedSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& sheet,
+        const wxString& variant, const std::string& projectDirectory )
+{
+    if( symbol.IsPower() || symbol.GetField( "CA.Probe" ) ) return;
+    auto component = ReadSymbolModelSettings( symbol, sheet, variant, projectDirectory );
+    if( MODEL_PROFILES().Apply( component ) ) WriteSymbolModelSettings( symbol, component );
+}
+
 SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators )
 {
     SCHEMATIC_SNAPSHOT result;
     std::vector<CIRCUIT_COMPONENT> components;
     std::vector<CIRCUIT_PROBE> probes;
+    std::vector<POWER_SYMBOL> powerSymbols;
     std::map<std::string, std::size_t> packages;
     const wxString variant = aSchematic.GetCurrentVariant();
     for( SCH_SHEET_PATH& sheet : aSchematic.Hierarchy() )
@@ -136,10 +155,7 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators 
                 for( const auto* pin : symbol->GetPins( &sheet ) )
                 {
                     auto* connection = pin->Connection( &sheet );
-                    auto name = connection ? connection->Name() : wxString();
-                    if( connection && ( connection->IsUnconnected() || connection->LocalName().StartsWith( "unconnected-(" ) ) ) name.clear();
-                    if( connection && ( connection->LocalName() == "GND" || connection->LocalName() == "0" ) ) name = "0";
-                    probe.pins[pin->GetShownNumber().ToStdString()] = name.ToStdString();
+                    probe.pins[pin->GetShownNumber().ToStdString()] = SimulationNet( *pin, sheet );
                     if( pin->GetShownNumber() == "1" && connection )
                     {
                         auto label = connection->LocalName();
@@ -153,23 +169,22 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators 
                     symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition() } );
                 continue;
             }
-            if( symbol->IsPower() || lib.starts_with( "power:" )
-                || symbol->GetExcludedFromSim( &sheet, variant ) )
+            if( symbol->GetExcludedFromSim( &sheet, variant ) )
                 continue;
+            if( symbol->IsPower() || lib.starts_with( "power:" ) )
+            {
+                for( const auto* pin : symbol->GetPins( &sheet ) )
+                    powerSymbols.push_back( { symbol->GetRef( &sheet ).ToStdString(),
+                        symbol->GetValue( true, &sheet, true, variant ).ToStdString(), SimulationNet( *pin, sheet ) } );
+                continue;
+            }
 
             CIRCUIT_COMPONENT component = ReadSymbolModelSettings( *symbol, sheet, variant,
                     aSchematic.Project().GetProjectPath().ToStdString() );
 
             for( const SCH_PIN* pin : symbol->GetPins( &sheet ) )
             {
-                SCH_CONNECTION* connection = pin->Connection( &sheet );
-                std::string name = connection ? connection->Name().ToStdString() : std::string();
-                if( connection && ( connection->IsUnconnected()
-                                     || connection->LocalName().StartsWith( "unconnected-(" ) ) )
-                    name.clear();
-                if( connection && ( connection->LocalName() == "GND" || connection->LocalName() == "0" ) )
-                    name = "0";
-                component.pins[pin->GetShownNumber().ToStdString()] = std::move( name );
+                component.pins[pin->GetShownNumber().ToStdString()] = SimulationNet( *pin, sheet );
             }
             std::size_t index = components.size();
             auto existing = packages.find( component.reference );
@@ -200,7 +215,7 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators 
                 result.pins.push_back( { index, pin->GetShownNumber().ToStdString(), sheet.PathAsString(), pin->GetPosition() } );
         }
     }
-    result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators );
+    result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators, powerSymbols );
     return result;
 }
 }

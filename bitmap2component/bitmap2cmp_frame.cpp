@@ -22,6 +22,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include <bitmap2component.h>
 #include <bitmap2cmp_frame.h>
 #include <bitmap2cmp_panel.h>
@@ -153,24 +154,10 @@ BITMAP2CMP_FRAME::BITMAP2CMP_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
         m_panel( nullptr ),
         m_statusBar( nullptr )
 {
-    m_aboutTitle = _HKI( "KiCad Image Converter" );
+    m_aboutTitle = CIRCUITALIVE::AppTitle( _HKI( "Image Converter" ) );
 
     // Give an icon
-    wxIcon icon;
-    wxIconBundle icon_bundle;
-
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_bitmap2component, 48 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_bitmap2component, 128 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_bitmap2component, 256 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_bitmap2component_32 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_bitmap2component_16 ) );
-    icon_bundle.AddIcon( icon );
-
-    SetIcons( icon_bundle );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     wxBoxSizer* mainSizer = new wxBoxSizer( wxVERTICAL );
     SetSizer( mainSizer );
@@ -361,7 +348,7 @@ void BITMAP2CMP_FRAME::UpdateTitle()
 
     title += _( "Image Converter" );
 
-    SetTitle( title );
+    SetTitle( CIRCUITALIVE::WindowTitle( title ) );
 }
 
 

@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "sr_reset_priority",
+  "name": "SR latch with reset priority",
+  "description": "Reusable authoring block. Parameters and connections are embedded in the saved model.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "s",
+      "label": "S",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "r",
+      "label": "R",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "reset",
+      "label": "Reset",
+      "role": "input",
+      "default_pin": "3"
+    },
+    {
+      "id": "q",
+      "label": "Q",
+      "role": "output",
+      "default_pin": "4"
+    },
+    {
+      "id": "nq",
+      "label": "Nq",
+      "role": "output",
+      "default_pin": "5"
+    },
+    {
+      "id": "vcc",
+      "label": "Vcc",
+      "role": "power",
+      "default_pin": "6"
+    },
+    {
+      "id": "gnd",
+      "label": "Gnd",
+      "role": "reference",
+      "default_pin": "7"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Vil",
+      "default": "0.3",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "Vih",
+      "default": "0.7",
+      "unit": "",
+      "min": 0.51,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Vmin",
+      "default": "0.1",
+      "unit": "V",
+      "min": 0.01,
+      "max": 100
+    },
+    {
+      "id": "vmax",
+      "label": "Vmax",
+      "default": "40",
+      "unit": "V",
+      "min": 0.1,
+      "max": 100
+    },
+    {
+      "id": "delay",
+      "label": "Delay",
+      "default": "100n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Transition",
+      "default": "2n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "25",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Ben_${id} en_${id} 0 V={v(${pin:vcc},${pin:gnd}) >= ${param:vmin} && v(${pin:vcc},${pin:gnd}) <= ${param:vmax}}",
+      "Bs_${id} s_${id} 0 V={v(en_${id}) > .5 && v(${pin:reset},${pin:gnd}) < ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s},${pin:gnd}) > ${param:vih}*v(${pin:vcc},${pin:gnd})}",
+      "Br_${id} r_${id} 0 V={v(en_${id}) < .5 || v(${pin:reset},${pin:gnd}) > ${param:vih}*v(${pin:vcc},${pin:gnd}) || (v(${pin:r},${pin:gnd}) > ${param:vih}*v(${pin:vcc},${pin:gnd}) && v(${pin:s},${pin:gnd}) < ${param:vil}*v(${pin:vcc},${pin:gnd}))}",
+      "Vone_${id} one_${id} 0 1",
+      "Aadc_${id} [s_${id} r_${id} one_${id}] [sd_${id} rd_${id} one_d_${id}] adc_${id}",
+      "Alatch_${id} sd_${id} rd_${id} one_d_${id} NULL NULL q_${id} nq_${id} latch_${id}",
+      "Adac_${id} [q_${id} nq_${id}] [qcode_${id} nqcode_${id}] dac_${id}",
+      "Bhi_q_${id} ${pin:q} ${pin:vcc} I={v(en_${id}) > .5 ? v(qcode_${id})*v(${pin:q},${pin:vcc})/${param:rout} : 0}",
+      "Blo_q_${id} ${pin:q} ${pin:gnd} I={v(en_${id}) > .5 ? (1-v(qcode_${id}))*v(${pin:q},${pin:gnd})/${param:rout} : 0}",
+      "Bhi_nq_${id} ${pin:nq} ${pin:vcc} I={v(en_${id}) > .5 ? v(nqcode_${id})*v(${pin:nq},${pin:vcc})/${param:rout} : 0}",
+      "Blo_nq_${id} ${pin:nq} ${pin:gnd} I={v(en_${id}) > .5 ? (1-v(nqcode_${id}))*v(${pin:nq},${pin:gnd})/${param:rout} : 0}"
+    ],
+    "definitions": [
+      ".model adc_${id} adc_bridge(in_low=.3 in_high=.7)",
+      ".model latch_${id} d_srlatch(sr_delay=${param:delay} ic=0 rise_delay=1p fall_delay=1p)",
+      ".model dac_${id} dac_bridge(out_low=0 out_high=1 out_undef=.5 t_rise=${param:transition} t_fall=${param:transition})"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "logic": {
+    "vcc": "vcc",
+    "gnd": "gnd",
+    "low_parameter": "vil",
+    "high_parameter": "vih",
+    "min_supply_parameter": "vmin",
+    "max_supply_parameter": "vmax",
+    "driver_enable": {
+      "q": "v(en_${id})",
+      "nq": "v(en_${id})"
+    },
+    "driver_value": {
+      "q": "v(qcode_${id})",
+      "nq": "v(nqcode_${id})"
+    }
+  }
+}

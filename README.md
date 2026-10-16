@@ -12,6 +12,7 @@ probes de tensão/corrente/potência, osciloscópio e modelos digitais XSPICE.
 - [Registro da base](docs/circuitalive/BASELINE.json): referência para o desenvolvimento futuro.
 - Fontes diretamente na raiz deste repositório.
 - [Configuração, compilação e execução](docs/circuitalive/BUILD_FEDORA.md).
+- [Nome, ícones e atalho local](docs/circuitalive/BRANDING.md).
 - [Validação da etapa 0](docs/circuitalive/VALIDATION.md): build completo,
   editor e simulador abertos, 53 casos SPICE aprovados.
 - [Sessão interativa — etapa 1](docs/circuitalive/INTERACTIVE_SESSION.md):
@@ -22,6 +23,8 @@ probes de tensão/corrente/potência, osciloscópio e modelos digitais XSPICE.
   painel lateral, configuração V/I/P por componente e exemplos prontos.
 - [Componentes básicos e digital](docs/circuitalive/BASIC_AND_DIGITAL_MODELS.md):
   fontes AC, diodos, transistores, 74HC00/74HC125 e indicação 0/1/Z/X nos pinos.
+- [Editor visual de modelos](docs/circuitalive/MODEL_AUTHOR.md): ferramenta na
+  janela principal para escolher símbolos, montar blocos e salvar modelos sem escrever JSON.
 - [Mapa do projeto](docs/circuitalive/Mapa_KiCad_Simulacao_Interativa.md), preservado como
   referência original; a revisão nele citada foi substituída pela base estável acima.
 
@@ -113,3 +116,5 @@ GitLab CI pipeline status can be viewed for Linux and Windows builds of the late
 
 A associação por arquivos de modelo e a configuração por componente estão descritas em
 [Modelos de simulação](docs/circuitalive/MODEL_FILES.md).
+[Perfis e componentes complexos](docs/circuitalive/COMPLEX_MODELS.md).
+[Alimentação por símbolos](docs/circuitalive/POWER_SYMBOLS.md).

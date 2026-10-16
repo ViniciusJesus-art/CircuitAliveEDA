@@ -23,6 +23,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include <wx/tokenzr.h>
 #include <bitmaps.h>
 #include <symbol_library_common.h>
@@ -111,7 +112,7 @@ SYMBOL_VIEWER_FRAME::SYMBOL_VIEWER_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
         m_libList( nullptr ),
         m_symbolList( nullptr )
 {
-    m_aboutTitle = _HKI( "KiCad Symbol Library Browser" );
+    m_aboutTitle = CIRCUITALIVE::AppTitle( _HKI( "Symbol Library Browser" ) );
 
     // Force the frame name used in config. the lib viewer frame has a name
     // depending on aFrameType (needed to identify the frame by wxWidgets),
@@ -119,9 +120,7 @@ SYMBOL_VIEWER_FRAME::SYMBOL_VIEWER_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_configName = LIB_VIEW_FRAME_NAME;
 
     // Give an icon
-    wxIcon  icon;
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::library_browser ) );
-    SetIcon( icon );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     m_libListWidth = 200;
     m_symbolListWidth = 300;
@@ -1070,7 +1069,7 @@ void SYMBOL_VIEWER_FRAME::DisplayLibInfos()
                              : _( "[no library selected]" );
 
         title += wxT( " \u2014 " ) + _( "Symbol Library Browser" );
-        SetTitle( title );
+        SetTitle( CIRCUITALIVE::WindowTitle( title ) );
     }
 }
 

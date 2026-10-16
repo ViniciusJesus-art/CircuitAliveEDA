@@ -24,6 +24,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include <settings/common_settings.h>
 #include <advanced_config.h>
 #include <bitmaps.h>
@@ -162,7 +163,7 @@ void KICAD_MANAGER_FRAME::doReCreateMenuBar()
     fileMenu->Add( KICAD_MANAGER_ACTIONS::unarchiveProject );
 
     fileMenu->AppendSeparator();
-    fileMenu->AddQuitOrClose( nullptr, wxS( "KiCad" ) );
+    fileMenu->AddQuitOrClose( nullptr, CIRCUITALIVE::ProductName() );
 
     //-- Edit menu -----------------------------------------------------------
     //

@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <circuitalive/branding.h>
 #include <wx/msgdlg.h>
 #include <wx/treebook.h>
 #include <wx/sizer.h>
@@ -65,7 +66,7 @@ PCB_CALCULATOR_FRAME::PCB_CALCULATOR_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
                   wxT( "calculator_tools" ), unityScale ),
     m_lastNotebookPage( -1 )
 {
-    m_aboutTitle = _HKI( "KiCad Calculator Tools" );
+    m_aboutTitle = CIRCUITALIVE::AppTitle( _HKI( "Calculator Tools" ) );
 
     SHAPE_POLY_SET dummy;   // A ugly trick to force the linker to include
                             // some methods in code and avoid link errors
@@ -85,21 +86,7 @@ PCB_CALCULATOR_FRAME::PCB_CALCULATOR_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     loadPages();
 
     // Give an icon
-    wxIcon icon;
-    wxIconBundle icon_bundle;
-
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_pcbcalculator, 48 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_pcbcalculator, 128 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_pcbcalculator, 256 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_pcbcalculator_32 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_pcbcalculator_16 ) );
-    icon_bundle.AddIcon( icon );
-
-    SetIcons( icon_bundle );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     m_toolManager = new TOOL_MANAGER;
     m_toolManager->SetEnvironment( nullptr, nullptr, nullptr, config(), this );
@@ -237,7 +224,7 @@ void PCB_CALCULATOR_FRAME::ShowChangedLanguage()
 {
     EDA_BASE_FRAME::ShowChangedLanguage();
 
-    SetTitle( _( "Calculator Tools" ) );
+    SetTitle( CIRCUITALIVE::AppTitle( _( "Calculator Tools" ) ) );
 
     SaveSettings( config() );
     Freeze();

@@ -68,7 +68,8 @@ double LedBrightness( double aForwardCurrent, double aBrightnessCurrent )
 }
 
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents,
-                                     const std::vector<CIRCUIT_PROBE>& aProbes, bool aPinIndicators )
+                                     const std::vector<CIRCUIT_PROBE>& aProbes, bool aPinIndicators,
+                                     const std::vector<POWER_SYMBOL>& aPowerSymbols )
 {
     CIRCUIT_SNAPSHOT result;
     result.config.step = result.config.maxStep = 1e-4;
@@ -99,6 +100,17 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         model.model.electricalGroups.push_back( group );
         allComponents.push_back( std::move( c ) ); models.push_back( std::move( model ) );
     }
+    const auto powerRails = CollectPowerRails( aPowerSymbols );
+    const auto powerStart = allComponents.size();
+    for( const auto& rail : powerRails )
+    {
+        CIRCUIT_COMPONENT c;
+        c.reference = rail.reference; c.pins = { { "1", rail.net }, { "2", "0" } };
+        RESOLVED_MODEL model;
+        model.pins = { { "p", "1" }, { "n", "2" } };
+        model.model.electricalGroups = { { "p", "n" } }; model.model.referencePin = "n";
+        allComponents.push_back( std::move( c ) ); models.push_back( std::move( model ) );
+    }
     const auto topology = BuildCircuitTopology( allComponents, models );
     struct NET_DRIVE { bool external = false; std::vector<std::string> enables; };
     std::map<std::string, NET_DRIVE> drives;
@@ -109,10 +121,17 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         {
             auto& drive = drives[topology.nodes[i].at( model.pins.at( pin.id ) )];
             if( model.model.logicVcc.empty() ) drive.external = true;
-            else if( auto enable = model.model.driverEnable.find( pin.id ); enable != model.model.driverEnable.end() )
-                drive.enables.push_back( ExpandModelTemplate( enable->second, model, topology.nodes[i], i ) );
+            else
+            {
+                if( auto enable = model.model.driverEnable.find( pin.id ); enable != model.model.driverEnable.end() )
+                    drive.enables.push_back( ExpandModelTemplate( enable->second, model, topology.nodes[i], i ) );
+                if( auto internal = model.model.internalDrive.find( pin.id ); internal != model.model.internalDrive.end() )
+                    drive.enables.push_back( ExpandModelTemplate( internal->second, model, topology.nodes[i], i ) );
+            }
         }
     }
+    for( std::size_t i = 0; i < powerRails.size(); ++i )
+        for( const auto& [pin, node] : topology.nodes[powerStart + i] ) drives[node].external = true;
     // Ideal inline sensors preserve the driver's presence across the cut wire.
     for( std::size_t pass = 0; pass < aProbes.size(); ++pass )
         for( std::size_t i = 0; i < aProbes.size(); ++i )
@@ -152,6 +171,15 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     auto voltage = [&]( const std::string& node )
         { return node == "0" ? NO_SIGNAL : signal( "v(" + node + ")" ); };
     std::vector<std::pair<std::string, CURRENT_WARNING>> warnings;
+    VOLTAGE_CONSTRAINTS supplies;
+    for( std::size_t i = 0; i < aComponents.size(); ++i )
+    {
+        const auto& m = models[i];
+        if( !m.model.voltageConstraint.empty() )
+            supplies.Add( topology.nodes[i].at( m.pins.at( m.model.measurePositive ) ),
+                topology.nodes[i].at( m.pins.at( m.model.measureNegative ) ),
+                m.parameters.at( m.model.voltageConstraint ), aComponents[i].reference );
+    }
 
     for( std::size_t i = 0; i < aComponents.size(); ++i )
     {
@@ -162,6 +190,13 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 || !references.insert( c.reference ).second )
                 throw std::runtime_error( "Annotate the schematic: reference missing or repeated" );
             const auto& model = models.at( i );
+            if( !model.model.maxStepParameter.empty() )
+            {
+                const double step = model.parameters.at( model.model.maxStepParameter );
+                if( step <= 0 ) throw std::runtime_error( "Maximum time step must be positive" );
+                result.config.step = result.config.maxStep = std::min( result.config.maxStep, step );
+                result.config.horizon = std::min( result.config.horizon, result.config.maxStep * 9e7 );
+            }
             if( !model.model.frequencyParameter.empty() )
             {
                 const double frequency = model.parameters.at( model.model.frequencyParameter );
@@ -224,7 +259,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             errors.push_back( c.reference + ": " + e.what() );
         }
     }
-    if( aComponents.empty() )
+    if( aComponents.empty() && powerRails.empty() )
         errors.push_back( "The schematic has no supported components" );
     std::string voltageSignal;
     for( const auto& pins : topology.nodes )
@@ -251,11 +286,23 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             if( nodes.at( "1" ) == nodes.at( "2" ) )
                 throw std::runtime_error( name + ": current probe is bypassed by another wire or equal net labels" );
             const auto source = "Vprobe" + std::to_string( i + 1 );
+            supplies.Add( nodes.at( "1" ), nodes.at( "2" ), 0, name );
             deck << source << ' ' << nodes.at( "1" ) << ' ' << nodes.at( "2" ) << " 0\n";
             channel.current = signal( "i(" + source + ")" );
             channel.quantity = probe.kind == PROBE_KIND::POWER ? MEASURE_QUANTITY::POWER : MEASURE_QUANTITY::CURRENT;
         }
         result.measurements.push_back( std::move( channel ) );
+    }
+    for( std::size_t i = 0; i < powerRails.size(); ++i )
+    {
+        const auto& rail = powerRails[i]; const auto& nodes = topology.nodes[powerStart + i];
+        if( supplies.Add( nodes.at( "1" ), nodes.at( "2" ), rail.voltage,
+                         rail.reference + " (" + rail.name + ")" ) )
+        {
+            const auto source = "Vpower" + std::to_string( i + 1 );
+            deck << source << ' ' << nodes.at( "1" ) << ' ' << nodes.at( "2" ) << " DC " << rail.voltage << '\n';
+            warnings.push_back( { "i(" + source + ")", { rail.name, NO_SIGNAL, 10 } } );
+        }
     }
     if( !errors.empty() )
     {

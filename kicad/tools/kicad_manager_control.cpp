@@ -26,6 +26,7 @@
 #include <pgm_kicad.h>
 #include <policy_keys.h>
 #include <kiway.h>
+#include <circuitalive/model_author_api.h>
 #include <kicad_manager_frame.h>
 #include <kiplatform/policy.h>
 #include <kiplatform/secrets.h>
@@ -738,6 +739,22 @@ int KICAD_MANAGER_CONTROL::UpdateMenu( const TOOL_EVENT& aEvent )
 }
 
 
+int KICAD_MANAGER_CONTROL::ShowSimulationModelEditor( const TOOL_EVENT& )
+{
+    if( m_inShowPlayer ) return -1;
+    REENTRANCY_GUARD guard( &m_inShowPlayer );
+    try
+    {
+        auto* face = m_frame->Kiway().KiFACE( KIWAY::FACE_SCH );
+        auto entry = reinterpret_cast<CIRCUITALIVE::MODEL_AUTHOR_ENTRY>(
+                face->IfaceOrAddress( CIRCUITALIVE::MODEL_AUTHOR_INTERFACE ) );
+        if( !entry ) throw std::runtime_error( "Simulation Model Editor is missing from the schematic module" );
+        entry( m_frame, &m_frame->Kiway() );
+    }
+    catch( const std::exception& error ) { DisplayError( m_frame, wxString::FromUTF8( error.what() ) ); }
+    return 0;
+}
+
 int KICAD_MANAGER_CONTROL::ShowPlayer( const TOOL_EVENT& aEvent )
 {
     FRAME_T       playerType = aEvent.Parameter<FRAME_T>();
@@ -963,6 +980,7 @@ void KICAD_MANAGER_CONTROL::setTransitions()
 
     Go( &KICAD_MANAGER_CONTROL::ShowPlayer,         KICAD_MANAGER_ACTIONS::editSchematic.MakeEvent() );
     Go( &KICAD_MANAGER_CONTROL::ShowPlayer,         KICAD_MANAGER_ACTIONS::editSymbols.MakeEvent() );
+    Go( &KICAD_MANAGER_CONTROL::ShowSimulationModelEditor, KICAD_MANAGER_ACTIONS::editSimulationModels.MakeEvent() );
     Go( &KICAD_MANAGER_CONTROL::ShowPlayer,         KICAD_MANAGER_ACTIONS::editPCB.MakeEvent() );
     Go( &KICAD_MANAGER_CONTROL::ShowPlayer,         KICAD_MANAGER_ACTIONS::editFootprints.MakeEvent() );
     Go( &KICAD_MANAGER_CONTROL::Execute,            KICAD_MANAGER_ACTIONS::viewGerbers.MakeEvent() );

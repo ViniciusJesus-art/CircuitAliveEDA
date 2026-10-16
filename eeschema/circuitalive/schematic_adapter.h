@@ -32,4 +32,6 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators 
 CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& aSymbol, SCH_SHEET_PATH& aSheet,
         const wxString& aVariant, const std::string& aProjectDirectory );
 void WriteSymbolModelSettings( SCH_SYMBOL& aSymbol, const CIRCUIT_COMPONENT& aSettings );
+void ApplySavedSymbolModelSettings( SCH_SYMBOL& aSymbol, SCH_SHEET_PATH& aSheet,
+        const wxString& aVariant, const std::string& aProjectDirectory );
 }

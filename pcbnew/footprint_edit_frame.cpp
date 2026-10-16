@@ -20,6 +20,7 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <circuitalive/branding.h>
 #include "tool/embed_tool.h"
 #include "tools/convert_tool.h"
 #include "tools/drawing_tool.h"
@@ -106,25 +107,11 @@ FOOTPRINT_EDIT_FRAME::FOOTPRINT_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_show_layer_manager_tools( true )
 {
     m_showBorderAndTitleBlock = false;   // true to show the frame references
-    m_aboutTitle = _HKI( "KiCad Footprint Editor" );
+    m_aboutTitle = CIRCUITALIVE::AppTitle( _HKI( "Footprint Editor" ) );
     m_editorSettings = nullptr;
 
     // Give an icon
-    wxIcon icon;
-    wxIconBundle icon_bundle;
-
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_modedit, 48 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_modedit, 128 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_modedit, 256 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_modedit_32 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_modedit_16 ) );
-    icon_bundle.AddIcon( icon );
-
-    SetIcons( icon_bundle );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     // Create GAL canvas
     m_canvasType = loadCanvasTypeSetting();
@@ -1134,7 +1121,7 @@ void FOOTPRINT_EDIT_FRAME::UpdateTitle()
 
     title += wxT( " \u2014 " ) + _( "Footprint Editor" );
 
-    SetTitle( title );
+    SetTitle( CIRCUITALIVE::WindowTitle( title ) );
 }
 
 

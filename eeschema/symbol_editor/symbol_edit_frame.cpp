@@ -23,6 +23,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include <bitmaps.h>
 #include <wx/hyperlink.h>
 #include <base_screen.h>
@@ -133,23 +134,9 @@ SYMBOL_EDIT_FRAME::SYMBOL_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_unit = 1;
     m_bodyStyle = 1;
     m_syncLibrariesInProgress = false;
-    m_aboutTitle = _HKI( "KiCad Symbol Editor" );
+    m_aboutTitle = CIRCUITALIVE::AppTitle( _HKI( "Symbol Editor" ) );
 
-    wxIcon icon;
-    wxIconBundle icon_bundle;
-
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_libedit, 48 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_libedit, 256 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_libedit, 128 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_libedit_32 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_libedit_16 ) );
-    icon_bundle.AddIcon( icon );
-
-    SetIcons( icon_bundle );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     m_settings = GetAppSettings<SYMBOL_EDITOR_SETTINGS>( "symbol_editor" );
     LoadSettings( m_settings );

@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "pushpull",
+  "name": "Push-pull output stage",
+  "description": "Reusable authoring block. Parameters and connections are embedded in the saved model.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "state",
+      "label": "State",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "out",
+      "label": "Out",
+      "role": "output",
+      "default_pin": "2"
+    },
+    {
+      "id": "vcc",
+      "label": "Vcc",
+      "role": "power",
+      "default_pin": "3"
+    },
+    {
+      "id": "gnd",
+      "label": "Gnd",
+      "role": "reference",
+      "default_pin": "4"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Vil",
+      "default": "0.3",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "Vih",
+      "default": "0.7",
+      "unit": "",
+      "min": 0.51,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Vmin",
+      "default": "0.1",
+      "unit": "V",
+      "min": 0.01,
+      "max": 100
+    },
+    {
+      "id": "vmax",
+      "label": "Vmax",
+      "default": "40",
+      "unit": "V",
+      "min": 0.1,
+      "max": 100
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "10",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000.0
+    },
+    {
+      "id": "imax",
+      "label": "Imax",
+      "default": "0.2",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 10
+    },
+    {
+      "id": "high_drop",
+      "label": "High drop",
+      "default": "1.2",
+      "unit": "V",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Low drop",
+      "default": "0.1",
+      "unit": "V",
+      "min": 0,
+      "max": 3
+    },
+    {
+      "id": "cout",
+      "label": "Cout",
+      "default": "20p",
+      "unit": "F",
+      "min": 1e-15,
+      "max": 1e-06
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Ben_${id} en_${id} 0 V={v(${pin:vcc},${pin:gnd}) >= ${param:vmin} && v(${pin:vcc},${pin:gnd}) <= ${param:vmax}}",
+      "Bcode_${id} code_${id} 0 V={max(0,min(1,v(${pin:state},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u)))}",
+      "Bhi_${id} ${pin:out} ${pin:vcc} I={v(en_${id}) > .5 ? v(code_${id})*${param:imax}*tanh((v(${pin:out},${pin:vcc})+${param:high_drop})/(${param:rout}*${param:imax})) : 0}",
+      "Blo_${id} ${pin:out} ${pin:gnd} I={v(en_${id}) > .5 ? (1-v(code_${id}))*${param:imax}*tanh((v(${pin:out},${pin:gnd})-${param:low_drop})/(${param:rout}*${param:imax})) : 0}",
+      "Cout_${id} ${pin:out} ${pin:gnd} ${param:cout}"
+    ],
+    "definitions": []
+  },
+  "ignore_legacy_spice_fields": true,
+  "logic": {
+    "vcc": "vcc",
+    "gnd": "gnd",
+    "low_parameter": "vil",
+    "high_parameter": "vih",
+    "min_supply_parameter": "vmin",
+    "max_supply_parameter": "vmax",
+    "driver_enable": {
+      "out": "v(en_${id})"
+    },
+    "driver_value": {
+      "out": "v(code_${id})"
+    }
+  }
+}

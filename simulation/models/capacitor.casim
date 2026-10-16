@@ -46,9 +46,12 @@
     "symbol_names": [
       "C",
       "C_Small",
+      "C_Small_US",
+      "C_45deg",
       "C_US",
       "C_Polarized",
       "C_Polarized_Small",
+      "C_Polarized_Small_US",
       "C_Polarized_US"
     ],
     "device_hints": [

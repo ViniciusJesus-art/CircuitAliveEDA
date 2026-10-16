@@ -1,0 +1,403 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "sram_62256",
+  "name": "62256 SRAM 32K x 8",
+  "description": "Configurable behavioral approximation; see docs/circuitalive/COMPLEX_MODELS.md for fidelity and limits.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "gnd",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "14"
+    },
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "role": "power",
+      "default_pin": "28"
+    },
+    {
+      "id": "a14",
+      "label": "A14",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "a12",
+      "label": "A12",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "a7",
+      "label": "A7",
+      "role": "input",
+      "default_pin": "3"
+    },
+    {
+      "id": "a6",
+      "label": "A6",
+      "role": "input",
+      "default_pin": "4"
+    },
+    {
+      "id": "a5",
+      "label": "A5",
+      "role": "input",
+      "default_pin": "5"
+    },
+    {
+      "id": "a4",
+      "label": "A4",
+      "role": "input",
+      "default_pin": "6"
+    },
+    {
+      "id": "a3",
+      "label": "A3",
+      "role": "input",
+      "default_pin": "7"
+    },
+    {
+      "id": "a2",
+      "label": "A2",
+      "role": "input",
+      "default_pin": "8"
+    },
+    {
+      "id": "a1",
+      "label": "A1",
+      "role": "input",
+      "default_pin": "9"
+    },
+    {
+      "id": "a0",
+      "label": "A0",
+      "role": "input",
+      "default_pin": "10"
+    },
+    {
+      "id": "d0",
+      "label": "Q0",
+      "role": "bidirectional",
+      "default_pin": "11"
+    },
+    {
+      "id": "d1",
+      "label": "Q1",
+      "role": "bidirectional",
+      "default_pin": "12"
+    },
+    {
+      "id": "d2",
+      "label": "Q2",
+      "role": "bidirectional",
+      "default_pin": "13"
+    },
+    {
+      "id": "d3",
+      "label": "Q3",
+      "role": "bidirectional",
+      "default_pin": "15"
+    },
+    {
+      "id": "d4",
+      "label": "Q4",
+      "role": "bidirectional",
+      "default_pin": "16"
+    },
+    {
+      "id": "d5",
+      "label": "Q5",
+      "role": "bidirectional",
+      "default_pin": "17"
+    },
+    {
+      "id": "d6",
+      "label": "Q6",
+      "role": "bidirectional",
+      "default_pin": "18"
+    },
+    {
+      "id": "d7",
+      "label": "Q7",
+      "role": "bidirectional",
+      "default_pin": "19"
+    },
+    {
+      "id": "cs",
+      "label": "~{CS}",
+      "role": "input",
+      "default_pin": "20"
+    },
+    {
+      "id": "a10",
+      "label": "A10",
+      "role": "input",
+      "default_pin": "21"
+    },
+    {
+      "id": "oe",
+      "label": "~{OE}",
+      "role": "input",
+      "default_pin": "22"
+    },
+    {
+      "id": "a11",
+      "label": "A11",
+      "role": "input",
+      "default_pin": "23"
+    },
+    {
+      "id": "a9",
+      "label": "A9",
+      "role": "input",
+      "default_pin": "24"
+    },
+    {
+      "id": "a8",
+      "label": "A8",
+      "role": "input",
+      "default_pin": "25"
+    },
+    {
+      "id": "a13",
+      "label": "A13",
+      "role": "input",
+      "default_pin": "26"
+    },
+    {
+      "id": "we",
+      "label": "~{WE}",
+      "role": "input",
+      "default_pin": "27"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Vil",
+      "default": "0.3",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "Vih",
+      "default": "0.7",
+      "unit": "",
+      "min": 0.1,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Vmin",
+      "default": "2",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Vmax",
+      "default": "6",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "rise_delay",
+      "label": "Rise delay",
+      "default": "10n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "fall_delay",
+      "label": "Fall delay",
+      "default": "10n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Transition",
+      "default": "2n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "25",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Cin",
+      "default": "3.5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Iq",
+      "default": "2u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "read_delay",
+      "label": "Read delay",
+      "default": "70n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "high_drop",
+      "label": "High drop",
+      "unit": "V",
+      "default": "0",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Low drop",
+      "unit": "V",
+      "default": "0",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "powerup_delay",
+      "label": "Power recovery address holdoff",
+      "default": "100n",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 1
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Memory_RAM:CY62256-70PC"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "behavioral": {
+    "version": 1,
+    "supply": {
+      "vcc": "vcc",
+      "gnd": "gnd"
+    },
+    "blocks": [
+      {
+        "type": "and",
+        "inputs": [
+          "!cs",
+          "!we"
+        ],
+        "out": "writing"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!cs",
+          "we",
+          "!oe"
+        ],
+        "out": "reading"
+      },
+      {
+        "type": "ram",
+        "data_in": [
+          "d0",
+          "d1",
+          "d2",
+          "d3",
+          "d4",
+          "d5",
+          "d6",
+          "d7"
+        ],
+        "data_out": [
+          "q0",
+          "q1",
+          "q2",
+          "q3",
+          "q4",
+          "q5",
+          "q6",
+          "q7"
+        ],
+        "address": [
+          "a0",
+          "a1",
+          "a2",
+          "a3",
+          "a4",
+          "a5",
+          "a6",
+          "a7",
+          "a8",
+          "a9",
+          "a10",
+          "a11",
+          "a12",
+          "a13",
+          "a14"
+        ],
+        "write": "writing",
+        "select": [
+          "!cs"
+        ],
+        "initial": 2
+      }
+    ],
+    "outputs": {
+      "d0": {
+        "signal": "q0",
+        "enable": "reading"
+      },
+      "d1": {
+        "signal": "q1",
+        "enable": "reading"
+      },
+      "d2": {
+        "signal": "q2",
+        "enable": "reading"
+      },
+      "d3": {
+        "signal": "q3",
+        "enable": "reading"
+      },
+      "d4": {
+        "signal": "q4",
+        "enable": "reading"
+      },
+      "d5": {
+        "signal": "q5",
+        "enable": "reading"
+      },
+      "d6": {
+        "signal": "q6",
+        "enable": "reading"
+      },
+      "d7": {
+        "signal": "q7",
+        "enable": "reading"
+      }
+    }
+  }
+}

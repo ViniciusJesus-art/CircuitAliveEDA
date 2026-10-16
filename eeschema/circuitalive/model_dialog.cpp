@@ -1,6 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "model_dialog.h"
 #include "simulation_model.h"
+#include "model_profiles.h"
 #include <dialog_shim.h>
 #include <wx/button.h>
 #include <wx/choice.h>
@@ -80,6 +81,20 @@ public:
         measurements->Add( new wxStaticText( this, wxID_ANY,
             _( "I enters the (+) terminal. P is signed power for this port pair." ) ), 0, wxTOP, 4 );
         layout->Add( measurements, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
+        auto* defaults = new wxBoxSizer( wxHORIZONTAL );
+        m_remember = new wxCheckBox( this, wxID_ANY,
+            wxString::Format( _( "Use these settings for new %s symbols" ), wxString::FromUTF8( component.libraryId ) ) );
+        m_remember->SetValue( true );
+        m_remember->SetToolTip( _( "Copies the model, pin mapping, parameters and measurement choices into new symbols. Existing symbols keep their settings. $value follows each symbol's Value." ) );
+        defaults->Add( m_remember, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8 );
+        auto* forget = new wxButton( this, wxID_ANY, _( "Forget saved default" ) );
+        defaults->Add( forget );
+        layout->Add( defaults, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
+        forget->Bind( wxEVT_BUTTON, [this, forget]( wxCommandEvent& )
+        {
+            m_forget = true; m_remember->SetValue( false );
+            forget->SetLabel( _( "Removed on OK" ) );
+        } );
         layout->Add( CreateSeparatedButtonSizer( wxOK | wxCANCEL ), 0, wxEXPAND | wxALL, 10 );
         SetSizer( layout );
         SetMinSize( wxSize( 760, 720 ) ); SetSize( 900, 880 ); Centre();
@@ -137,6 +152,13 @@ public:
                 for( const auto& [pin, net] : m_component.pins ) nodes[pin] = "n" + std::to_string( nodes.size() + 1 );
                 for( const auto& line : resolved.model.instance ) ExpandModelTemplate( line, resolved, nodes, 0 );
                 for( const auto& line : resolved.model.definitions ) ExpandModelTemplate( line, resolved, nodes, 0 );
+                if( m_remember->GetValue() )
+                {
+                    auto profile = m_component;
+                    if( profile.modelFile.empty() ) profile.modelFile = "builtin:" + resolved.model.id;
+                    MODEL_PROFILES().Save( profile );
+                }
+                else if( m_forget ) MODEL_PROFILES().Remove( m_component.libraryId );
                 EndQuasiModal( wxID_OK );
             }
             catch( const std::exception& e ) { showError( e.what() ); }
@@ -282,6 +304,8 @@ private:
     wxGrid* m_parameters;
     wxCheckBox *m_voltage, *m_current, *m_power;
     wxChoice *m_positive, *m_negative;
+    wxCheckBox* m_remember;
+    bool m_forget = false;
 };
 
 bool EditSimulationModel( wxWindow* parent, CIRCUIT_COMPONENT& component )

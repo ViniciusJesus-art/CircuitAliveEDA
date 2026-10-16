@@ -119,6 +119,13 @@ TOOL_ACTION KICAD_MANAGER_ACTIONS::editSymbols( TOOL_ACTION_ARGS()
         .Flags( AF_NONE )
         .Parameter( FRAME_SCH_SYMBOL_EDITOR ) );
 
+TOOL_ACTION KICAD_MANAGER_ACTIONS::editSimulationModels( TOOL_ACTION_ARGS()
+        .Name( "circuitalive.Manager.editSimulationModels" )
+        .Scope( AS_GLOBAL )
+        .FriendlyName( _( "Simulation Model Editor" ) )
+        .Tooltip( _( "Build simulation models, map symbol pins and configure behavior" ) )
+        .Icon( BITMAPS::simulator ) );
+
 TOOL_ACTION KICAD_MANAGER_ACTIONS::editPCB( TOOL_ACTION_ARGS()
         .Name( "kicad.Control.editPCB" )
         .Scope( AS_GLOBAL )

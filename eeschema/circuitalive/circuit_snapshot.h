@@ -4,6 +4,7 @@
 #include <sim/interactive_sim_session.h>
 #include "measurements.h"
 #include "logic_signals.h"
+#include "power_rails.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -62,7 +63,8 @@ struct CIRCUIT_SNAPSHOT
 /// Resolve model files, parameters and physical pins, then freeze a component deck.
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents,
                                      const std::vector<CIRCUIT_PROBE>& aProbes = {},
-                                     bool aPinIndicators = false );
+                                     bool aPinIndicators = false,
+                                     const std::vector<POWER_SYMBOL>& aPowerSymbols = {} );
 double ParseComponentValue( const std::string& aValue );
 double LedBrightness( double aForwardCurrent, double aBrightnessCurrent = 0.01 );
 }

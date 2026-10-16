@@ -18,6 +18,7 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <circuitalive/branding.h>
 #include <kiface_base.h>
 #include <settings/color_settings.h>
 #include <base_units.h>
@@ -94,7 +95,7 @@ GERBVIEW_FRAME::GERBVIEW_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_netText = nullptr;
     m_apertText = nullptr;
     m_dcodeText = nullptr;
-    m_aboutTitle = _HKI( "KiCad Gerber Viewer" );
+    m_aboutTitle = CIRCUITALIVE::AppTitle( _HKI( "Gerber Viewer" ) );
 
     SHAPE_POLY_SET dummy;   // A ugly trick to force the linker to include
                             // some methods in code and avoid link errors
@@ -114,21 +115,7 @@ GERBVIEW_FRAME::GERBVIEW_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     galCanvas->GetView()->UseDrawPriority( true );
 
     // Give an icon
-    wxIcon icon;
-    wxIconBundle icon_bundle;
-
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_gerbview, 48 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_gerbview, 128 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_gerbview, 256 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_gerbview_32 ) );
-    icon_bundle.AddIcon( icon );
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_gerbview_16 ) );
-    icon_bundle.AddIcon( icon );
-
-    SetIcons( icon_bundle );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     // Be sure a page info is set. this default value will be overwritten later.
     PAGE_INFO pageInfo( PAGE_SIZE_TYPE::GERBER );
@@ -670,7 +657,7 @@ void GERBVIEW_FRAME::UpdateTitleAndInfo()
     // Display the gerber filename
     if( gerber == nullptr )
     {
-        SetTitle( _("Gerber Viewer") );
+        SetTitle( CIRCUITALIVE::AppTitle( _( "Gerber Viewer" ) ) );
 
         SetStatusText( wxEmptyString, 0 );
 
@@ -694,7 +681,7 @@ void GERBVIEW_FRAME::UpdateTitleAndInfo()
             title += wxS( " " ) + _( "(with X2 attributes)" );
 
         title += wxT( " \u2014 " ) + _( "Gerber Viewer" );
-        SetTitle( title );
+        SetTitle( CIRCUITALIVE::WindowTitle( title ) );
 
         gerber->DisplayImageInfo( this );
 

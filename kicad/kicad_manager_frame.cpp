@@ -23,6 +23,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include "kicad_id.h"
 #include "pcm.h"
 #include "pgm_kicad.h"
@@ -158,7 +159,7 @@ KICAD_MANAGER_FRAME::KICAD_MANAGER_FRAME( wxWindow* parent, const wxString& titl
     const int defaultLeftWinWidth = FromDIP( 250 );
 
     m_leftWinWidth = defaultLeftWinWidth; // Default value
-    m_aboutTitle = "KiCad";
+    m_aboutTitle = CIRCUITALIVE::ProductName();
 
     // JPC: A very ugly hack to fix an issue on Linux: if the wxbase315u_xml_gcc_custom.so is
     // used **only** in PCM, it is not found in some cases at run time.
@@ -180,37 +181,7 @@ KICAD_MANAGER_FRAME::KICAD_MANAGER_FRAME( wxWindow* parent, const wxString& titl
     GetStatusBar()->SetFont( KIUI::GetStatusFont( this ) );
 
     // Give an icon
-    wxIcon icon;
-    wxIconBundle icon_bundle;
-
-    if( IsNightlyVersion())
-    {
-        icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_kicad_nightly, 48 ) );
-        icon_bundle.AddIcon( icon );
-        icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_kicad_nightly, 128 ) );
-        icon_bundle.AddIcon( icon );
-        icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_kicad_nightly, 256 ) );
-        icon_bundle.AddIcon( icon );
-        icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_kicad_nightly_32 ) );
-        icon_bundle.AddIcon( icon );
-        icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_kicad_nightly_16 ) );
-        icon_bundle.AddIcon( icon );
-    }
-    else
-    {
-        icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_kicad, 48 ) );
-        icon_bundle.AddIcon( icon );
-        icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_kicad, 128 ) );
-        icon_bundle.AddIcon( icon );
-        icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_kicad, 256 ) );
-        icon_bundle.AddIcon( icon );
-        icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_kicad_32 ) );
-        icon_bundle.AddIcon( icon );
-        icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_kicad_16 ) );
-        icon_bundle.AddIcon( icon );
-    }
-
-    SetIcons( icon_bundle );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     // Load the settings
     LoadSettings( config() );
@@ -285,9 +256,9 @@ KICAD_MANAGER_FRAME::KICAD_MANAGER_FRAME( wxWindow* parent, const wxString& titl
     }
 
     if( ADVANCED_CFG::GetCfg().m_HideVersionFromTitle )
-        SetTitle( wxT( "KiCad" ) );
+        SetTitle( CIRCUITALIVE::ProductName() );
     else
-        SetTitle( wxString( "KiCad " ) + GetMajorMinorVersion() );
+        SetTitle( ( CIRCUITALIVE::ProductName() + " " ) + GetMajorMinorVersion() );
 
     // Do not let the messages window have initial focus
     m_projectTreePane->SetFocus();
@@ -989,7 +960,7 @@ bool KICAD_MANAGER_FRAME::LoadProject( const wxFileName& aProjectFileName )
     {
         wxString head = Kiway().LocalHistory().GetHeadHash( Prj().GetProjectPath() );
 
-        KICAD_MESSAGE_DIALOG dlg( this, _( "KiCad found unsaved changes from your last session that are newer than "
+        KICAD_MESSAGE_DIALOG dlg( this, _( "CircuitAliveEDA found unsaved changes from your last session that are newer than "
                                            "the saved project files." ),
                                   _( "Recover Unsaved Changes" ), wxYES_NO | wxICON_QUESTION );
 
@@ -1298,9 +1269,9 @@ void KICAD_MANAGER_FRAME::ProjectChanged()
     }
 
     if( ADVANCED_CFG::GetCfg().m_HideVersionFromTitle )
-        title += wxT( " \u2014 " ) + wxString( wxS( "KiCad" ) );
+        title += wxT( " \u2014 " ) + wxString( CIRCUITALIVE::ProductName() );
     else
-        title += wxT( " \u2014 " ) + wxString( wxS( "KiCad " ) ) + GetMajorMinorVersion();
+        title += wxT( " \u2014 " ) + ( CIRCUITALIVE::ProductName() + " " ) + GetMajorMinorVersion();
 
     SetTitle( title );
 

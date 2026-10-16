@@ -30,6 +30,7 @@
  *        (locale handling)
  */
 
+#include <circuitalive/branding.h>
 #include <wx/html/htmlwin.h>
 #include <wx/fs_zip.h>
 #include <wx/dir.h>
@@ -436,6 +437,9 @@ bool PGM_BASE::InitPgm( bool aHeadless, bool aSkipPyInit, bool aIsUnitTest )
 #endif
 
     // Analyze the command line & initialize the binary path
+#if defined( __WXGTK__ )
+    App().SetClassName( CIRCUITALIVE::DesktopId() );
+#endif
     wxString tmp;
     SetLanguagePath();
     SetDefaultLanguage( tmp );

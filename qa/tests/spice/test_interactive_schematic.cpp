@@ -8,6 +8,10 @@
 #include <sch_sheet_path.h>
 #include <sch_screen.h>
 #include <circuitalive/probe_placement.h>
+#include <circuitalive/model_profiles.h>
+#include <filesystem>
+#include <cstdlib>
+#include <unistd.h>
 #include <connection_graph.h>
 #include <sch_pin.h>
 #include <base_units.h>
@@ -314,4 +318,108 @@ BOOST_FIXTURE_TEST_CASE( NativeAcRectifierUsesStandardSourceDiodeAndScope, KI_TE
             BOOST_CHECK( channel.connected ); BOOST_CHECK_GT( voltage, 3 ); BOOST_CHECK_LT( voltage, 5 );
         }
     BOOST_CHECK( scope );
+}
+
+BOOST_FIXTURE_TEST_CASE( Native555DemoHasConnectedScopeChannelsAndOscillates, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "ne555_astable.kicad_sch" );
+    LoadSchematic( file ); const auto snapshot = CaptureSchematic( *m_schematic );
+    BOOST_REQUIRE_EQUAL( snapshot.probes.size(), 2 );
+    BOOST_REQUIRE_EQUAL( snapshot.circuit.measurements.size(), 5 );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config );
+    session.AdvanceTo( .1 );
+    for( const auto& channel : snapshot.circuit.measurements )
+        if( channel.scope )
+        {
+            BOOST_CHECK( channel.connected );
+            const double value = MeasurementValue( channel, session.Snapshot().latest );
+            BOOST_CHECK_GT( value, 0 ); BOOST_CHECK_LT( value, 9 );
+        }
+}
+
+BOOST_FIXTURE_TEST_CASE( NativeRegulatorDemoMeasuresBothOutputs, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "linear_regulators.kicad_sch" );
+    LoadSchematic( file ); const auto snapshot = CaptureSchematic( *m_schematic );
+    BOOST_REQUIRE_EQUAL( snapshot.circuit.measurements.size(), 6 );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config ); session.AdvanceTo( .02 );
+    for( const auto& channel : snapshot.circuit.measurements )
+        if( channel.quantity == MEASURE_QUANTITY::VOLTAGE )
+            BOOST_CHECK_CLOSE( MeasurementValue( channel, session.Snapshot().latest ), 5, 1 );
+}
+
+BOOST_FIXTURE_TEST_CASE( PlacementAdapterCopiesUserProfileIntoNativeSymbolFields, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    struct PROFILE_ENV
+    {
+        std::string old = std::getenv( "CIRCUITALIVE_PROFILE_FILE" ) ? std::getenv( "CIRCUITALIVE_PROFILE_FILE" ) : "";
+        std::filesystem::path file = std::filesystem::temp_directory_path() / ( "ca-native-profile-" + std::to_string( getpid() ) + ".json" );
+        PROFILE_ENV() { setenv( "CIRCUITALIVE_PROFILE_FILE", file.c_str(), 1 ); }
+        ~PROFILE_ENV()
+        {
+            if( old.empty() ) unsetenv( "CIRCUITALIVE_PROFILE_FILE" ); else setenv( "CIRCUITALIVE_PROFILE_FILE", old.c_str(), 1 );
+            std::error_code error; std::filesystem::remove( file, error ); std::filesystem::remove( file.string() + ".lock", error );
+        }
+    } environment;
+    LoadSchematic( wxFileName( CIRCUITALIVE_TEST_SCHEMATIC ) );
+    SCH_SYMBOL* cap = nullptr;
+    for( auto* item : m_schematic->RootScreen()->Items().OfType( SCH_SYMBOL_T ) )
+    {
+        auto* s = static_cast<SCH_SYMBOL*>( item );
+        if( s->GetRef( &m_schematic->CurrentSheet() ) == "C1" ) cap = s;
+    }
+    BOOST_REQUIRE( cap );
+    auto settings = ReadSymbolModelSettings( *cap, m_schematic->CurrentSheet(), "", "" );
+    settings.modelFile = "builtin:capacitor"; settings.modelParameters = { { "capacitance", "22u" } };
+    settings.modelPins = { { "p", "1" }, { "n", "2" } };
+    MODEL_PROFILES().Save( settings );
+    auto clear = settings; clear.modelFile.clear(); clear.modelPins.clear(); clear.modelParameters.clear();
+    WriteSymbolModelSettings( *cap, clear );
+    // Opening/capturing existing schematics must not apply user defaults retroactively.
+    BOOST_CHECK( ReadSymbolModelSettings( *cap, m_schematic->CurrentSheet(), "", "" ).modelFile.empty() );
+    ApplySavedSymbolModelSettings( *cap, m_schematic->CurrentSheet(), "", "" );
+    const auto placed = ReadSymbolModelSettings( *cap, m_schematic->CurrentSheet(), "", "" );
+    BOOST_CHECK_EQUAL( placed.modelFile, "builtin:capacitor" );
+    BOOST_CHECK_EQUAL( placed.modelParameters.at( "capacitance" ), "22u" );
+    BOOST_CHECK( !cap->GetField( "CA.Parameters" )->IsVisible() );
+}
+
+BOOST_FIXTURE_TEST_CASE( NativePowerSymbolsGenerateSuppliesAndKeepGlobalNetConnectivity, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "power_symbol_sources.kicad_sch" );
+    LoadSchematic( file );
+    auto s = CaptureSchematic( *m_schematic );
+    BOOST_REQUIRE_EQUAL( s.locations.size(), 5 );
+    BOOST_REQUIRE_EQUAL( s.circuit.currentWarnings.size(), 4 );
+    std::map<wxString, std::size_t> parts;
+    for( std::size_t i = 0; i < s.locations.size(); ++i ) parts[s.locations[i].reference] = i;
+    BOOST_CHECK_EQUAL( s.circuit.pinNodes[parts.at( "R1" )].at( "1" ), s.circuit.pinNodes[parts.at( "R5" )].at( "1" ) );
+    for( const auto& [ref, i] : parts ) BOOST_CHECK_EQUAL( s.circuit.pinNodes[i].at( "2" ), "0" );
+    auto voltages = [&]( const SCHEMATIC_SNAPSHOT& snapshot )
+    {
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+        session.Configure( snapshot.circuit.netlist, snapshot.circuit.config ); session.AdvanceTo( .02 );
+        std::map<std::string, double> result;
+        for( const auto& channel : snapshot.circuit.measurements )
+            if( channel.quantity == MEASURE_QUANTITY::VOLTAGE ) result[channel.name] = MeasurementValue( channel, session.Snapshot().latest );
+        return result;
+    };
+    auto v = voltages( s );
+    BOOST_CHECK_CLOSE( v.at( "R1" ), 5, 1e-6 ); BOOST_CHECK_CLOSE( v.at( "R5" ), 5, 1e-6 );
+    BOOST_CHECK_CLOSE( v.at( "R2" ), 24, 1e-6 ); BOOST_CHECK_CLOSE( v.at( "R3" ), -12, 1e-6 );
+    BOOST_CHECK_CLOSE( v.at( "R4" ), 3.3, 1e-6 );
+    // Power library ID +12V with edited Value +24V was already resolved above.
+    // Editing that Value to +5V must join the existing +5V net, with no duplicated ideal source.
+    for( auto* item : m_schematic->RootScreen()->Items().OfType( SCH_SYMBOL_T ) )
+    {
+        auto* symbol = static_cast<SCH_SYMBOL*>( item );
+        if( symbol->GetLibId().Format() == "power:+12V" ) symbol->GetField( FIELD_T::VALUE )->SetText( "+5V" );
+    }
+    m_schematic->ConnectionGraph()->Recalculate( m_schematic->Hierarchy(), true );
+    s = CaptureSchematic( *m_schematic );
+    BOOST_CHECK_EQUAL( s.circuit.currentWarnings.size(), 3 );
+    v = voltages( s ); BOOST_CHECK_CLOSE( v.at( "R2" ), 5, 1e-6 );
+    BOOST_CHECK_EQUAL( s.circuit.pinNodes[parts.at( "R1" )].at( "1" ), s.circuit.pinNodes[parts.at( "R2" )].at( "1" ) );
 }

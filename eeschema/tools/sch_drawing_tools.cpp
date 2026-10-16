@@ -23,6 +23,7 @@
  */
 
 #include "sch_sheet_path.h"
+#include <circuitalive/schematic_adapter.h>
 #include <limits>
 #include <memory>
 #include <set>
@@ -444,6 +445,16 @@ int SCH_DRAWING_TOOLS::PlaceSymbol( const TOOL_EVENT& aEvent )
 
                 symbol = new SCH_SYMBOL( *libSymbol, &m_frame->GetCurrentSheet(), sel, cursorPos,
                                          &m_frame->Schematic() );
+                try
+                {
+                    CIRCUITALIVE::ApplySavedSymbolModelSettings( *symbol, m_frame->GetCurrentSheet(),
+                            m_frame->Schematic().GetCurrentVariant(),
+                            m_frame->Prj().GetProjectPath().ToStdString() );
+                }
+                catch( const std::exception& error )
+                {
+                    DisplayError( m_frame, wxString::FromUTF8( error.what() ) );
+                }
                 addSymbol( symbol );
                 annotate();
 

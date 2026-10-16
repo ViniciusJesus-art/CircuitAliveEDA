@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "constant_current",
+  "name": "Constant current",
+  "description": "Reusable authoring block. Parameters and connections are embedded in the saved model.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "p",
+      "label": "P",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "N",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "current",
+      "label": "Current",
+      "default": "3m",
+      "unit": "A",
+      "min": -1000000.0,
+      "max": 1000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "I${id} ${pin:p} ${pin:n} DC ${param:current}"
+    ],
+    "definitions": []
+  },
+  "ignore_legacy_spice_fields": true
+}

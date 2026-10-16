@@ -113,19 +113,22 @@ static void buildKicadAboutBanner( EDA_BASE_FRAME* aParent, ABOUT_APP_INFO& aInf
                 << wxT( "</u></b>" ); // bold & underlined font for caption
 
     description << wxT( "<p>" )
-                << _( "The KiCad EDA Suite is a set of open source applications for the "
-                      "creation of electronic schematics and printed circuit boards." )
+                << _( "CircuitAliveEDA is an electronics design application based on KiCad, "
+                      "with interactive simulation, schematic capture and printed circuit board design." )
                 << wxT( "</p>" );
 
     description << wxT( "</p>" );
 
     /* websites */
     description << wxT( "<p><b><u>" )
-                << _( "KiCad on the web" )
+                << _( "CircuitAliveEDA and upstream KiCad" )
                 << wxT( "</u></b>" ); // bold & underlined font for caption
 
     // bullet-ed list with some http links
     description << wxT( "<ul>" );
+    description << wxT( "<li>CircuitAliveEDA — " )
+                << HtmlHyperlink( wxS( "https://github.com/ViniciusJesus-art/CircuitAliveEDA" ) )
+                << wxT( "</li>" );
     description << wxT( "<li>" )
                 << _( "The official KiCad website - " )
                 << HtmlHyperlink( wxS( "http://www.kicad.org" ) )
@@ -150,7 +153,7 @@ static void buildKicadAboutBanner( EDA_BASE_FRAME* aParent, ABOUT_APP_INFO& aInf
     description << wxT( "<ul>" );
     description << wxT( "<li>" )
                 << _( "Report or examine bugs - " )
-                << HtmlHyperlink( wxS( "https://go.kicad.org/bugs" ) )
+                << HtmlHyperlink( wxS( "https://github.com/ViniciusJesus-art/CircuitAliveEDA/issues" ) )
                 << wxT( "</li>" );
     description << wxT( "</ul></p>" );
 
@@ -174,7 +177,7 @@ static void buildKicadAboutBanner( EDA_BASE_FRAME* aParent, ABOUT_APP_INFO& aInf
     license
         << wxT( "<div align='center'>" )
         << HtmlNewline( 4 )
-        << _( "The complete KiCad EDA Suite is released under the" ) << HtmlNewline( 2 )
+        << _( "CircuitAliveEDA and its upstream KiCad code are released under the" ) << HtmlNewline( 2 )
         << HtmlHyperlink( wxS( "http://www.gnu.org/licenses" ),
                           _( "GNU General Public License (GPL) version 3 or any later version" ) )
         << wxT( "</div>" );

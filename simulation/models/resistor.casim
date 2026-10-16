@@ -38,7 +38,9 @@
     "symbol_names": [
       "R",
       "R_US",
-      "R_Small"
+      "R_Small",
+      "R_Small_US",
+      "R_45deg"
     ],
     "device_hints": [
       "R"
