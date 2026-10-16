@@ -283,7 +283,7 @@ BOOST_AUTO_TEST_CASE( InteractiveCircuitWithoutLedStillHasAnObservableSignal )
     components.resize( 5 );
     auto circuit = BuildCircuitSnapshot( components );
     BOOST_CHECK( circuit.leds.empty() );
-    BOOST_REQUIRE_EQUAL( circuit.config.signals.size(), 1 );
+    BOOST_REQUIRE_EQUAL( circuit.config.signals.size(), 2 ); // Voltage plus the source's overcurrent monitor.
     INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
     session.Configure( circuit.netlist, circuit.config );
     session.AdvanceTo( 0.5 );

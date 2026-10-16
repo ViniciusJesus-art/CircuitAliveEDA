@@ -20,6 +20,9 @@ struct EDITOR_SESSION_VIEW
     SIM_SESSION_SNAPSHOT sample;
     std::vector<bool> switches;
     std::vector<double> ledCurrents;
+    std::vector<double> measurements;
+    std::vector<SIM_SAMPLE> scopeHistory;
+    std::vector<std::string> warnings;
     std::string error;
 };
 

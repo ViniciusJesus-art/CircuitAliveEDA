@@ -134,6 +134,23 @@ SIMULATION_MODEL MODEL_REPOSITORY::Load( const fs::path& aFile )
         }
         m.ignoreLegacyFields = j.value( "ignore_legacy_spice_fields", false );
         m.legacyFields = j.value( "legacy_spice_fields", std::map<std::string, std::string>{} );
+        if( j.contains( "measurement_ports" ) )
+        {
+            m.measurePositive = j.at( "measurement_ports" ).at( "positive" );
+            m.measureNegative = j.at( "measurement_ports" ).at( "negative" );
+            if( !ports.contains( m.measurePositive ) || !ports.contains( m.measureNegative )
+                || m.measurePositive == m.measureNegative ) throw std::runtime_error( "Invalid measurement ports" );
+        }
+        if( j.contains( "current_warning" ) )
+        {
+            m.warningSignal = j.at( "current_warning" ).at( "signal" );
+            m.warningParameter = j.at( "current_warning" ).at( "limit_parameter" );
+            if( !parameters.contains( m.warningParameter ) ) throw std::runtime_error( "Unknown warning parameter" );
+        }
+        m.voltageConstraint = j.value( "voltage_constraint_parameter", "" );
+        if( !m.voltageConstraint.empty()
+            && ( !parameters.contains( m.voltageConstraint ) || m.measurePositive.empty() || m.measureNegative.empty() ) )
+            throw std::runtime_error( "Invalid voltage constraint" );
         return m;
     }
     catch( const std::exception& e )

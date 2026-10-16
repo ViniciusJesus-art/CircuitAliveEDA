@@ -41,8 +41,10 @@ desenha apenas os indicadores da instância visível.
 | `Switch:SW_SPST` | Chave analógica controlada por clique, inicialmente fechada |
 | `Device:LED`, `LED_Small` | Modelo didático vermelho inicial, pino 1 cátodo e 2 ânodo; não precisa renomear Value |
 
-O status mostra a corrente de até três LEDs e a quantidade restante; todos os
-LEDs suportados continuam recebendo indicação de brilho no desenho.
+O status mostra tempo, estado e avisos. Correntes, tensões e potência ficam na
+aba Measurements; a aba Oscilloscope mostra as curvas das probes de osciloscópio.
+Veja [Medições e osciloscópio](MEASUREMENTS.md). Todos os LEDs suportados
+continuam recebendo indicação de brilho no desenho.
 
 Os símbolos são os das bibliotecas padrão do KiCad. Não há biblioteca separada
 de componentes CircuitAlive: `simulation_model.*` lê os arquivos que associam o ID de biblioteca ao
@@ -128,6 +130,9 @@ Todo o código novo da integração fica em `eeschema/circuitalive/`:
 | `simulation_overlay.*` | Brilho do LED, indicação da chave e localização do clique, sem mudar símbolos |
 | `editor_simulation.*` | Ferramenta, estado, timer e ciclo de vida |
 | `simulation_toolbar.*` | Ações e integração na toolbar original; ícone vetorial Pause local |
+| `measurements.*` | Canais de medição, nomes e unidades |
+| `probe_placement.*` | Símbolos de probe e inserção nos fios com desfazer nativo |
+| `instrument_panel.*` | Painel lateral de ferramentas, valores e osciloscópio |
 | `CMakeLists.txt` | Compilação e ligação dos módulos |
 
 O núcleo e o worker continuam nos arquivos `interactive_sim_*` da etapa 1, em
@@ -145,8 +150,8 @@ Não foi necessário modificar `SCH_SYMBOL`, `SCH_PIN`, `SCH_ACTIONS`, o painter
 os formatos de arquivo ou o wrapper ngspice original. A integração usa os botões
 nativos `ACTION_TOOLBAR` e acrescenta as ações ao final da toolbar principal,
 inclusive após sua recriação ou personalização. As três ações usam o namespace
-`circuitalive.Interactive.*`. Não cria painel nem barra extra e não exibe nome
-do projeto junto dos botões.
+`circuitalive.Interactive.*`. Não cria barra extra e não exibe nome do projeto
+junto dos botões. O painel lateral Simulation reúne ferramentas e resultados.
 
 Ao migrar a base, primeiro revalide os pontos de conexão e a API utilizada pelo
 `schematic_adapter`; depois compile e execute os testes de conectividade e motor.

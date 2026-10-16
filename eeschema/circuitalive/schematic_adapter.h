@@ -22,6 +22,7 @@ struct SCHEMATIC_SNAPSHOT
 {
     CIRCUIT_SNAPSHOT circuit;
     std::vector<SYMBOL_LOCATION> locations;
+    std::vector<SYMBOL_LOCATION> probes;
 };
 
 /// The only adapter that reads KiCad symbols/connectivity. Call exclusively on the GUI thread.

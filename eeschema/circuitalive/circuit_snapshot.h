@@ -2,6 +2,7 @@
 #pragma once
 
 #include <sim/interactive_sim_session.h>
+#include "measurements.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -22,6 +23,7 @@ struct CIRCUIT_COMPONENT
     std::map<std::string, std::string> modelParameters = {};
     std::string projectDirectory = {};
     std::map<std::string, std::string> legacySpiceFields = {};
+    MEASUREMENT_SELECTION measurements = {};
 };
 
 struct CIRCUIT_INDICATOR
@@ -30,6 +32,7 @@ struct CIRCUIT_INDICATOR
     std::size_t signal;
     double brightnessCurrent = 0.01;
     double ratedCurrent = 0.02;
+    std::string reference = {};
 };
 
 struct CIRCUIT_SWITCH
@@ -50,10 +53,13 @@ struct CIRCUIT_SNAPSHOT
     std::vector<std::string> automaticReferences; // Source reference + negative pin number.
     std::vector<std::string> floatingIslands;     // Representative component; no source or explicit ground.
     std::size_t openPins = 0;
+    std::vector<MEASUREMENT_CHANNEL> measurements;
+    std::vector<CURRENT_WARNING> currentWarnings;
 };
 
 /// Resolve model files, parameters and physical pins, then freeze a component deck.
-CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents );
+CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents,
+                                     const std::vector<CIRCUIT_PROBE>& aProbes = {} );
 double ParseComponentValue( const std::string& aValue );
 double LedBrightness( double aForwardCurrent, double aBrightnessCurrent = 0.01 );
 }

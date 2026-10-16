@@ -45,6 +45,9 @@ struct SIMULATION_MODEL
     double controlOn = 5, controlOff = 0;
     bool ignoreLegacyFields = false;
     std::map<std::string, std::string> legacyFields;
+    std::string measurePositive, measureNegative;
+    std::string warningSignal, warningParameter;
+    std::string voltageConstraint;
 };
 
 struct RESOLVED_MODEL

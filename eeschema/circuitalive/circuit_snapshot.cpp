@@ -67,7 +67,8 @@ double LedBrightness( double aForwardCurrent, double aBrightnessCurrent )
     return std::sqrt( std::clamp( aForwardCurrent / aBrightnessCurrent, 0.0, 1.0 ) );
 }
 
-CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents )
+CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents,
+                                     const std::vector<CIRCUIT_PROBE>& aProbes )
 {
     CIRCUIT_SNAPSHOT result;
     result.config.step = result.config.maxStep = 1e-4;
@@ -83,7 +84,22 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         try { models.push_back( repository.Resolve( component ) ); }
         catch( const std::exception& e ) { throw std::runtime_error( component.reference + ": " + e.what() ); }
     }
-    const auto topology = BuildCircuitTopology( aComponents, models );
+    auto allComponents = aComponents;
+    for( std::size_t i = 0; i < aProbes.size(); ++i )
+    {
+        const auto& probe = aProbes[i];
+        CIRCUIT_COMPONENT c;
+        c.reference = "#probe" + std::to_string( i + 1 ); c.pins = probe.pins;
+        const bool series = probe.kind == PROBE_KIND::CURRENT || probe.kind == PROBE_KIND::POWER;
+        if( !c.pins.contains( "1" ) || ( series && !c.pins.contains( "2" ) ) )
+            throw std::runtime_error( "Invalid probe pin mapping" );
+        RESOLVED_MODEL model;
+        std::vector<std::string> group;
+        for( const auto& [pin, net] : c.pins ) { model.pins[pin] = pin; group.push_back( pin ); }
+        model.model.electricalGroups.push_back( group );
+        allComponents.push_back( std::move( c ) ); models.push_back( std::move( model ) );
+    }
+    const auto topology = BuildCircuitTopology( allComponents, models );
     result.pinNodes = topology.nodes;
     result.automaticReferences = topology.automaticReferences;
     result.floatingIslands = topology.floatingIslands;
@@ -94,6 +110,15 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     deck.imbue( std::locale::classic() );
     deck.precision( 17 );
     deck << "CircuitAliveEDA interactive schematic snapshot\n";
+    auto signal = [&]( const std::string& name ) -> std::size_t
+    {
+        auto it = std::find( result.config.signals.begin(), result.config.signals.end(), name );
+        if( it != result.config.signals.end() ) return it - result.config.signals.begin();
+        result.config.signals.push_back( name ); return result.config.signals.size() - 1;
+    };
+    auto voltage = [&]( const std::string& node )
+        { return node == "0" ? NO_SIGNAL : signal( "v(" + node + ")" ); };
+    std::vector<std::pair<std::string, CURRENT_WARNING>> warnings;
 
     for( std::size_t i = 0; i < aComponents.size(); ++i )
     {
@@ -104,20 +129,55 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 || !references.insert( c.reference ).second )
                 throw std::runtime_error( "Annotate the schematic: reference missing or repeated" );
             const auto& model = models.at( i );
+            auto modelNodes = topology.nodes.at( i );
+            if( !model.model.voltageConstraint.empty() && model.parameters.at( model.model.voltageConstraint ) != 0
+                && modelNodes.at( model.pins.at( model.model.measurePositive ) )
+                    == modelNodes.at( model.pins.at( model.model.measureNegative ) ) )
+                throw std::runtime_error( "Short circuit across voltage-source terminals" );
+            const auto& selected = c.measurements;
+            if( selected.Any() )
+            {
+                auto p = selected.positive.empty() ? model.model.measurePositive : selected.positive;
+                auto n = selected.negative.empty() ? model.model.measureNegative : selected.negative;
+                if( p.empty() && model.model.pins.size() == 2 ) p = model.model.pins.front().id;
+                if( n.empty() && model.model.pins.size() == 2 ) n = model.model.pins.back().id;
+                if( p.empty() || n.empty() || p == n || !model.pins.contains( p ) || !model.pins.contains( n ) )
+                    throw std::runtime_error( "Select the measurement's positive and negative model ports" );
+                const auto pp = model.pins.at( p ), np = model.pins.at( n );
+                MEASUREMENT_CHANNEL channel;
+                channel.name = c.reference;
+                if( selected.voltage || selected.power )
+                { channel.positive = voltage( modelNodes.at( pp ) ); channel.negative = voltage( modelNodes.at( np ) ); }
+                if( selected.current || selected.power )
+                {
+                    const auto source = "Vmeas" + std::to_string( i + 1 );
+                    const auto node = "sense_ca" + std::to_string( i + 1 );
+                    deck << source << ' ' << modelNodes.at( pp ) << ' ' << node << " 0\n";
+                    modelNodes[pp] = node;
+                    channel.current = signal( "i(" + source + ")" );
+                }
+                for( auto [enabled, quantity] : { std::pair{ selected.voltage, MEASURE_QUANTITY::VOLTAGE },
+                        std::pair{ selected.current, MEASURE_QUANTITY::CURRENT },
+                        std::pair{ selected.power, MEASURE_QUANTITY::POWER } } )
+                    if( enabled ) { channel.quantity = quantity; result.measurements.push_back( channel ); }
+            }
             auto expand = [&]( const std::string& text )
-                { return ExpandModelTemplate( text, model, topology.nodes.at( i ), i ); };
+                { return ExpandModelTemplate( text, model, modelNodes, i ); };
             for( const auto& line : model.model.instance ) deck << expand( line ) << '\n';
             for( const auto& line : model.model.definitions ) deck << expand( line ) << '\n';
             if( !model.model.indicatorSignal.empty() )
             {
                 result.leds.push_back( { i, result.config.signals.size(),
                     model.parameters.at( model.model.brightnessParameter ),
-                    model.model.ratingParameter.empty() ? 0 : model.parameters.at( model.model.ratingParameter ) } );
+                    model.model.ratingParameter.empty() ? 0 : model.parameters.at( model.model.ratingParameter ), c.reference } );
                 result.config.signals.push_back( expand( model.model.indicatorSignal ) );
             }
             if( !model.model.controlSource.empty() )
                 result.switches.push_back( { i, expand( model.model.controlSource ),
                                             model.model.controlOn, model.model.controlOff } );
+            if( !model.model.warningSignal.empty() && model.parameters.at( model.model.warningParameter ) > 0 )
+                warnings.push_back( { expand( model.model.warningSignal ),
+                    { c.reference, NO_SIGNAL, model.parameters.at( model.model.warningParameter ) } } );
         }
         catch( const std::exception& e )
         {
@@ -132,8 +192,31 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             if( name != "0" && voltageSignal.empty() ) voltageSignal = "v(" + name + ")";
     if( voltageSignal.empty() )
         errors.push_back( "Connect at least one non-ground net" );
-    if( result.config.signals.size() > 64 )
-        errors.push_back( "This prototype supports at most 64 LED signals" );
+    std::set<std::string> probeNames;
+    for( std::size_t i = 0; i < aProbes.size(); ++i )
+    {
+        const auto& probe = aProbes[i];
+        const auto& nodes = topology.nodes.at( aComponents.size() + i );
+        auto name = !probe.name.empty() ? probe.name : !probe.label.empty() ? probe.label : AlphabeticProbeName( probe.sequence );
+        const auto base = name;
+        for( std::size_t suffix = 2; !probeNames.insert( name ).second; ++suffix ) name = base + " " + std::to_string( suffix );
+        MEASUREMENT_CHANNEL channel;
+        channel.name = name; channel.probe = i;
+        channel.connected = !probe.pins.at( "1" ).empty();
+        channel.scope = probe.kind == PROBE_KIND::OSCILLOSCOPE;
+        if( probe.kind != PROBE_KIND::CURRENT ) channel.positive = voltage( nodes.at( "1" ) );
+        if( probe.kind == PROBE_KIND::CURRENT || probe.kind == PROBE_KIND::POWER )
+        {
+            channel.connected = channel.connected && !probe.pins.at( "2" ).empty();
+            if( nodes.at( "1" ) == nodes.at( "2" ) )
+                throw std::runtime_error( name + ": current probe is bypassed by another wire or equal net labels" );
+            const auto source = "Vprobe" + std::to_string( i + 1 );
+            deck << source << ' ' << nodes.at( "1" ) << ' ' << nodes.at( "2" ) << " 0\n";
+            channel.current = signal( "i(" + source + ")" );
+            channel.quantity = probe.kind == PROBE_KIND::POWER ? MEASURE_QUANTITY::POWER : MEASURE_QUANTITY::CURRENT;
+        }
+        result.measurements.push_back( std::move( channel ) );
+    }
     if( !errors.empty() )
     {
         std::string message;
@@ -143,6 +226,11 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     }
     if( result.config.signals.empty() )
         result.config.signals.push_back( voltageSignal );
+    for( auto& [name, warning] : warnings )
+    { warning.signal = signal( name ); result.currentWarnings.push_back( warning ); }
+    if( result.config.signals.size() > 64 ) throw std::runtime_error( "This session supports up to 64 saved signals; reduce the measurements" );
+    if( std::any_of( result.measurements.begin(), result.measurements.end(), []( const auto& c ) { return c.scope; } ) )
+        result.config.historyCapacity = std::min<std::size_t>( 4096, 65536 / result.config.signals.size() );
     // 1 Tohm numerical leakage keeps genuinely open/capacitive nodes solvable.
     // It is not a wire or logic pull-down; floating islands remain identified in the snapshot.
     deck << ".options rshunt=1e12\n.end\n";

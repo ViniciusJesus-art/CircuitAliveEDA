@@ -30,6 +30,7 @@ A associação e os parâmetros ficam em campos ocultos do próprio símbolo:
 | `CA.Model` | `builtin:<id>` para modelos distribuídos ou caminho de um arquivo próprio |
 | `CA.Pins` | Objeto JSON `terminal do modelo → número físico do símbolo` |
 | `CA.Parameters` | Objeto JSON de substituições por componente |
+| `CA.Measurements` | Seleção V/I/P e par de terminais lógicos para medir |
 
 Essas alterações usam o histórico de desfazer do KiCad. Cancelar a janela não
 altera o esquema. A confirmação invalida a sessão anterior como qualquer edição.
@@ -117,6 +118,35 @@ terminal que pode fornecer a referência automática, como o negativo da fonte.
 `electrical_groups` permite separar grupos galvanicamente isolados de um mesmo
 modelo; na ausência desse campo, todos os seus terminais pertencem ao mesmo grupo
 para escolher a referência numérica. GND explícito continua tendo prioridade.
+
+## Medições e avisos no arquivo de modelo
+
+O campo opcional `measurement_ports` escolhe o par padrão da janela V/I/P:
+
+```json
+"measurement_ports": {"positive":"p", "negative":"n"}
+```
+
+Os nomes são IDs lógicos declarados em `pins`. Modelos de dois terminais sem
+esse campo usam o primeiro e o último terminal. Modelos com mais terminais
+precisam de um par explícito no arquivo ou na seleção por componente.
+I é a corrente que entra no terminal positivo; P usa a tensão entre o par
+multiplicada por essa corrente. Veja [Medições e osciloscópio](MEASUREMENTS.md).
+
+Um monitor opcional declara um sinal de corrente e um parâmetro de limite:
+
+```json
+"current_warning": {"signal":"i(V${id})", "limit_parameter":"current_warning"},
+"voltage_constraint_parameter": "voltage"
+```
+
+`limit_parameter` precisa existir em `parameters`; valores positivos habilitam
+o aviso e 0 o desativa. O sinal usa os mesmos templates do netlist. O campo
+`voltage_constraint_parameter` é reservado a uma diferença de potencial ideal
+imposta entre os `measurement_ports`: se o parâmetro for diferente de zero,
+terminais na mesma rede geram erro de curto antes de iniciar a sessão.
+A fonte DC distribuída declara ambos; o primeiro não adiciona resistência
+interna nem limita corrente.
 
 ## LED
 

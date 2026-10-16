@@ -7,6 +7,10 @@
 #include <sch_field.h>
 #include <sch_sheet_path.h>
 #include <sch_screen.h>
+#include <circuitalive/probe_placement.h>
+#include <connection_graph.h>
+#include <sch_pin.h>
+#include <base_units.h>
 
 using namespace CIRCUITALIVE;
 
@@ -27,12 +31,15 @@ BOOST_FIXTURE_TEST_CASE( ModelAssociationAndParametersPersistInSymbolFields, KI_
     settings.modelFile = "builtin:led";
     settings.modelPins = { { "a", "2" }, { "k", "1" } };
     settings.modelParameters = { { "forward_voltage", "3.2V" }, { "reference_current", "20mA" } };
+    settings.measurements = { true, true, true, "a", "k" };
     WriteSymbolModelSettings( *led, settings );
     BOOST_CHECK( !led->GetField( "CA.Model" )->IsVisible() );
     const auto read = ReadSymbolModelSettings( *led, m_schematic->CurrentSheet(), "", "" );
     BOOST_CHECK_EQUAL( read.modelFile, settings.modelFile );
     BOOST_CHECK( read.modelPins == settings.modelPins );
     BOOST_CHECK( read.modelParameters == settings.modelParameters );
+    BOOST_CHECK( read.measurements.voltage && read.measurements.current && read.measurements.power );
+    BOOST_CHECK_EQUAL( read.measurements.positive, "a" ); BOOST_CHECK_EQUAL( read.measurements.negative, "k" );
     BOOST_CHECK_EQUAL( read.value, originalValue );
     // The association, not the drawing's library ID, owns simulation compatibility.
     led->SetLibId( LIB_ID( "ArbitraryLibrary", "ArbitraryDrawing" ) );
@@ -40,9 +47,10 @@ BOOST_FIXTURE_TEST_CASE( ModelAssociationAndParametersPersistInSymbolFields, KI_
     INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
     session.Configure( snapshot.circuit.netlist, snapshot.circuit.config );
     session.AdvanceTo( .02 );
-    const double current = session.Snapshot().latest.values.at( 0 );
+    const double current = session.Snapshot().latest.values.at( snapshot.circuit.leds[0].signal );
     BOOST_CHECK_GT( current, .003 ); BOOST_CHECK_LT( current, .005 );
     settings.modelFile.clear(); settings.modelPins.clear(); settings.modelParameters.clear();
+    settings.measurements = {};
     WriteSymbolModelSettings( *led, settings );
     BOOST_CHECK( led->GetField( "CA.Model" ) == nullptr );
     BOOST_CHECK( led->GetField( "CA.Pins" ) == nullptr );
@@ -162,5 +170,96 @@ BOOST_FIXTURE_TEST_CASE( ProjectLocalResistorNoGroundLabelAndOpenPin, KI_TEST::S
     const auto sample = session.Snapshot();
     BOOST_CHECK_GT( sample.latest.values.at( 0 ), 0.005 );
     BOOST_CHECK_LT( sample.latest.values.at( 0 ), 0.008 );
-    BOOST_CHECK_CLOSE( sample.latest.values.at( 1 ), 5, 1e-5 );
+    BOOST_CHECK_CLOSE( sample.latest.values.back(), 5, 1e-5 );
+}
+
+BOOST_FIXTURE_TEST_CASE( NativeProbeSymbolsConnectAndKeepPhysicalPinOrientation, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "standard_library_led.kicad_sch" ); LoadSchematic( file );
+    auto& sheet = m_schematic->CurrentSheet();
+    VECTOR2I position;
+    bool found = false;
+    for( auto* item : m_schematic->RootScreen()->Items().OfType( SCH_SYMBOL_T ) )
+    {
+        auto* symbol = static_cast<SCH_SYMBOL*>( item );
+        if( !symbol->GetRef( &sheet ).StartsWith( "V" ) ) continue;
+        for( const auto* pin : symbol->GetPins( &sheet ) )
+            if( pin->GetShownNumber() == "1" ) { position = pin->GetPosition(); found = true; }
+    }
+    BOOST_REQUIRE( found );
+    auto probe = MakeProbeSymbol( PROBE_KIND::VOLTAGE, sheet, position, false, 1, "Supply" );
+    m_schematic->RootScreen()->Append( probe.release() );
+    m_schematic->ConnectionGraph()->Recalculate( m_schematic->Hierarchy(), true );
+    const auto snapshot = CaptureSchematic( *m_schematic );
+    BOOST_CHECK_EQUAL( snapshot.locations.size(), 3 ); BOOST_REQUIRE_EQUAL( snapshot.probes.size(), 1 );
+    BOOST_REQUIRE_EQUAL( snapshot.circuit.measurements.size(), 1 );
+    BOOST_CHECK_EQUAL( snapshot.circuit.measurements[0].name, "Supply" );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config ); session.AdvanceTo( .02 );
+    BOOST_CHECK_CLOSE( MeasurementValue( snapshot.circuit.measurements[0], session.Snapshot().latest ), 5, 1e-5 );
+    for( bool vertical : { false, true } )
+    {
+        auto ammeter = MakeProbeSymbol( PROBE_KIND::CURRENT, sheet, position, vertical, 2, "" );
+        BOOST_REQUIRE_EQUAL( ammeter->GetPins( &sheet ).size(), 2 );
+        for( const auto* pin : ammeter->GetPins( &sheet ) )
+        {
+            const auto actual = pin->GetPosition();
+            const int direction = pin->GetShownNumber() == "1" ? -1 : 1;
+            const auto delta = vertical ? VECTOR2I( 0, schIUScale.mmToIU( 1.27 ) ) : VECTOR2I( schIUScale.mmToIU( 1.27 ), 0 );
+            BOOST_CHECK( actual == position + delta * direction );
+        }
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( SavedOscilloscopeProbeCapturesCapacitorCharge, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC );
+    file.SetFullName( "scope_rc.kicad_sch" );
+    LoadSchematic( file );
+    const auto snapshot = CaptureSchematic( *m_schematic );
+    BOOST_REQUIRE_EQUAL( snapshot.probes.size(), 1 );
+    BOOST_REQUIRE_EQUAL( snapshot.circuit.measurements.size(), 1 );
+    const auto& channel = snapshot.circuit.measurements.front();
+    BOOST_CHECK( channel.scope && channel.connected );
+    BOOST_CHECK_EQUAL( channel.name, "Capacitor" );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config );
+    session.AdvanceTo( .02 );
+    const double early = MeasurementValue( channel, session.Snapshot().latest );
+    session.AdvanceTo( .5 );
+    const double later = MeasurementValue( channel, session.Snapshot().latest );
+    BOOST_CHECK_GT( early, 0 );
+    BOOST_CHECK_GT( later, early + .1 );
+    BOOST_CHECK_LT( later, 5 );
+}
+
+BOOST_FIXTURE_TEST_CASE( SavedMeasurementProbesPreserveOrderAndComponentSelections, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC );
+    file.SetFullName( "measurement_probes.kicad_sch" );
+    LoadSchematic( file );
+    const auto snapshot = CaptureSchematic( *m_schematic );
+    BOOST_REQUIRE_EQUAL( snapshot.probes.size(), 4 );
+    BOOST_REQUIRE_EQUAL( snapshot.circuit.measurements.size(), 10 );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config );
+    session.AdvanceTo( .02 );
+    const auto sample = session.Snapshot().latest;
+    std::vector<std::string> probeNames;
+    double componentPower = 0, wirePower = 0;
+    for( const auto& channel : snapshot.circuit.measurements )
+    {
+        const double value = MeasurementValue( channel, sample );
+        BOOST_CHECK( channel.connected );
+        if( channel.probe != NO_SIGNAL )
+        {
+            probeNames.push_back( channel.name );
+            if( channel.quantity == MEASURE_QUANTITY::POWER ) wirePower = value;
+        }
+        else if( channel.quantity == MEASURE_QUANTITY::POWER ) componentPower += value;
+    }
+    const std::vector<std::string> expected{ "Supply", "B", "C", "D" };
+    BOOST_CHECK( probeNames == expected );
+    BOOST_CHECK_CLOSE( componentPower, wirePower, 1e-4 );
+    BOOST_CHECK_GT( wirePower, .02 );
 }

@@ -92,5 +92,9 @@
     "signal": "@d${id}[id]",
     "brightness_parameter": "brightness_current",
     "rating_parameter": "rated_current"
+  },
+  "measurement_ports": {
+    "positive": "a",
+    "negative": "k"
   }
 }

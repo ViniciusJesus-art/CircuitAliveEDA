@@ -27,6 +27,14 @@
       "unit": "V",
       "min": -1000000.0,
       "max": 1000000.0
+    },
+    {
+      "id": "current_warning",
+      "label": "Current warning (0 disables)",
+      "unit": "A",
+      "default": "10",
+      "min": 0,
+      "max": 1000000000.0
     }
   ],
   "spice": {
@@ -46,5 +54,14 @@
     "Sim.Device": "V",
     "Sim.Type": "DC",
     "Sim.Pins": "1=+ 2=-"
-  }
+  },
+  "measurement_ports": {
+    "positive": "p",
+    "negative": "n"
+  },
+  "current_warning": {
+    "signal": "i(V${id})",
+    "limit_parameter": "current_warning"
+  },
+  "voltage_constraint_parameter": "voltage"
 }

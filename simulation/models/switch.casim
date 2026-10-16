@@ -55,5 +55,9 @@
     "source": "Vcontrol${id}",
     "on": 5,
     "off": 0
+  },
+  "measurement_ports": {
+    "positive": "p",
+    "negative": "n"
   }
 }

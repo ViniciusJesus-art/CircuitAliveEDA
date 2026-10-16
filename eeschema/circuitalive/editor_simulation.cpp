@@ -5,6 +5,10 @@
 #include "simulation_overlay.h"
 #include "simulation_toolbar.h"
 #include "model_dialog.h"
+#include "instrument_panel.h"
+#include "probe_placement.h"
+#include <tool/actions.h>
+#include <wx/textdlg.h>
 #include <algorithm>
 
 #include <tools/sch_tool_base.h>
@@ -65,6 +69,8 @@ private:
     int Configure( const TOOL_EVENT& );
     void tick( wxTimerEvent& );
     void click( wxMouseEvent& );
+    void key( wxKeyEvent& );
+    void chooseProbe( PROBE_KIND );
     void redraw();
     void setStatus( const wxString& aText );
     void publishStatus();
@@ -75,6 +81,8 @@ private:
     bool m_statusPending = false;
     std::unique_ptr<SESSION_RUNNER> m_runner;
     std::unique_ptr<SIMULATION_OVERLAY> m_overlay;
+    std::unique_ptr<INSTRUMENT_PANEL> m_instruments;
+    std::optional<PROBE_KIND> m_placing;
     SCHEMATIC_SNAPSHOT m_circuit;
     EDITOR_SESSION_VIEW m_session;
     bool m_active = false;
@@ -104,9 +112,18 @@ void EDITOR_SIMULATION_TOOL::Install()
     actions->SetConditions( SIMULATION_ACTIONS::stop, ACTION_CONDITIONS().Enable(
             [this]( const SELECTION& ) { return m_active; } ) );
     EnsureSimulationToolbar( *m_frame );
+    m_instruments = std::make_unique<INSTRUMENT_PANEL>( m_frame, [this]( PROBE_KIND kind ) { chooseProbe( kind ); } );
+    if( auto* manager = wxAuiManager::GetManager( m_frame ) )
+    {
+        manager->AddPane( m_instruments.get(), wxAuiPaneInfo().Name( "CircuitAliveInstruments" )
+            .Caption( _( "Simulation" ) ).Right().Layer( 1 ).Position( 0 ).CloseButton( false )
+            .TopDockable( false ).BottomDockable( false ).MinSize( 300, 220 ).BestSize( 350, 650 ) );
+        manager->Update();
+    }
     setStatus( _( "Stopped — t = 0 s" ) );
     Bind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
     m_frame->GetCanvas()->Bind( wxEVT_LEFT_DOWN, &EDITOR_SIMULATION_TOOL::click, this );
+    m_frame->Bind( wxEVT_CHAR_HOOK, &EDITOR_SIMULATION_TOOL::key, this );
     m_timer.Start( 33 );
 }
 
@@ -117,6 +134,12 @@ void EDITOR_SIMULATION_TOOL::Shutdown()
     m_timer.Stop();
     Unbind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
     m_frame->GetCanvas()->Unbind( wxEVT_LEFT_DOWN, &EDITOR_SIMULATION_TOOL::click, this );
+    m_frame->Unbind( wxEVT_CHAR_HOOK, &EDITOR_SIMULATION_TOOL::key, this );
+    if( m_instruments )
+    {
+        if( auto* manager = wxAuiManager::GetManager( m_frame ) ) manager->DetachPane( m_instruments.get() );
+        m_instruments.reset();
+    }
     m_frame->Schematic().RemoveListener( this );
     if( m_overlay && m_frame->GetCanvas()->GetView()->HasItem( m_overlay.get() ) )
         m_frame->GetCanvas()->GetView()->Remove( m_overlay.get() );
@@ -151,12 +174,15 @@ void EDITOR_SIMULATION_TOOL::Invalidate()
     m_active = false;
     m_session = {};
     m_circuit = {};
+    if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, false );
     redraw();
     setStatus( _( "Circuit changed — press Play to rebuild" ) );
 }
 
 int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
 {
+    m_placing.reset();
+    if( m_instruments ) m_instruments->SetPlacement( {} );
     if( !m_runner )
         return 0;
     const auto state = m_runner->View().state;
@@ -175,7 +201,7 @@ int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
         }
         catch( const std::exception& e )
         {
-            setStatus( _( "Circuit needs attention" ) );
+            setStatus( _( "Circuit needs attention" ) + " — " + wxString::FromUTF8( e.what() ).Left( 160 ) );
             wxMessageBox( wxString::FromUTF8( e.what() ), _( "Interactive simulation" ),
                           wxOK | wxICON_INFORMATION, m_frame );
         }
@@ -197,6 +223,7 @@ int EDITOR_SIMULATION_TOOL::Stop( const TOOL_EVENT& )
     m_active = false;
     m_session = {};
     m_circuit = {};
+    if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, false );
     redraw();
     setStatus( _( "Stopped — t = 0 s" ) );
     return 0;
@@ -207,8 +234,21 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
     auto& selection = m_toolMgr->GetTool<SCH_SELECTION_TOOL>()->RequestSelection( { SCH_SYMBOL_T } );
     if( selection.Size() != 1 ) return 0;
     auto* symbol = static_cast<SCH_SYMBOL*>( selection.Front() );
+    m_placing.reset(); if( m_instruments ) m_instruments->SetPlacement( {} );
     try
     {
+        if( symbol->GetField( "CA.Probe" ) )
+        {
+            wxTextEntryDialog dialog( m_frame, _( "Probe name (blank uses the net label or A, B, C...)" ),
+                _( "Probe properties" ), symbol->GetField( FIELD_T::VALUE )->GetText() );
+            if( dialog.ShowModal() == wxID_OK )
+            {
+                SCH_COMMIT commit( m_frame ); commit.Modify( symbol, m_frame->GetScreen() );
+                symbol->GetField( FIELD_T::VALUE )->SetText( dialog.GetValue() );
+                commit.Push( _( "Rename simulation probe" ) ); Invalidate();
+            }
+            return 0;
+        }
         auto component = ReadSymbolModelSettings( *symbol, m_frame->GetCurrentSheet(),
             m_frame->Schematic().GetCurrentVariant(), m_frame->Prj().GetProjectPath().ToStdString() );
         if( EditSimulationModel( m_frame, component ) )
@@ -229,6 +269,19 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
 
 void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
 {
+    if( m_placing )
+    {
+        try
+        {
+            const auto position = m_frame->GetCanvas()->GetView()->ToWorld( VECTOR2D( aEvent.GetPosition().x, aEvent.GetPosition().y ) );
+            PlaceProbe( *m_frame, *m_placing, m_instruments->ProbeName(), VECTOR2I( position ),
+                        std::max( 1, int( m_frame->GetCanvas()->GetView()->ToWorld( 12.0 ) ) ) );
+            m_instruments->ClearProbeName();
+            setStatus( _( "Probe placed — click another wire or press Esc" ) );
+        }
+        catch( const std::exception& e ) { setStatus( wxString::FromUTF8( e.what() ) ); }
+        return;
+    }
     if( m_active && ( m_session.state == EDITOR_SESSION_STATE::RUNNING
                      || m_session.state == EDITOR_SESSION_STATE::PAUSED ) )
     {
@@ -244,6 +297,24 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
         }
     }
     aEvent.Skip();
+}
+
+void EDITOR_SIMULATION_TOOL::chooseProbe( PROBE_KIND kind )
+{
+    m_toolMgr->RunAction( ACTIONS::cancelInteractive );
+    m_placing = kind; m_instruments->SetPlacement( kind );
+    setStatus( _( "Click a wire to place the probe; Esc finishes placement" ) );
+    m_frame->GetCanvas()->SetFocus();
+}
+
+void EDITOR_SIMULATION_TOOL::key( wxKeyEvent& event )
+{
+    if( m_placing && event.GetKeyCode() == WXK_ESCAPE )
+    {
+        m_placing.reset(); m_instruments->SetPlacement( {} );
+        setStatus( _( "Probe placement finished" ) ); return;
+    }
+    event.Skip();
 }
 
 void EDITOR_SIMULATION_TOOL::redraw()
@@ -265,6 +336,7 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     EnsureSimulationToolbar( *m_frame );
     m_session = m_runner->View();
     const auto state = m_session.state;
+    if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, m_active );
     if( !m_active )
     {
         publishStatus();
@@ -274,18 +346,12 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
                               _( "Paused" ), _( "Completed (1 h limit)" ), _( "Error" ) };
     wxString status = wxString::Format( "%s — t = %.3f s", names[static_cast<int>( state )],
                                        m_session.sample.latest.time );
-    for( std::size_t i = 0; i < std::min<std::size_t>( 3, m_session.ledCurrents.size() ); ++i )
-    {
-        const auto& led = m_circuit.circuit.leds.at( i );
-        status += wxString::Format( "   %s: %.2f mA", m_circuit.locations.at( led.component ).reference,
-                                    m_session.ledCurrents[i] * 1000 );
-        if( led.ratedCurrent > 0 && m_session.ledCurrents[i] > led.ratedCurrent )
-            status += _( " (overcurrent)" );
-    }
-    if( m_session.ledCurrents.size() > 3 )
-        status += wxString::Format( "   +%zu LEDs", m_session.ledCurrents.size() - 3 );
+    for( std::size_t i = 0; i < std::min<std::size_t>( 2, m_session.warnings.size() ); ++i )
+        status += "   " + wxString::FromUTF8( m_session.warnings[i] );
+    if( m_session.warnings.size() > 2 ) status += wxString::Format( _( "   +%zu warnings" ), m_session.warnings.size() - 2 );
     if( !m_circuit.circuit.floatingIslands.empty() )
         status += wxString::Format( _( "   Floating: %zu" ), m_circuit.circuit.floatingIslands.size() );
+    if( state == EDITOR_SESSION_STATE::ERROR ) status += "   " + wxString::FromUTF8( m_session.error ).Left( 140 );
     setStatus( status );
     publishStatus();
     redraw();

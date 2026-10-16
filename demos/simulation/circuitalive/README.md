@@ -41,3 +41,22 @@ com três pinos pela ação **Simulation model...**. A pinagem física e o parâ
 `ratio` são configuráveis; não exige recompilar.
 
 Veja [Arquivos de modelo](../../../docs/circuitalive/MODEL_FILES.md).
+
+## Medições e osciloscópio
+
+`measurement_probes.kicad_sch` contém probes V, A, W e osciloscópio, além de
+V/I/P selecionados em R1 e D1. Play abre Measurements; Oscilloscope mostra a
+tensão contínua no ponto D. R2 mantém um pino aberto para demonstrar que isso
+não impede a simulação.
+
+`scope_rc.kicad_sch` acrescenta uma probe de osciloscópio chamada Capacitor ao
+exemplo RC/chave/LED. Play abre diretamente a curva; clique em SW1 para ver a
+descarga e use Pause para inspecionar o trecho conservado.
+
+```bash
+./circuitalive eeschema demos/simulation/circuitalive/measurement_probes.kicad_sch
+./circuitalive eeschema demos/simulation/circuitalive/scope_rc.kicad_sch
+```
+
+Uso, convenções de sinal e limites em
+[Medições e osciloscópio](../../../docs/circuitalive/MEASUREMENTS.md).

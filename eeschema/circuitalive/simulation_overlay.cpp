@@ -14,6 +14,14 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
         || aSession.state == EDITOR_SESSION_STATE::ERROR )
         return;
     SetLineWidth( schIUScale.mmToIU( 0.12 ) );
+    for( const auto& channel : aCircuit.circuit.measurements )
+    {
+        if( channel.probe == NO_SIGNAL || channel.probe >= aCircuit.probes.size() ) continue;
+        const auto& location = aCircuit.probes[channel.probe]; if( location.sheet != aCurrentSheet ) continue;
+        SetIsFill( false ); SetIsStroke( true ); SetStrokeColor( KIGFX::COLOR4D( .12, .5, .9, 1 ) );
+        SetGlyphSize( VECTOR2I( schIUScale.mmToIU( 1 ), schIUScale.mmToIU( 1 ) ) );
+        BitmapText( wxString::FromUTF8( channel.name ), location.position + VECTOR2I( schIUScale.mmToIU( 3.5 ), schIUScale.mmToIU( -1 ) ), ANGLE_0 );
+    }
     for( std::size_t i = 0; i < aCircuit.circuit.leds.size(); ++i )
     {
         const auto& location = aCircuit.locations.at( aCircuit.circuit.leds[i].component );

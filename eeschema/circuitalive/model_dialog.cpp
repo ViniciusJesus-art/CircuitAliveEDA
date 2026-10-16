@@ -4,6 +4,7 @@
 #include <dialog_shim.h>
 #include <wx/button.h>
 #include <wx/choice.h>
+#include <wx/checkbox.h>
 #include <wx/filedlg.h>
 #include <wx/grid.h>
 #include <wx/msgdlg.h>
@@ -21,6 +22,10 @@ public:
                      wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER ), m_component( component ),
         m_repository( MODEL_REPOSITORY::DefaultDirectories( component.projectDirectory ) )
     {
+        // These controls describe a particular symbol, not a dialog preference.
+        // DIALOG_SHIM's generic persistence must never overwrite its saved model/pins/measurements.
+        OptOut( this );
+        SetInitialFocus( nullptr );
         auto* layout = new wxBoxSizer( wxVERTICAL );
         layout->Add( new wxStaticText( this, wxID_ANY, wxString::Format( "%s — %s   Value: %s",
             wxString::FromUTF8( component.reference ), wxString::FromUTF8( component.libraryId ),
@@ -54,9 +59,28 @@ public:
         m_parameters->SetColLabelValue( 2, _( "Unit" ) );
         m_parameters->SetColLabelValue( 3, _( "Model default" ) );
         layout->Add( m_parameters, 2, wxEXPAND | wxALL, 10 );
+        auto* measurements = new wxBoxSizer( wxVERTICAL );
+        auto* checks = new wxBoxSizer( wxHORIZONTAL );
+        m_voltage = new wxCheckBox( this, wxID_ANY, _( "Measure V" ) );
+        m_current = new wxCheckBox( this, wxID_ANY, _( "Measure I" ) );
+        m_power = new wxCheckBox( this, wxID_ANY, _( "Measure P" ) );
+        m_voltage->SetValue( component.measurements.voltage );
+        m_current->SetValue( component.measurements.current );
+        m_power->SetValue( component.measurements.power );
+        for( auto* check : { m_voltage, m_current, m_power } ) checks->Add( check, 0, wxRIGHT, 20 );
+        measurements->Add( checks, 0, wxBOTTOM, 6 );
+        auto* ports = new wxBoxSizer( wxHORIZONTAL );
+        m_positive = new wxChoice( this, wxID_ANY ); m_negative = new wxChoice( this, wxID_ANY );
+        ports->Add( new wxStaticText( this, wxID_ANY, _( "From (+):" ) ), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 6 );
+        ports->Add( m_positive, 1, wxRIGHT, 12 );
+        ports->Add( new wxStaticText( this, wxID_ANY, _( "To (−):" ) ), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 6 );
+        ports->Add( m_negative, 1 ); measurements->Add( ports, 0, wxEXPAND );
+        measurements->Add( new wxStaticText( this, wxID_ANY,
+            _( "I enters the (+) terminal. P is signed power for this port pair." ) ), 0, wxTOP, 4 );
+        layout->Add( measurements, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
         layout->Add( CreateSeparatedButtonSizer( wxOK | wxCANCEL ), 0, wxEXPAND | wxALL, 10 );
         SetSizer( layout );
-        SetMinSize( wxSize( 760, 600 ) ); SetSize( 900, 760 ); Centre();
+        SetMinSize( wxSize( 760, 720 ) ); SetSize( 900, 880 ); Centre();
         int selected = 0;
         for( std::size_t i = 0; i < m_models.size(); ++i )
             if( component.modelFile == "builtin:" + m_models[i].id ) selected = static_cast<int>( i + 1 );
@@ -115,6 +139,7 @@ public:
             }
             catch( const std::exception& e ) { showError( e.what() ); }
         }, wxID_OK );
+        SetInitialFocus( m_pins );
     }
     const CIRCUIT_COMPONENT& Result() const { return m_component; }
 
@@ -173,6 +198,7 @@ private:
         catch( const std::exception& e ) { m_details->SetLabel( wxString::FromUTF8( e.what() ) ); }
         if( m_pins->GetNumberRows() ) m_pins->DeleteRows( 0, m_pins->GetNumberRows() );
         if( m_parameters->GetNumberRows() ) m_parameters->DeleteRows( 0, m_parameters->GetNumberRows() );
+        m_positive->Clear(); m_negative->Clear();
         if( m_model )
         {
             wxArrayString physical;
@@ -186,7 +212,20 @@ private:
                 m_pins->SetCellValue( row, 2, wxString::FromUTF8( it == m_component.modelPins.end() ? pin.defaultPin : it->second ) );
                 m_pins->SetReadOnly( row, 0 ); m_pins->SetReadOnly( row, 1 );
                 m_pins->SetCellEditor( row, 2, new wxGridCellChoiceEditor( physical, false ) );
+                m_positive->Append( wxString::FromUTF8( pin.label + " [" + pin.id + "]" ) );
+                m_negative->Append( wxString::FromUTF8( pin.label + " [" + pin.id + "]" ) );
             }
+            auto choose = [&]( wxChoice* choice, const std::string& selected, const std::string& fallback, int defaultIndex )
+            {
+                int index = defaultIndex;
+                for( std::size_t i = 0; i < m_model->pins.size(); ++i )
+                    if( m_model->pins[i].id == fallback ) index = i;
+                for( std::size_t i = 0; i < m_model->pins.size(); ++i )
+                    if( m_model->pins[i].id == selected ) index = i;
+                if( index < static_cast<int>( m_model->pins.size() ) ) choice->SetSelection( index );
+            };
+            choose( m_positive, m_component.measurements.positive, m_model->measurePositive, 0 );
+            choose( m_negative, m_component.measurements.negative, m_model->measureNegative, 1 );
             for( const auto& parameter : m_model->parameters )
             {
                 const int row = m_parameters->GetNumberRows(); m_parameters->AppendRows();
@@ -215,6 +254,16 @@ private:
             grid->SaveEditControlValue(); grid->HideCellEditControl();
         }
         m_component.modelPins.clear(); m_component.modelParameters.clear();
+        auto& selected = m_component.measurements;
+        selected.voltage = m_voltage->GetValue(); selected.current = m_current->GetValue(); selected.power = m_power->GetValue();
+        if( selected.Any() )
+        {
+            if( m_positive->GetSelection() < 0 || m_negative->GetSelection() < 0
+                || m_positive->GetSelection() == m_negative->GetSelection() )
+                throw std::runtime_error( "Select two distinct measurement ports" );
+            selected.positive = m_model->pins.at( m_positive->GetSelection() ).id;
+            selected.negative = m_model->pins.at( m_negative->GetSelection() ).id;
+        }
         for( std::size_t i = 0; i < m_model->pins.size(); ++i )
             m_component.modelPins[m_model->pins[i].id] = m_pins->GetCellValue( i, 2 ).ToStdString();
         for( std::size_t i = 0; i < m_model->parameters.size(); ++i )
@@ -229,6 +278,8 @@ private:
     wxStaticText* m_details;
     wxGrid* m_pins;
     wxGrid* m_parameters;
+    wxCheckBox *m_voltage, *m_current, *m_power;
+    wxChoice *m_positive, *m_negative;
 };
 
 bool EditSimulationModel( wxWindow* parent, CIRCUIT_COMPONENT& component )

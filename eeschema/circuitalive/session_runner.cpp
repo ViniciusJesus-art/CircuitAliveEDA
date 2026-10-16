@@ -81,6 +81,7 @@ void SESSION_RUNNER::run()
     EDITOR_SESSION_VIEW view;
     std::uint64_t revision = 0;
     bool running = false;
+    std::map<std::string, std::string> latchedWarnings;
     auto next = std::chrono::steady_clock::now();
 
     for( ;; )
@@ -110,10 +111,11 @@ void SESSION_RUNNER::run()
                     session->Configure( circuit.netlist, circuit.config );
                     session->AdvanceTo( circuit.config.step );
                     view = {};
+                    latchedWarnings.clear();
                     view.sample = session->Snapshot( true );
                     view.switches.assign( circuit.switches.size(), true );
                     running = true;
-                    next = std::chrono::steady_clock::now();
+                    next = std::chrono::steady_clock::now() + std::chrono::milliseconds( 20 );
                     break;
                 case COMMAND_TYPE::RESUME:
                     if( session && view.sample.state != SIM_SESSION_STATE::COMPLETED )
@@ -128,6 +130,7 @@ void SESSION_RUNNER::run()
                 case COMMAND_TYPE::STOP:
                     session.reset();
                     view = {};
+                    latchedWarnings.clear();
                     running = false;
                     break;
                 case COMMAND_TYPE::TOGGLE:
@@ -168,7 +171,31 @@ void SESSION_RUNNER::run()
                             ? view.sample.latest.values.at( led.signal )
                             : sum / view.sample.history.size() );
                 }
-                view.sample.history.clear(); // GUI only receives the reduced display values.
+                view.measurements.clear();
+                for( const auto& channel : circuit.measurements )
+                    view.measurements.push_back( MeasurementValue( channel, view.sample.latest ) );
+                if( std::any_of( circuit.measurements.begin(), circuit.measurements.end(), []( const auto& c ) { return c.scope; } ) )
+                {
+                    for( const auto& sample : view.sample.history )
+                        if( view.scopeHistory.empty() || sample.time > view.scopeHistory.back().time )
+                            view.scopeHistory.push_back( sample );
+                    const auto capacity = std::min<std::size_t>( 8192, 65536 / circuit.config.signals.size() );
+                    if( view.scopeHistory.size() > capacity )
+                        view.scopeHistory.erase( view.scopeHistory.begin(), view.scopeHistory.end() - capacity );
+                }
+                auto warn = [&]( const std::string& name, double limit, std::size_t signal )
+                {
+                    bool exceeded = std::abs( view.sample.latest.values.at( signal ) ) > limit;
+                    for( const auto& sample : view.sample.history ) exceeded |= std::abs( sample.values.at( signal ) ) > limit;
+                    if( exceeded ) latchedWarnings.try_emplace( name,
+                        "Overcurrent: " + name + " (> " + FormatMeasurement( limit, MEASURE_QUANTITY::CURRENT ) + ")" );
+                };
+                for( const auto& warning : circuit.currentWarnings ) warn( warning.name, warning.limit, warning.signal );
+                for( const auto& led : circuit.leds )
+                    if( led.ratedCurrent > 0 ) warn( led.reference.empty() ? "LED" : led.reference, led.ratedCurrent, led.signal );
+                view.warnings.clear();
+                for( const auto& [name, warning] : latchedWarnings ) view.warnings.push_back( warning );
+                view.sample.history.clear();
             }
         }
         catch( const std::exception& e )

@@ -11,6 +11,7 @@
 #include <sch_text.h>
 #include <sch_textbox.h>
 #include <schematic.h>
+#include <algorithm>
 #include <sstream>
 #include <stdexcept>
 
@@ -41,6 +42,20 @@ CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& s
     };
     component.modelPins = map( "CA.Pins" );
     component.modelParameters = map( "CA.Parameters" );
+    const auto measurements = field( "CA.Measurements" );
+    if( !measurements.empty() )
+    {
+        try
+        {
+            auto j = nlohmann::json::parse( measurements );
+            component.measurements.voltage = j.value( "voltage", false );
+            component.measurements.current = j.value( "current", false );
+            component.measurements.power = j.value( "power", false );
+            component.measurements.positive = j.value( "positive", "" );
+            component.measurements.negative = j.value( "negative", "" );
+        }
+        catch( const std::exception& ) { throw std::runtime_error( component.reference + ": invalid CA.Measurements" ); }
+    }
     for( const wxString name : { "Sim.Library", "Sim.Name", "Sim.Params", "Sim.Device", "Sim.Type", "Sim.Pins" } )
         if( auto value = field( name ); !value.empty() ) component.legacySpiceFields[name.ToStdString()] = value;
     component.explicitSpiceModel = !component.legacySpiceFields.empty();
@@ -54,7 +69,11 @@ void WriteSymbolModelSettings( SCH_SYMBOL& symbol, const CIRCUIT_COMPONENT& sett
     const std::map<wxString, std::string> fields = {
         { "CA.Model", settings.modelFile },
         { "CA.Pins", settings.modelPins.empty() ? "" : nlohmann::json( settings.modelPins ).dump() },
-        { "CA.Parameters", settings.modelParameters.empty() ? "" : nlohmann::json( settings.modelParameters ).dump() }
+        { "CA.Parameters", settings.modelParameters.empty() ? "" : nlohmann::json( settings.modelParameters ).dump() },
+        { "CA.Measurements", !settings.measurements.Any() ? "" : nlohmann::json{
+            { "voltage", settings.measurements.voltage }, { "current", settings.measurements.current },
+            { "power", settings.measurements.power }, { "positive", settings.measurements.positive },
+            { "negative", settings.measurements.negative } }.dump() }
     };
     for( const auto& [name, value] : fields )
     {
@@ -70,6 +89,7 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
 {
     SCHEMATIC_SNAPSHOT result;
     std::vector<CIRCUIT_COMPONENT> components;
+    std::vector<CIRCUIT_PROBE> probes;
     const wxString variant = aSchematic.GetCurrentVariant();
     for( SCH_SHEET_PATH& sheet : aSchematic.Hierarchy() )
     {
@@ -99,6 +119,36 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
         {
             auto* symbol = static_cast<SCH_SYMBOL*>( item );
             std::string lib = symbol->GetLibId().Format().c_str();
+            auto* probeField = symbol->GetField( "CA.Probe" );
+            if( probeField )
+            {
+                CIRCUIT_PROBE probe;
+                probe.kind = ParseProbeKind( probeField->GetText().ToStdString() );
+                probe.name = symbol->GetField( FIELD_T::VALUE )->GetText().ToStdString();
+                if( auto* f = symbol->GetField( "CA.ProbeSequence" ) )
+                {
+                    unsigned long index = 1; f->GetText().ToULong( &index ); probe.sequence = std::max<unsigned long>( 1, index );
+                }
+                for( const auto* pin : symbol->GetPins( &sheet ) )
+                {
+                    auto* connection = pin->Connection( &sheet );
+                    auto name = connection ? connection->Name() : wxString();
+                    if( connection && ( connection->IsUnconnected() || connection->LocalName().StartsWith( "unconnected-(" ) ) ) name.clear();
+                    if( connection && ( connection->LocalName() == "GND" || connection->LocalName() == "0" ) ) name = "0";
+                    probe.pins[pin->GetShownNumber().ToStdString()] = name.ToStdString();
+                    if( pin->GetShownNumber() == "1" && connection )
+                    {
+                        auto label = connection->LocalName();
+                        if( !label.StartsWith( "Net-(" ) && !label.StartsWith( "unconnected-(" ) ) probe.label = label.ToStdString();
+                    }
+                }
+                const auto at = std::upper_bound( probes.begin(), probes.end(), probe.sequence,
+                    []( std::size_t sequence, const CIRCUIT_PROBE& p ) { return sequence < p.sequence; } ) - probes.begin();
+                probes.insert( probes.begin() + at, std::move( probe ) );
+                result.probes.insert( result.probes.begin() + at, { sheet.PathAsString(), symbol->m_Uuid.AsString(),
+                    symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition() } );
+                continue;
+            }
             if( symbol->IsPower() || lib.starts_with( "power:" )
                 || symbol->GetExcludedFromSim( &sheet, variant ) )
                 continue;
@@ -123,7 +173,7 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
                                           symbol->GetPosition() } );
         }
     }
-    result.circuit = BuildCircuitSnapshot( components );
+    result.circuit = BuildCircuitSnapshot( components, probes );
     return result;
 }
 }

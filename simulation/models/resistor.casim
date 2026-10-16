@@ -44,5 +44,9 @@
       "R"
     ]
   },
-  "ignore_legacy_spice_fields": true
+  "ignore_legacy_spice_fields": true,
+  "measurement_ports": {
+    "positive": "p",
+    "negative": "n"
+  }
 }
