@@ -118,3 +118,16 @@ target_compile_definitions( qa_spice
 kicad_add_boost_test( qa_spice qa_spice )
 
 setup_qa_env( qa_spice )
+
+if( TARGET circuitalive_sim_session )
+    add_executable( qa_interactive_sim test_interactive_sim_session.cpp )
+    target_link_libraries( qa_interactive_sim PRIVATE
+        circuitalive_sim_session Boost::unit_test_framework )
+    target_compile_definitions( qa_interactive_sim PRIVATE
+        BOOST_TEST_DYN_LINK
+        CIRCUITALIVE_TEST_WORKER="$<TARGET_FILE:circuitalive-sim-worker>"
+        CIRCUITALIVE_TEST_DEMO="${PROJECT_SOURCE_DIR}/demos/simulation/circuitalive/rc_switch_led.cir" )
+    add_dependencies( qa_interactive_sim circuitalive-sim-worker )
+    add_test( NAME qa_interactive_sim COMMAND qa_interactive_sim --log_level=test_suite )
+    set_tests_properties( qa_interactive_sim PROPERTIES TIMEOUT 120 )
+endif()

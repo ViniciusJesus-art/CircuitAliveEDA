@@ -1,8 +1,9 @@
 # CircuitAliveEDA
 
-Projeto derivado do KiCad para desenvolver simulação interativa no esquemático. Esta primeira
-etapa prepara a base original, a compilação no Fedora e o simulador existente.
-Os controles de simulação interativa descritos no mapa são etapas futuras.
+Projeto derivado do KiCad para desenvolver simulação interativa no esquemático.
+A base KiCad estável está preparada e o primeiro núcleo de sessão interativa já
+foi implementado e testado, com ngspice isolado em processo auxiliar.
+Os controles visuais no esquemático pertencem à próxima etapa.
 
 - Repositório independente privado: <https://github.com/ViniciusJesus-art/CircuitAliveEDA>
 - Branch de trabalho: `main`.
@@ -13,6 +14,8 @@ Os controles de simulação interativa descritos no mapa são etapas futuras.
 - [Configuração, compilação e execução](docs/circuitalive/BUILD_FEDORA.md).
 - [Validação da etapa 0](docs/circuitalive/VALIDATION.md): build completo,
   editor e simulador abertos, 53 casos SPICE aprovados.
+- [Sessão interativa — etapa 1](docs/circuitalive/INTERACTIVE_SESSION.md):
+  controlador, teste RC/chave/LED, pausa/retomada, reset e medição de memória.
 - [Mapa do projeto](docs/circuitalive/Mapa_KiCad_Simulacao_Interativa.md), preservado como
   referência original; a revisão nele citada foi substituída pela base estável acima.
 

@@ -1,5 +1,8 @@
 # Validação da base estável
 
+Registro da etapa 0, anterior à implementação da sessão interativa. A validação
+da etapa 1 está em [INTERACTIVE_SESSION.md](INTERACTIVE_SESSION.md).
+
 Executada em 16/10/2026, no Fedora Linux 44 x86_64 desta máquina.
 
 ## Base para o desenvolvimento

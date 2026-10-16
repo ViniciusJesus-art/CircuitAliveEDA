@@ -1,0 +1,13 @@
+CircuitAliveEDA - RC, voltage-controlled switch and LED (stage 1)
+* Component-only deck. The session adds the transient analysis and save policy.
+Vpower supply 0 5
+Vcontrol control 0 5
+S1 supply charge control 0 SW
+Rcharge charge cap 1k
+Cstorage cap 0 1u ic=0
+Rbleed cap 0 10k
+Rled cap anode 330
+Dled anode 0 REDLED
+.model SW SW(Ron=0.01 Roff=1e12 Vt=2.5 Vh=0.1)
+.model REDLED D(Is=1e-20 N=2 Rs=5)
+.end

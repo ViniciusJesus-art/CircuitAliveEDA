@@ -4,8 +4,8 @@
 
 Esta é a etapa 0 do [mapa](Mapa_KiCad_Simulacao_Interativa.md): base estável, checkout
 completo, ambiente de compilação, instalação local e verificação do KiCad original.
-A implementação de Play/Pause/Stop e de simulação interativa ainda pertence às
-etapas seguintes.
+O núcleo de sessão Play/Pause/Stop foi acrescentado na
+[etapa 1](INTERACTIVE_SESSION.md); a integração visual ao editor é a etapa seguinte.
 
 Base fixada: **KiCad 10.0.7**, tag oficial `10.0.7`, commit
 [`69cafb907ebc09e7722a2a464b1d466fc2e3608d`](https://gitlab.com/kicad/code/kicad/-/tags/10.0.7),
@@ -16,7 +16,8 @@ A revisão `6809ada8746084720c0093eb484c889afb35d0d4` do mapa original foi
 substituída: ela continha 30 commits posteriores à versão estável. O mapa é
 mantido como documento de referência, sem alterar seu conteúdo original.
 Os commits de configuração do projeto foram reaplicados sobre a tag estável;
-nenhum código C++ do KiCad foi modificado nesta preparação.
+nenhum código C++ do KiCad foi modificado na preparação da etapa 0.
+A etapa 1 adiciona módulos novos de sessão, sem alterar o wrapper tradicional de ngspice.
 O Git acrescenta a quantidade e o hash dos commits do projeto à versão de
 compilação, além do sufixo `CircuitAliveEDA`; isso não altera a base upstream.
 
@@ -83,6 +84,8 @@ prefira `--system`. Checksums dos RPMs usados ficam em
 `.circuitalive/dependencies.sha256`, com uma cópia da preparação inicial em
 [FEDORA44_RPMS.sha256](FEDORA44_RPMS.sha256); as versões detectadas ficam no log do CMake.
 Os pacotes são extraídos sem executar scripts RPM e sem instalação global.
+Antes de configurar, os scripts também reparam atalhos locais de bibliotecas
+que tenham ficado inválidos após atualizações do sistema, mantendo o mesmo nome de ABI.
 
 ## Compilar e instalar
 

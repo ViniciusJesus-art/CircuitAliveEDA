@@ -5,9 +5,35 @@ import hashlib
 import os
 import re
 import subprocess
+import sys
 
 root = Path(__file__).resolve().parents[2]
 prefix = root / '.circuitalive/deps'
+
+
+def repair_runtime_links():
+    """Reuse ABI symlinks rather than pinning a system library's patch filename."""
+    for link in prefix.rglob('*'):
+        if not link.is_symlink() or link.exists():
+            continue
+        target = link.readlink()
+        if target.is_absolute():
+            system = Path('/') / link.relative_to(prefix)
+            if system.exists():
+                link.unlink()
+                link.symlink_to(system)
+            continue
+        system = Path('/') / link.relative_to(prefix).parent / target
+        if system.exists():
+            dest = link.parent / target
+            if not dest.exists():
+                dest.symlink_to(system)
+
+
+if sys.argv[1:] == ['--repair-runtime-links']:
+    repair_runtime_links()
+    raise SystemExit(0)
+
 key = hashlib.sha256(str(root).encode()).hexdigest()[:12]
 alias = f'/tmp/circuitalive-{os.getuid()}-{key}'
 names = {
@@ -42,17 +68,7 @@ for rpm in sorted((root / '.circuitalive/rpms').glob('*.rpm')):
         raise SystemExit(f'Falha ao extrair {rpm.name}')
 
 # Development symlinks refer to runtime libraries already installed on this host.
-for link in prefix.rglob('*'):
-    if not link.is_symlink() or link.exists():
-        continue
-    target = link.readlink()
-    if target.is_absolute():
-        continue
-    system = Path('/') / link.relative_to(prefix).parent / target
-    if system.exists():
-        dest = link.parent / target
-        if not dest.exists():
-            dest.symlink_to(system.resolve())
+repair_runtime_links()
 
 # Fedora wx-config hardcodes /usr even when given --prefix.
 wxconfig = prefix / 'usr/lib64/wx/config/gtk3-unicode-3.2'
