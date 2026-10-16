@@ -1,7 +1,8 @@
 # Sessão interativa — etapa 1
 
 Implementada sobre KiCad 10.0.7, no Fedora/Linux. Esta entrega é o núcleo testável
-do motor; os botões e indicadores no esquemático pertencem à etapa 2.
+do motor. Os botões e indicadores foram adicionados na
+[etapa 2](EDITOR_SIMULATION.md), em módulos separados.
 
 ## Comportamento implementado
 
@@ -18,8 +19,8 @@ do motor; os botões e indicadores no esquemático pertencem à etapa 2.
   métricas. Uma geração nova invalida resultados de uma sessão encerrada.
 
 Estados: `STOPPED`, `RUNNING`, `PAUSED`, `COMPLETED`, `ERROR`.
-As chamadas do controlador são síncronas e serializadas. A futura interface deve
-executá-las em sua thread de controle e publicar os snapshots para a thread wx.
+As chamadas do controlador são síncronas e serializadas. A interface da etapa 2
+as executa em sua thread de controle e publica os snapshots para a thread wx.
 Callbacks do ngspice não acessam objetos do editor nem objetos gráficos.
 
 ## Por que usar um processo auxiliar

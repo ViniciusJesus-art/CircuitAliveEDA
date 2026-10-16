@@ -169,6 +169,11 @@ estão em [VALIDATION.md](VALIDATION.md).
 
 ## Git
 
+A barra interativa Play/Pause/Stop e o circuito de demonstração estão descritos em
+[EDITOR_SIMULATION.md](EDITOR_SIMULATION.md). A integração fica concentrada em
+`eeschema/circuitalive/`; esse documento também lista os pontos que precisam ser
+revalidados ao atualizar a base KiCad.
+
 ```text
 origin           git@github.com:ViniciusJesus-art/CircuitAliveEDA.git
 upstream         https://github.com/KiCad/kicad-source-mirror.git

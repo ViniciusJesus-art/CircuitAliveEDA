@@ -120,9 +120,9 @@ kicad_add_boost_test( qa_spice qa_spice )
 setup_qa_env( qa_spice )
 
 if( TARGET circuitalive_sim_session )
-    add_executable( qa_interactive_sim test_interactive_sim_session.cpp )
+    add_executable( qa_interactive_sim test_interactive_sim_session.cpp test_interactive_circuit.cpp )
     target_link_libraries( qa_interactive_sim PRIVATE
-        circuitalive_sim_session Boost::unit_test_framework )
+        circuitalive_interactive circuitalive_sim_session Boost::unit_test_framework )
     target_compile_definitions( qa_interactive_sim PRIVATE
         BOOST_TEST_DYN_LINK
         CIRCUITALIVE_TEST_WORKER="$<TARGET_FILE:circuitalive-sim-worker>"
@@ -130,4 +130,9 @@ if( TARGET circuitalive_sim_session )
     add_dependencies( qa_interactive_sim circuitalive-sim-worker )
     add_test( NAME qa_interactive_sim COMMAND qa_interactive_sim --log_level=test_suite )
     set_tests_properties( qa_interactive_sim PROPERTIES TIMEOUT 120 )
+    target_sources( qa_spice PRIVATE test_interactive_schematic.cpp )
+    target_compile_definitions( qa_spice PRIVATE
+        CIRCUITALIVE_TEST_WORKER="$<TARGET_FILE:circuitalive-sim-worker>"
+        CIRCUITALIVE_TEST_SCHEMATIC="${PROJECT_SOURCE_DIR}/demos/simulation/circuitalive/interactive_rc_led.kicad_sch" )
+    add_dependencies( qa_spice circuitalive-sim-worker )
 endif()

@@ -784,3 +784,4 @@ make_lexer(
 
 add_subdirectory( python_scripts )
 add_subdirectory( sim )
+add_subdirectory( circuitalive )

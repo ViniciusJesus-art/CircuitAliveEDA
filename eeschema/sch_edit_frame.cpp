@@ -60,6 +60,7 @@
 #include <project/net_settings.h>
 #include <python_scripting.h>
 #include <sch_edit_frame.h>
+#include <circuitalive/editor_simulation.h>
 #include <symbol_chooser_frame.h>
 #include <sch_painter.h>
 #include <sch_marker.h>
@@ -489,6 +490,7 @@ SCH_EDIT_FRAME::SCH_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     Bind( EDA_EVT_CLOSE_DIALOG_BOOK_REPORTER, &SCH_EDIT_FRAME::onCloseSymbolDiffDialog, this );
     Bind( EDA_EVT_CLOSE_ERC_DIALOG, &SCH_EDIT_FRAME::onCloseErcDialog, this );
     Bind( EDA_EVT_CLOSE_DIALOG_SYMBOL_FIELDS_TABLE, &SCH_EDIT_FRAME::onCloseSymbolFieldsTableDialog, this );
+    CIRCUITALIVE::InstallEditorSimulation( this );
 }
 
 void SCH_EDIT_FRAME::StartCrossProbeFlash( const std::vector<SCH_ITEM*>& aItems )
@@ -593,6 +595,7 @@ void SCH_EDIT_FRAME::OnCrossProbeFlashTimer( wxTimerEvent& aEvent )
 
 SCH_EDIT_FRAME::~SCH_EDIT_FRAME()
 {
+    CIRCUITALIVE::ShutdownEditorSimulation( this );
     // Ensure that teardowns without doCloseWindow are fully unregistered
     if( m_schematic )
         Kiway().LocalHistory().UnregisterSaver( m_schematic );
@@ -709,6 +712,7 @@ void SCH_EDIT_FRAME::setupTools()
     m_toolManager->RegisterTool( new SCH_NAVIGATE_TOOL );
     m_toolManager->RegisterTool( new PROPERTIES_TOOL );
     m_toolManager->RegisterTool( new EMBED_TOOL );
+    CIRCUITALIVE::RegisterEditorSimulation( m_toolManager );
     m_toolManager->InitTools();
 
     // Run the selection tool, it is supposed to be always active
@@ -1335,6 +1339,7 @@ SEVERITY SCH_EDIT_FRAME::GetSeverity( int aErrorCode ) const
 
 void SCH_EDIT_FRAME::OnModify()
 {
+    CIRCUITALIVE::InvalidateEditorSimulation( this );
     EDA_BASE_FRAME::OnModify();
 
     if( GetScreen() )
@@ -3056,6 +3061,7 @@ void SCH_EDIT_FRAME::SetSchematic( SCHEMATIC* aSchematic )
     static_cast<KIGFX::SCH_PAINTER*>( view->GetPainter() )->SetSchematic( m_schematic );
     m_toolManager->SetEnvironment( m_schematic, GetCanvas()->GetView(), GetCanvas()->GetViewControls(), config(),
                                    this );
+    CIRCUITALIVE::RebindEditorSimulation( this );
 }
 
 
