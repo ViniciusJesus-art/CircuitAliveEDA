@@ -5,8 +5,10 @@ configurados por componente. Veja [Arquivos de modelo](MODEL_FILES.md) para o
 funcionamento atual; as validações históricas ao final registram as etapas anteriores.
 
 O editor possui ícones **Play, Pause e Stop no final da barra superior original**,
-com o mesmo tamanho e comportamento dos outros botões. Tempo, estado e corrente
-dos LEDs aparecem na barra de status inferior existente. A preparação usa o circuito desenhado e o grafo elétrico do
+com o mesmo tamanho e comportamento dos outros botões. Tempo, estado e avisos
+aparecem na barra inferior. Leituras ficam nas abas opcionais. O botão após Stop
+alterna os níveis dos pinos; a seta da barra direita abre as probes recolhidas.
+A preparação usa o circuito desenhado e o grafo elétrico do
 KiCad. Nenhuma janela de análise ou duração precisa ser preenchida para o conjunto
 de componentes suportado.
 
@@ -40,6 +42,9 @@ desenha apenas os indicadores da instância visível.
 | `Simulation_SPICE:VDC`, `Device:Battery`, `Device:Battery_Cell` | Fonte DC, valor do campo Value, pino 1 positivo |
 | `Switch:SW_SPST` | Chave analógica controlada por clique, inicialmente fechada |
 | `Device:LED`, `LED_Small` | Modelo didático vermelho inicial, pino 1 cátodo e 2 ânodo; não precisa renomear Value |
+
+O catálogo foi ampliado com fontes AC/pulsadas, indutor, diodos, transistores e
+74HC00/74HC125; consulte [Componentes básicos e digital](BASIC_AND_DIGITAL_MODELS.md).
 
 O status mostra tempo, estado e avisos. Correntes, tensões e potência ficam na
 aba Measurements; a aba Oscilloscope mostra as curvas das probes de osciloscópio.
@@ -133,6 +138,7 @@ Todo o código novo da integração fica em `eeschema/circuitalive/`:
 | `measurements.*` | Canais de medição, nomes e unidades |
 | `probe_placement.*` | Símbolos de probe e inserção nos fios com desfazer nativo |
 | `instrument_panel.*` | Painel lateral de ferramentas, valores e osciloscópio |
+| `logic_signals.*` | Interpretação dos pinos, incluindo driver Z e estado indefinido X |
 | `CMakeLists.txt` | Compilação e ligação dos módulos |
 
 O núcleo e o worker continuam nos arquivos `interactive_sim_*` da etapa 1, em

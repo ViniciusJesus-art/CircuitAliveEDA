@@ -1,6 +1,8 @@
 # Probes, medições e osciloscópio
 
-O painel **Simulation**, à direita do esquemático, contém a aba **Probes**.
+O painel **Simulation** inicia recolhido. Abra-o pela seta diagonal no final
+da barra direita; outro clique cancela a colocação e recolhe o painel.
+Ele contém a aba **Probes**.
 Escolha Voltage, Current, Power ou Oscilloscope e clique em um fio elétrico.
 O símbolo é uma seta diagonal para cima e para a direita, com V, A, W ou ~.
 É possível colocar várias probes seguidas; **Esc** encerra a ferramenta.
@@ -84,7 +86,7 @@ parte dela. O desenho conserva os extremos das amostras agrupadas por pixel.
 O passo máximo atual do solver é **100 µs**. Este osciloscópio inicial serve
 para acompanhar transientes compatíveis com essa resolução; ainda não oferece
 trigger, cursores, RMS, FFT ou captura de sinais de alta frequência. A sessão
-aceita até 64 sinais salvos, incluindo indicadores e monitores internos.
+aceita até 256 sinais salvos, incluindo indicadores e monitores internos.
 
 ## Status e avisos
 

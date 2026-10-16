@@ -10,7 +10,7 @@ class SIMULATION_OVERLAY : public KIGFX::VIEW_OVERLAY
 {
 public:
     void Render( const SCHEMATIC_SNAPSHOT& aCircuit, const EDITOR_SESSION_VIEW& aSession,
-                 const wxString& aCurrentSheet );
+                 const wxString& aCurrentSheet, bool aLogicLevels = false );
     int SwitchAt( const SCHEMATIC_SNAPSHOT& aCircuit, const wxString& aCurrentSheet,
                   const VECTOR2I& aPosition ) const;
 };

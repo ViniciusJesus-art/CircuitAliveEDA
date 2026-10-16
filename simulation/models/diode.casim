@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "diode",
+  "name": "Generic silicon diode",
+  "description": "Modelo didático configurável; não é um macromodelo certificado pelo fabricante.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "k",
+      "label": "Cathode (K)",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "a",
+      "label": "Anode (A)",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "saturation_current",
+      "label": "Saturation current",
+      "default": "4e-09",
+      "unit": "A",
+      "min": 1e-20,
+      "max": 1
+    },
+    {
+      "id": "emission",
+      "label": "Emission coefficient",
+      "default": "1.8",
+      "unit": "",
+      "min": 0.5,
+      "max": 5
+    },
+    {
+      "id": "series_resistance",
+      "label": "Series resistance",
+      "default": "0.5",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "breakdown",
+      "label": "Breakdown voltage (configure for exact part)",
+      "default": "100",
+      "unit": "V",
+      "min": 1,
+      "max": 1000000.0
+    },
+    {
+      "id": "junction_capacitance",
+      "label": "Zero-bias junction capacitance",
+      "default": "4p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "transit_time",
+      "label": "Transit time",
+      "default": "4n",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "spice": {
+    "instance": [
+      "D${id} ${pin:a} ${pin:k} model_${id}"
+    ],
+    "definitions": [
+      ".model model_${id} D(Is=${param:saturation_current} N=${param:emission} Rs=${param:series_resistance} BV=${param:breakdown} Cjo=${param:junction_capacitance} Tt=${param:transit_time})"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Device:D",
+      "Device:D_Small"
+    ],
+    "symbol_names": []
+  },
+  "measurement_ports": {
+    "positive": "a",
+    "negative": "k"
+  }
+}

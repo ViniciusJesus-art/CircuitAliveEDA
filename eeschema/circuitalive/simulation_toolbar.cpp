@@ -24,6 +24,12 @@ TOOL_ACTION SIMULATION_ACTIONS::pause( TOOL_ACTION_ARGS().Name( "circuitalive.In
 TOOL_ACTION SIMULATION_ACTIONS::stop( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.stop" )
         .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "Interactive Stop" ) )
         .Tooltip( wxTRANSLATE( "Stop and reset interactive simulation" ) ).Icon( BITMAPS::sim_stop ) );
+TOOL_ACTION SIMULATION_ACTIONS::probes( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.probes" )
+        .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "Measurement probes" ) )
+        .Tooltip( wxTRANSLATE( "Show or hide probe tools; hiding returns to the cursor" ) ).Icon( BITMAPS::sim_run ) );
+TOOL_ACTION SIMULATION_ACTIONS::logicLevels( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.logicLevels" )
+        .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "Pin logic levels" ) )
+        .Tooltip( wxTRANSLATE( "Show pin levels: 1 red, 0 blue, Z gray, X yellow" ) ).Icon( BITMAPS::sim_run ) );
 
 void EnsureSimulationToolbar( SCH_EDIT_FRAME& aFrame )
 {
@@ -36,11 +42,12 @@ void EnsureSimulationToolbar( SCH_EDIT_FRAME& aFrame )
         && !toolbar->FindTool( SIMULATION_ACTIONS::pause.GetUIId() )
         && !toolbar->FindTool( SIMULATION_ACTIONS::stop.GetUIId() ) )
         toolbar->AddScaledSeparator( &aFrame );
-    for( const auto* action : { &SIMULATION_ACTIONS::play, &SIMULATION_ACTIONS::pause, &SIMULATION_ACTIONS::stop } )
+    for( const auto* action : { &SIMULATION_ACTIONS::play, &SIMULATION_ACTIONS::pause,
+                               &SIMULATION_ACTIONS::stop, &SIMULATION_ACTIONS::logicLevels } )
     {
         if( !toolbar->FindTool( action->GetUIId() ) )
         {
-            toolbar->Add( *action );
+            toolbar->Add( *action, action == &SIMULATION_ACTIONS::logicLevels );
             added = true;
         }
     }
@@ -57,6 +64,30 @@ void EnsureSimulationToolbar( SCH_EDIT_FRAME& aFrame )
     auto* item = toolbar->FindTool( SIMULATION_ACTIONS::pause.GetUIId() );
     if( item && !item->GetBitmapBundle().IsSameAs( icon->second ) )
         toolbar->SetToolBitmap( SIMULATION_ACTIONS::pause, icon->second );
+    static std::map<int, wxBitmapBundle> logicIcons, probeIcons;
+    auto setIcon = [&]( ACTION_TOOLBAR* bar, const TOOL_ACTION& action,
+                        std::map<int, wxBitmapBundle>& icons, const char* svg )
+    {
+        auto [entry, fresh] = icons.try_emplace( size );
+        if( fresh ) entry->second = wxBitmapBundle::FromSVG( svg, wxSize( size, size ) );
+        auto* tool = bar->FindTool( action.GetUIId() );
+        if( tool && !tool->GetBitmapBundle().IsSameAs( entry->second ) ) bar->SetToolBitmap( action, entry->second );
+    };
+    setIcon( toolbar, SIMULATION_ACTIONS::logicLevels, logicIcons,
+        "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><circle cx='6' cy='6' r='4' fill='#eb4034'/>"
+        "<circle cx='18' cy='6' r='4' fill='#3286ed'/><path d='M2 20h5v-7h10v7h5' fill='none' stroke='#92999e' stroke-width='2'/></svg>" );
+    auto* right = dynamic_cast<ACTION_TOOLBAR*>( manager->GetPane( "RightToolbar" ).window );
+    if( right )
+    {
+        if( !right->FindTool( SIMULATION_ACTIONS::probes.GetUIId() ) )
+        {
+            right->AddScaledSeparator( &aFrame ); right->Add( SIMULATION_ACTIONS::probes, true );
+            right->KiRealize(); added = true;
+        }
+        setIcon( right, SIMULATION_ACTIONS::probes, probeIcons,
+            "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M3 21L20 4M9 4h11v11' "
+            "fill='none' stroke='#318fd8' stroke-width='2'/></svg>" );
+    }
     if( added )
     {
         toolbar->KiRealize();

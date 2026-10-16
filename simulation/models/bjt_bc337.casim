@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "bjt_bc337",
+  "name": "BC337 NPN transistor",
+  "description": "Modelo didático configurável; não é um macromodelo certificado pelo fabricante.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "c",
+      "label": "Collector",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "b",
+      "label": "Base",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "e",
+      "label": "Emitter",
+      "role": "reference",
+      "default_pin": "3"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "beta",
+      "label": "Forward current gain (nominal)",
+      "default": "180",
+      "unit": "",
+      "min": 1,
+      "max": 2000
+    },
+    {
+      "id": "saturation_current",
+      "label": "Saturation current",
+      "default": "10f",
+      "unit": "A",
+      "min": 1e-20,
+      "max": 1
+    },
+    {
+      "id": "early_voltage",
+      "label": "Early voltage",
+      "default": "80",
+      "unit": "V",
+      "min": 1,
+      "max": 10000.0
+    },
+    {
+      "id": "transit_time",
+      "label": "Forward transit time",
+      "default": "0.6n",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "base_capacitance",
+      "label": "Base-emitter capacitance",
+      "default": "15p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "collector_capacitance",
+      "label": "Base-collector capacitance",
+      "default": "5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Q${id} ${pin:c} ${pin:b} ${pin:e} model_${id}"
+    ],
+    "definitions": [
+      ".model model_${id} NPN(Is=${param:saturation_current} Bf=${param:beta} Vaf=${param:early_voltage} Tf=${param:transit_time} Cje=${param:base_capacitance} Cjc=${param:collector_capacitance})"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Transistor_BJT:BC337"
+    ],
+    "symbol_names": []
+  },
+  "measurement_ports": {
+    "positive": "c",
+    "negative": "e"
+  }
+}

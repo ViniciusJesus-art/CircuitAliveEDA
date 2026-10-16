@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "pulse_voltage",
+  "name": "Pulse voltage / logic clock",
+  "description": "Modelo didático configurável; não é um macromodelo certificado pelo fabricante.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Positive (+)",
+      "role": "power",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Negative (-)",
+      "role": "reference",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "low",
+      "label": "Low voltage",
+      "default": "0",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "high",
+      "label": "High voltage",
+      "default": "5",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "delay",
+      "label": "Start delay",
+      "default": "0.1",
+      "unit": "s",
+      "min": 0,
+      "max": 3600
+    },
+    {
+      "id": "rise",
+      "label": "Rise time",
+      "default": "1u",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 3600
+    },
+    {
+      "id": "fall",
+      "label": "Fall time",
+      "default": "1u",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 3600
+    },
+    {
+      "id": "width",
+      "label": "High pulse width",
+      "default": "0.25",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 3600
+    },
+    {
+      "id": "period",
+      "label": "Period",
+      "default": "0.5",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 3600
+    },
+    {
+      "id": "current_warning",
+      "label": "Current warning (0 disables)",
+      "default": "10",
+      "unit": "A",
+      "min": 0,
+      "max": 1000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "V${id} ${pin:p} ${pin:n} PULSE(${param:low} ${param:high} ${param:delay} ${param:rise} ${param:fall} ${param:width} ${param:period})"
+    ],
+    "definitions": []
+  },
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Simulation_SPICE:VPULSE"
+    ],
+    "symbol_names": []
+  },
+  "measurement_ports": {
+    "positive": "p",
+    "negative": "n"
+  },
+  "reference_pin": "n",
+  "current_warning": {
+    "signal": "i(V${id})",
+    "limit_parameter": "current_warning"
+  }
+}

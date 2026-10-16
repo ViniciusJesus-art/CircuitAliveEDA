@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "74hc125",
+  "name": "74HC125 quad three-state buffer",
+  "description": "Modelo didático configurável; não é um macromodelo certificado pelo fabricante.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "oe1",
+      "label": "Active-low /OE1",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "a1",
+      "label": "A1",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "y1",
+      "label": "Y1",
+      "role": "output",
+      "default_pin": "3"
+    },
+    {
+      "id": "oe2",
+      "label": "Active-low /OE2",
+      "role": "input",
+      "default_pin": "4"
+    },
+    {
+      "id": "a2",
+      "label": "A2",
+      "role": "input",
+      "default_pin": "5"
+    },
+    {
+      "id": "y2",
+      "label": "Y2",
+      "role": "output",
+      "default_pin": "6"
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "7"
+    },
+    {
+      "id": "y3",
+      "label": "Y3",
+      "role": "output",
+      "default_pin": "8"
+    },
+    {
+      "id": "a3",
+      "label": "A3",
+      "role": "input",
+      "default_pin": "9"
+    },
+    {
+      "id": "oe3",
+      "label": "Active-low /OE3",
+      "role": "input",
+      "default_pin": "10"
+    },
+    {
+      "id": "y4",
+      "label": "Y4",
+      "role": "output",
+      "default_pin": "11"
+    },
+    {
+      "id": "a4",
+      "label": "A4",
+      "role": "input",
+      "default_pin": "12"
+    },
+    {
+      "id": "oe4",
+      "label": "Active-low /OE4",
+      "role": "input",
+      "default_pin": "13"
+    },
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "role": "power",
+      "default_pin": "14"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Low input threshold / VCC",
+      "default": "0.3",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "High input threshold / VCC",
+      "default": "0.7",
+      "unit": "",
+      "min": 0.51,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Minimum supply voltage",
+      "default": "2",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Maximum supply voltage",
+      "default": "6",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "rise_delay",
+      "label": "Low-to-high propagation delay",
+      "default": "7n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "fall_delay",
+      "label": "High-to-low propagation delay",
+      "default": "7n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Output transition time",
+      "default": "2n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Output resistance (nominal)",
+      "default": "25",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Input capacitance",
+      "default": "3.5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Bn_a1_${id} n_a1_${id} 0 V={${drive:a1} > 0.5 ? v(${pin:a1},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
+      "Cin_a1_${id} ${pin:a1} ${pin:gnd} ${param:cin}",
+      "Bn_oe1_${id} n_oe1_${id} 0 V={${drive:oe1} > 0.5 ? v(${pin:oe1},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
+      "Cin_oe1_${id} ${pin:oe1} ${pin:gnd} ${param:cin}",
+      "Aadc1_${id} [n_a1_${id} n_oe1_${id}] [d_a1_${id} d_oe1_${id}] adc_${id}",
+      "Ag1_${id} d_a1_${id} d_y1_${id} gate_${id}",
+      "Aoe1_${id} d_oe1_${id} d_oe_delay1_${id} gate_${id}",
+      "Adac1_${id} [d_y1_${id} d_oe_delay1_${id}] [code1_${id} oe_code1_${id}] dac_${id}",
+      "Ben1_${id} en1_${id} 0 V={(v(${pin:vcc},${pin:gnd}) >= ${param:vmin} && v(${pin:vcc},${pin:gnd}) <= ${param:vmax}) ? (v(oe_code1_${id}) <= ${param:vil} ? 1 : (v(oe_code1_${id}) >= ${param:vih} ? 0 : 2)) : 0}",
+      "Bstate1_${id} state1_${id} 0 V={v(en1_${id}) > 1.5 ? 0.5 : v(code1_${id})}",
+      "Bhi1_${id} ${pin:y1} ${pin:vcc} I={v(en1_${id}) > 0.5 ? ((v(state1_${id}) > ${param:vih} || v(state1_${id}) < ${param:vil}) ? 1 : 1u)*v(state1_${id})*v(${pin:y1},${pin:vcc})/${param:rout} : 0}",
+      "Blo1_${id} ${pin:y1} ${pin:gnd} I={v(en1_${id}) > 0.5 ? ((v(state1_${id}) > ${param:vih} || v(state1_${id}) < ${param:vil}) ? 1 : 1u)*(1-v(state1_${id}))*v(${pin:y1},${pin:gnd})/${param:rout} : 0}",
+      "Bn_a2_${id} n_a2_${id} 0 V={${drive:a2} > 0.5 ? v(${pin:a2},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
+      "Cin_a2_${id} ${pin:a2} ${pin:gnd} ${param:cin}",
+      "Bn_oe2_${id} n_oe2_${id} 0 V={${drive:oe2} > 0.5 ? v(${pin:oe2},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
+      "Cin_oe2_${id} ${pin:oe2} ${pin:gnd} ${param:cin}",
+      "Aadc2_${id} [n_a2_${id} n_oe2_${id}] [d_a2_${id} d_oe2_${id}] adc_${id}",
+      "Ag2_${id} d_a2_${id} d_y2_${id} gate_${id}",
+      "Aoe2_${id} d_oe2_${id} d_oe_delay2_${id} gate_${id}",
+      "Adac2_${id} [d_y2_${id} d_oe_delay2_${id}] [code2_${id} oe_code2_${id}] dac_${id}",
+      "Ben2_${id} en2_${id} 0 V={(v(${pin:vcc},${pin:gnd}) >= ${param:vmin} && v(${pin:vcc},${pin:gnd}) <= ${param:vmax}) ? (v(oe_code2_${id}) <= ${param:vil} ? 1 : (v(oe_code2_${id}) >= ${param:vih} ? 0 : 2)) : 0}",
+      "Bstate2_${id} state2_${id} 0 V={v(en2_${id}) > 1.5 ? 0.5 : v(code2_${id})}",
+      "Bhi2_${id} ${pin:y2} ${pin:vcc} I={v(en2_${id}) > 0.5 ? ((v(state2_${id}) > ${param:vih} || v(state2_${id}) < ${param:vil}) ? 1 : 1u)*v(state2_${id})*v(${pin:y2},${pin:vcc})/${param:rout} : 0}",
+      "Blo2_${id} ${pin:y2} ${pin:gnd} I={v(en2_${id}) > 0.5 ? ((v(state2_${id}) > ${param:vih} || v(state2_${id}) < ${param:vil}) ? 1 : 1u)*(1-v(state2_${id}))*v(${pin:y2},${pin:gnd})/${param:rout} : 0}",
+      "Bn_a3_${id} n_a3_${id} 0 V={${drive:a3} > 0.5 ? v(${pin:a3},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
+      "Cin_a3_${id} ${pin:a3} ${pin:gnd} ${param:cin}",
+      "Bn_oe3_${id} n_oe3_${id} 0 V={${drive:oe3} > 0.5 ? v(${pin:oe3},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
+      "Cin_oe3_${id} ${pin:oe3} ${pin:gnd} ${param:cin}",
+      "Aadc3_${id} [n_a3_${id} n_oe3_${id}] [d_a3_${id} d_oe3_${id}] adc_${id}",
+      "Ag3_${id} d_a3_${id} d_y3_${id} gate_${id}",
+      "Aoe3_${id} d_oe3_${id} d_oe_delay3_${id} gate_${id}",
+      "Adac3_${id} [d_y3_${id} d_oe_delay3_${id}] [code3_${id} oe_code3_${id}] dac_${id}",
+      "Ben3_${id} en3_${id} 0 V={(v(${pin:vcc},${pin:gnd}) >= ${param:vmin} && v(${pin:vcc},${pin:gnd}) <= ${param:vmax}) ? (v(oe_code3_${id}) <= ${param:vil} ? 1 : (v(oe_code3_${id}) >= ${param:vih} ? 0 : 2)) : 0}",
+      "Bstate3_${id} state3_${id} 0 V={v(en3_${id}) > 1.5 ? 0.5 : v(code3_${id})}",
+      "Bhi3_${id} ${pin:y3} ${pin:vcc} I={v(en3_${id}) > 0.5 ? ((v(state3_${id}) > ${param:vih} || v(state3_${id}) < ${param:vil}) ? 1 : 1u)*v(state3_${id})*v(${pin:y3},${pin:vcc})/${param:rout} : 0}",
+      "Blo3_${id} ${pin:y3} ${pin:gnd} I={v(en3_${id}) > 0.5 ? ((v(state3_${id}) > ${param:vih} || v(state3_${id}) < ${param:vil}) ? 1 : 1u)*(1-v(state3_${id}))*v(${pin:y3},${pin:gnd})/${param:rout} : 0}",
+      "Bn_a4_${id} n_a4_${id} 0 V={${drive:a4} > 0.5 ? v(${pin:a4},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
+      "Cin_a4_${id} ${pin:a4} ${pin:gnd} ${param:cin}",
+      "Bn_oe4_${id} n_oe4_${id} 0 V={${drive:oe4} > 0.5 ? v(${pin:oe4},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
+      "Cin_oe4_${id} ${pin:oe4} ${pin:gnd} ${param:cin}",
+      "Aadc4_${id} [n_a4_${id} n_oe4_${id}] [d_a4_${id} d_oe4_${id}] adc_${id}",
+      "Ag4_${id} d_a4_${id} d_y4_${id} gate_${id}",
+      "Aoe4_${id} d_oe4_${id} d_oe_delay4_${id} gate_${id}",
+      "Adac4_${id} [d_y4_${id} d_oe_delay4_${id}] [code4_${id} oe_code4_${id}] dac_${id}",
+      "Ben4_${id} en4_${id} 0 V={(v(${pin:vcc},${pin:gnd}) >= ${param:vmin} && v(${pin:vcc},${pin:gnd}) <= ${param:vmax}) ? (v(oe_code4_${id}) <= ${param:vil} ? 1 : (v(oe_code4_${id}) >= ${param:vih} ? 0 : 2)) : 0}",
+      "Bstate4_${id} state4_${id} 0 V={v(en4_${id}) > 1.5 ? 0.5 : v(code4_${id})}",
+      "Bhi4_${id} ${pin:y4} ${pin:vcc} I={v(en4_${id}) > 0.5 ? ((v(state4_${id}) > ${param:vih} || v(state4_${id}) < ${param:vil}) ? 1 : 1u)*v(state4_${id})*v(${pin:y4},${pin:vcc})/${param:rout} : 0}",
+      "Blo4_${id} ${pin:y4} ${pin:gnd} I={v(en4_${id}) > 0.5 ? ((v(state4_${id}) > ${param:vih} || v(state4_${id}) < ${param:vil}) ? 1 : 1u)*(1-v(state4_${id}))*v(${pin:y4},${pin:gnd})/${param:rout} : 0}"
+    ],
+    "definitions": [
+      ".model adc_${id} adc_bridge(in_low=${param:vil} in_high=${param:vih})",
+      ".model gate_${id} d_buffer(rise_delay=${param:rise_delay} fall_delay=${param:fall_delay})",
+      ".model dac_${id} dac_bridge(out_low=0 out_high=1 out_undef=0.5 t_rise=${param:transition} t_fall=${param:transition})"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "74xx:74HC125"
+    ]
+  },
+  "logic": {
+    "vcc": "vcc",
+    "gnd": "gnd",
+    "low_parameter": "vil",
+    "high_parameter": "vih",
+    "min_supply_parameter": "vmin",
+    "max_supply_parameter": "vmax",
+    "driver_enable": {
+      "y1": "v(en1_${id})",
+      "y2": "v(en2_${id})",
+      "y3": "v(en3_${id})",
+      "y4": "v(en4_${id})"
+    },
+    "driver_value": {
+      "y1": "v(state1_${id})",
+      "y2": "v(state2_${id})",
+      "y3": "v(state3_${id})",
+      "y4": "v(state4_${id})"
+    }
+  },
+  "measurement_ports": {
+    "positive": "vcc",
+    "negative": "gnd"
+  }
+}

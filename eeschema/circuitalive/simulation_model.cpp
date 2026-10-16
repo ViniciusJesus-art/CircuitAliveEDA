@@ -54,7 +54,7 @@ SIMULATION_MODEL MODEL_REPOSITORY::Load( const fs::path& aFile )
         std::ifstream stream( aFile );
         const auto j = JSON::parse( stream );
         if( j.at( "schema_version" ) != 1 || j.at( "backend" ) != "ngspice" )
-            throw std::runtime_error( "Unsupported model version/backend; digital runtime is not implemented yet" );
+            throw std::runtime_error( "Unsupported model version/backend; use ngspice for analog or XSPICE models" );
         SIMULATION_MODEL m;
         m.file = fs::absolute( aFile ).lexically_normal();
         m.id = j.at( "id" );
@@ -148,9 +148,35 @@ SIMULATION_MODEL MODEL_REPOSITORY::Load( const fs::path& aFile )
             if( !parameters.contains( m.warningParameter ) ) throw std::runtime_error( "Unknown warning parameter" );
         }
         m.voltageConstraint = j.value( "voltage_constraint_parameter", "" );
+        m.frequencyParameter = j.value( "frequency_parameter", "" );
+        if( !m.frequencyParameter.empty() && !parameters.contains( m.frequencyParameter ) )
+            throw std::runtime_error( "Unknown frequency parameter" );
         if( !m.voltageConstraint.empty()
             && ( !parameters.contains( m.voltageConstraint ) || m.measurePositive.empty() || m.measureNegative.empty() ) )
             throw std::runtime_error( "Invalid voltage constraint" );
+        if( j.contains( "logic" ) )
+        {
+            const auto& logic = j.at( "logic" );
+            m.logicVcc = logic.at( "vcc" ); m.logicGround = logic.at( "gnd" );
+            m.logicLow = logic.at( "low_parameter" ); m.logicHigh = logic.at( "high_parameter" );
+            m.logicMinSupply = logic.at( "min_supply_parameter" );
+            m.logicMaxSupply = logic.at( "max_supply_parameter" );
+            if( !ports.contains( m.logicVcc ) || !ports.contains( m.logicGround ) || m.logicVcc == m.logicGround )
+                throw std::runtime_error( "Invalid logic supply ports" );
+            for( const auto& p : { m.logicLow, m.logicHigh, m.logicMinSupply, m.logicMaxSupply } )
+                if( !parameters.contains( p ) ) throw std::runtime_error( "Unknown logic parameter: " + p );
+            m.driverEnable = logic.at( "driver_enable" ).get<std::map<std::string, std::string>>();
+            m.driverValue = logic.value( "driver_value", std::map<std::string, std::string>{} );
+            for( const auto& [port, expression] : m.driverEnable )
+            {
+                auto pin = std::find_if( m.pins.begin(), m.pins.end(), [&]( const auto& p ) { return p.id == port; } );
+                if( pin == m.pins.end() || ( pin->role != "output" && pin->role != "bidirectional" ) || expression.empty() )
+                    throw std::runtime_error( "Invalid logic driver: " + port );
+            }
+            for( const auto& [port, expression] : m.driverValue )
+                if( !m.driverEnable.contains( port ) || expression.empty() )
+                    throw std::runtime_error( "Invalid logic driver value: " + port );
+        }
         return m;
     }
     catch( const std::exception& e )
@@ -264,6 +290,12 @@ RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
         if( !r.parameters.contains( id ) ) throw std::runtime_error( "Unknown model parameter: " + id );
     if( !r.model.brightnessParameter.empty() && r.parameters.at( r.model.brightnessParameter ) <= 0 )
         throw std::runtime_error( "Brightness current must be positive" );
+    if( !r.model.logicVcc.empty() && ( r.parameters.at( r.model.logicLow ) < 0
+        || r.parameters.at( r.model.logicHigh ) > 1
+        || r.parameters.at( r.model.logicLow ) >= r.parameters.at( r.model.logicHigh )
+        || r.parameters.at( r.model.logicMinSupply ) <= 0
+        || r.parameters.at( r.model.logicMaxSupply ) < r.parameters.at( r.model.logicMinSupply ) ) )
+        throw std::runtime_error( "Invalid logic thresholds or supply range" );
     return r;
 }
 
@@ -288,6 +320,13 @@ std::string ExpandModelTemplate( const std::string& text, const RESOLVED_MODEL& 
             number.imbue( std::locale::classic() );
             number << std::setprecision( 17 ) << model.parameters.at( token.substr( 6 ) );
             result += number.str();
+        }
+        else if( token.starts_with( "drive:" ) )
+        {
+            const auto port = token.substr( 6 );
+            if( !model.pins.contains( port ) ) throw std::runtime_error( "Unknown driven port: " + port );
+            const auto it = model.driveExpressions.find( port );
+            result += it == model.driveExpressions.end() ? "1" : it->second;
         }
         else throw std::runtime_error( "Unknown model placeholder: " + token );
         cursor = end + 1;

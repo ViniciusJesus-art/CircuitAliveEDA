@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "diode_1n4005",
+  "name": "1N4005 rectifier diode",
+  "description": "Modelo did\u00e1tico configur\u00e1vel; n\u00e3o \u00e9 um macromodelo certificado pelo fabricante.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "k",
+      "label": "Cathode (K)",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "a",
+      "label": "Anode (A)",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "saturation_current",
+      "label": "Saturation current",
+      "default": "10n",
+      "unit": "A",
+      "min": 1e-20,
+      "max": 1
+    },
+    {
+      "id": "emission",
+      "label": "Emission coefficient",
+      "default": "1.9",
+      "unit": "",
+      "min": 0.5,
+      "max": 5
+    },
+    {
+      "id": "series_resistance",
+      "label": "Series resistance",
+      "default": "0.04",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "breakdown",
+      "label": "Breakdown voltage (configure for exact part)",
+      "default": "600",
+      "unit": "V",
+      "min": 1,
+      "max": 1000000.0
+    },
+    {
+      "id": "junction_capacitance",
+      "label": "Zero-bias junction capacitance",
+      "default": "20p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "transit_time",
+      "label": "Transit time",
+      "default": "2u",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "spice": {
+    "instance": [
+      "D${id} ${pin:a} ${pin:k} model_${id}"
+    ],
+    "definitions": [
+      ".model model_${id} D(Is=${param:saturation_current} N=${param:emission} Rs=${param:series_resistance} BV=${param:breakdown} Cjo=${param:junction_capacitance} Tt=${param:transit_time})"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Diode:1N4005"
+    ]
+  },
+  "measurement_ports": {
+    "positive": "a",
+    "negative": "k"
+  }
+}

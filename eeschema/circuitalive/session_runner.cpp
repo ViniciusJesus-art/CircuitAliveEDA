@@ -2,6 +2,7 @@
 #include "session_runner.h"
 #include <algorithm>
 #include <filesystem>
+#include <set>
 #include <stdexcept>
 #include <unistd.h>
 
@@ -174,6 +175,8 @@ void SESSION_RUNNER::run()
                 view.measurements.clear();
                 for( const auto& channel : circuit.measurements )
                     view.measurements.push_back( MeasurementValue( channel, view.sample.latest ) );
+                view.logicLevels.clear();
+                for( const auto& pin : circuit.logicPins ) view.logicLevels.push_back( PinLogicLevel( pin, view.sample.latest ) );
                 if( std::any_of( circuit.measurements.begin(), circuit.measurements.end(), []( const auto& c ) { return c.scope; } ) )
                 {
                     for( const auto& sample : view.sample.history )
@@ -195,6 +198,15 @@ void SESSION_RUNNER::run()
                     if( led.ratedCurrent > 0 ) warn( led.reference.empty() ? "LED" : led.reference, led.ratedCurrent, led.signal );
                 view.warnings.clear();
                 for( const auto& [name, warning] : latchedWarnings ) view.warnings.push_back( warning );
+                std::set<std::size_t> checkedSupplies;
+                for( const auto& pin : circuit.logicPins )
+                    if( pin.digital && checkedSupplies.insert( pin.component ).second )
+                    {
+                        auto v = [&]( std::size_t index ) { return index == NO_SIGNAL ? 0.0 : view.sample.latest.values.at( index ); };
+                        const double supply = v( pin.vcc ) - v( pin.ground );
+                        if( supply < pin.minSupply || supply > pin.maxSupply )
+                            view.warnings.push_back( "Logic supply out of range: " + pin.reference );
+                    }
                 view.sample.history.clear();
             }
         }

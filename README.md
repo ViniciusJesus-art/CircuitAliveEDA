@@ -3,7 +3,7 @@
 Projeto derivado do KiCad para desenvolver simulação interativa no esquemático.
 A base KiCad estável possui um núcleo de sessão interativa com ngspice isolado
 e controles Play/Pause/Stop no esquemático, com chave clicável, brilho de LED,
-probes de tensão/corrente/potência e osciloscópio.
+probes de tensão/corrente/potência, osciloscópio e modelos digitais XSPICE.
 
 - Repositório independente privado: <https://github.com/ViniciusJesus-art/CircuitAliveEDA>
 - Branch de trabalho: `main`.
@@ -20,6 +20,8 @@ probes de tensão/corrente/potência e osciloscópio.
   demonstração, componentes suportados e organização modular para atualizar a base.
 - [Medições e osciloscópio](docs/circuitalive/MEASUREMENTS.md): ferramentas no
   painel lateral, configuração V/I/P por componente e exemplos prontos.
+- [Componentes básicos e digital](docs/circuitalive/BASIC_AND_DIGITAL_MODELS.md):
+  fontes AC, diodos, transistores, 74HC00/74HC125 e indicação 0/1/Z/X nos pinos.
 - [Mapa do projeto](docs/circuitalive/Mapa_KiCad_Simulacao_Interativa.md), preservado como
   referência original; a revisão nele citada foi substituída pela base estável acima.
 

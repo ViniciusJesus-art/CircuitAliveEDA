@@ -23,6 +23,7 @@ struct EDITOR_SESSION_VIEW
     std::vector<double> measurements;
     std::vector<SIM_SAMPLE> scopeHistory;
     std::vector<std::string> warnings;
+    std::vector<LOGIC_LEVEL> logicLevels;
     std::string error;
 };
 

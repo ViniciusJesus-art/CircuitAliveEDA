@@ -1,0 +1,967 @@
+(kicad_sch (version 20260306) (generator "eeschema") (generator_version "10.0") (uuid "f7a34529-6169-4b24-a4e5-0aaab42a12f7") (paper "A4")
+(lib_symbols
+(symbol "Simulation_SPICE:VSIN"
+(pin_numbers
+			(hide yes)
+		)
+(pin_names
+			(offset 0.0254)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "V"
+			(at 2.54 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Value" "VSIN"
+			(at 2.54 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Footprint" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Datasheet" "https://ngspice.sourceforge.io/docs/ngspice-html-manual/manual.xhtml#sec_Independent_Sources_for"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Voltage source, sinusoidal"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Pins" "1=+ 2=-"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Params" "dc=0 ampl=1 f=1k ac=1"
+			(at 2.54 -2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Sim.Type" "SIN"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Device" "V"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "ki_keywords" "simulation ac vac"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "VSIN_0_0"
+			(arc
+				(start -1.27 0)
+				(mid -0.635 0.6323)
+				(end 0 0)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(arc
+				(start 1.27 0)
+				(mid 0.635 -0.6323)
+				(end 0 0)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(text "+"
+				(at 0 1.905 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+		)
+(symbol "VSIN_0_1"
+			(circle
+				(center 0 0)
+				(radius 2.54)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+		)
+(symbol "VSIN_1_1"
+			(pin passive line
+				(at 0 5.08 270)
+				(length 2.54)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -5.08 90)
+				(length 2.54)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+)
+(symbol "Diode:1N4007"
+(pin_numbers
+			(hide yes)
+		)
+(pin_names
+			(hide yes)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Sim.Device" "D"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Sim.Pins" "1=K 2=A"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "1N4007_0_1"
+			(polyline
+				(pts
+					(xy -1.27 1.27) (xy -1.27 -1.27)
+				)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 1.27 1.27) (xy 1.27 -1.27) (xy -1.27 0) (xy 1.27 1.27)
+				)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy 1.27 0) (xy -1.27 0)
+				)
+				(stroke
+					(width 0)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+(symbol "1N4007_1_1"
+			(pin passive line
+				(at -3.81 0 0)
+				(length 2.54)
+				(name "K"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 3.81 0 180)
+				(length 2.54)
+				(name "A"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+(property "Reference" "D"
+			(at 0 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Value" "1N4007"
+			(at 0 -2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Footprint" "Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal"
+			(at 0 -4.445 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Datasheet" "http://www.vishay.com/docs/88503/1n4001.pdf"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "1000V 1A General Purpose Rectifier Diode, DO-41"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_keywords" "diode"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_fp_filters" "D*DO?41*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+)
+(symbol "Device:C"
+(pin_numbers
+			(hide yes)
+		)
+(pin_names
+			(offset 0.254)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "C"
+			(at 0.635 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Value" "C"
+			(at 0.635 -2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+(property "Footprint" ""
+			(at 0.9652 -3.81 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Unpolarized capacitor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_keywords" "cap capacitor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_fp_filters" "C_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "C_0_1"
+			(polyline
+				(pts
+					(xy -2.032 0.762) (xy 2.032 0.762)
+				)
+				(stroke
+					(width 0.508)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(polyline
+				(pts
+					(xy -2.032 -0.762) (xy 2.032 -0.762)
+				)
+				(stroke
+					(width 0.508)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+(symbol "C_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 2.794)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 2.794)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+)
+(symbol "Device:R"
+(pin_numbers
+			(hide yes)
+		)
+(pin_names
+			(offset 0)
+		)
+(exclude_from_sim no)
+(in_bom yes)
+(on_board yes)
+(in_pos_files yes)
+(duplicate_pin_numbers_are_jumpers no)
+(property "Reference" "R"
+			(at 2.032 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Value" "R"
+			(at 0 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Footprint" ""
+			(at -1.778 0 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "Description" "Resistor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_keywords" "R res resistor"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(property "ki_fp_filters" "R_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+(symbol "R_0_1"
+			(rectangle
+				(start -1.016 -2.54)
+				(end 1.016 2.54)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+		)
+(symbol "R_1_1"
+			(pin passive line
+				(at 0 3.81 270)
+				(length 1.27)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 1.27)
+				(name ""
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+)
+(symbol "CircuitAlive_Instruments:Probe_oscilloscope"
+			(pin_numbers
+				(hide yes)
+			)
+			(pin_names
+				(hide yes)
+			)
+			(exclude_from_sim no)
+			(in_bom no)
+			(on_board no)
+			(in_pos_files no)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "#P"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "Probe_oscilloscope_1_1"
+				(polyline
+					(pts
+						(xy 0 0) (xy 2.54 2.54)
+					)
+					(stroke
+						(width 0.18)
+						(type solid)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0.8466 2.54) (xy 2.54 2.54)
+					)
+					(stroke
+						(width 0.18)
+						(type solid)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 2.54 2.54) (xy 2.54 0.8466)
+					)
+					(stroke
+						(width 0.18)
+						(type solid)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(text "~"
+					(at 3.81 2.54 0)
+					(effects
+						(font
+							(size 1 1)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 0 0)
+					(length 0)
+					(name ""
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+			(embedded_fonts no)
+		))
+(text "AC sinusoidal source + 1N4007 + capacitor" (at 25 20 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "93708e37-bab7-4507-8573-a7424b007e11"))
+(text "Play: Measurements shows diode V/I/P and capacitor voltage. Scope: rectified waveform." (at 25 28 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "6c9a5295-011f-4067-985e-46c7eb646fb3"))
+(text "V1: Simulation model to change peak amplitude, frequency, offset and phase." (at 25 36 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "1a6f2f52-fda4-4d7a-880c-6784a775e268"))
+(wire (pts (xy 35.0 59.92) (xy 35.0 54.84)) (stroke (width 0) (type default)) (uuid "59120e04-2d2e-4097-97a8-87eaede098ba"))
+(wire (pts (xy 35.0 70.08) (xy 35.0 75.16)) (stroke (width 0) (type default)) (uuid "0b8efe91-73c4-4638-bc83-a9bdbd52f7f2"))
+(wire (pts (xy 76.19 45.0) (xy 71.11 45.0)) (stroke (width 0) (type default)) (uuid "b2e8e266-cf3f-4682-a01c-e37d32bfea43"))
+(wire (pts (xy 83.81 45.0) (xy 88.89 45.0)) (stroke (width 0) (type default)) (uuid "c902a5dc-c91c-4157-9bff-b9800fb212e0"))
+(wire (pts (xy 120.0 61.19) (xy 120.0 56.11)) (stroke (width 0) (type default)) (uuid "c3ab742b-cc35-4cf7-a10e-bde6b4ae0e92"))
+(wire (pts (xy 120.0 68.81) (xy 120.0 73.89)) (stroke (width 0) (type default)) (uuid "1b361c8a-d04a-4f81-bd6a-6400bcd214bb"))
+(wire (pts (xy 165.0 61.19) (xy 165.0 56.11)) (stroke (width 0) (type default)) (uuid "ce56e16f-9e95-44b0-8a44-d4cdf30b904c"))
+(wire (pts (xy 165.0 68.81) (xy 165.0 73.89)) (stroke (width 0) (type default)) (uuid "8fe287bd-fe59-47cf-b25f-c5a924525023"))
+(label "AC" (at 35.0 54.84 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "99ce9751-046a-4f87-ba76-2ea864cded9c"))
+(label "GND" (at 35.0 75.16 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "26e67ea7-07b3-4aea-a33c-17f7f56cbeec"))
+(label "RECT" (at 71.11 45.0 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "7f0d2da3-29f1-4cbe-9eb5-04660fd16c38"))
+(label "AC" (at 88.89 45.0 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "40554364-92eb-4273-9808-e5dc34b762ac"))
+(label "RECT" (at 120.0 56.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "db34561f-d294-4625-ba1d-421a648466e2"))
+(label "GND" (at 120.0 73.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "72a410c3-bae1-4a85-97fd-ac11b02e36c1"))
+(label "RECT" (at 165.0 56.11 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "9bbf3672-1d78-40e2-be1b-f286a98f0d67"))
+(label "GND" (at 165.0 73.89 0) (effects (font (size 1 1)) (justify left bottom)) (uuid "c532adc9-254b-4b57-b0c5-eed9f9970a85"))
+(symbol (lib_id "Simulation_SPICE:VSIN") (at 35 65 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "43a86ee0-06a2-4f9a-a851-3741244188d4")
+(property "Reference" "V1" (at 38 58 0) (effects (font (size 1.27 1.27))))
+(property "Value" "VSIN" (at 38 72 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "02a88881-2865-4390-a323-0b01873815f2"))
+(pin "2" (uuid "f792634d-7786-4871-9d02-f19da92312b3"))
+(instances (project "analog_rectifier" (path "/f7a34529-6169-4b24-a4e5-0aaab42a12f7" (reference "V1") (unit 1)))))
+(symbol (lib_id "Diode:1N4007") (at 80 45 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "33a4cc96-72bc-4ef1-bd0a-ac501c3511b1")
+(property "Reference" "D1" (at 83 38 0) (effects (font (size 1.27 1.27))))
+(property "Value" "1N4007" (at 83 52 0) (effects (font (size 1.27 1.27))))
+(property "CA.Measurements" "{\"voltage\":true,\"current\":true,\"power\":true,\"positive\":\"a\",\"negative\":\"k\"}" (at 80 45 0) (effects (font (size 1 1)) (hide yes)))
+(pin "1" (uuid "014ee04a-7881-4ca5-8a3c-345cefce9896"))
+(pin "2" (uuid "ab923d60-8ac7-40eb-acf8-4ef81ba3eefb"))
+(instances (project "analog_rectifier" (path "/f7a34529-6169-4b24-a4e5-0aaab42a12f7" (reference "D1") (unit 1)))))
+(symbol (lib_id "Device:C") (at 120 65 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "9f811ee4-cbdc-4785-a8f7-eba93bfc3650")
+(property "Reference" "C1" (at 123 58 0) (effects (font (size 1.27 1.27))))
+(property "Value" "100uF" (at 123 72 0) (effects (font (size 1.27 1.27))))
+(property "CA.Measurements" "{\"voltage\":true,\"positive\":\"p\",\"negative\":\"n\"}" (at 120 65 0) (effects (font (size 1 1)) (hide yes)))
+(pin "1" (uuid "d6b4f401-4e02-4b68-9529-a42dbe773b27"))
+(pin "2" (uuid "e5c8aa81-6287-4efb-b1dc-5eecf08a57a6"))
+(instances (project "analog_rectifier" (path "/f7a34529-6169-4b24-a4e5-0aaab42a12f7" (reference "C1") (unit 1)))))
+(symbol (lib_id "Device:R") (at 165 65 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid "f9deebc8-726f-4e60-96ba-cd4bd959377e")
+(property "Reference" "R1" (at 168 58 0) (effects (font (size 1.27 1.27))))
+(property "Value" "1k" (at 168 72 0) (effects (font (size 1.27 1.27))))
+(pin "1" (uuid "716b6170-ce39-4970-979e-69a158eae371"))
+(pin "2" (uuid "6e090eba-c8a9-4839-84bd-e29f48dca945"))
+(instances (project "analog_rectifier" (path "/f7a34529-6169-4b24-a4e5-0aaab42a12f7" (reference "R1") (unit 1)))))
+(symbol
+		(lib_id "CircuitAlive_Instruments:Probe_oscilloscope")
+		(at 120.0000 61.1900 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board no)
+		(in_pos_files no)
+		(dnp no)
+		(uuid "8b120459-d8cd-43ca-a1e5-7ee1686716be")
+		(property "Reference" "#P1"
+			(at 120.0000 61.1900 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "Rectified"
+			(at 120.0000 61.1900 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 120.0000 61.1900 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 120.0000 61.1900 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 120.0000 61.1900 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "CA.Probe" "oscilloscope"
+			(at 1.8900 -18.8100 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "CA.ProbeSequence" "1"
+			(at 1.8900 -18.8100 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e7351b3f-a2b7-40ce-9b6f-68c5110fbb7f")
+		)
+		(instances
+			(project "analog_rectifier"
+				(path "/f7a34529-6169-4b24-a4e5-0aaab42a12f7"
+					(reference "#P1")
+					(unit 1)
+				)
+			)
+		)
+	)
+(embedded_fonts no))

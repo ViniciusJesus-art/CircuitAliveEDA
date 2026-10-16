@@ -263,3 +263,55 @@ BOOST_FIXTURE_TEST_CASE( SavedMeasurementProbesPreserveOrderAndComponentSelectio
     BOOST_CHECK_CLOSE( componentPower, wirePower, 1e-4 );
     BOOST_CHECK_GT( wirePower, .02 );
 }
+
+BOOST_FIXTURE_TEST_CASE( NativeHc00UnitsShareOnePoweredSimulationPackage, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "digital_74hc00.kicad_sch" );
+    LoadSchematic( file );
+    const auto snapshot = CaptureSchematic( *m_schematic, true );
+    BOOST_REQUIRE_EQUAL( snapshot.locations.size(), 8 );
+    BOOST_REQUIRE_EQUAL( snapshot.circuit.switches.size(), 2 );
+    std::size_t component = 0;
+    for( std::size_t i = 0; i < snapshot.locations.size(); ++i )
+        if( snapshot.locations[i].reference == "U1" ) component = i;
+    std::size_t physicalPins = 0;
+    for( const auto& pin : snapshot.pins ) if( pin.component == component ) ++physicalPins;
+    BOOST_CHECK_EQUAL( physicalPins, 14 );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config ); session.AdvanceTo( .02 );
+    auto level = [&]( const char* number )
+    {
+        for( const auto& pin : snapshot.circuit.logicPins )
+            if( pin.component == component && pin.pin == number ) return PinLogicLevel( pin, session.Snapshot().latest );
+        throw std::runtime_error( "Missing HC00 pin" );
+    };
+    BOOST_CHECK( level( "1" ) == LOGIC_LEVEL::LOW );
+    BOOST_CHECK( level( "3" ) == LOGIC_LEVEL::HIGH );
+    BOOST_CHECK( level( "9" ) == LOGIC_LEVEL::HIGH_Z );
+    BOOST_CHECK( level( "8" ) == LOGIC_LEVEL::UNKNOWN );
+    for( const auto& sw : snapshot.circuit.switches ) session.SetSourceValue( sw.controlSource, sw.off );
+    session.AdvanceTo( .04 );
+    BOOST_CHECK( level( "1" ) == LOGIC_LEVEL::HIGH );
+    BOOST_CHECK( level( "2" ) == LOGIC_LEVEL::HIGH );
+    BOOST_CHECK( level( "3" ) == LOGIC_LEVEL::LOW );
+}
+
+BOOST_FIXTURE_TEST_CASE( NativeAcRectifierUsesStandardSourceDiodeAndScope, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "analog_rectifier.kicad_sch" );
+    LoadSchematic( file );
+    const auto snapshot = CaptureSchematic( *m_schematic, true );
+    BOOST_REQUIRE_EQUAL( snapshot.locations.size(), 4 );
+    BOOST_REQUIRE_EQUAL( snapshot.circuit.measurements.size(), 5 );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config ); session.AdvanceTo( .1 );
+    bool scope = false;
+    for( const auto& channel : snapshot.circuit.measurements )
+        if( channel.scope )
+        {
+            scope = true;
+            const double voltage = MeasurementValue( channel, session.Snapshot().latest );
+            BOOST_CHECK( channel.connected ); BOOST_CHECK_GT( voltage, 3 ); BOOST_CHECK_LT( voltage, 5 );
+        }
+    BOOST_CHECK( scope );
+}

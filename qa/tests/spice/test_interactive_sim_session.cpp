@@ -192,6 +192,9 @@ BOOST_AUTO_TEST_CASE( InvalidRequestsDoNotMutateActiveCircuit )
     auto cfg = Config();
     cfg.historyCapacity = 0;
     BOOST_CHECK_THROW( session.Configure( RC, cfg ), std::runtime_error );
+    cfg = Config(); cfg.historyCapacity = 1; cfg.signals.clear();
+    for( int i = 0; i < 257; ++i ) cfg.signals.push_back( "v(n" + std::to_string( i ) + ")" );
+    BOOST_CHECK_THROW( session.Configure( RC, cfg ), std::runtime_error );
     cfg = Config();
     BOOST_CHECK_THROW( session.Configure( "Bad\n.control\nquit\n.endc\n.end\n", cfg ),
                         std::runtime_error );
@@ -205,6 +208,25 @@ BOOST_AUTO_TEST_CASE( InvalidRequestsDoNotMutateActiveCircuit )
     BOOST_CHECK_THROW( session.Configure( RC, cfg ), std::runtime_error );
     BOOST_CHECK_EQUAL( session.Snapshot().latest.time, before.latest.time );
     session.AdvanceTo( 0.001 );
+}
+
+BOOST_AUTO_TEST_CASE( TwoHundredFiftySixSignalsKeepBoundedHistory )
+{
+    auto cfg = Config(); cfg.signals.clear(); cfg.historyCapacity = 4;
+    std::string deck = "Many pin signals\nV1 supply 0 5\n";
+    for( int i = 0; i < 256; ++i )
+    {
+        const auto n = std::to_string( i );
+        deck += "Ra" + n + " supply n" + n + " 1k\nRb" + n + " n" + n + " 0 1k\n";
+        cfg.signals.push_back( "v(n" + n + ")" );
+    }
+    deck += ".end\n";
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( deck, cfg ); session.AdvanceTo( .001 );
+    const auto snapshot = session.Snapshot();
+    BOOST_REQUIRE_EQUAL( snapshot.latest.values.size(), 256 );
+    BOOST_CHECK_LE( snapshot.history.size(), 4 );
+    for( double value : snapshot.latest.values ) BOOST_CHECK_CLOSE( value, 2.5, 1e-5 );
 }
 
 BOOST_AUTO_TEST_CASE( MissingSignalFailsAndStopAllowsRecovery )

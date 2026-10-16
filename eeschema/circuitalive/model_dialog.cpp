@@ -45,6 +45,7 @@ public:
         layout->Add( new wxStaticText( this, wxID_ANY, _( "Model ports → physical symbol pins" ) ),
                      0, wxLEFT | wxRIGHT | wxTOP, 10 );
         m_pins = new wxGrid( this, wxID_ANY );
+        m_pins->SetMinSize( wxSize( 200, 150 ) );
         m_pins->CreateGrid( 0, 3 );
         m_pins->SetColLabelValue( 0, _( "Model port" ) );
         m_pins->SetColLabelValue( 1, _( "Role" ) );
@@ -53,6 +54,7 @@ public:
         layout->Add( new wxStaticText( this, wxID_ANY, _( "Parameters — blank uses the model default; $value follows the symbol Value" ) ),
                      0, wxLEFT | wxRIGHT, 10 );
         m_parameters = new wxGrid( this, wxID_ANY );
+        m_parameters->SetMinSize( wxSize( 200, 180 ) );
         m_parameters->CreateGrid( 0, 4 );
         m_parameters->SetColLabelValue( 0, _( "Parameter" ) );
         m_parameters->SetColLabelValue( 1, _( "Value" ) );

@@ -48,6 +48,11 @@ struct SIMULATION_MODEL
     std::string measurePositive, measureNegative;
     std::string warningSignal, warningParameter;
     std::string voltageConstraint;
+    std::string frequencyParameter;
+    // Mixed-signal behavior remains in the file's SPICE/XSPICE templates.
+    std::string logicVcc, logicGround, logicLow, logicHigh, logicMinSupply, logicMaxSupply;
+    std::map<std::string, std::string> driverEnable;
+    std::map<std::string, std::string> driverValue;
 };
 
 struct RESOLVED_MODEL
@@ -56,6 +61,7 @@ struct RESOLVED_MODEL
     std::map<std::string, std::string> pins; // Model port -> schematic physical pin.
     std::map<std::string, std::string> parameterText;
     std::map<std::string, double> parameters;
+    std::map<std::string, std::string> driveExpressions;
 };
 
 /// Model data is read afresh for each Play; no schematic/library pointers or code loading.

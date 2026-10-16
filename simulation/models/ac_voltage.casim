@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "ac_voltage",
+  "name": "AC sinusoidal voltage",
+  "description": "Modelo didático configurável; não é um macromodelo certificado pelo fabricante.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Positive (+)",
+      "role": "power",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Negative (-)",
+      "role": "reference",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "offset",
+      "label": "DC offset",
+      "default": "0",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "amplitude",
+      "label": "Peak amplitude",
+      "default": "5",
+      "unit": "V",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "frequency",
+      "label": "Frequency",
+      "default": "50",
+      "unit": "Hz",
+      "min": 0.001,
+      "max": 1000000.0
+    },
+    {
+      "id": "delay",
+      "label": "Start delay",
+      "default": "0",
+      "unit": "s",
+      "min": 0,
+      "max": 3600
+    },
+    {
+      "id": "phase",
+      "label": "Phase",
+      "default": "0",
+      "unit": "deg",
+      "min": -360,
+      "max": 360
+    },
+    {
+      "id": "current_warning",
+      "label": "Current warning (0 disables)",
+      "default": "10",
+      "unit": "A",
+      "min": 0,
+      "max": 1000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "V${id} ${pin:p} ${pin:n} SIN(${param:offset} ${param:amplitude} ${param:frequency} ${param:delay} 0 ${param:phase})"
+    ],
+    "definitions": []
+  },
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Simulation_SPICE:VSIN"
+    ],
+    "symbol_names": []
+  },
+  "frequency_parameter": "frequency",
+  "voltage_constraint_parameter": "amplitude",
+  "measurement_ports": {
+    "positive": "p",
+    "negative": "n"
+  },
+  "reference_pin": "n",
+  "current_warning": {
+    "signal": "i(V${id})",
+    "limit_parameter": "current_warning"
+  }
+}

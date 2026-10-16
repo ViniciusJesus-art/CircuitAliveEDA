@@ -134,6 +134,7 @@ INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_
 
 std::string INSTRUMENT_PANEL::ProbeName() const { return m_name->GetValue().ToStdString(); }
 void INSTRUMENT_PANEL::ClearProbeName() { m_name->Clear(); }
+void INSTRUMENT_PANEL::SelectTools() { m_tabs->SetSelection( 0 ); }
 void INSTRUMENT_PANEL::SetPlacement( std::optional<PROBE_KIND> kind )
 {
     for( std::size_t i = 0; i < m_buttons.size(); ++i ) m_buttons[i]->SetValue( kind && static_cast<std::size_t>( *kind ) == i );

@@ -60,3 +60,16 @@ descarga e use Pause para inspecionar o trecho conservado.
 
 Uso, convenções de sinal e limites em
 [Medições e osciloscópio](../../../docs/circuitalive/MEASUREMENTS.md).
+
+## Fontes, diodos e lógica digital
+
+`analog_rectifier.kicad_sch` usa VSIN, 1N4007, capacitor e resistor. Play abre
+as medições do diodo/capacitor e a aba de osciloscópio com o sinal retificado.
+
+`digital_74hc00.kicad_sch` usa as cinco unidades de um 74HC00. A unidade E
+alimenta as quatro portas. SW1/SW2 aterradas mantêm A/B em 0; abertas deixam
+os pull-ups elevar as entradas a 1. Ative o botão após Stop para ver as cores
+dos pinos. FLOAT é uma entrada sem driver, e a saída correspondente é X.
+
+Veja [Componentes básicos e digital](../../../docs/circuitalive/BASIC_AND_DIGITAL_MODELS.md)
+para os modelos, as convenções de Z/X e os limites elétricos.

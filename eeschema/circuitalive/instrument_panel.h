@@ -20,6 +20,7 @@ public:
     INSTRUMENT_PANEL( wxWindow* aParent, std::function<void( PROBE_KIND )> aChooseProbe );
     std::string ProbeName() const;
     void ClearProbeName();
+    void SelectTools();
     void SetPlacement( std::optional<PROBE_KIND> aKind );
     void UpdateSession( const SCHEMATIC_SNAPSHOT& aCircuit, const EDITOR_SESSION_VIEW& aSession, bool aActive );
 

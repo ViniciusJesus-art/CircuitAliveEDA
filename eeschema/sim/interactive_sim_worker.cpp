@@ -125,7 +125,7 @@ private:
                 || cfg.horizon <= 0 || cfg.step > cfg.horizon || cfg.maxStep > cfg.horizon
                 || cfg.horizon / std::min( cfg.step, cfg.maxStep ) > 1e8
                 || cfg.historyCapacity == 0 || cfg.historyCapacity > 4096
-                || cfg.signals.empty() || cfg.signals.size() > 64
+                || cfg.signals.empty() || cfg.signals.size() > 256
                 || cfg.signals.size() * cfg.historyCapacity > 65536 )
             throw std::runtime_error( "Invalid simulation timing, signals or history capacity" );
 

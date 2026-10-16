@@ -11,6 +11,8 @@ struct SIMULATION_ACTIONS
     static TOOL_ACTION pause;
     static TOOL_ACTION stop;
     static TOOL_ACTION configure;
+    static TOOL_ACTION probes;
+    static TOOL_ACTION logicLevels;
 };
 
 /// Append native-sized actions to the existing main toolbar, including after customization/recreation.

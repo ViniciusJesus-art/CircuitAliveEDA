@@ -74,7 +74,7 @@ BOOST_AUTO_TEST_CASE( WorkerIsLocatedForManagerStandaloneAndInstalledLayouts )
 BOOST_AUTO_TEST_CASE( InteractiveCatalogueRejectsIncompleteOrCustomCircuits )
 {
     auto components = Components();
-    components[6].libraryId = "Device:D";
+    components[6].libraryId = "Unsupported:UnmodeledDevice";
     BOOST_CHECK_THROW( BuildCircuitSnapshot( components ), std::runtime_error );
     components = Components();
     components[6].explicitSpiceModel = true;

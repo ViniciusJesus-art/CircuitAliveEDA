@@ -1,7 +1,7 @@
 # All CircuitAlive editor code is assembled here, keeping the upstream build hook small.
 if( TARGET circuitalive_sim_session )
     add_library( circuitalive_interactive STATIC
-        circuit_snapshot.cpp circuit_topology.cpp simulation_model.cpp session_runner.cpp measurements.cpp )
+        circuit_snapshot.cpp circuit_topology.cpp simulation_model.cpp session_runner.cpp measurements.cpp logic_signals.cpp )
     target_compile_definitions( circuitalive_interactive PRIVATE
         CIRCUITALIVE_BUNDLED_MODEL_DIR="${PROJECT_SOURCE_DIR}/simulation/models" )
     target_include_directories( circuitalive_interactive PUBLIC ${PROJECT_SOURCE_DIR}/eeschema )

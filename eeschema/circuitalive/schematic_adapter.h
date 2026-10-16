@@ -23,10 +23,12 @@ struct SCHEMATIC_SNAPSHOT
     CIRCUIT_SNAPSHOT circuit;
     std::vector<SYMBOL_LOCATION> locations;
     std::vector<SYMBOL_LOCATION> probes;
+    struct PIN_LOCATION { std::size_t component; std::string pin; wxString sheet; VECTOR2I position; };
+    std::vector<PIN_LOCATION> pins;
 };
 
 /// The only adapter that reads KiCad symbols/connectivity. Call exclusively on the GUI thread.
-SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic );
+SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators = false );
 CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& aSymbol, SCH_SHEET_PATH& aSheet,
         const wxString& aVariant, const std::string& aProjectDirectory );
 void WriteSymbolModelSettings( SCH_SYMBOL& aSymbol, const CIRCUIT_COMPONENT& aSettings );

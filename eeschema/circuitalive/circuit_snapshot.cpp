@@ -38,7 +38,7 @@ double ParseComponentValue( const std::string& aValue )
     // The netlist receives the parsed number, never the original text.
     const std::map<std::string, double> scales = {
         { "", 1 }, { "R", 1 }, { "r", 1 }, { "Ohm", 1 }, { "ohm", 1 }, { "Ω", 1 },
-        { "V", 1 }, { "F", 1 }, { "A", 1 }, { "s", 1 }, { "Hz", 1 },
+        { "V", 1 }, { "F", 1 }, { "H", 1 }, { "deg", 1 }, { "A", 1 }, { "s", 1 }, { "Hz", 1 },
         { "f", 1e-15 }, { "p", 1e-12 }, { "n", 1e-9 },
         { "u", 1e-6 }, { "U", 1e-6 }, { "µ", 1e-6 }, { "μ", 1e-6 }, { "m", 1e-3 }, { "M", 1e6 },
         { "k", 1e3 }, { "K", 1e3 }, { "Meg", 1e6 }, { "meg", 1e6 }, { "G", 1e9 }, { "g", 1e9 }
@@ -47,7 +47,7 @@ double ParseComponentValue( const std::string& aValue )
     auto scale = scales.find( suffix );
     if( scale == scales.end() )
     {
-        for( const std::string unit : { "Ohm", "ohm", "Ω", "F", "V", "A", "s", "Hz" } )
+        for( const std::string unit : { "Ohm", "ohm", "Ω", "F", "H", "deg", "V", "A", "s", "Hz" } )
         {
             if( suffix.ends_with( unit ) )
             {
@@ -68,7 +68,7 @@ double LedBrightness( double aForwardCurrent, double aBrightnessCurrent )
 }
 
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents,
-                                     const std::vector<CIRCUIT_PROBE>& aProbes )
+                                     const std::vector<CIRCUIT_PROBE>& aProbes, bool aPinIndicators )
 {
     CIRCUIT_SNAPSHOT result;
     result.config.step = result.config.maxStep = 1e-4;
@@ -100,6 +100,39 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         allComponents.push_back( std::move( c ) ); models.push_back( std::move( model ) );
     }
     const auto topology = BuildCircuitTopology( allComponents, models );
+    struct NET_DRIVE { bool external = false; std::vector<std::string> enables; };
+    std::map<std::string, NET_DRIVE> drives;
+    for( std::size_t i = 0; i < aComponents.size(); ++i )
+    {
+        const auto& model = models[i];
+        for( const auto& pin : model.model.pins )
+        {
+            auto& drive = drives[topology.nodes[i].at( model.pins.at( pin.id ) )];
+            if( model.model.logicVcc.empty() ) drive.external = true;
+            else if( auto enable = model.model.driverEnable.find( pin.id ); enable != model.model.driverEnable.end() )
+                drive.enables.push_back( ExpandModelTemplate( enable->second, model, topology.nodes[i], i ) );
+        }
+    }
+    // Ideal inline sensors preserve the driver's presence across the cut wire.
+    for( std::size_t pass = 0; pass < aProbes.size(); ++pass )
+        for( std::size_t i = 0; i < aProbes.size(); ++i )
+            if( aProbes[i].kind == PROBE_KIND::CURRENT || aProbes[i].kind == PROBE_KIND::POWER )
+            {
+                auto& a = drives[topology.nodes[aComponents.size()+i].at( "1" )];
+                auto& b = drives[topology.nodes[aComponents.size()+i].at( "2" )];
+                a.external = b.external = a.external || b.external;
+                auto merged = a.enables; merged.insert( merged.end(), b.enables.begin(), b.enables.end() );
+                std::sort( merged.begin(), merged.end() ); merged.erase( std::unique( merged.begin(), merged.end() ), merged.end() );
+                a.enables = b.enables = std::move( merged );
+            }
+    for( std::size_t i = 0; i < aComponents.size(); ++i )
+        for( const auto& pin : models[i].model.pins )
+        {
+            const auto& drive = drives.at( topology.nodes[i].at( models[i].pins.at( pin.id ) ) );
+            std::string expression = drive.external ? "1" : "0";
+            if( !drive.external ) for( const auto& enabled : drive.enables ) expression += "+(" + enabled + ")";
+            models[i].driveExpressions[pin.id] = "(" + expression + ")";
+        }
     result.pinNodes = topology.nodes;
     result.automaticReferences = topology.automaticReferences;
     result.floatingIslands = topology.floatingIslands;
@@ -129,6 +162,13 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 || !references.insert( c.reference ).second )
                 throw std::runtime_error( "Annotate the schematic: reference missing or repeated" );
             const auto& model = models.at( i );
+            if( !model.model.frequencyParameter.empty() )
+            {
+                const double frequency = model.parameters.at( model.model.frequencyParameter );
+                if( frequency <= 0 ) throw std::runtime_error( "Frequency must be positive" );
+                result.config.step = result.config.maxStep = std::min( result.config.maxStep, 1 / ( frequency * 100 ) );
+                result.config.horizon = std::min( result.config.horizon, result.config.maxStep * 9e7 );
+            }
             auto modelNodes = topology.nodes.at( i );
             if( !model.model.voltageConstraint.empty() && model.parameters.at( model.model.voltageConstraint ) != 0
                 && modelNodes.at( model.pins.at( model.model.measurePositive ) )
@@ -228,7 +268,36 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         result.config.signals.push_back( voltageSignal );
     for( auto& [name, warning] : warnings )
     { warning.signal = signal( name ); result.currentWarnings.push_back( warning ); }
-    if( result.config.signals.size() > 64 ) throw std::runtime_error( "This session supports up to 64 saved signals; reduce the measurements" );
+    if( aPinIndicators )
+        for( std::size_t i = 0; i < aComponents.size(); ++i )
+        {
+            const auto& model = models[i];
+            for( const auto& pin : model.model.pins )
+            {
+                LOGIC_PIN channel;
+                channel.component = i; channel.pin = model.pins.at( pin.id ); channel.reference = aComponents[i].reference;
+                channel.voltage = voltage( topology.nodes[i].at( channel.pin ) );
+                channel.digital = !model.model.logicVcc.empty();
+                if( channel.digital )
+                {
+                    channel.vcc = voltage( topology.nodes[i].at( model.pins.at( model.model.logicVcc ) ) );
+                    channel.ground = voltage( topology.nodes[i].at( model.pins.at( model.model.logicGround ) ) );
+                    channel.low = model.parameters.at( model.model.logicLow ); channel.high = model.parameters.at( model.model.logicHigh );
+                    channel.minSupply = model.parameters.at( model.model.logicMinSupply ); channel.maxSupply = model.parameters.at( model.model.logicMaxSupply );
+                    channel.output = model.model.driverEnable.contains( pin.id );
+                    if( model.model.driverValue.contains( pin.id ) )
+                        channel.driverValue = signal( ExpandModelTemplate( model.model.driverValue.at( pin.id ), model, topology.nodes[i], i ) );
+                    const auto& drive = drives.at( topology.nodes[i].at( channel.pin ) );
+                    channel.externalDrive = drive.external || pin.role == "power" || pin.role == "reference";
+                    if( channel.output )
+                        channel.enables.push_back( signal( ExpandModelTemplate( model.model.driverEnable.at( pin.id ), model, topology.nodes[i], i ) ) );
+                    else for( const auto& enabled : drive.enables ) channel.enables.push_back( signal( enabled ) );
+                }
+                result.logicPins.push_back( std::move( channel ) );
+            }
+        }
+    if( result.config.signals.size() > 256 ) throw std::runtime_error( "This session supports up to 256 saved signals; reduce the circuit or measurements" );
+    result.config.historyCapacity = std::min<std::size_t>( 256, 65536 / result.config.signals.size() );
     if( std::any_of( result.measurements.begin(), result.measurements.end(), []( const auto& c ) { return c.scope; } ) )
         result.config.historyCapacity = std::min<std::size_t>( 4096, 65536 / result.config.signals.size() );
     // 1 Tohm numerical leakage keeps genuinely open/capacitive nodes solvable.

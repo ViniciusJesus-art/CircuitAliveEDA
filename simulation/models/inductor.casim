@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "inductor",
+  "name": "Ideal inductor",
+  "description": "Modelo didático configurável; não é um macromodelo certificado pelo fabricante.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Terminal 1",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Terminal 2",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "inductance",
+      "label": "Inductance",
+      "default": "$value",
+      "unit": "H",
+      "min": 1e-12,
+      "max": 1000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "L${id} ${pin:p} ${pin:n} ${param:inductance} IC=0"
+    ],
+    "definitions": []
+  },
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Device:L",
+      "Device:L_Small"
+    ],
+    "symbol_names": [
+      "L",
+      "L_Small"
+    ]
+  },
+  "measurement_ports": {
+    "positive": "p",
+    "negative": "n"
+  }
+}

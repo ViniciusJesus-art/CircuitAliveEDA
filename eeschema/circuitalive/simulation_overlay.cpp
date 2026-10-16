@@ -7,13 +7,35 @@ namespace CIRCUITALIVE
 {
 void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
                                  const EDITOR_SESSION_VIEW& aSession,
-                                 const wxString& aCurrentSheet )
+                                 const wxString& aCurrentSheet, bool aLogicLevels )
 {
     Clear();
     if( aSession.state == EDITOR_SESSION_STATE::STOPPED
         || aSession.state == EDITOR_SESSION_STATE::ERROR )
         return;
     SetLineWidth( schIUScale.mmToIU( 0.12 ) );
+    if( aLogicLevels )
+        for( const auto& location : aCircuit.pins )
+        {
+            if( location.sheet != aCurrentSheet ) continue;
+            for( std::size_t i = 0; i < aCircuit.circuit.logicPins.size() && i < aSession.logicLevels.size(); ++i )
+            {
+                const auto& pin = aCircuit.circuit.logicPins[i];
+                if( pin.component != location.component || pin.pin != location.pin ) continue;
+                const auto level = aSession.logicLevels[i];
+                const auto color = level == LOGIC_LEVEL::HIGH ? KIGFX::COLOR4D( .95, .12, .08, 1 )
+                    : level == LOGIC_LEVEL::LOW ? KIGFX::COLOR4D( .08, .35, 1, 1 )
+                    : level == LOGIC_LEVEL::HIGH_Z ? KIGFX::COLOR4D( .55, .57, .6, 1 ) : KIGFX::COLOR4D( 1, .7, .05, 1 );
+                SetIsStroke( true ); SetIsFill( true ); SetStrokeColor( KIGFX::COLOR4D( .1, .1, .1, 1 ) ); SetFillColor( color );
+                Circle( VECTOR2D( location.position ), schIUScale.mmToIU( .45 ) );
+                SetIsFill( false ); SetStrokeColor( color );
+                SetGlyphSize( VECTOR2I( schIUScale.mmToIU( .8 ), schIUScale.mmToIU( .8 ) ) );
+                const char* text = level == LOGIC_LEVEL::HIGH ? "1" : level == LOGIC_LEVEL::LOW ? "0"
+                    : level == LOGIC_LEVEL::HIGH_Z ? "Z" : "X";
+                BitmapText( text, location.position + VECTOR2I( schIUScale.mmToIU( .7 ), schIUScale.mmToIU( -.7 ) ), ANGLE_0 );
+                break;
+            }
+        }
     for( const auto& channel : aCircuit.circuit.measurements )
     {
         if( channel.probe == NO_SIGNAL || channel.probe >= aCircuit.probes.size() ) continue;

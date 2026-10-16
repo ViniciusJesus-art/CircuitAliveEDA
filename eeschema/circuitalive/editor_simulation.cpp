@@ -62,11 +62,16 @@ private:
         Go( &EDITOR_SIMULATION_TOOL::Pause, SIMULATION_ACTIONS::pause.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Stop, SIMULATION_ACTIONS::stop.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Configure, SIMULATION_ACTIONS::configure.MakeEvent() );
+        Go( &EDITOR_SIMULATION_TOOL::ToggleProbes, SIMULATION_ACTIONS::probes.MakeEvent() );
+        Go( &EDITOR_SIMULATION_TOOL::ToggleLogic, SIMULATION_ACTIONS::logicLevels.MakeEvent() );
     }
     int Play( const TOOL_EVENT& );
     int Pause( const TOOL_EVENT& );
     int Stop( const TOOL_EVENT& );
     int Configure( const TOOL_EVENT& );
+    int ToggleProbes( const TOOL_EVENT& );
+    int ToggleLogic( const TOOL_EVENT& );
+    void showInstruments( bool );
     void tick( wxTimerEvent& );
     void click( wxMouseEvent& );
     void key( wxKeyEvent& );
@@ -87,6 +92,8 @@ private:
     EDITOR_SESSION_VIEW m_session;
     bool m_active = false;
     bool m_errorShown = false;
+    bool m_probePanel = false, m_logicLevels = false, m_instrumentsVisible = false;
+    bool m_resultOpened = false;
 };
 
 void EDITOR_SIMULATION_TOOL::Install()
@@ -103,6 +110,10 @@ void EDITOR_SIMULATION_TOOL::Install()
         []( const SELECTION& selected )
         { return selected.Size() == 1 && selected.Front()->Type() == SCH_SYMBOL_T; } );
     auto* actions = m_toolMgr->GetActionManager();
+    actions->SetConditions( SIMULATION_ACTIONS::probes, ACTION_CONDITIONS().Check(
+        [this]( const SELECTION& ) { return m_probePanel; } ) );
+    actions->SetConditions( SIMULATION_ACTIONS::logicLevels, ACTION_CONDITIONS().Check(
+        [this]( const SELECTION& ) { return m_logicLevels; } ) );
     actions->SetConditions( SIMULATION_ACTIONS::play, ACTION_CONDITIONS().Enable(
             [this]( const SELECTION& )
             { return m_session.state != EDITOR_SESSION_STATE::RUNNING
@@ -117,7 +128,7 @@ void EDITOR_SIMULATION_TOOL::Install()
     {
         manager->AddPane( m_instruments.get(), wxAuiPaneInfo().Name( "CircuitAliveInstruments" )
             .Caption( _( "Simulation" ) ).Right().Layer( 1 ).Position( 0 ).CloseButton( false )
-            .TopDockable( false ).BottomDockable( false ).MinSize( 300, 220 ).BestSize( 350, 650 ) );
+            .TopDockable( false ).BottomDockable( false ).MinSize( 300, 220 ).BestSize( 350, 650 ).Hide() );
         manager->Update();
     }
     setStatus( _( "Stopped — t = 0 s" ) );
@@ -174,6 +185,8 @@ void EDITOR_SIMULATION_TOOL::Invalidate()
     m_active = false;
     m_session = {};
     m_circuit = {};
+    m_resultOpened = false;
+    showInstruments( m_probePanel );
     if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, false );
     redraw();
     setStatus( _( "Circuit changed — press Play to rebuild" ) );
@@ -194,8 +207,9 @@ int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
         {
             // Freeze a complete graph/model snapshot on this thread; the solver never reads it live.
             m_frame->RecalculateConnections( nullptr, NO_CLEANUP );
-            m_circuit = CaptureSchematic( m_frame->Schematic() );
+            m_circuit = CaptureSchematic( m_frame->Schematic(), true );
             m_runner->Start( m_circuit.circuit );
+            m_resultOpened = false;
             m_active = true;
             m_errorShown = false;
         }
@@ -207,6 +221,33 @@ int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
         }
     }
     return 0;
+}
+
+void EDITOR_SIMULATION_TOOL::showInstruments( bool visible )
+{
+    if( visible == m_instrumentsVisible ) return;
+    if( auto* manager = wxAuiManager::GetManager( m_frame ) )
+    {
+        manager->GetPane( m_instruments.get() ).Show( visible ); manager->Update();
+        m_instrumentsVisible = visible;
+    }
+}
+
+int EDITOR_SIMULATION_TOOL::ToggleProbes( const TOOL_EVENT& )
+{
+    m_probePanel = !m_probePanel;
+    m_placing.reset(); m_instruments->SetPlacement( {} );
+    m_toolMgr->RunAction( ACTIONS::cancelInteractive );
+    m_toolMgr->RunAction( ACTIONS::selectionTool );
+    showInstruments( m_probePanel );
+    if( m_probePanel ) m_instruments->SelectTools();
+    m_frame->GetCanvas()->SetFocus();
+    return 0;
+}
+
+int EDITOR_SIMULATION_TOOL::ToggleLogic( const TOOL_EVENT& )
+{
+    m_logicLevels = !m_logicLevels; redraw(); return 0;
 }
 
 int EDITOR_SIMULATION_TOOL::Pause( const TOOL_EVENT& )
@@ -223,6 +264,8 @@ int EDITOR_SIMULATION_TOOL::Stop( const TOOL_EVENT& )
     m_active = false;
     m_session = {};
     m_circuit = {};
+    m_resultOpened = false;
+    showInstruments( m_probePanel );
     if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, false );
     redraw();
     setStatus( _( "Stopped — t = 0 s" ) );
@@ -254,8 +297,14 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
         if( EditSimulationModel( m_frame, component ) )
         {
             SCH_COMMIT commit( m_frame );
-            commit.Modify( symbol, m_frame->GetScreen() );
-            WriteSymbolModelSettings( *symbol, component );
+            for( auto& sheet : m_frame->Schematic().Hierarchy() )
+                for( auto* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
+                {
+                    auto* unit = static_cast<SCH_SYMBOL*>( item );
+                    if( unit != symbol && ( !symbol->IsMultiUnit() || unit->GetRef( &sheet ).ToStdString() != component.reference
+                        || unit->GetLibId() != symbol->GetLibId() ) ) continue;
+                    commit.Modify( unit, sheet.LastScreen() ); WriteSymbolModelSettings( *unit, component );
+                }
             commit.Push( _( "Configure simulation model" ) );
             Invalidate();
         }
@@ -322,7 +371,7 @@ void EDITOR_SIMULATION_TOOL::redraw()
     if( !m_overlay )
         return;
     auto* view = m_frame->GetCanvas()->GetView();
-    m_overlay->Render( m_circuit, m_session, m_frame->GetCurrentSheet().PathAsString() );
+    m_overlay->Render( m_circuit, m_session, m_frame->GetCurrentSheet().PathAsString(), m_logicLevels );
     if( !view->HasItem( m_overlay.get() ) )
         view->Add( m_overlay.get() );
     view->Update( m_overlay.get() );
@@ -337,13 +386,16 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     m_session = m_runner->View();
     const auto state = m_session.state;
     if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, m_active );
+    if( m_active && !m_circuit.circuit.measurements.empty() && !m_instrumentsVisible
+        && !m_resultOpened )
+    { showInstruments( true ); m_resultOpened = true; }
     if( !m_active )
     {
         publishStatus();
         return;
     }
     const wxString names[] = { _( "Stopped" ), _( "Preparing" ), _( "Running" ),
-                              _( "Paused" ), _( "Completed (1 h limit)" ), _( "Error" ) };
+                              _( "Paused" ), _( "Completed" ), _( "Error" ) };
     wxString status = wxString::Format( "%s — t = %.3f s", names[static_cast<int>( state )],
                                        m_session.sample.latest.time );
     for( std::size_t i = 0; i < std::min<std::size_t>( 2, m_session.warnings.size() ); ++i )

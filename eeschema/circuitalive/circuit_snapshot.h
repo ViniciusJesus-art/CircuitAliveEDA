@@ -3,6 +3,7 @@
 
 #include <sim/interactive_sim_session.h>
 #include "measurements.h"
+#include "logic_signals.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -55,11 +56,13 @@ struct CIRCUIT_SNAPSHOT
     std::size_t openPins = 0;
     std::vector<MEASUREMENT_CHANNEL> measurements;
     std::vector<CURRENT_WARNING> currentWarnings;
+    std::vector<LOGIC_PIN> logicPins;
 };
 
 /// Resolve model files, parameters and physical pins, then freeze a component deck.
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents,
-                                     const std::vector<CIRCUIT_PROBE>& aProbes = {} );
+                                     const std::vector<CIRCUIT_PROBE>& aProbes = {},
+                                     bool aPinIndicators = false );
 double ParseComponentValue( const std::string& aValue );
 double LedBrightness( double aForwardCurrent, double aBrightnessCurrent = 0.01 );
 }

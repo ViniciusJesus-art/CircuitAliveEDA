@@ -6,10 +6,10 @@ arquivo descreve o comportamento elétrico, os parâmetros e os terminais do mod
 O programa conhece o backend ngspice e os indicadores/interações disponíveis,
 sem uma lista de componentes permitidos no executável.
 
-O envelope `.casim` v1 abaixo atende os modelos **analógicos ngspice** atuais.
-Não fixa a linguagem de programação do futuro backend digital. O formato para
-equações lógicas, eventos, atrasos e resolução de barramentos será discutido
-antes de implementar esse backend.
+O envelope `.casim` v1 atende modelos analógicos e digitais XSPICE no backend
+ngspice. O comportamento fica no arquivo, incluindo portas e atrasos. Uma
+linguagem própria para componentes programáveis permanece uma decisão futura.
+Veja [Componentes básicos e digital](BASIC_AND_DIGITAL_MODELS.md).
 
 ## Configurar no editor
 
@@ -66,9 +66,10 @@ prioridade produzem erro e pedem uma escolha explícita. Um arquivo sem `matches
 pode ser associado manualmente a qualquer desenho cuja pinagem seja compatível.
 Uma associação inexistente ou arquivo inválido é identificado antes da simulação.
 
-Os arquivos distribuídos são `resistor.casim`, `capacitor.casim`,
+Os primeiros arquivos distribuídos são `resistor.casim`, `capacitor.casim`,
 `dc_voltage.casim`, `led.casim` e `switch.casim`. São os arquivos que declaram
-as associações dos componentes padrão e das cópias locais de R/C. Para manter a
+as associações dos componentes padrão e das cópias locais de R/C. O catálogo
+atual inclui também [componentes básicos e digitais](BASIC_AND_DIGITAL_MODELS.md). Para manter a
 compatibilidade anterior, os modelos ideais R/C desconsideram campos SPICE antigos;
 nos demais, campos SPICE personalizados pedem uma associação explícita.
 
@@ -187,11 +188,11 @@ levar a rede a 1 enquanto a saída continua Z. Uma tensão intermediária não �
 prova de alta impedância. Entradas e saídas de uma família lógica precisam
 considerar sua alimentação; atrasos precisam ser representados no tempo do motor.
 
-**Esta etapa ainda não executa uma linguagem digital própria, não agrupa as
-unidades de um CI e não exibe estados 0/1/Z/X nos pinos.** Declarar `role: output`
-informa a associação, mas não cria sozinho um driver digital. Um novo comportamento
-analógico descrito em SPICE já pode ser carregado sem recompilação; o backend
-digital será uma extensão separada, após definir esses contratos.
+Os modelos atuais 74HC00 e 74HC125 já usam eventos XSPICE, agrupam as unidades
+do mesmo CI e exibem 0/1/Z/X opcionalmente nos pinos. Declarar `role: output`
+sozinho continua insuficiente: o circuito SPICE e o bloco `logic` do arquivo
+definem comportamento, alimentação e enable. Uma linguagem digital própria
+ainda não foi definida. Detalhes em [Componentes básicos e digital](BASIC_AND_DIGITAL_MODELS.md).
 
 ## Organização
 

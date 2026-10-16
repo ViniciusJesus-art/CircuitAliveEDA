@@ -61,6 +61,9 @@ CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& s
     component.explicitSpiceModel = !component.legacySpiceFields.empty();
     for( const SCH_PIN* pin : symbol.GetPins( &sheet ) )
         component.pins[pin->GetShownNumber().ToStdString()] = "";
+    if( symbol.IsMultiUnit() )
+        for( const SCH_PIN* pin : symbol.GetAllLibPins() )
+            component.pins.try_emplace( pin->GetShownNumber().ToStdString(), "" );
     return component;
 }
 
@@ -85,11 +88,12 @@ void WriteSymbolModelSettings( SCH_SYMBOL& symbol, const CIRCUIT_COMPONENT& sett
     }
 }
 
-SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
+SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators )
 {
     SCHEMATIC_SNAPSHOT result;
     std::vector<CIRCUIT_COMPONENT> components;
     std::vector<CIRCUIT_PROBE> probes;
+    std::map<std::string, std::size_t> packages;
     const wxString variant = aSchematic.GetCurrentVariant();
     for( SCH_SHEET_PATH& sheet : aSchematic.Hierarchy() )
     {
@@ -167,13 +171,36 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
                     name = "0";
                 component.pins[pin->GetShownNumber().ToStdString()] = std::move( name );
             }
-            components.push_back( std::move( component ) );
-            result.locations.push_back( { sheet.PathAsString(), symbol->m_Uuid.AsString(),
-                                          symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(),
-                                          symbol->GetPosition() } );
+            std::size_t index = components.size();
+            auto existing = packages.find( component.reference );
+            if( symbol->IsMultiUnit() && existing != packages.end() )
+            {
+                index = existing->second;
+                auto& package = components[index];
+                if( package.libraryId != component.libraryId || package.modelFile != component.modelFile
+                    || package.modelPins != component.modelPins || package.modelParameters != component.modelParameters )
+                    throw std::runtime_error( component.reference + ": units must share one simulation model and parameters" );
+                for( const SCH_PIN* pin : symbol->GetPins( &sheet ) )
+                {
+                    const auto number = pin->GetShownNumber().ToStdString();
+                    if( !package.pins[number].empty() && package.pins[number] != component.pins[number] )
+                        throw std::runtime_error( component.reference + ": repeated pin connected to different nets" );
+                    package.pins[number] = component.pins[number];
+                }
+                if( component.measurements.Any() ) package.measurements = component.measurements;
+            }
+            else
+            {
+                if( symbol->IsMultiUnit() ) packages[component.reference] = index;
+                components.push_back( std::move( component ) );
+                result.locations.push_back( { sheet.PathAsString(), symbol->m_Uuid.AsString(),
+                                              symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition() } );
+            }
+            if( aPinIndicators ) for( const SCH_PIN* pin : symbol->GetPins( &sheet ) )
+                result.pins.push_back( { index, pin->GetShownNumber().ToStdString(), sheet.PathAsString(), pin->GetPosition() } );
         }
     }
-    result.circuit = BuildCircuitSnapshot( components, probes );
+    result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators );
     return result;
 }
 }
