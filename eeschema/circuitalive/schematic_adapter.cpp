@@ -1,6 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "schematic_adapter.h"
-#include "component_catalog.h"
+#include <nlohmann/json.hpp>
+#include <project.h>
 #include <sch_connection.h>
 #include <sch_field.h>
 #include <sch_pin.h>
@@ -15,6 +16,56 @@
 
 namespace CIRCUITALIVE
 {
+CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& sheet,
+        const wxString& variant, const std::string& projectDirectory )
+{
+    CIRCUIT_COMPONENT component;
+    component.libraryId = symbol.GetLibId().Format().c_str();
+    component.reference = symbol.GetRef( &sheet ).ToStdString();
+    component.value = symbol.GetValue( true, &sheet, true, variant ).ToStdString();
+    component.projectDirectory = projectDirectory;
+    auto field = [&]( const wxString& name ) -> std::string
+    {
+        const SCH_FIELD* f = symbol.GetField( name );
+        return f ? f->GetShownText( &sheet, false, 0, variant ).ToStdString() : std::string();
+    };
+    component.deviceHint = field( "Sim.Device" );
+    component.modelFile = field( "CA.Model" );
+    auto map = [&]( const wxString& name ) -> std::map<std::string, std::string>
+    {
+        const auto value = field( name );
+        if( value.empty() ) return {};
+        try { return nlohmann::json::parse( value ).get<std::map<std::string, std::string>>(); }
+        catch( const std::exception& )
+            { throw std::runtime_error( component.reference + ": invalid " + name.ToStdString() ); }
+    };
+    component.modelPins = map( "CA.Pins" );
+    component.modelParameters = map( "CA.Parameters" );
+    for( const wxString name : { "Sim.Library", "Sim.Name", "Sim.Params", "Sim.Device", "Sim.Type", "Sim.Pins" } )
+        if( auto value = field( name ); !value.empty() ) component.legacySpiceFields[name.ToStdString()] = value;
+    component.explicitSpiceModel = !component.legacySpiceFields.empty();
+    for( const SCH_PIN* pin : symbol.GetPins( &sheet ) )
+        component.pins[pin->GetShownNumber().ToStdString()] = "";
+    return component;
+}
+
+void WriteSymbolModelSettings( SCH_SYMBOL& symbol, const CIRCUIT_COMPONENT& settings )
+{
+    const std::map<wxString, std::string> fields = {
+        { "CA.Model", settings.modelFile },
+        { "CA.Pins", settings.modelPins.empty() ? "" : nlohmann::json( settings.modelPins ).dump() },
+        { "CA.Parameters", settings.modelParameters.empty() ? "" : nlohmann::json( settings.modelParameters ).dump() }
+    };
+    for( const auto& [name, value] : fields )
+    {
+        if( value.empty() ) { symbol.RemoveField( name ); continue; }
+        auto* field = symbol.GetField( name );
+        if( !field ) field = symbol.AddField( SCH_FIELD( &symbol, FIELD_T::USER, name ) );
+        field->SetText( wxString::FromUTF8( value ) );
+        field->SetVisible( false );
+    }
+}
+
 SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
 {
     SCHEMATIC_SNAPSHOT result;
@@ -52,26 +103,8 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
                 || symbol->GetExcludedFromSim( &sheet, variant ) )
                 continue;
 
-            CIRCUIT_COMPONENT component;
-            component.libraryId = lib;
-            component.reference = symbol->GetRef( &sheet ).ToStdString();
-            component.value = symbol->GetValue( true, &sheet, true, variant ).ToStdString();
-            auto field = [&]( const wxString& name ) -> wxString
-            {
-                const SCH_FIELD* f = symbol->GetField( name );
-                return f ? f->GetShownText( &sheet, false, 0, variant ) : wxString();
-            };
-            component.deviceHint = field( "Sim.Device" ).ToStdString();
-            const auto behavior = FindBuiltinBehavior( lib, component.deviceHint );
-            bool vdc = behavior == BUILTIN_BEHAVIOR::DC_VOLTAGE;
-            bool led = behavior == BUILTIN_BEHAVIOR::RED_LED;
-            component.explicitSpiceModel = !field( "Sim.Library" ).empty()
-                    || !field( "Sim.Name" ).empty() || !field( "Sim.Params" ).empty()
-                    || ( !field( "Sim.Device" ).empty() && !( vdc && field( "Sim.Device" ) == "V" ) )
-                    || ( !field( "Sim.Type" ).empty() && !( vdc && field( "Sim.Type" ) == "DC" ) )
-                    || ( !field( "Sim.Pins" ).empty()
-                         && !( vdc && field( "Sim.Pins" ) == "1=+ 2=-" )
-                         && !( led && field( "Sim.Pins" ) == "1=K 2=A" ) );
+            CIRCUIT_COMPONENT component = ReadSymbolModelSettings( *symbol, sheet, variant,
+                    aSchematic.Project().GetProjectPath().ToStdString() );
 
             for( const SCH_PIN* pin : symbol->GetPins( &sheet ) )
             {

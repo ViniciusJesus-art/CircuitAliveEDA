@@ -1,0 +1,14 @@
+{
+  "schema_version":1,"backend":"ngspice","id":"divider","name":"User three-pin divider",
+  "pins":[
+    {"id":"in","label":"Input","role":"input","default_pin":"10"},
+    {"id":"out","label":"Output","role":"output","default_pin":"20"},
+    {"id":"gnd","label":"Return","role":"reference","default_pin":"30"}
+  ],
+  "parameters":[{"id":"ratio","label":"Upper resistance ratio","default":"1","min":0.01,"max":100}],
+  "spice":{
+    "instance":["X${id} ${pin:in} ${pin:out} ${pin:gnd} divider${id}"],
+    "definitions":[".subckt divider${id} in out gnd","Rupper in out {1000*${param:ratio}}",
+                   "Rlower out gnd 1000",".ends divider${id}"]
+  }
+}

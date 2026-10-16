@@ -1,6 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "simulation_toolbar.h"
 #include <bitmaps.h>
+#include <tool/tool_event.h>
 #include <kiplatform/ui.h>
 #include <pgm_base.h>
 #include <sch_edit_frame.h>
@@ -10,6 +11,10 @@
 
 namespace CIRCUITALIVE
 {
+TOOL_ACTION SIMULATION_ACTIONS::configure( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.configureModel" )
+        .Scope( AS_GLOBAL ).DefaultHotkey( MD_CTRL + MD_ALT + 'M' )
+        .FriendlyName( wxTRANSLATE( "Simulation model..." ) )
+        .Tooltip( wxTRANSLATE( "Associate a model file, map physical pins and configure parameters" ) ) );
 TOOL_ACTION SIMULATION_ACTIONS::play( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.play" )
         .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "Interactive Play" ) )
         .Tooltip( wxTRANSLATE( "Start or resume interactive simulation" ) ).Icon( BITMAPS::sim_run ) );

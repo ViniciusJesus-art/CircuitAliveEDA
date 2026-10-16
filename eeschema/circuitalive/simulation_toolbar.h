@@ -10,6 +10,7 @@ struct SIMULATION_ACTIONS
     static TOOL_ACTION play;
     static TOOL_ACTION pause;
     static TOOL_ACTION stop;
+    static TOOL_ACTION configure;
 };
 
 /// Append native-sized actions to the existing main toolbar, including after customization/recreation.

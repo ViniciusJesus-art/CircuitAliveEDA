@@ -4,9 +4,15 @@
 #include "session_runner.h"
 #include "simulation_overlay.h"
 #include "simulation_toolbar.h"
+#include "model_dialog.h"
 #include <algorithm>
 
 #include <tools/sch_tool_base.h>
+#include <tools/sch_selection_tool.h>
+#include <sch_symbol.h>
+#include <sch_screen.h>
+#include <sch_commit.h>
+#include <project.h>
 #include <sch_draw_panel.h>
 #include <sch_edit_frame.h>
 #include <schematic.h>
@@ -51,10 +57,12 @@ private:
         Go( &EDITOR_SIMULATION_TOOL::Play, SIMULATION_ACTIONS::play.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Pause, SIMULATION_ACTIONS::pause.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Stop, SIMULATION_ACTIONS::stop.MakeEvent() );
+        Go( &EDITOR_SIMULATION_TOOL::Configure, SIMULATION_ACTIONS::configure.MakeEvent() );
     }
     int Play( const TOOL_EVENT& );
     int Pause( const TOOL_EVENT& );
     int Stop( const TOOL_EVENT& );
+    int Configure( const TOOL_EVENT& );
     void tick( wxTimerEvent& );
     void click( wxMouseEvent& );
     void redraw();
@@ -82,6 +90,10 @@ void EDITOR_SIMULATION_TOOL::Install()
     m_overlay = std::make_unique<SIMULATION_OVERLAY>();
     m_frame->Schematic().AddListener( this );
     m_installed = true;
+    auto* selection = m_toolMgr->GetTool<SCH_SELECTION_TOOL>();
+    selection->GetToolMenu().GetMenu().AddItem( SIMULATION_ACTIONS::configure,
+        []( const SELECTION& selected )
+        { return selected.Size() == 1 && selected.Front()->Type() == SCH_SYMBOL_T; } );
     auto* actions = m_toolMgr->GetActionManager();
     actions->SetConditions( SIMULATION_ACTIONS::play, ACTION_CONDITIONS().Enable(
             [this]( const SELECTION& )
@@ -190,6 +202,31 @@ int EDITOR_SIMULATION_TOOL::Stop( const TOOL_EVENT& )
     return 0;
 }
 
+int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
+{
+    auto& selection = m_toolMgr->GetTool<SCH_SELECTION_TOOL>()->RequestSelection( { SCH_SYMBOL_T } );
+    if( selection.Size() != 1 ) return 0;
+    auto* symbol = static_cast<SCH_SYMBOL*>( selection.Front() );
+    try
+    {
+        auto component = ReadSymbolModelSettings( *symbol, m_frame->GetCurrentSheet(),
+            m_frame->Schematic().GetCurrentVariant(), m_frame->Prj().GetProjectPath().ToStdString() );
+        if( EditSimulationModel( m_frame, component ) )
+        {
+            SCH_COMMIT commit( m_frame );
+            commit.Modify( symbol, m_frame->GetScreen() );
+            WriteSymbolModelSettings( *symbol, component );
+            commit.Push( _( "Configure simulation model" ) );
+            Invalidate();
+        }
+    }
+    catch( const std::exception& e )
+    {
+        wxMessageBox( wxString::FromUTF8( e.what() ), _( "Simulation model" ), wxOK, m_frame );
+    }
+    return 0;
+}
+
 void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
 {
     if( m_active && ( m_session.state == EDITOR_SESSION_STATE::RUNNING
@@ -242,6 +279,8 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
         const auto& led = m_circuit.circuit.leds.at( i );
         status += wxString::Format( "   %s: %.2f mA", m_circuit.locations.at( led.component ).reference,
                                     m_session.ledCurrents[i] * 1000 );
+        if( led.ratedCurrent > 0 && m_session.ledCurrents[i] > led.ratedCurrent )
+            status += _( " (overcurrent)" );
     }
     if( m_session.ledCurrents.size() > 3 )
         status += wxString::Format( "   +%zu LEDs", m_session.ledCurrents.size() - 3 );

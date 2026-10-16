@@ -1,6 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "circuit_snapshot.h"
-#include "component_catalog.h"
+#include "simulation_model.h"
 #include "circuit_topology.h"
 
 #include <algorithm>
@@ -38,7 +38,8 @@ double ParseComponentValue( const std::string& aValue )
     // The netlist receives the parsed number, never the original text.
     const std::map<std::string, double> scales = {
         { "", 1 }, { "R", 1 }, { "r", 1 }, { "Ohm", 1 }, { "ohm", 1 }, { "Ω", 1 },
-        { "V", 1 }, { "F", 1 }, { "f", 1e-15 }, { "p", 1e-12 }, { "n", 1e-9 },
+        { "V", 1 }, { "F", 1 }, { "A", 1 }, { "s", 1 }, { "Hz", 1 },
+        { "f", 1e-15 }, { "p", 1e-12 }, { "n", 1e-9 },
         { "u", 1e-6 }, { "U", 1e-6 }, { "µ", 1e-6 }, { "μ", 1e-6 }, { "m", 1e-3 }, { "M", 1e6 },
         { "k", 1e3 }, { "K", 1e3 }, { "Meg", 1e6 }, { "meg", 1e6 }, { "G", 1e9 }, { "g", 1e9 }
     };
@@ -46,7 +47,7 @@ double ParseComponentValue( const std::string& aValue )
     auto scale = scales.find( suffix );
     if( scale == scales.end() )
     {
-        for( const std::string unit : { "Ohm", "ohm", "Ω", "F", "V" } )
+        for( const std::string unit : { "Ohm", "ohm", "Ω", "F", "V", "A", "s", "Hz" } )
         {
             if( suffix.ends_with( unit ) )
             {
@@ -60,10 +61,10 @@ double ParseComponentValue( const std::string& aValue )
     return number * scale->second;
 }
 
-double LedBrightness( double aForwardCurrent )
+double LedBrightness( double aForwardCurrent, double aBrightnessCurrent )
 {
     // Display response, not an optical/damage model. Reverse current never lights the LED.
-    return std::sqrt( std::clamp( aForwardCurrent / 0.01, 0.0, 1.0 ) );
+    return std::sqrt( std::clamp( aForwardCurrent / aBrightnessCurrent, 0.0, 1.0 ) );
 }
 
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents )
@@ -72,7 +73,17 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     result.config.step = result.config.maxStep = 1e-4;
     result.config.horizon = 3600; // Finite internal horizon: completion is explicit in the UI.
     result.config.historyCapacity = 256;
-    const auto topology = BuildCircuitTopology( aComponents );
+    std::string projectDirectory;
+    for( const auto& component : aComponents )
+        if( !component.projectDirectory.empty() ) { projectDirectory = component.projectDirectory; break; }
+    MODEL_REPOSITORY repository( MODEL_REPOSITORY::DefaultDirectories( projectDirectory ) );
+    std::vector<RESOLVED_MODEL> models;
+    for( const auto& component : aComponents )
+    {
+        try { models.push_back( repository.Resolve( component ) ); }
+        catch( const std::exception& e ) { throw std::runtime_error( component.reference + ": " + e.what() ); }
+    }
+    const auto topology = BuildCircuitTopology( aComponents, models );
     result.pinNodes = topology.nodes;
     result.automaticReferences = topology.automaticReferences;
     result.floatingIslands = topology.floatingIslands;
@@ -92,48 +103,21 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             if( c.reference.empty() || c.reference.find( '?' ) != std::string::npos
                 || !references.insert( c.reference ).second )
                 throw std::runtime_error( "Annotate the schematic: reference missing or repeated" );
-            const auto behavior = FindBuiltinBehavior( c.libraryId, c.deviceHint );
-            auto node = [&]( const std::string& pin ) { return topology.nodes.at( i ).at( pin ); };
-            const bool fixedPassive = behavior == BUILTIN_BEHAVIOR::RESISTOR
-                                      || behavior == BUILTIN_BEHAVIOR::CAPACITOR;
-            // R/C in this initial catalogue always use Value and the fixed ideal behaviour.
-            // Existing Sim.* fields belong to KiCad's traditional simulator, not an external-model requirement.
-            if( c.explicitSpiceModel && !fixedPassive )
-                throw std::runtime_error( "Custom SPICE model is not supported for " + c.libraryId );
-
-            const std::string id = std::to_string( i + 1 );
-            if( fixedPassive )
+            const auto& model = models.at( i );
+            auto expand = [&]( const std::string& text )
+                { return ExpandModelTemplate( text, model, topology.nodes.at( i ), i ); };
+            for( const auto& line : model.model.instance ) deck << expand( line ) << '\n';
+            for( const auto& line : model.model.definitions ) deck << expand( line ) << '\n';
+            if( !model.model.indicatorSignal.empty() )
             {
-                double value = ParseComponentValue( c.value );
-                if( value <= 0 )
-                    throw std::runtime_error( "R and C must have a positive value" );
-                bool capacitor = behavior == BUILTIN_BEHAVIOR::CAPACITOR;
-                deck << ( capacitor ? "C" : "R" ) << "ca" << id << ' ' << node( "1" )
-                     << ' ' << node( "2" ) << ' ' << value << ( capacitor ? " ic=0" : "" ) << '\n';
+                result.leds.push_back( { i, result.config.signals.size(),
+                    model.parameters.at( model.model.brightnessParameter ),
+                    model.model.ratingParameter.empty() ? 0 : model.parameters.at( model.model.ratingParameter ) } );
+                result.config.signals.push_back( expand( model.model.indicatorSignal ) );
             }
-            else if( behavior == BUILTIN_BEHAVIOR::DC_VOLTAGE )
-            {
-                deck << "Vca" << id << ' ' << node( "1" ) << ' ' << node( "2" )
-                     << " DC " << ParseComponentValue( c.value ) << '\n';
-            }
-            else if( behavior == BUILTIN_BEHAVIOR::RED_LED )
-            {
-                // Initial fixed red teaching model; the symbol's display value is not a model selector.
-                deck << "Dca" << id << ' ' << node( "2" ) << ' ' << node( "1" )
-                     << " CA_RED\n"; // KiCad pin 1 = cathode, pin 2 = anode.
-                result.leds.push_back( { i, result.config.signals.size() } );
-                result.config.signals.push_back( "@dca" + id + "[id]" );
-            }
-            else if( behavior == BUILTIN_BEHAVIOR::SWITCH )
-            {
-                std::string source = "Vcontrol" + id;
-                deck << source << " control" << id << " 0 5\n"
-                     << "Sca" << id << ' ' << node( "1" ) << ' ' << node( "2" )
-                     << " control" << id << " 0 CA_SW\n";
-                result.switches.push_back( { i, source } );
-            }
-            else
-                throw std::runtime_error( "No interactive model for " + c.libraryId );
+            if( !model.model.controlSource.empty() )
+                result.switches.push_back( { i, expand( model.model.controlSource ),
+                                            model.model.controlOn, model.model.controlOff } );
         }
         catch( const std::exception& e )
         {
@@ -161,9 +145,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         result.config.signals.push_back( voltageSignal );
     // 1 Tohm numerical leakage keeps genuinely open/capacitive nodes solvable.
     // It is not a wire or logic pull-down; floating islands remain identified in the snapshot.
-    deck << ".options rshunt=1e12\n"
-         << ".model CA_SW SW(Ron=0.01 Roff=1e12 Vt=2.5 Vh=0.1)\n"
-         << ".model CA_RED D(Is=1e-20 N=2 Rs=5)\n.end\n";
+    deck << ".options rshunt=1e12\n.end\n";
     result.netlist = deck.str();
     return result;
 }

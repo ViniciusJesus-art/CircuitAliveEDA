@@ -120,7 +120,8 @@ kicad_add_boost_test( qa_spice qa_spice )
 setup_qa_env( qa_spice )
 
 if( TARGET circuitalive_sim_session )
-    add_executable( qa_interactive_sim test_interactive_sim_session.cpp test_interactive_circuit.cpp )
+    add_executable( qa_interactive_sim test_interactive_sim_session.cpp test_interactive_circuit.cpp
+        test_interactive_models.cpp )
     target_link_libraries( qa_interactive_sim PRIVATE
         circuitalive_interactive circuitalive_sim_session Boost::unit_test_framework )
     target_compile_definitions( qa_interactive_sim PRIVATE

@@ -1,27 +1,21 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "circuit_topology.h"
-#include "component_catalog.h"
 #include <algorithm>
 #include <numeric>
 #include <stdexcept>
 
 namespace CIRCUITALIVE
 {
-CIRCUIT_TOPOLOGY BuildCircuitTopology( const std::vector<CIRCUIT_COMPONENT>& aComponents )
+CIRCUIT_TOPOLOGY BuildCircuitTopology( const std::vector<CIRCUIT_COMPONENT>& aComponents,
+                                     const std::vector<RESOLVED_MODEL>& aModels )
 {
     CIRCUIT_TOPOLOGY result;
     result.nodes.resize( aComponents.size() );
     std::map<std::string, std::size_t> nodeIds;
     std::vector<std::map<std::string, std::size_t>> pins( aComponents.size() );
-    std::vector<BUILTIN_BEHAVIOR> behaviors;
     for( std::size_t i = 0; i < aComponents.size(); ++i )
     {
         const auto& c = aComponents[i];
-        auto behavior = FindBuiltinBehavior( c.libraryId, c.deviceHint );
-        behaviors.push_back( behavior );
-        if( behavior == BUILTIN_BEHAVIOR::UNKNOWN ) continue;
-        if( c.pins.size() != 2 || !c.pins.contains( "1" ) || !c.pins.contains( "2" ) )
-            throw std::runtime_error( c.reference + ": this basic model requires physical pins 1 and 2" );
         for( const auto& [pin, rawName] : c.pins )
         {
             std::string name = rawName;
@@ -48,9 +42,13 @@ CIRCUIT_TOPOLOGY BuildCircuitTopology( const std::vector<CIRCUIT_COMPONENT>& aCo
         }
         return node;
     };
-    for( const auto& pair : pins )
-        if( !pair.empty() )
-            parents[root( pair.at( "2" ) )] = root( pair.at( "1" ) );
+    for( std::size_t i = 0; i < pins.size(); ++i )
+        for( const auto& group : aModels.at( i ).model.electricalGroups )
+        {
+            auto first = pins[i].at( aModels[i].pins.at( group.front() ) );
+            for( const auto& port : group )
+                parents[root( pins[i].at( aModels[i].pins.at( port ) ) )] = root( first );
+        }
 
     struct ISLAND
     {
@@ -63,20 +61,23 @@ CIRCUIT_TOPOLOGY BuildCircuitTopology( const std::vector<CIRCUIT_COMPONENT>& aCo
     const auto ground = nodeIds.find( "net:0" );
     for( std::size_t i = 0; i < aComponents.size(); ++i )
     {
-        if( pins[i].empty() ) continue;
-        auto id = root( pins[i].at( "1" ) );
-        auto [it, inserted] = islands.try_emplace( id, pins[i].at( "1" ), aComponents[i].reference, "", false );
-        auto& island = it->second;
-        if( ground != nodeIds.end() && root( ground->second ) == id )
+        for( const auto& [pin, node] : pins[i] )
         {
-            island.explicitGround = true;
-            island.referenceNode = ground->second;
-        }
-        else if( behaviors[i] == BUILTIN_BEHAVIOR::DC_VOLTAGE
-                 && ( island.source.empty() || aComponents[i].reference < island.source ) )
-        {
-            island.source = aComponents[i].reference;
-            island.referenceNode = pins[i].at( "2" );
+            auto id = root( node );
+            auto [it, inserted] = islands.try_emplace( id, node, aComponents[i].reference, "", false );
+            auto& island = it->second;
+            if( ground != nodeIds.end() && root( ground->second ) == id )
+            {
+                island.explicitGround = true;
+                island.referenceNode = ground->second;
+            }
+            else if( !aModels[i].model.referencePin.empty()
+                     && aModels[i].pins.at( aModels[i].model.referencePin ) == pin
+                     && ( island.source.empty() || aComponents[i].reference < island.source ) )
+            {
+                island.source = aComponents[i].reference + "." + pin;
+                island.referenceNode = node;
+            }
         }
     }
     std::vector<std::string> spiceNames( nodeIds.size() );
@@ -87,7 +88,7 @@ CIRCUIT_TOPOLOGY BuildCircuitTopology( const std::vector<CIRCUIT_COMPONENT>& aCo
         if( !island.explicitGround )
         {
             if( !island.source.empty() )
-                result.automaticReferences.push_back( island.source + ".2" );
+                result.automaticReferences.push_back( island.source );
             else
                 result.floatingIslands.push_back( island.representative );
         }

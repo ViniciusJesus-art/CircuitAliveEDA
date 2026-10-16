@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "capacitor",
+  "name": "Ideal capacitor",
+  "description": "",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Positive",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Negative",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "capacitance",
+      "label": "Capacitance",
+      "default": "$value",
+      "unit": "F",
+      "min": 1e-18,
+      "max": 1000000.0
+    },
+    {
+      "id": "initial_voltage",
+      "label": "Initial voltage",
+      "default": "0",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "C${id} ${pin:p} ${pin:n} ${param:capacitance} ic=${param:initial_voltage}"
+    ]
+  },
+  "matches": {
+    "symbol_names": [
+      "C",
+      "C_Small",
+      "C_US",
+      "C_Polarized",
+      "C_Polarized_Small",
+      "C_Polarized_US"
+    ],
+    "device_hints": [
+      "C"
+    ]
+  },
+  "ignore_legacy_spice_fields": true
+}

@@ -135,8 +135,8 @@ void SESSION_RUNNER::run()
                         && view.state != EDITOR_SESSION_STATE::COMPLETED )
                     {
                         bool closed = !view.switches[command.index];
-                        session->SetSourceValue( circuit.switches[command.index].controlSource,
-                                                 closed ? 5.0 : 0.0 );
+                        const auto& control = circuit.switches[command.index];
+                        session->SetSourceValue( control.controlSource, closed ? control.on : control.off );
                         view.switches[command.index] = closed;
                         view.sample = session->Snapshot( true );
                     }

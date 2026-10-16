@@ -17,18 +17,27 @@ struct CIRCUIT_COMPONENT
     std::map<std::string, std::string> pins; // physical pin number -> connectivity graph net
     bool explicitSpiceModel = false;
     std::string deviceHint = {}; // KiCad's Sim.Device, including passives with project-local IDs.
+    std::string modelFile = {}; // builtin:<id> or a project-relative/absolute .casim file.
+    std::map<std::string, std::string> modelPins = {};
+    std::map<std::string, std::string> modelParameters = {};
+    std::string projectDirectory = {};
+    std::map<std::string, std::string> legacySpiceFields = {};
 };
 
 struct CIRCUIT_INDICATOR
 {
     std::size_t component;
     std::size_t signal;
+    double brightnessCurrent = 0.01;
+    double ratedCurrent = 0.02;
 };
 
 struct CIRCUIT_SWITCH
 {
     std::size_t component;
     std::string controlSource;
+    double on = 5;
+    double off = 0;
 };
 
 struct CIRCUIT_SNAPSHOT
@@ -43,9 +52,8 @@ struct CIRCUIT_SNAPSHOT
     std::size_t openPins = 0;
 };
 
-/// Standard symbols use the initial catalogue; R/C always use Value and their fixed ideal behaviour.
-/// Unknown symbols and unsupported custom models on other devices remain errors.
+/// Resolve model files, parameters and physical pins, then freeze a component deck.
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents );
 double ParseComponentValue( const std::string& aValue );
-double LedBrightness( double aForwardCurrent );
+double LedBrightness( double aForwardCurrent, double aBrightnessCurrent = 0.01 );
 }

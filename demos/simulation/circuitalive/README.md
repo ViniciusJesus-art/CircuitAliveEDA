@@ -32,3 +32,12 @@ KiCad instaladas (`Device`, `Switch`, `Simulation_SPICE`), sob a licença das
 bibliotecas KiCad, CC BY-SA 4.0 com a exceção para projetos que as utilizam.
 Os modelos didáticos inline e o exemplo CircuitAliveEDA foram escritos para o
 projeto. Detalhes e limites em [EDITOR_SIMULATION.md](../../../docs/circuitalive/EDITOR_SIMULATION.md).
+
+## Modelos por arquivo
+
+`models/voltage_divider.casim` exemplifica um modelo próprio com três terminais e
+um subcircuito SPICE, sem associação automática. Pode ser vinculado a um desenho
+com três pinos pela ação **Simulation model...**. A pinagem física e o parâmetro
+`ratio` são configuráveis; não exige recompilar.
+
+Veja [Arquivos de modelo](../../../docs/circuitalive/MODEL_FILES.md).

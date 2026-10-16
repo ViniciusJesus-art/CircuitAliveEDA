@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "led",
+  "name": "LED (configurable diode)",
+  "description": "Forward voltage is specified at the reference current and 27 C. Current is calculated by the circuit. The warning threshold does not limit current or simulate damage.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "k",
+      "label": "Cathode (K)",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "a",
+      "label": "Anode (A)",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "forward_voltage",
+      "label": "Forward voltage at reference current",
+      "default": "2.194",
+      "unit": "V",
+      "min": 1.2,
+      "max": 6
+    },
+    {
+      "id": "reference_current",
+      "label": "Reference current",
+      "default": "10m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 0.1
+    },
+    {
+      "id": "emission",
+      "label": "Emission coefficient",
+      "default": "2",
+      "unit": "",
+      "min": 1,
+      "max": 4
+    },
+    {
+      "id": "series_resistance",
+      "label": "Series resistance",
+      "default": "5",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 10
+    },
+    {
+      "id": "brightness_current",
+      "label": "Current for full displayed brightness",
+      "default": "10m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 1
+    },
+    {
+      "id": "rated_current",
+      "label": "Current warning threshold",
+      "default": "20m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 1
+    }
+  ],
+  "spice": {
+    "instance": [
+      "D${id} ${pin:a} ${pin:k} m${id} area={area${id}}"
+    ],
+    "definitions": [
+      ".param area${id}={${param:reference_current}/(exp((${param:forward_voltage}-${param:reference_current}*${param:series_resistance})/(${param:emission}*0.0258649258))-1)/1e-12}",
+      ".model m${id} D(Is=1e-12 N=${param:emission} Rs={${param:series_resistance}*area${id}} Tnom=27)"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "Device:LED",
+      "Device:LED_Small"
+    ]
+  },
+  "legacy_spice_fields": {
+    "Sim.Pins": "1=K 2=A"
+  },
+  "indicator": {
+    "type": "led",
+    "signal": "@d${id}[id]",
+    "brightness_parameter": "brightness_current",
+    "rating_parameter": "rated_current"
+  }
+}

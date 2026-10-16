@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "switch",
+  "name": "Interactive SPST switch",
+  "description": "",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Terminal 1",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Terminal 2",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "on_resistance",
+      "label": "Closed resistance",
+      "default": "0.01",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000.0
+    },
+    {
+      "id": "off_resistance",
+      "label": "Open resistance",
+      "default": "1e12",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vcontrol${id} control${id} 0 5",
+      "S${id} ${pin:p} ${pin:n} control${id} 0 m${id}"
+    ],
+    "definitions": [
+      ".model m${id} SW(Ron=${param:on_resistance} Roff=${param:off_resistance} Vt=2.5 Vh=0.1)"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "Switch:SW_SPST"
+    ]
+  },
+  "control": {
+    "source": "Vcontrol${id}",
+    "on": 5,
+    "off": 0
+  }
+}

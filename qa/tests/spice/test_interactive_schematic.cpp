@@ -10,6 +10,46 @@
 
 using namespace CIRCUITALIVE;
 
+BOOST_FIXTURE_TEST_CASE( ModelAssociationAndParametersPersistInSymbolFields, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC );
+    file.SetFullName( "standard_library_led.kicad_sch" );
+    LoadSchematic( file );
+    SCH_SYMBOL* led = nullptr;
+    for( SCH_ITEM* item : m_schematic->RootScreen()->Items().OfType( SCH_SYMBOL_T ) )
+    {
+        auto* symbol = static_cast<SCH_SYMBOL*>( item );
+        if( symbol->GetRef( &m_schematic->CurrentSheet() ) == "D1" ) led = symbol;
+    }
+    BOOST_REQUIRE( led );
+    auto settings = ReadSymbolModelSettings( *led, m_schematic->CurrentSheet(), "", "" );
+    const auto originalValue = settings.value;
+    settings.modelFile = "builtin:led";
+    settings.modelPins = { { "a", "2" }, { "k", "1" } };
+    settings.modelParameters = { { "forward_voltage", "3.2V" }, { "reference_current", "20mA" } };
+    WriteSymbolModelSettings( *led, settings );
+    BOOST_CHECK( !led->GetField( "CA.Model" )->IsVisible() );
+    const auto read = ReadSymbolModelSettings( *led, m_schematic->CurrentSheet(), "", "" );
+    BOOST_CHECK_EQUAL( read.modelFile, settings.modelFile );
+    BOOST_CHECK( read.modelPins == settings.modelPins );
+    BOOST_CHECK( read.modelParameters == settings.modelParameters );
+    BOOST_CHECK_EQUAL( read.value, originalValue );
+    // The association, not the drawing's library ID, owns simulation compatibility.
+    led->SetLibId( LIB_ID( "ArbitraryLibrary", "ArbitraryDrawing" ) );
+    auto snapshot = CaptureSchematic( *m_schematic );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config );
+    session.AdvanceTo( .02 );
+    const double current = session.Snapshot().latest.values.at( 0 );
+    BOOST_CHECK_GT( current, .003 ); BOOST_CHECK_LT( current, .005 );
+    settings.modelFile.clear(); settings.modelPins.clear(); settings.modelParameters.clear();
+    WriteSymbolModelSettings( *led, settings );
+    BOOST_CHECK( led->GetField( "CA.Model" ) == nullptr );
+    BOOST_CHECK( led->GetField( "CA.Pins" ) == nullptr );
+    BOOST_CHECK( led->GetField( "CA.Parameters" ) == nullptr );
+    BOOST_CHECK_THROW( CaptureSchematic( *m_schematic ), std::runtime_error );
+}
+
 BOOST_FIXTURE_TEST_CASE( InteractiveSchematicConnectivitySnapshot, KI_TEST::SCHEMATIC_TEST_FIXTURE )
 {
     LoadSchematic( wxFileName( CIRCUITALIVE_TEST_SCHEMATIC ) );

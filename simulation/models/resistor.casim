@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "resistor",
+  "name": "Ideal resistor",
+  "description": "",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Terminal 1",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Terminal 2",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "resistance",
+      "label": "Resistance",
+      "default": "$value",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "R${id} ${pin:p} ${pin:n} ${param:resistance}"
+    ]
+  },
+  "matches": {
+    "symbol_names": [
+      "R",
+      "R_US",
+      "R_Small"
+    ],
+    "device_hints": [
+      "R"
+    ]
+  },
+  "ignore_legacy_spice_fields": true
+}

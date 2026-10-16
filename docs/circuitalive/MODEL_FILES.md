@@ -1,0 +1,192 @@
+# Arquivos de modelo e configuração por componente
+
+Esta etapa substitui o catálogo de componentes em C++ por **arquivos carregados
+em tempo de execução**. O símbolo descreve o desenho e os pinos físicos; o
+arquivo descreve o comportamento elétrico, os parâmetros e os terminais do modelo.
+O programa conhece o backend ngspice e os indicadores/interações disponíveis,
+sem uma lista de componentes permitidos no executável.
+
+O envelope `.casim` v1 abaixo atende os modelos **analógicos ngspice** atuais.
+Não fixa a linguagem de programação do futuro backend digital. O formato para
+equações lógicas, eventos, atrasos e resolução de barramentos será discutido
+antes de implementar esse backend.
+
+## Configurar no editor
+
+1. Selecione um símbolo, clique com o botão direito e escolha **Simulation model...**.
+   O atalho é **Ctrl+Alt+M**; sobre um símbolo, ele também permite selecioná-lo.
+2. Escolha um dos arquivos disponíveis ou use **Load file...** para um arquivo próprio.
+3. Associe cada terminal do modelo ao número do pino físico do símbolo.
+   A coluna Role descreve entrada, saída, alimentação, referência ou terminal passivo.
+4. Edite os parâmetros desejados. Campo vazio usa o padrão do arquivo;
+   `$value` acompanha o campo Value do símbolo. São aceitas unidades como `3.2V`,
+   `20mA`, `470R` e `100uF`.
+5. Confirme e salve o esquema. Play cria uma sessão usando os arquivos atuais.
+
+A associação e os parâmetros ficam em campos ocultos do próprio símbolo:
+
+| Campo | Conteúdo |
+|---|---|
+| `CA.Model` | `builtin:<id>` para modelos distribuídos ou caminho de um arquivo próprio |
+| `CA.Pins` | Objeto JSON `terminal do modelo → número físico do símbolo` |
+| `CA.Parameters` | Objeto JSON de substituições por componente |
+
+Essas alterações usam o histórico de desfazer do KiCad. Cancelar a janela não
+altera o esquema. A confirmação invalida a sessão anterior como qualquer edição.
+Cada instância conserva seus próprios parâmetros; modificar um LED não modifica
+os outros. Arquivos externos ao projeto usam caminho absoluto; arquivos dentro
+do projeto usam caminho relativo à pasta do projeto. Mantenha esses arquivos
+junto do projeto ao compartilhá-lo.
+
+**Não é necessário recompilar para criar, associar ou editar um modelo.**
+Uma nova sessão, iniciada após Stop, lê novamente os arquivos. Play durante Pause
+retoma a cópia já carregada. **Reload file** atualiza a descrição na janela de
+configuração. Uma alteração somente no arquivo não modifica uma sessão em curso.
+
+## Localização e associação automática
+
+Os arquivos `.casim` são procurados diretamente nestas pastas, nesta ordem:
+
+1. `models/` dentro da pasta do projeto.
+2. Pasta indicada por `CIRCUITALIVE_MODEL_DIR`, quando configurada.
+3. `share/circuitalive/models` na instalação.
+4. `simulation/models` no checkout, para desenvolvimento.
+
+O mesmo ID na primeira pasta tem precedência. A busca não é recursiva.
+O projeto pode manter uma cópia de um modelo para fixar seus parâmetros.
+O launcher deste checkout define `CIRCUITALIVE_MODEL_DIR` como `simulation/models`
+quando a variável não foi definida, permitindo editar esses arquivos e usar a
+instalação local diretamente, sem recompilar nem reinstalar.
+
+Uma associação explícita no símbolo tem prioridade. Sem ela, `matches` dentro
+dos próprios arquivos resolve, por prioridade: ID completo de biblioteca,
+nome curto do símbolo e indicação `Sim.Device`. Duas associações de mesma
+prioridade produzem erro e pedem uma escolha explícita. Um arquivo sem `matches`
+pode ser associado manualmente a qualquer desenho cuja pinagem seja compatível.
+Uma associação inexistente ou arquivo inválido é identificado antes da simulação.
+
+Os arquivos distribuídos são `resistor.casim`, `capacitor.casim`,
+`dc_voltage.casim`, `led.casim` e `switch.casim`. São os arquivos que declaram
+as associações dos componentes padrão e das cópias locais de R/C. Para manter a
+compatibilidade anterior, os modelos ideais R/C desconsideram campos SPICE antigos;
+nos demais, campos SPICE personalizados pedem uma associação explícita.
+
+## Exemplo de arquivo analógico
+
+Um resistor próprio pode ser descrito inteiramente neste arquivo:
+
+```json
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "my_resistor",
+  "name": "My resistor",
+  "pins": [
+    {"id": "p", "label": "Terminal 1", "role": "passive", "default_pin": "1"},
+    {"id": "n", "label": "Terminal 2", "role": "passive", "default_pin": "2"}
+  ],
+  "parameters": [
+    {"id": "resistance", "label": "Resistance", "unit": "Ohm",
+     "default": "$value", "min": 0.000001, "max": 1000000000000}
+  ],
+  "spice": {
+    "instance": ["R${id} ${pin:p} ${pin:n} ${param:resistance}"]
+  }
+}
+```
+
+O gerador substitui `${id}` por um identificador da instância, `${pin:p}` pelo
+nó elétrico do terminal mapeado e `${param:resistance}` pelo número validado.
+O texto do Value não é inserido como código SPICE. Terminais e parâmetros
+desconhecidos, pinagem repetida ou incompleta, valores não numéricos e parâmetros
+fora dos limites são recusados.
+
+`spice.definitions` aceita linhas de `.model`, `.subckt` e outros elementos do
+deck suportados pelo worker. Nomes locais a uma instância devem incluir `${id}`
+para evitar conflitos. Subcircuitos podem ter mais de dois terminais; veja
+`demos/simulation/circuitalive/models/voltage_divider.casim`. A ordem dos terminais
+na linha X é a ordem da declaração `.subckt`. O número do pino físico do símbolo
+não precisa coincidir com a posição do terminal no modelo.
+
+Os arquivos contêm o modelo inline. Nesta versão não são carregados scripts do
+sistema, bibliotecas nativas, comandos `.control` nem includes SPICE externos.
+O worker continua responsável pelas análises, pausa, retomada e tempo de execução.
+
+Pinos abertos continuam sendo nós distintos. `reference_pin` identifica um
+terminal que pode fornecer a referência automática, como o negativo da fonte.
+`electrical_groups` permite separar grupos galvanicamente isolados de um mesmo
+modelo; na ausência desse campo, todos os seus terminais pertencem ao mesmo grupo
+para escolher a referência numérica. GND explícito continua tendo prioridade.
+
+## LED
+
+O arquivo `led.casim` expõe:
+
+| Parâmetro | Efeito |
+|---|---|
+| Forward voltage at reference current | Tensão direta do modelo na corrente de referência, a 27 °C |
+| Reference current | Corrente em que a tensão acima é especificada |
+| Emission coefficient / Series resistance | Forma da curva elétrica do diodo |
+| Current for full displayed brightness | Escala do indicador visual |
+| Current warning threshold | Acrescenta `overcurrent` ao status quando ultrapassado |
+
+A corrente real resulta do circuito. A corrente de referência não força uma
+corrente no LED, e o limite de aviso não limita a corrente nem simula destruição.
+O indicador atual conserva a cor inicial; cores e outros indicadores poderão
+ser descritos por extensões visuais. Temperatura e efeitos ópticos avançados
+também não fazem parte deste modelo didático.
+
+O arquivo normaliza a corrente de saturação usando a área do diodo e compensa
+a resistência de série pela mesma escala. Assim a calibração também funciona
+com tensões diretas maiores, sem depender de valores de IS abaixo do limite
+numérico observado no ngspice 47. As regras de escala por área e o modelo de
+diodo estão no [manual oficial do ngspice, capítulo 7.2](https://ngspice.sourceforge.io/docs/ngspice-manual.pdf).
+
+## Contrato digital a discutir
+
+Para um 74HC00 programável, a associação precisará separar:
+
+- **Encapsulamento/pinagem:** números físicos, quatro portas, VCC/GND e unidades do símbolo.
+- **Comportamento lógico:** funções, estado interno e eventos com tempos de propagação.
+- **Perfil elétrico:** alimentação, limiares de entrada, impedância/corrente das saídas e carga.
+- **Resolução de rede:** estado de cada saída e estado resultante do barramento, incluindo 0/1/Z/X.
+- **Visualização:** estado do driver, estado lido nas entradas e indicação no desenho.
+
+Z pertence ao estado de acionamento de uma saída. Um resistor de pull-up pode
+levar a rede a 1 enquanto a saída continua Z. Uma tensão intermediária não é uma
+prova de alta impedância. Entradas e saídas de uma família lógica precisam
+considerar sua alimentação; atrasos precisam ser representados no tempo do motor.
+
+**Esta etapa ainda não executa uma linguagem digital própria, não agrupa as
+unidades de um CI e não exibe estados 0/1/Z/X nos pinos.** Declarar `role: output`
+informa a associação, mas não cria sozinho um driver digital. Um novo comportamento
+analógico descrito em SPICE já pode ser carregado sem recompilação; o backend
+digital será uma extensão separada, após definir esses contratos.
+
+## Organização
+
+- `simulation_model.*`: leitura, descoberta, associação, parâmetros e expansão de templates, sem wx/KiCad.
+- `model_dialog.*`: escolha de arquivo, pinagem e parâmetros; edita uma cópia.
+- `schematic_adapter.*`: leitura/gravação dos campos no símbolo e captura das conexões.
+- `circuit_topology.*`: nós, grupos elétricos e referências, usando a pinagem do modelo.
+- `circuit_snapshot.*`: congela os modelos em um deck para o worker.
+- `simulation/models/*.casim`: comportamentos e associações iniciais, sem recompilação.
+
+Somente modificar o carregador, um backend ou os recursos da interface exige
+recompilar o EDA. Acrescentar componentes expressáveis pelo backend existente
+exige somente novos arquivos e suas associações.
+
+## Verificação desta etapa
+
+- `qa_interactive_sim`: 36 casos aprovados, incluindo arquivo externo com três
+  pinos, subcircuito, alterações no arquivo, associação automática e ambiguidade,
+  validação de pinagem/parâmetros, configuração independente de LEDs e calibração
+  da tensão direta de 1,2 V a 6 V.
+- `qa_spice`: 58 casos aprovados, incluindo captura de esquema com associação
+  explícita a um desenho arbitrário e persistência dos campos de configuração.
+- Interface validada em Xvfb pelo gerenciador KiCad: parâmetros do LED alteraram
+  a corrente de 6,07 mA para 4,17 mA; o limite de 1 mA gerou aviso de sobrecorrente.
+  Desfazer restaurou 6,07 mA e refazer recuperou a configuração. Um arquivo próprio
+  foi carregado e salvo como caminho relativo `models/test_led.casim`.
+- Evidências locais em `.circuitalive/logs/`: `test-model-files-session.log`,
+  `test-model-files-spice.log`, `model-files-ui-results.json` e `model-files-*.png`.

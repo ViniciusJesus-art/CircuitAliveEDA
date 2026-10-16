@@ -20,7 +20,7 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
         if( location.sheet != aCurrentSheet )
             continue;
         double brightness = i < aSession.ledCurrents.size()
-                ? LedBrightness( aSession.ledCurrents[i] ) : 0;
+                ? LedBrightness( aSession.ledCurrents[i], aCircuit.circuit.leds[i].brightnessCurrent ) : 0;
         SetIsFill( true );
         SetIsStroke( true );
         SetStrokeColor( KIGFX::COLOR4D( 0.85, 0.15, 0.08, 1 ) );

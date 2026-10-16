@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "dc_voltage",
+  "name": "DC voltage source",
+  "description": "",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Positive (+)",
+      "role": "power",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Negative (-)",
+      "role": "reference",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "voltage",
+      "label": "DC voltage",
+      "default": "$value",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "V${id} ${pin:p} ${pin:n} DC ${param:voltage}"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "Simulation_SPICE:VDC",
+      "Device:Battery",
+      "Device:Battery_Cell"
+    ]
+  },
+  "reference_pin": "n",
+  "legacy_spice_fields": {
+    "Sim.Device": "V",
+    "Sim.Type": "DC",
+    "Sim.Pins": "1=+ 2=-"
+  }
+}

@@ -106,3 +106,6 @@ GitLab CI pipeline status can be viewed for Linux and Windows builds of the late
 * [tools](tools)             - Helpers for developing, testing and building
 * [translation](translation) - Translation data files (managed through [Weblate](https://hosted.weblate.org/projects/kicad/master-source/) for most languages)
 * [utils](utils)             - Small utils for KiCad, e.g. IDF, STEP, and OGL tools and converters
+
+A associação por arquivos de modelo e a configuração por componente estão descritas em
+[Modelos de simulação](docs/circuitalive/MODEL_FILES.md).

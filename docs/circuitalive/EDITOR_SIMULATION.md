@@ -1,5 +1,9 @@
 # Simulação no esquemático — etapa 2
 
+**Atualização:** os comportamentos agora vêm de arquivos de modelo e podem ser
+configurados por componente. Veja [Arquivos de modelo](MODEL_FILES.md) para o
+funcionamento atual; as validações históricas ao final registram as etapas anteriores.
+
 O editor possui ícones **Play, Pause e Stop no final da barra superior original**,
 com o mesmo tamanho e comportamento dos outros botões. Tempo, estado e corrente
 dos LEDs aparecem na barra de status inferior existente. A preparação usa o circuito desenhado e o grafo elétrico do
@@ -41,11 +45,10 @@ O status mostra a corrente de até três LEDs e a quantidade restante; todos os
 LEDs suportados continuam recebendo indicação de brilho no desenho.
 
 Os símbolos são os das bibliotecas padrão do KiCad. Não há biblioteca separada
-de componentes CircuitAlive: `component_catalog.*` associa o ID de biblioteca ao
-comportamento elétrico inicial. R e C usam sempre o comportamento ideal e o campo
+de componentes CircuitAlive: `simulation_model.*` lê os arquivos que associam o ID de biblioteca ao
+comportamento elétrico inicial. Os arquivos distribuídos de R e C usam por padrão comportamento ideal e o campo
 Value, sem exigir configuração SPICE. Campos `Sim.*` existentes nesses passivos
-não os tornam incompatíveis nem substituem seu Value neste modo. A seleção de
-comportamentos diferentes será uma extensão desse catálogo.
+não os tornam incompatíveis nem substituem seu Value neste modo. Outro arquivo de modelo pode ser associado pela janela Simulation model.
 
 Isso também se aplica a cópias em bibliotecas locais do projeto: por exemplo,
 `rectifier_schlib:R` e `rectifier_schlib:C`. O nome local R/C ou o campo
@@ -94,16 +97,19 @@ Exemplo com o resistor local real, fonte sem label GND e R2 com um terminal aber
 Valores usam ponto decimal e unidades KiCad/SI: `470R`, `4R7`, `4k7`, `1000u`,
 `100uF`, `2.2Meg`. `M` significa mega e `m` significa mili, como no campo Value
 do KiCad. O netlist recebe o número convertido. Notações não reconhecidas geram erro.
-Nos dispositivos além de R/C, modelos SPICE externos e pinagens diferentes ainda
-são recusados com a referência do componente. Componentes fora do catálogo também
-são identificados antes de iniciar a simulação.
+Modelos próprios e pinagens diferentes podem ser associados por um arquivo `.casim`.
+Campos SPICE antigos personalizados em dispositivos além de R/C pedem associação
+explícita. Um componente sem arquivo associado é identificado antes de iniciar
+a simulação; veja [Arquivos de modelo](MODEL_FILES.md).
 Diretivas SPICE em textos também são recusadas; remova/exclua esses textos do
 modo interativo ou use o simulador tradicional para análises personalizadas.
 
-O modelo do LED é `D(Is=1e-20 N=2 Rs=5)` e o da chave
-`SW(Ron=0.01 Roff=1e12 Vt=2.5 Vh=0.1)`. São modelos didáticos próprios, sem
+O LED usa um modelo de diodo configurável por tensão direta na corrente de
+referência; a chave usa por padrão `SW(Ron=0.01 Roff=1e12 Vt=2.5 Vh=0.1)`.
+São modelos didáticos próprios, sem
 pretensão de reproduzir um fabricante. O brilho usa corrente direta, com resposta
-visual `sqrt(clamp(I / 10mA, 0, 1))`; corrente reversa não acende o LED. A média das
+visual `sqrt(clamp(I / I_brilho, 0, 1))`, com 10 mA por padrão e escala configurável;
+corrente reversa não acende o LED. A média das
 amostras retidas em cada trecho suaviza a apresentação. Isso ainda não é uma
 integração de PWM de alta frequência nem um modelo de dano/sobreaquecimento.
 
@@ -114,7 +120,8 @@ Todo o código novo da integração fica em `eeschema/circuitalive/`:
 | Arquivo | Responsabilidade |
 |---|---|
 | `circuit_snapshot.*` | Validação, valores e netlist, sem wx/KiCad |
-| `component_catalog.*` | Associação entre símbolos padrão e comportamentos iniciais; ponto de extensão para futuros modelos |
+| `simulation_model.*` | Arquivos, associação, terminais, parâmetros e templates do modelo |
+| `model_dialog.*` | Configuração por componente no editor |
 | `circuit_topology.*` | Nós, pinos abertos, ilhas elétricas e prioridade entre GND explícito e referência automática |
 | `schematic_adapter.*` | Captura do grafo, campos e instâncias do KiCad, somente na thread gráfica |
 | `session_runner.*` | Thread proprietária da sessão, fila limitada e estados copiados para a interface |
