@@ -1,16 +1,21 @@
 # CircuitAliveEDA: RC, chave e LED
 
 `interactive_rc_led.kicad_sch` é a demonstração da etapa 2. Abra no editor
-CircuitAliveEDA e use a barra Play/Pause/Stop. Clique em SW1 durante execução ou
+CircuitAliveEDA e use os ícones Play/Pause/Stop no final da barra superior. Clique em SW1 durante execução ou
 pausa. A capacitância maior torna carga e descarga perceptíveis na tela.
 
 ```bash
 ./circuitalive eeschema demos/simulation/circuitalive/interactive_rc_led.kicad_sch
 ```
 
-SW1 inicia fechada; C1 inicia em 0 V. D1 usa o modelo didático vermelho indicado
-pelo valor `RED`. O resistor R2 oferece caminho de descarga, e R3 limita a
+SW1 inicia fechada; C1 inicia em 0 V. D1 usa o modelo didático vermelho inicial.
+O resistor R2 oferece caminho de descarga, e R3 limita a
 corrente do LED. Não é preciso acrescentar diretiva `.tran`.
+
+`standard_library_led.kicad_sch` é o exemplo mínimo com fonte de 5 V, R1 de
+`470R`, um `Device:LED` com o nome padrão e GND. Todos vêm das bibliotecas padrão
+do KiCad. R1 inclui campos `Sim.*` para comprovar que eles não impedem o uso do
+resistor ideal. Não é necessário atribuir modelo SPICE aos componentes básicos.
 
 `rc_switch_led.cir` é o circuito de teste do núcleo da etapa 1, com constantes de
 tempo menores e uma fonte de controle explícita; ele não é o esquemático da

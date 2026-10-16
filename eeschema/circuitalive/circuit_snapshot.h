@@ -38,7 +38,8 @@ struct CIRCUIT_SNAPSHOT
     std::vector<CIRCUIT_SWITCH> switches;
 };
 
-/// Small, explicit stage-2 catalogue. Unknown/custom models are errors, never substituted.
+/// Standard symbols use the initial catalogue; R/C always use Value and their fixed ideal behaviour.
+/// Unknown symbols and unsupported custom models on other devices remain errors.
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents );
 double ParseComponentValue( const std::string& aValue );
 double LedBrightness( double aForwardCurrent );

@@ -43,7 +43,13 @@ BOOST_AUTO_TEST_CASE( InteractiveValuesAndDisplayResponse )
     BOOST_CHECK_CLOSE( ParseComponentValue( "100 uF" ), 100e-6, 1e-9 );
     BOOST_CHECK_CLOSE( ParseComponentValue( "1kOhm" ), 1000, 1e-9 );
     BOOST_CHECK_CLOSE( ParseComponentValue( "2.2Meg" ), 2.2e6, 1e-9 );
-    BOOST_CHECK_CLOSE( ParseComponentValue( "1M" ), 1e-3, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "1M" ), 1e6, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "1m" ), 1e-3, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "470R" ), 470, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "4R7" ), 4.7, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "4k7" ), 4700, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "2u2F" ), 2.2e-6, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "R47" ), 0.47, 1e-9 );
     BOOST_CHECK_THROW( ParseComponentValue( "1\nVhack a 0 9" ), std::runtime_error );
     BOOST_CHECK_THROW( ParseComponentValue( "NaN" ), std::runtime_error );
     BOOST_CHECK_THROW( ParseComponentValue( "1e999" ), std::runtime_error );
@@ -59,7 +65,7 @@ BOOST_AUTO_TEST_CASE( InteractiveCatalogueRejectsIncompleteOrCustomCircuits )
     components[6].libraryId = "Device:D";
     BOOST_CHECK_THROW( BuildCircuitSnapshot( components ), std::runtime_error );
     components = Components();
-    components[6].value = "LED";
+    components[6].explicitSpiceModel = true;
     BOOST_CHECK_THROW( BuildCircuitSnapshot( components ), std::runtime_error );
     components = Components();
     components[0].explicitSpiceModel = true;
@@ -77,6 +83,47 @@ BOOST_AUTO_TEST_CASE( InteractiveCatalogueRejectsIncompleteOrCustomCircuits )
         for( auto& [pin, net] : c.pins )
             if( net == "0" ) net = "floating";
     BOOST_CHECK_THROW( BuildCircuitSnapshot( components ), std::runtime_error );
+}
+
+BOOST_AUTO_TEST_CASE( StandardLibraryPassivesUseFixedBehavioursAndValue )
+{
+    for( const std::string resistor : { "Device:R", "Device:R_US", "Device:R_Small" } )
+    {
+        for( const std::string capacitor : { "Device:C", "Device:C_Small", "Device:C_US",
+                "Device:C_Polarized", "Device:C_Polarized_Small", "Device:C_Polarized_US" } )
+        {
+            auto components = Components();
+            components[2].libraryId = resistor;
+            components[2].value = "470R";
+            components[2].explicitSpiceModel = true;
+            components[3].libraryId = capacitor;
+            components[3].explicitSpiceModel = true;
+            auto circuit = BuildCircuitSnapshot( components );
+            INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+            session.Configure( circuit.netlist, circuit.config );
+            session.AdvanceTo( 0.5 );
+            BOOST_CHECK_GT( session.Snapshot().latest.values.at( 0 ), 0.002 );
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE( StandardLibraryLedDoesNotRequireRenamingOrSpiceModel )
+{
+    for( const std::string source : { "Simulation_SPICE:VDC", "Device:Battery", "Device:Battery_Cell" } )
+    {
+        const std::vector<CIRCUIT_COMPONENT> components = {
+            { "V2", source, "5", { { "1", "supply" }, { "2", "0" } } },
+            { "R1", "Device:R", "470R", { { "1", "supply" }, { "2", "anode" } }, true },
+            { "D1", "Device:LED", "LED", { { "1", "0" }, { "2", "anode" } } }
+        };
+        auto circuit = BuildCircuitSnapshot( components );
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+        session.Configure( circuit.netlist, circuit.config );
+        session.AdvanceTo( 0.02 );
+        auto current = session.Snapshot().latest.values.at( 0 );
+        BOOST_CHECK_GT( current, 0.005 );
+        BOOST_CHECK_LT( current, 0.008 );
+    }
 }
 
 BOOST_AUTO_TEST_CASE( SchematicSnapshotPreservesLedPolarityAndResistorEffect )

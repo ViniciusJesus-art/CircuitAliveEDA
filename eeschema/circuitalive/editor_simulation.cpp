@@ -3,6 +3,7 @@
 #include "schematic_adapter.h"
 #include "session_runner.h"
 #include "simulation_overlay.h"
+#include "simulation_toolbar.h"
 #include <algorithm>
 
 #include <tools/sch_tool_base.h>
@@ -10,26 +11,15 @@
 #include <sch_edit_frame.h>
 #include <schematic.h>
 #include <tool/tool_action.h>
-#include <wx/aui/framemanager.h>
-#include <wx/button.h>
+#include <tool/action_manager.h>
 #include <wx/filename.h>
 #include <wx/msgdlg.h>
-#include <wx/panel.h>
-#include <wx/sizer.h>
-#include <wx/stattext.h>
+#include <wx/statusbr.h>
 #include <wx/stdpaths.h>
 #include <wx/timer.h>
 
 namespace CIRCUITALIVE
 {
-// Independent action namespace: no additions to upstream SCH_ACTIONS or its simulator commands.
-static TOOL_ACTION play( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.play" )
-        .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "Interactive Play" ) ) );
-static TOOL_ACTION pause( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.pause" )
-        .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "Interactive Pause" ) ) );
-static TOOL_ACTION stop( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.stop" )
-        .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "Interactive Stop" ) ) );
-
 class EDITOR_SIMULATION_TOOL : public wxEvtHandler, public SCH_TOOL_BASE<SCH_EDIT_FRAME>,
                                public SCHEMATIC_LISTENER
 {
@@ -43,7 +33,7 @@ public:
     void Rebind()
     {
         Invalidate();
-        if( m_panel )
+        if( m_installed )
             m_frame->Schematic().AddListener( this );
     }
     void Reset( RESET_REASON aReason ) override
@@ -58,9 +48,9 @@ public:
 private:
     void setTransitions() override
     {
-        Go( &EDITOR_SIMULATION_TOOL::Play, play.MakeEvent() );
-        Go( &EDITOR_SIMULATION_TOOL::Pause, pause.MakeEvent() );
-        Go( &EDITOR_SIMULATION_TOOL::Stop, stop.MakeEvent() );
+        Go( &EDITOR_SIMULATION_TOOL::Play, SIMULATION_ACTIONS::play.MakeEvent() );
+        Go( &EDITOR_SIMULATION_TOOL::Pause, SIMULATION_ACTIONS::pause.MakeEvent() );
+        Go( &EDITOR_SIMULATION_TOOL::Stop, SIMULATION_ACTIONS::stop.MakeEvent() );
     }
     int Play( const TOOL_EVENT& );
     int Pause( const TOOL_EVENT& );
@@ -69,13 +59,12 @@ private:
     void click( wxMouseEvent& );
     void redraw();
     void setStatus( const wxString& aText );
+    void publishStatus();
 
     wxTimer m_timer;
-    wxPanel* m_panel = nullptr; // owned by the frame/AUI
-    wxButton* m_play = nullptr;
-    wxButton* m_pause = nullptr;
-    wxButton* m_stop = nullptr;
-    wxStaticText* m_status = nullptr;
+    bool m_installed = false;
+    wxString m_status;
+    bool m_statusPending = false;
     std::unique_ptr<SESSION_RUNNER> m_runner;
     std::unique_ptr<SIMULATION_OVERLAY> m_overlay;
     SCHEMATIC_SNAPSHOT m_circuit;
@@ -86,7 +75,7 @@ private:
 
 void EDITOR_SIMULATION_TOOL::Install()
 {
-    if( m_panel )
+    if( m_installed )
         return;
     wxFileName worker( wxStandardPaths::Get().GetExecutablePath() );
     // Installed binaries share bin/. The source build places the worker in eeschema/sim/.
@@ -96,38 +85,18 @@ void EDITOR_SIMULATION_TOOL::Install()
     m_runner = std::make_unique<SESSION_RUNNER>( worker.GetFullPath().ToStdString() );
     m_overlay = std::make_unique<SIMULATION_OVERLAY>();
     m_frame->Schematic().AddListener( this );
-    m_panel = new wxPanel( m_frame );
-    auto* row = new wxBoxSizer( wxHORIZONTAL );
-    row->Add( new wxStaticText( m_panel, wxID_ANY, "CircuitAlive" ), 0,
-              wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 8 );
-    auto button = [&]( const wxString& label, TOOL_ACTION& action )
-    {
-        auto* control = new wxButton( m_panel, wxID_ANY, label, wxDefaultPosition,
-                                      wxDefaultSize, wxBU_EXACTFIT );
-        control->Bind( wxEVT_BUTTON, [this, &action]( wxCommandEvent& )
-                       { m_toolMgr->RunAction( action ); } );
-        row->Add( control, 0, wxALL, 2 );
-        return control;
-    };
-    m_play = button( _( "Play" ), play );
-    m_pause = button( _( "Pause" ), pause );
-    m_stop = button( _( "Stop" ), stop );
-    m_play->SetToolTip( _( "Start or resume the supported interactive circuit" ) );
-    m_pause->SetToolTip( _( "Pause with capacitor and solver state preserved" ) );
-    m_stop->SetToolTip( _( "Discard the session and reset initial conditions" ) );
-    m_status = new wxStaticText( m_panel, wxID_ANY, _( "Stopped — t = 0 s" ),
-                                 wxDefaultPosition, wxDefaultSize,
-                                 wxST_NO_AUTORESIZE | wxST_ELLIPSIZE_END );
-    m_status->SetMinSize( m_panel->FromDIP( wxSize( 540, -1 ) ) );
-    row->Add( m_status, 1, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, 12 );
-    m_panel->SetSizerAndFit( row );
-    if( auto* manager = wxAuiManager::GetManager( m_frame ) )
-    {
-        manager->AddPane( m_panel, wxAuiPaneInfo().Name( "CircuitAliveInteractive" )
-                .Caption( "CircuitAlive" ).Top().Layer( 1 ).Row( 1 ).ToolbarPane()
-                .Gripper( false ).DockFixed( true ).Resizable( false ) );
-        manager->Update();
-    }
+    m_installed = true;
+    auto* actions = m_toolMgr->GetActionManager();
+    actions->SetConditions( SIMULATION_ACTIONS::play, ACTION_CONDITIONS().Enable(
+            [this]( const SELECTION& )
+            { return m_session.state != EDITOR_SESSION_STATE::RUNNING
+                     && m_session.state != EDITOR_SESSION_STATE::PREPARING; } ) );
+    actions->SetConditions( SIMULATION_ACTIONS::pause, ACTION_CONDITIONS().Enable(
+            [this]( const SELECTION& ) { return m_session.state == EDITOR_SESSION_STATE::RUNNING; } ) );
+    actions->SetConditions( SIMULATION_ACTIONS::stop, ACTION_CONDITIONS().Enable(
+            [this]( const SELECTION& ) { return m_active; } ) );
+    EnsureSimulationToolbar( *m_frame );
+    setStatus( _( "Stopped — t = 0 s" ) );
     Bind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
     m_frame->GetCanvas()->Bind( wxEVT_LEFT_DOWN, &EDITOR_SIMULATION_TOOL::click, this );
     m_timer.Start( 33 );
@@ -135,7 +104,7 @@ void EDITOR_SIMULATION_TOOL::Install()
 
 void EDITOR_SIMULATION_TOOL::Shutdown()
 {
-    if( !m_panel )
+    if( !m_installed )
         return;
     m_timer.Stop();
     Unbind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
@@ -145,16 +114,24 @@ void EDITOR_SIMULATION_TOOL::Shutdown()
         m_frame->GetCanvas()->GetView()->Remove( m_overlay.get() );
     m_overlay.reset();
     m_runner.reset(); // bounded IPC shutdown; no queued callbacks refer to GUI objects
-    m_panel = nullptr;
+    m_installed = false;
 }
 
 void EDITOR_SIMULATION_TOOL::setStatus( const wxString& aText )
 {
-    if( m_status && m_status->GetLabel() != aText )
+    m_status = aText;
+    m_statusPending = true;
+}
+
+void EDITOR_SIMULATION_TOOL::publishStatus()
+{
+    // Publish after the toolbar action completes: native action cleanup can clear field 0.
+    // Once idle, leave it available for the usual editor help messages.
+    if( m_statusPending && m_frame->GetStatusBar() )
     {
-        m_status->SetLabel( aText );
-        m_status->SetToolTip( aText );
-        m_panel->Layout();
+        if( m_frame->GetStatusBar()->GetStatusText( 0 ) != m_status )
+            m_frame->SetStatusText( m_status, 0 );
+        m_statusPending = false;
     }
 }
 
@@ -252,13 +229,14 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
 {
     if( !m_runner )
         return;
+    EnsureSimulationToolbar( *m_frame );
     m_session = m_runner->View();
     const auto state = m_session.state;
-    m_play->Enable( state != EDITOR_SESSION_STATE::RUNNING && state != EDITOR_SESSION_STATE::PREPARING );
-    m_pause->Enable( state == EDITOR_SESSION_STATE::RUNNING );
-    m_stop->Enable( m_active );
     if( !m_active )
+    {
+        publishStatus();
         return;
+    }
     const wxString names[] = { _( "Stopped" ), _( "Preparing" ), _( "Running" ),
                               _( "Paused" ), _( "Completed (1 h limit)" ), _( "Error" ) };
     wxString status = wxString::Format( "%s — t = %.3f s", names[static_cast<int>( state )],
@@ -272,6 +250,7 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     if( m_session.ledCurrents.size() > 3 )
         status += wxString::Format( "   +%zu LEDs", m_session.ledCurrents.size() - 3 );
     setStatus( status );
+    publishStatus();
     redraw();
     if( state == EDITOR_SESSION_STATE::ERROR && !m_errorShown )
     {

@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "schematic_adapter.h"
+#include "component_catalog.h"
 #include <sch_connection.h>
 #include <sch_field.h>
 #include <sch_pin.h>
@@ -59,8 +60,9 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
                 const SCH_FIELD* f = symbol->GetField( name );
                 return f ? f->GetShownText( &sheet, false, 0, variant ) : wxString();
             };
-            bool vdc = lib == "Simulation_SPICE:VDC";
-            bool led = lib == "Device:LED" || lib == "Device:LED_Small";
+            const auto behavior = FindBuiltinBehavior( lib );
+            bool vdc = behavior == BUILTIN_BEHAVIOR::DC_VOLTAGE;
+            bool led = behavior == BUILTIN_BEHAVIOR::RED_LED;
             component.explicitSpiceModel = !field( "Sim.Library" ).empty()
                     || !field( "Sim.Name" ).empty() || !field( "Sim.Params" ).empty()
                     || ( !field( "Sim.Device" ).empty() && !( vdc && field( "Sim.Device" ) == "V" ) )

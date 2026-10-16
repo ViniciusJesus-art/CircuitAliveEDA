@@ -1,7 +1,8 @@
 # Simulação no esquemático — etapa 2
 
-O editor possui uma barra CircuitAlive com **Play, Pause e Stop**, tempo simulado
-e corrente dos LEDs. A preparação usa o circuito desenhado e o grafo elétrico do
+O editor possui ícones **Play, Pause e Stop no final da barra superior original**,
+com o mesmo tamanho e comportamento dos outros botões. Tempo, estado e corrente
+dos LEDs aparecem na barra de status inferior existente. A preparação usa o circuito desenhado e o grafo elétrico do
 KiCad. Nenhuma janela de análise ou duração precisa ser preenchida para o conjunto
 de componentes suportado.
 
@@ -11,14 +12,14 @@ de componentes suportado.
 ./circuitalive eeschema demos/simulation/circuitalive/interactive_rc_led.kicad_sch
 ```
 
-1. Pressione Play. A chave começa fechada; C1 carrega e D1 acende gradualmente.
+1. Pressione o ícone Play. A chave começa fechada; C1 carrega e D1 acende gradualmente.
 2. Clique no corpo de SW1. O contorno e ON/OFF indicam a posição elétrica;
    o capacitor descarrega e o LED perde brilho conforme sua corrente diminui.
 3. Pause congela o tempo e o estado elétrico. É possível mudar a chave durante
    a pausa; o efeito elétrico aparece ao retomar com Play.
 4. Stop descarta a sessão. O próximo Play começa em zero, com C1 descarregado
    e a chave fechada.
-5. Uma edição confirmada do esquema encerra a sessão. A barra pede novo Play
+5. Uma edição confirmada do esquema encerra a sessão. O status pede novo Play
    para reconstruir o circuito. Trocar a variante também invalida a sessão.
 
 Os cliques de chave alteram somente a sessão. Não modificam o arquivo, o valor do
@@ -31,13 +32,27 @@ desenha apenas os indicadores da instância visível.
 | Símbolo da biblioteca | Comportamento nesta etapa |
 |---|---|
 | `Device:R`, `R_US`, `R_Small` | Resistor positivo, valor do campo Value |
-| `Device:C`, `C_Small` | Capacitor positivo, condição inicial de 0 V |
-| `Simulation_SPICE:VDC` | Fonte DC, valor do campo Value, pino 1 positivo |
+| `Device:C`, `C_Small`, `C_US`, `C_Polarized`, `C_Polarized_Small`, `C_Polarized_US` | Capacitor ideal positivo, condição inicial de 0 V |
+| `Simulation_SPICE:VDC`, `Device:Battery`, `Device:Battery_Cell` | Fonte DC, valor do campo Value, pino 1 positivo |
 | `Switch:SW_SPST` | Chave analógica controlada por clique, inicialmente fechada |
-| `Device:LED`, `LED_Small`, com Value `RED` ou `LED_RED` | Modelo didático de LED vermelho, pino 1 cátodo e 2 ânodo |
+| `Device:LED`, `LED_Small` | Modelo didático vermelho inicial, pino 1 cátodo e 2 ânodo; não precisa renomear Value |
 
-A barra mostra a corrente de até três LEDs e a quantidade restante; todos os
+O status mostra a corrente de até três LEDs e a quantidade restante; todos os
 LEDs suportados continuam recebendo indicação de brilho no desenho.
+
+Os símbolos são os das bibliotecas padrão do KiCad. Não há biblioteca separada
+de componentes CircuitAlive: `component_catalog.*` associa o ID de biblioteca ao
+comportamento elétrico inicial. R e C usam sempre o comportamento ideal e o campo
+Value, sem exigir configuração SPICE. Campos `Sim.*` existentes nesses passivos
+não os tornam incompatíveis nem substituem seu Value neste modo. A seleção de
+comportamentos diferentes será uma extensão desse catálogo.
+
+Exemplo mínimo, equivalente a uma fonte de 5 V, resistor de 470 ohms e LED,
+incluindo campos `Sim.*` no resistor para reproduzir a regressão:
+
+```bash
+./circuitalive eeschema demos/simulation/circuitalive/standard_library_led.kicad_sch
+```
 
 Os componentes precisam estar anotados e conectados. Uma rede `GND` ou `0` define
 a referência elétrica; símbolos `power:*` são rótulos elétricos, não fontes de
@@ -45,10 +60,12 @@ tensão. A captura respeita exclusões de simulação e instancia as folhas usan
 o grafo de conectividade. Nomes de redes são convertidos em identificadores
 internos; texto do esquema nunca é inserido como comando no netlist.
 
-Valores usam ponto decimal e sufixos SPICE: `330`, `10k`, `1000u`, `100uF`,
-`2.2Meg`. `M` significa mili; mega é `Meg`. Notações não reconhecidas geram erro.
-Modelos SPICE personalizados, pinagens diferentes e componentes fora do catálogo
-são recusados com a referência do componente; não há substituição automática.
+Valores usam ponto decimal e unidades KiCad/SI: `470R`, `4R7`, `4k7`, `1000u`,
+`100uF`, `2.2Meg`. `M` significa mega e `m` significa mili, como no campo Value
+do KiCad. O netlist recebe o número convertido. Notações não reconhecidas geram erro.
+Nos dispositivos além de R/C, modelos SPICE externos e pinagens diferentes ainda
+são recusados com a referência do componente. Componentes fora do catálogo também
+são identificados antes de iniciar a simulação.
 Diretivas SPICE em textos também são recusadas; remova/exclua esses textos do
 modo interativo ou use o simulador tradicional para análises personalizadas.
 
@@ -65,11 +82,13 @@ Todo o código novo da integração fica em `eeschema/circuitalive/`:
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `circuit_snapshot.*` | Catálogo, validação, valores e netlist, sem wx/KiCad |
+| `circuit_snapshot.*` | Validação, valores e netlist, sem wx/KiCad |
+| `component_catalog.*` | Associação entre símbolos padrão e comportamentos iniciais; ponto de extensão para futuros modelos |
 | `schematic_adapter.*` | Captura do grafo, campos e instâncias do KiCad, somente na thread gráfica |
 | `session_runner.*` | Thread proprietária da sessão, fila limitada e estados copiados para a interface |
 | `simulation_overlay.*` | Brilho do LED, indicação da chave e localização do clique, sem mudar símbolos |
-| `editor_simulation.*` | Ações próprias, ferramenta, barra, timer e ciclo de vida |
+| `editor_simulation.*` | Ferramenta, estado, timer e ciclo de vida |
+| `simulation_toolbar.*` | Ações e integração na toolbar original; ícone vetorial Pause local |
 | `CMakeLists.txt` | Compilação e ligação dos módulos |
 
 O núcleo e o worker continuam nos arquivos `interactive_sim_*` da etapa 1, em
@@ -84,9 +103,11 @@ Os pontos de conexão com arquivos anteriores do KiCad são intencionalmente peq
 - `qa/tests/spice/CMakeLists.txt`: conexão dos testes dos módulos.
 
 Não foi necessário modificar `SCH_SYMBOL`, `SCH_PIN`, `SCH_ACTIONS`, o painter,
-os formatos de arquivo ou o wrapper ngspice original. A barra é um painel AUI
-próprio e aparece também com configurações de toolbar já existentes. As três
-ações usam o namespace `circuitalive.Interactive.*`.
+os formatos de arquivo ou o wrapper ngspice original. A integração usa os botões
+nativos `ACTION_TOOLBAR` e acrescenta as ações ao final da toolbar principal,
+inclusive após sua recriação ou personalização. As três ações usam o namespace
+`circuitalive.Interactive.*`. Não cria painel nem barra extra e não exibe nome
+do projeto junto dos botões.
 
 Ao migrar a base, primeiro revalide os pontos de conexão e a API utilizada pelo
 `schematic_adapter`; depois compile e execute os testes de conectividade e motor.
@@ -130,7 +151,7 @@ da demonstração, captura as conexões reais e simula carga/descarga. A interfa
 também deve ser verificada em uma sessão gráfica, incluindo edição e fechamento
 com a sessão ativa.
 
-### Resultado nesta máquina
+### Validação inicial da etapa 2
 
 - `qa_interactive_sim`: **20 casos aprovados**, 1,99 s.
 - `qa_spice`: **54 casos aprovados**, 2,10 s; inclui os 53 anteriores e a captura
@@ -147,3 +168,17 @@ com a sessão ativa.
 Evidências locais em `.circuitalive/logs/`: `test-editor-interactive-final.log`,
 `test-editor-spice-final.log`, `editor-ui-results.json`, capturas `editor-*.png`
 e `gui-editor-exit.txt`. São artefatos gerados e não fazem parte do Git.
+
+### Correção para componentes padrão e toolbar nativa
+
+- `qa_interactive_sim`: **22 casos aprovados**, incluindo variantes de R/C,
+  valores `470R`, `4k7`, `4R7` e a distinção SI entre `M` e `m`.
+- `qa_spice`: **56 casos aprovados**, incluindo o resistor com `Sim.Device`,
+  `Sim.Pins` e `Sim.Params`, o capacitor com metadados diferentes de seu Value e
+  o exemplo mínimo de fonte, resistor, LED e GND carregado do arquivo real.
+- Na interface: ícones Play/Pause/Stop ao final da toolbar original, sem painel
+  adicional; fonte de 5 V, resistor `470R` e LED padrão resultaram em **6,07 mA**.
+- Pause manteve `t = 0,820 s`; Play retomou desse ponto; Stop mostrou `t = 0 s`;
+  novo Play reiniciou a sessão. Fechamento durante execução: **exit code 0**.
+- Logs: `test-standard-components-session.log`, `test-standard-components-spice.log`,
+  `native-toolbar-results.json`, `native-toolbar-*.png` e `gui-native-toolbar-exit.txt`.
