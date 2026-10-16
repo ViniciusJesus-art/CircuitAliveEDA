@@ -2,16 +2,23 @@
 
 ## Escopo
 
-Esta é a etapa 0 do [mapa](Mapa_KiCad_Simulacao_Interativa.md): fork, checkout
+Esta é a etapa 0 do [mapa](Mapa_KiCad_Simulacao_Interativa.md): base estável, checkout
 completo, ambiente de compilação, instalação local e verificação do KiCad original.
 A implementação de Play/Pause/Stop e de simulação interativa ainda pertence às
 etapas seguintes.
 
-Base fixada: [6809ada8746084720c0093eb484c889afb35d0d4](https://github.com/KiCad/kicad-source-mirror/tree/6809ada8746084720c0093eb484c889afb35d0d4),
-branch upstream `10.0`. O código declara `10.0.7-unknown` como versão de
-desenvolvimento; o sufixo de compilação `CircuitAliveEDA` identifica este projeto.
-Um checkout raso sem tags pode apresentar `unknown` na versão, mesmo com o hash
-exato disponível no binário.
+Base fixada: **KiCad 10.0.7**, tag oficial `10.0.7`, commit
+[`69cafb907ebc09e7722a2a464b1d466fc2e3608d`](https://gitlab.com/kicad/code/kicad/-/tags/10.0.7),
+publicada em 06/10/2026. O registro legível por ferramentas está em
+[BASELINE.json](BASELINE.json). Essa é a base para as próximas etapas.
+
+A revisão `6809ada8746084720c0093eb484c889afb35d0d4` do mapa original foi
+substituída: ela continha 30 commits posteriores à versão estável. O mapa é
+mantido como documento de referência, sem alterar seu conteúdo original.
+Os commits de configuração do projeto foram reaplicados sobre a tag estável;
+nenhum código C++ do KiCad foi modificado nesta preparação.
+O Git acrescenta a quantidade e o hash dos commits do projeto à versão de
+compilação, além do sufixo `CircuitAliveEDA`; isso não altera a base upstream.
 
 ## Organização
 
@@ -47,7 +54,7 @@ caminho, configure uma nova árvore de build.
 Plataforma inicial: Fedora Linux 44, x86_64. O código requer C++20 e CMake >= 3.22.
 Os presets mantêm esquemáticos, PCB, 3D/OpenCascade, API IPC, Python/wxPython e
 testes SPICE habilitados. Telemetria Sentry e busca de atualizações ficam
-desabilitadas para este fork.
+desabilitadas para o CircuitAliveEDA.
 
 Em uma máquina nova, a opção recomendada é instalar as dependências pelo Fedora:
 
@@ -165,14 +172,16 @@ upstream         https://github.com/KiCad/kicad-source-mirror.git
 upstream-gitlab  https://gitlab.com/kicad/code/kicad.git
 ```
 
-Branch de trabalho: `circuitalive/main`. A branch local `upstream/10.0-base`
-preserva a revisão escolhida. O download inicial usa histórico raso, com todos
-os arquivos de trabalho presentes; o fork remoto mantém o histórico upstream.
-Se precisar do histórico completo local:
+Branch principal: `main`. O `origin` é um repositório **independente e privado**,
+fora da rede de forks do GitHub. Os remotes upstream continuam disponíveis para
+consultas e futuras atualizações deliberadas; não acompanhe automaticamente o
+HEAD da branch `10.0`. Use a tag registrada em [BASELINE.json](BASELINE.json).
 
-```bash
-git fetch --unshallow upstream
-```
+O histórico Git do upstream é mantido, junto com os commits de configuração
+reaplicados na base estável. A branch local `circuitalive/main` preserva o estado
+anterior à migração para consulta. O fork público anterior é conservado como
+arquivo, com o nome `CircuitAliveEDA-upstream-fork`; novos commits do projeto
+são enviados somente ao `origin` privado.
 
 Os arquivos de `.circuitalive`, inclusive a autenticação local do GitHub, são
 ignorados. Os fontes preservam licenças e créditos originais. Referência de

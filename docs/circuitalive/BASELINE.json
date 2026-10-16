@@ -1,0 +1,12 @@
+{
+  "project": "CircuitAliveEDA",
+  "upstream_repository": "https://gitlab.com/kicad/code/kicad.git",
+  "upstream_mirror": "https://github.com/KiCad/kicad-source-mirror.git",
+  "tag": "10.0.7",
+  "commit": "69cafb907ebc09e7722a2a464b1d466fc2e3608d",
+  "release_date": "2026-10-06",
+  "selected_on": "2026-10-16",
+  "policy": "Base fixa para o desenvolvimento. Alterações de versão upstream devem ser explícitas.",
+  "repository": "https://github.com/ViniciusJesus-art/CircuitAliveEDA",
+  "default_branch": "main"
+}
