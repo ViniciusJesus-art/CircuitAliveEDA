@@ -182,6 +182,9 @@ reaplicados na base estável. A branch local `circuitalive/main` preserva o esta
 anterior à migração para consulta. O fork público anterior é conservado como
 arquivo, com o nome `CircuitAliveEDA-upstream-fork`; novos commits do projeto
 são enviados somente ao `origin` privado.
+O workflow `lockdown.yml` do espelho oficial foi removido: ele fechava e
+bloqueava automaticamente pull requests como spam, comportamento inadequado
+para o desenvolvimento independente do CircuitAliveEDA.
 
 Os arquivos de `.circuitalive`, inclusive a autenticação local do GitHub, são
 ignorados. Os fontes preservam licenças e créditos originais. Referência de
