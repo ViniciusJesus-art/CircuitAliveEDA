@@ -386,8 +386,7 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     m_session = m_runner->View();
     const auto state = m_session.state;
     if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, m_active );
-    if( m_active && !m_circuit.circuit.measurements.empty() && !m_instrumentsVisible
-        && !m_resultOpened )
+    if( m_active && !m_circuit.circuit.measurements.empty() && !m_resultOpened )
     { showInstruments( true ); m_resultOpened = true; }
     if( !m_active )
     {
