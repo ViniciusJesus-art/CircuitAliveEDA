@@ -17,6 +17,12 @@ corrente do LED. Não é preciso acrescentar diretiva `.tran`.
 do KiCad. R1 inclui campos `Sim.*` para comprovar que eles não impedem o uso do
 resistor ideal. Não é necessário atribuir modelo SPICE aos componentes básicos.
 
+`open_pins_auto_reference.kicad_sch` usa o símbolo real `rectifier_schlib:R`, uma
+fonte DC de 5 V sem GND explícito e R2 com um terminal aberto. A sessão escolhe
+automaticamente o negativo da fonte como referência. O terminal aberto de R2
+fica próximo de 5 V, sem corrente de carga, e o LED do ramo principal continua
+funcionando. Pinos abertos não precisam ser conectados para permitir Play.
+
 `rc_switch_led.cir` é o circuito de teste do núcleo da etapa 1, com constantes de
 tempo menores e uma fonte de controle explícita; ele não é o esquemático da
 interface.

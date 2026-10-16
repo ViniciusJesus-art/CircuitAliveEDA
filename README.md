@@ -36,6 +36,7 @@ Para abrir apenas o editor de esquemáticos ou usar a linha de comando:
 ./circuitalive eeschema
 ./circuitalive eeschema demos/simulation/circuitalive/interactive_rc_led.kicad_sch
 ./circuitalive eeschema demos/simulation/circuitalive/standard_library_led.kicad_sch
+./circuitalive eeschema demos/simulation/circuitalive/open_pins_auto_reference.kicad_sch
 ./circuitalive cli version
 ```
 

@@ -1,10 +1,31 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "session_runner.h"
 #include <algorithm>
+#include <filesystem>
 #include <stdexcept>
+#include <unistd.h>
 
 namespace CIRCUITALIVE
 {
+std::string FindSessionWorker( const std::string& aApplicationExecutable )
+{
+    namespace fs = std::filesystem;
+    const auto directory = fs::path( aApplicationExecutable ).parent_path();
+    const fs::path candidates[] = {
+        directory / "circuitalive-sim-worker",
+        directory / "sim/circuitalive-sim-worker",
+        directory.parent_path() / "eeschema/sim/circuitalive-sim-worker"
+    };
+    for( const auto& candidate : candidates )
+    {
+        std::error_code error;
+        if( fs::is_regular_file( candidate, error ) && access( candidate.c_str(), X_OK ) == 0 )
+            return candidate.string();
+    }
+    // Keep startup usable if the install is incomplete; the control thread reports a Play error.
+    return candidates[0].string();
+}
+
 SESSION_RUNNER::SESSION_RUNNER( std::string aWorker ) : m_worker( std::move( aWorker ) ),
         m_thread( &SESSION_RUNNER::run, this ) {}
 

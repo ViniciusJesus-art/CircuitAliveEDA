@@ -99,3 +99,28 @@ BOOST_FIXTURE_TEST_CASE( StandardLibrarySourceResistorLedWithSimulationMetadata,
     BOOST_CHECK_GT( current, 0.005 );
     BOOST_CHECK_LT( current, 0.008 );
 }
+
+BOOST_FIXTURE_TEST_CASE( ProjectLocalResistorNoGroundLabelAndOpenPin, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC );
+    file.SetFullName( "open_pins_auto_reference.kicad_sch" );
+    LoadSchematic( file );
+    auto snapshot = CaptureSchematic( *m_schematic );
+    BOOST_REQUIRE_EQUAL( snapshot.locations.size(), 4 );
+    BOOST_REQUIRE_EQUAL( snapshot.circuit.automaticReferences.size(), 1 );
+    BOOST_CHECK_EQUAL( snapshot.circuit.automaticReferences[0], "V2.2" );
+    BOOST_CHECK( snapshot.circuit.floatingIslands.empty() );
+    BOOST_CHECK_EQUAL( snapshot.circuit.openPins, 1 );
+    std::size_t openResistor = 0;
+    for( std::size_t i = 0; i < snapshot.locations.size(); ++i )
+        if( snapshot.locations[i].reference == "R2" ) openResistor = i;
+    snapshot.circuit.config.signals.push_back(
+            "v(" + snapshot.circuit.pinNodes.at( openResistor ).at( "2" ) + ")" );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config );
+    session.AdvanceTo( 0.02 );
+    const auto sample = session.Snapshot();
+    BOOST_CHECK_GT( sample.latest.values.at( 0 ), 0.005 );
+    BOOST_CHECK_LT( sample.latest.values.at( 0 ), 0.008 );
+    BOOST_CHECK_CLOSE( sample.latest.values.at( 1 ), 5, 1e-5 );
+}

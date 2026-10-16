@@ -8,5 +8,6 @@ enum class BUILTIN_BEHAVIOR { UNKNOWN, RESISTOR, CAPACITOR, DC_VOLTAGE, RED_LED,
 
 /// Associates ordinary KiCad library symbols with our initial, fixed electrical behaviours.
 /// Symbols remain in the standard libraries. Future behaviour choices belong in this module.
-BUILTIN_BEHAVIOR FindBuiltinBehavior( std::string_view aLibraryId );
+BUILTIN_BEHAVIOR FindBuiltinBehavior( std::string_view aLibraryId,
+                                      std::string_view aDeviceHint = {} );
 }

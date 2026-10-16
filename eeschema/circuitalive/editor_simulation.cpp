@@ -77,12 +77,8 @@ void EDITOR_SIMULATION_TOOL::Install()
 {
     if( m_installed )
         return;
-    wxFileName worker( wxStandardPaths::Get().GetExecutablePath() );
-    // Installed binaries share bin/. The source build places the worker in eeschema/sim/.
-    worker.SetFullName( "circuitalive-sim-worker" );
-    if( !worker.IsFileExecutable() )
-        worker.AppendDir( "sim" );
-    m_runner = std::make_unique<SESSION_RUNNER>( worker.GetFullPath().ToStdString() );
+    m_runner = std::make_unique<SESSION_RUNNER>( FindSessionWorker(
+            wxStandardPaths::Get().GetExecutablePath().ToStdString() ) );
     m_overlay = std::make_unique<SIMULATION_OVERLAY>();
     m_frame->Schematic().AddListener( this );
     m_installed = true;
@@ -249,6 +245,8 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     }
     if( m_session.ledCurrents.size() > 3 )
         status += wxString::Format( "   +%zu LEDs", m_session.ledCurrents.size() - 3 );
+    if( !m_circuit.circuit.floatingIslands.empty() )
+        status += wxString::Format( _( "   Floating: %zu" ), m_circuit.circuit.floatingIslands.size() );
     setStatus( status );
     publishStatus();
     redraw();

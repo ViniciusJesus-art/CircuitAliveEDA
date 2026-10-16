@@ -1,6 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "circuit_snapshot.h"
 #include "component_catalog.h"
+#include "circuit_topology.h"
 
 #include <algorithm>
 #include <charconv>
@@ -71,28 +72,17 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     result.config.step = result.config.maxStep = 1e-4;
     result.config.horizon = 3600; // Finite internal horizon: completion is explicit in the UI.
     result.config.historyCapacity = 256;
-    std::map<std::string, std::string> nets;
+    const auto topology = BuildCircuitTopology( aComponents );
+    result.pinNodes = topology.nodes;
+    result.automaticReferences = topology.automaticReferences;
+    result.floatingIslands = topology.floatingIslands;
+    result.openPins = topology.openPins;
     std::set<std::string> references;
     std::vector<std::string> errors;
-    bool grounded = false;
     std::ostringstream deck;
     deck.imbue( std::locale::classic() );
     deck.precision( 17 );
     deck << "CircuitAliveEDA interactive schematic snapshot\n";
-
-    auto node = [&]( const CIRCUIT_COMPONENT& c, const std::string& pin ) -> std::string
-    {
-        auto it = c.pins.find( pin );
-        if( it == c.pins.end() || it->second.empty() )
-            throw std::runtime_error( "Pin " + pin + " has no electrical connection" );
-        if( it->second == "GND" || it->second == "0" )
-        {
-            grounded = true;
-            return "0";
-        }
-        auto [net, inserted] = nets.emplace( it->second, "n" + std::to_string( nets.size() + 1 ) );
-        return net->second;
-    };
 
     for( std::size_t i = 0; i < aComponents.size(); ++i )
     {
@@ -102,13 +92,14 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             if( c.reference.empty() || c.reference.find( '?' ) != std::string::npos
                 || !references.insert( c.reference ).second )
                 throw std::runtime_error( "Annotate the schematic: reference missing or repeated" );
-            const auto behavior = FindBuiltinBehavior( c.libraryId );
+            const auto behavior = FindBuiltinBehavior( c.libraryId, c.deviceHint );
+            auto node = [&]( const std::string& pin ) { return topology.nodes.at( i ).at( pin ); };
             const bool fixedPassive = behavior == BUILTIN_BEHAVIOR::RESISTOR
                                       || behavior == BUILTIN_BEHAVIOR::CAPACITOR;
             // R/C in this initial catalogue always use Value and the fixed ideal behaviour.
             // Existing Sim.* fields belong to KiCad's traditional simulator, not an external-model requirement.
             if( c.explicitSpiceModel && !fixedPassive )
-                throw std::runtime_error( "Custom SPICE model is not supported by interactive mode yet" );
+                throw std::runtime_error( "Custom SPICE model is not supported for " + c.libraryId );
 
             const std::string id = std::to_string( i + 1 );
             if( fixedPassive )
@@ -117,18 +108,18 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 if( value <= 0 )
                     throw std::runtime_error( "R and C must have a positive value" );
                 bool capacitor = behavior == BUILTIN_BEHAVIOR::CAPACITOR;
-                deck << ( capacitor ? "C" : "R" ) << "ca" << id << ' ' << node( c, "1" )
-                     << ' ' << node( c, "2" ) << ' ' << value << ( capacitor ? " ic=0" : "" ) << '\n';
+                deck << ( capacitor ? "C" : "R" ) << "ca" << id << ' ' << node( "1" )
+                     << ' ' << node( "2" ) << ' ' << value << ( capacitor ? " ic=0" : "" ) << '\n';
             }
             else if( behavior == BUILTIN_BEHAVIOR::DC_VOLTAGE )
             {
-                deck << "Vca" << id << ' ' << node( c, "1" ) << ' ' << node( c, "2" )
+                deck << "Vca" << id << ' ' << node( "1" ) << ' ' << node( "2" )
                      << " DC " << ParseComponentValue( c.value ) << '\n';
             }
             else if( behavior == BUILTIN_BEHAVIOR::RED_LED )
             {
                 // Initial fixed red teaching model; the symbol's display value is not a model selector.
-                deck << "Dca" << id << ' ' << node( c, "2" ) << ' ' << node( c, "1" )
+                deck << "Dca" << id << ' ' << node( "2" ) << ' ' << node( "1" )
                      << " CA_RED\n"; // KiCad pin 1 = cathode, pin 2 = anode.
                 result.leds.push_back( { i, result.config.signals.size() } );
                 result.config.signals.push_back( "@dca" + id + "[id]" );
@@ -137,7 +128,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             {
                 std::string source = "Vcontrol" + id;
                 deck << source << " control" << id << " 0 5\n"
-                     << "Sca" << id << ' ' << node( c, "1" ) << ' ' << node( c, "2" )
+                     << "Sca" << id << ' ' << node( "1" ) << ' ' << node( "2" )
                      << " control" << id << " 0 CA_SW\n";
                 result.switches.push_back( { i, source } );
             }
@@ -151,9 +142,11 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     }
     if( aComponents.empty() )
         errors.push_back( "The schematic has no supported components" );
-    if( !grounded )
-        errors.push_back( "Connect a reference ground (power:GND or a net named 0/GND)" );
-    if( nets.empty() )
+    std::string voltageSignal;
+    for( const auto& pins : topology.nodes )
+        for( const auto& [pin, name] : pins )
+            if( name != "0" && voltageSignal.empty() ) voltageSignal = "v(" + name + ")";
+    if( voltageSignal.empty() )
         errors.push_back( "Connect at least one non-ground net" );
     if( result.config.signals.size() > 64 )
         errors.push_back( "This prototype supports at most 64 LED signals" );
@@ -165,8 +158,11 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         throw std::runtime_error( message );
     }
     if( result.config.signals.empty() )
-        result.config.signals.push_back( "v(" + nets.begin()->second + ")" );
-    deck << ".model CA_SW SW(Ron=0.01 Roff=1e12 Vt=2.5 Vh=0.1)\n"
+        result.config.signals.push_back( voltageSignal );
+    // 1 Tohm numerical leakage keeps genuinely open/capacitive nodes solvable.
+    // It is not a wire or logic pull-down; floating islands remain identified in the snapshot.
+    deck << ".options rshunt=1e12\n"
+         << ".model CA_SW SW(Ron=0.01 Roff=1e12 Vt=2.5 Vh=0.1)\n"
          << ".model CA_RED D(Is=1e-20 N=2 Rs=5)\n.end\n";
     result.netlist = deck.str();
     return result;

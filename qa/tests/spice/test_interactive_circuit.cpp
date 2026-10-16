@@ -4,6 +4,7 @@
 #include <circuitalive/session_runner.h>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <thread>
 
 using namespace CIRCUITALIVE;
@@ -59,6 +60,17 @@ BOOST_AUTO_TEST_CASE( InteractiveValuesAndDisplayResponse )
     BOOST_CHECK_EQUAL( LedBrightness( 1 ), 1 );
 }
 
+BOOST_AUTO_TEST_CASE( WorkerIsLocatedForManagerStandaloneAndInstalledLayouts )
+{
+    namespace fs = std::filesystem;
+    const auto worker = fs::path( CIRCUITALIVE_TEST_WORKER );
+    const auto eeschema = worker.parent_path().parent_path();
+    BOOST_CHECK_EQUAL( FindSessionWorker( ( eeschema / "eeschema" ).string() ), worker.string() );
+    BOOST_CHECK_EQUAL( FindSessionWorker( ( eeschema.parent_path() / "kicad/kicad" ).string() ), worker.string() );
+    // In an installed layout the worker is directly beside the application.
+    BOOST_CHECK_EQUAL( FindSessionWorker( ( worker.parent_path() / "kicad" ).string() ), worker.string() );
+}
+
 BOOST_AUTO_TEST_CASE( InteractiveCatalogueRejectsIncompleteOrCustomCircuits )
 {
     auto components = Components();
@@ -79,10 +91,128 @@ BOOST_AUTO_TEST_CASE( InteractiveCatalogueRejectsIncompleteOrCustomCircuits )
     components = Components();
     components[1].reference = "V1";
     BOOST_CHECK_THROW( BuildCircuitSnapshot( components ), std::runtime_error );
+}
+
+BOOST_AUTO_TEST_CASE( ProjectLocalPassiveIdsAreNotExternalSpiceModels )
+{
+    auto components = Components();
+    components[2].libraryId = "rectifier_schlib:R";
+    components[2].value = "470R";
+    components[2].explicitSpiceModel = true;
+    components[3].libraryId = "rectifier_schlib:C";
+    components[3].explicitSpiceModel = true;
+    auto circuit = BuildCircuitSnapshot( components );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 0.5 );
+    BOOST_CHECK_GT( session.Snapshot().latest.values.at( 0 ), 0.002 );
+    // A copied symbol can have a descriptive name and identify its passive type via Sim.Device.
+    components[2].libraryId = "project:CustomResistor";
+    components[2].deviceHint = "R";
+    BOOST_CHECK_NO_THROW( BuildCircuitSnapshot( components ) );
+    components[2].pins["3"] = "extra";
+    BOOST_CHECK_THROW( BuildCircuitSnapshot( components ), std::runtime_error );
+}
+
+BOOST_AUTO_TEST_CASE( AutomaticSourceReferenceDoesNotRequireAGroundLabel )
+{
+    auto components = Components();
     for( auto& c : components )
         for( auto& [pin, net] : c.pins )
-            if( net == "0" ) net = "floating";
-    BOOST_CHECK_THROW( BuildCircuitSnapshot( components ), std::runtime_error );
+            if( net == "0" ) net = "return_wire";
+    auto circuit = BuildCircuitSnapshot( components );
+    BOOST_REQUIRE_EQUAL( circuit.automaticReferences.size(), 1 );
+    BOOST_CHECK_EQUAL( circuit.automaticReferences[0], "V1.2" );
+    BOOST_CHECK_EQUAL( circuit.pinNodes[0].at( "2" ), "0" );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 0.5 );
+    BOOST_CHECK_GT( session.Snapshot().latest.values.at( 0 ), 0.003 );
+}
+
+BOOST_AUTO_TEST_CASE( SeriesSuppliesKeepDistinctNegativeTerminals )
+{
+    const std::vector<CIRCUIT_COMPONENT> components = {
+        { "V1", "Simulation_SPICE:VDC", "5", { { "1", "middle" }, { "2", "return" } } },
+        { "V2", "Simulation_SPICE:VDC", "5", { { "1", "top" }, { "2", "middle" } } },
+        { "R1", "Device:R", "1k", { { "1", "top" }, { "2", "return" } } }
+    };
+    auto circuit = BuildCircuitSnapshot( components );
+    BOOST_REQUIRE_EQUAL( circuit.automaticReferences.size(), 1 );
+    BOOST_CHECK_NE( circuit.pinNodes[1].at( "2" ), "0" );
+    circuit.config.signals = { "v(" + circuit.pinNodes[1].at( "1" ) + ")",
+                               "v(" + circuit.pinNodes[0].at( "1" ) + ")" };
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 0.02 );
+    BOOST_CHECK_CLOSE( session.Snapshot().latest.values.at( 0 ), 10, 1e-7 );
+    BOOST_CHECK_CLOSE( session.Snapshot().latest.values.at( 1 ), 5, 1e-7 );
+}
+
+BOOST_AUTO_TEST_CASE( ExplicitGroundHasPriorityOverSourceNegative )
+{
+    const std::vector<CIRCUIT_COMPONENT> components = {
+        { "V1", "Simulation_SPICE:VDC", "5", { { "1", "0" }, { "2", "negative" } } }
+    };
+    auto circuit = BuildCircuitSnapshot( components );
+    BOOST_CHECK( circuit.automaticReferences.empty() );
+    BOOST_CHECK_EQUAL( circuit.pinNodes[0].at( "1" ), "0" );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 0.02 );
+    BOOST_CHECK_CLOSE( session.Snapshot().latest.values.at( 0 ), -5, 1e-7 );
+}
+
+BOOST_AUTO_TEST_CASE( OpenPinsReceiveVoltageWithoutBeingShortedTogether )
+{
+    const std::vector<CIRCUIT_COMPONENT> components = {
+        { "V1", "Simulation_SPICE:VDC", "5", { { "1", "in" }, { "2", "return" } } },
+        { "R1", "Device:R", "1k", { { "1", "in" }, { "2", "" } } },
+        { "R2", "Device:R", "1k", { { "1", "return" }, { "2", "" } } }
+    };
+    auto circuit = BuildCircuitSnapshot( components );
+    BOOST_CHECK_EQUAL( circuit.openPins, 2 );
+    BOOST_CHECK_NE( circuit.pinNodes[1].at( "2" ), circuit.pinNodes[2].at( "2" ) );
+    circuit.config.signals = { "v(" + circuit.pinNodes[1].at( "2" ) + ")",
+                               "v(" + circuit.pinNodes[2].at( "2" ) + ")", "i(vca1)" };
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 0.02 );
+    auto sample = session.Snapshot();
+    BOOST_CHECK_CLOSE( sample.latest.values.at( 0 ), 5, 1e-5 );
+    BOOST_CHECK_SMALL( sample.latest.values.at( 1 ), 1e-6 );
+    BOOST_CHECK_SMALL( sample.latest.values.at( 2 ), 1e-8 );
+}
+
+BOOST_AUTO_TEST_CASE( IsolatedComponentsDoNotPreventThePoweredCircuitFromRunning )
+{
+    auto components = Components();
+    components.push_back( { "R4", "Device:R", "1k", { { "1", "" }, { "2", "" } } } );
+    components.push_back( { "C2", "Device:C", "1u", { { "1", "" }, { "2", "" } } } );
+    components.push_back( { "D2", "Device:LED", "LED", { { "1", "" }, { "2", "" } } } );
+    auto circuit = BuildCircuitSnapshot( components );
+    BOOST_CHECK_EQUAL( circuit.openPins, 6 );
+    BOOST_CHECK_EQUAL( circuit.floatingIslands.size(), 3 );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 0.5 );
+    BOOST_CHECK_GT( session.Snapshot().latest.values.at( 0 ), 0.003 );
+    BOOST_CHECK_SMALL( session.Snapshot().latest.values.at( 1 ), 1e-8 );
+}
+
+BOOST_AUTO_TEST_CASE( CapacitorWithOpenTerminalPreservesItsInitialVoltage )
+{
+    const std::vector<CIRCUIT_COMPONENT> components = {
+        { "V1", "Simulation_SPICE:VDC", "5", { { "1", "in" }, { "2", "return" } } },
+        { "C1", "Device:C", "1u", { { "1", "in" }, { "2", "" } } }
+    };
+    auto circuit = BuildCircuitSnapshot( components );
+    circuit.config.signals = { "v(" + circuit.pinNodes[1].at( "2" ) + ")" };
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 0.02 );
+    // The initial capacitor voltage is 0 V: the unloaded terminal initially follows +5 V.
+    BOOST_CHECK_CLOSE( session.Snapshot().latest.values.at( 0 ), 5, 1e-4 );
 }
 
 BOOST_AUTO_TEST_CASE( StandardLibraryPassivesUseFixedBehavioursAndValue )

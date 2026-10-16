@@ -9,6 +9,9 @@
 
 namespace CIRCUITALIVE
 {
+/// Installed bin/, standalone source build, and source-build KiCad project manager layouts.
+std::string FindSessionWorker( const std::string& aApplicationExecutable );
+
 enum class EDITOR_SESSION_STATE { STOPPED, PREPARING, RUNNING, PAUSED, COMPLETED, ERROR };
 
 struct EDITOR_SESSION_VIEW

@@ -48,7 +48,8 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
         {
             auto* symbol = static_cast<SCH_SYMBOL*>( item );
             std::string lib = symbol->GetLibId().Format().c_str();
-            if( lib.starts_with( "power:" ) || symbol->GetExcludedFromSim( &sheet, variant ) )
+            if( symbol->IsPower() || lib.starts_with( "power:" )
+                || symbol->GetExcludedFromSim( &sheet, variant ) )
                 continue;
 
             CIRCUIT_COMPONENT component;
@@ -60,7 +61,8 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
                 const SCH_FIELD* f = symbol->GetField( name );
                 return f ? f->GetShownText( &sheet, false, 0, variant ) : wxString();
             };
-            const auto behavior = FindBuiltinBehavior( lib );
+            component.deviceHint = field( "Sim.Device" ).ToStdString();
+            const auto behavior = FindBuiltinBehavior( lib, component.deviceHint );
             bool vdc = behavior == BUILTIN_BEHAVIOR::DC_VOLTAGE;
             bool led = behavior == BUILTIN_BEHAVIOR::RED_LED;
             component.explicitSpiceModel = !field( "Sim.Library" ).empty()
@@ -75,7 +77,8 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic )
             {
                 SCH_CONNECTION* connection = pin->Connection( &sheet );
                 std::string name = connection ? connection->Name().ToStdString() : std::string();
-                if( name.starts_with( "unconnected-(" ) )
+                if( connection && ( connection->IsUnconnected()
+                                     || connection->LocalName().StartsWith( "unconnected-(" ) ) )
                     name.clear();
                 if( connection && ( connection->LocalName() == "GND" || connection->LocalName() == "0" ) )
                     name = "0";

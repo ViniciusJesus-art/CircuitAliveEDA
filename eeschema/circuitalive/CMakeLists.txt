@@ -1,6 +1,7 @@
 # All CircuitAlive editor code is assembled here, keeping the upstream build hook small.
 if( TARGET circuitalive_sim_session )
-    add_library( circuitalive_interactive STATIC circuit_snapshot.cpp component_catalog.cpp session_runner.cpp )
+    add_library( circuitalive_interactive STATIC
+        circuit_snapshot.cpp circuit_topology.cpp component_catalog.cpp session_runner.cpp )
     target_include_directories( circuitalive_interactive PUBLIC ${PROJECT_SOURCE_DIR}/eeschema )
     target_link_libraries( circuitalive_interactive PUBLIC circuitalive_sim_session )
     target_sources( eeschema_kiface_objects PRIVATE

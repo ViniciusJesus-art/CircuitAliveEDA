@@ -47,6 +47,13 @@ Value, sem exigir configuração SPICE. Campos `Sim.*` existentes nesses passivo
 não os tornam incompatíveis nem substituem seu Value neste modo. A seleção de
 comportamentos diferentes será uma extensão desse catálogo.
 
+Isso também se aplica a cópias em bibliotecas locais do projeto: por exemplo,
+`rectifier_schlib:R` e `rectifier_schlib:C`. O nome local R/C ou o campo
+`Sim.Device=R/C` identifica o comportamento básico; o modelo valida a existência
+dos dois pinos físicos 1 e 2. O nickname da biblioteca não é uma propriedade
+elétrica. Símbolos de alimentação são identificados também por seu tipo KiCad,
+permitindo GND copiado para uma biblioteca local.
+
 Exemplo mínimo, equivalente a uma fonte de 5 V, resistor de 470 ohms e LED,
 incluindo campos `Sim.*` no resistor para reproduzir a regressão:
 
@@ -54,11 +61,35 @@ incluindo campos `Sim.*` no resistor para reproduzir a regressão:
 ./circuitalive eeschema demos/simulation/circuitalive/standard_library_led.kicad_sch
 ```
 
-Os componentes precisam estar anotados e conectados. Uma rede `GND` ou `0` define
-a referência elétrica; símbolos `power:*` são rótulos elétricos, não fontes de
-tensão. A captura respeita exclusões de simulação e instancia as folhas usando
+Os componentes precisam estar anotados; pinos abertos são permitidos. Uma rede
+`GND` ou `0`, quando presente, define a referência elétrica. Na ausência dela,
+a sessão escolhe o negativo de uma fonte DC como 0 V para cada ilha elétrica
+independente. Não é preciso desenhar uma label GND. Fontes em série conservam
+terminais distintos e suas tensões se somam; não são aterrados todos os negativos.
+Símbolos de alimentação são rótulos elétricos, não fontes de tensão.
+A captura respeita exclusões de simulação e instancia as folhas usando
 o grafo de conectividade. Nomes de redes são convertidos em identificadores
 internos; texto do esquema nunca é inserido como comando no netlist.
+
+Cada pino fisicamente existente, mas aberto, recebe seu próprio nó. Não é
+curto-circuitado com outros pinos abertos nem automaticamente interpretado como
+nível lógico baixo. Um resistor ligado a +5 V e aberto na outra ponta apresenta
+aproximadamente 5 V nessa ponta, com corrente praticamente nula. Já uma ilha
+inteiramente isolada não tem tensão absoluta definida: o status indica
+`Floating` e a captura mantém a lista dessas ilhas. Isso não implementa ainda
+estados digitais X/Z, que pertencem às próximas etapas.
+
+O solver usa uma referência numérica por ilha e `rshunt=1e12` para estabilizar
+nós sem caminho DC. Trata-se de uma condutância muito pequena, não de um fio
+de GND; ela pode influenciar circuitos de impedância extremamente alta. Esse
+recurso e suas limitações são descritos no
+[manual oficial do ngspice, condicionamento de matriz](https://ngspice.sourceforge.io/docs/ngspice-manual.pdf).
+
+Exemplo com o resistor local real, fonte sem label GND e R2 com um terminal aberto:
+
+```bash
+./circuitalive eeschema demos/simulation/circuitalive/open_pins_auto_reference.kicad_sch
+```
 
 Valores usam ponto decimal e unidades KiCad/SI: `470R`, `4R7`, `4k7`, `1000u`,
 `100uF`, `2.2Meg`. `M` significa mega e `m` significa mili, como no campo Value
@@ -84,6 +115,7 @@ Todo o código novo da integração fica em `eeschema/circuitalive/`:
 |---|---|
 | `circuit_snapshot.*` | Validação, valores e netlist, sem wx/KiCad |
 | `component_catalog.*` | Associação entre símbolos padrão e comportamentos iniciais; ponto de extensão para futuros modelos |
+| `circuit_topology.*` | Nós, pinos abertos, ilhas elétricas e prioridade entre GND explícito e referência automática |
 | `schematic_adapter.*` | Captura do grafo, campos e instâncias do KiCad, somente na thread gráfica |
 | `session_runner.*` | Thread proprietária da sessão, fila limitada e estados copiados para a interface |
 | `simulation_overlay.*` | Brilho do LED, indicação da chave e localização do clique, sem mudar símbolos |
@@ -182,3 +214,22 @@ e `gui-editor-exit.txt`. São artefatos gerados e não fazem parte do Git.
   novo Play reiniciou a sessão. Fechamento durante execução: **exit code 0**.
 - Logs: `test-standard-components-session.log`, `test-standard-components-spice.log`,
   `native-toolbar-results.json`, `native-toolbar-*.png` e `gui-native-toolbar-exit.txt`.
+
+### Resistor local, referência automática e pinos abertos
+
+- `qa_interactive_sim`: **30 casos aprovados**, incluindo `rectifier_schlib:R/C`,
+  passivos identificados por `Sim.Device`, referência automática, prioridade do GND
+  explícito, duas fontes de 5 V em série produzindo 10 V, pinos abertos distintos,
+  aproximadamente 5 V no terminal aberto de um resistor sem carga, capacitor com
+  terminal aberto e componentes inteiramente isolados junto de um circuito ativo.
+- `qa_spice`: **57 casos aprovados**. O novo caso carrega
+  `open_pins_auto_reference.kicad_sch`, captura as conexões reais e confirma corrente
+  de LED entre 5 e 8 mA e 5 V no pino aberto de R2.
+- O exemplo foi aberto também pelo **gerenciador KiCad**, com a simulação no mesmo
+  processo: Play sem erro, 6,07 mA no LED, Pause mantendo `t = 0,840 s`, retomada,
+  Stop em zero e reinício. Encerramento normal: **exit code 0**.
+- A localização do worker atende tanto o editor standalone quanto o gerenciador,
+  na árvore de build e na instalação. A atualização do programa deve ser carregada
+  reabrindo também o gerenciador KiCad: ele mantém o módulo do editor em memória.
+- Evidências: `test-reference-open-pins-session.log`, `test-reference-open-pins-spice.log`,
+  `reference-manager-results.json` e `reference-manager-*.png`, em `.circuitalive/logs/`.

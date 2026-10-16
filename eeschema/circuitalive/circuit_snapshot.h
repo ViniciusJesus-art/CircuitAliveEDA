@@ -16,6 +16,7 @@ struct CIRCUIT_COMPONENT
     std::string value;
     std::map<std::string, std::string> pins; // physical pin number -> connectivity graph net
     bool explicitSpiceModel = false;
+    std::string deviceHint = {}; // KiCad's Sim.Device, including passives with project-local IDs.
 };
 
 struct CIRCUIT_INDICATOR
@@ -36,6 +37,10 @@ struct CIRCUIT_SNAPSHOT
     SIM_SESSION_CONFIG config;
     std::vector<CIRCUIT_INDICATOR> leds;
     std::vector<CIRCUIT_SWITCH> switches;
+    std::vector<std::map<std::string, std::string>> pinNodes; // Physical pins -> solver nodes, including open pins.
+    std::vector<std::string> automaticReferences; // Source reference + negative pin number.
+    std::vector<std::string> floatingIslands;     // Representative component; no source or explicit ground.
+    std::size_t openPins = 0;
 };
 
 /// Standard symbols use the initial catalogue; R/C always use Value and their fixed ideal behaviour.

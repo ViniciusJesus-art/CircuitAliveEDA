@@ -4,7 +4,7 @@
 
 namespace CIRCUITALIVE
 {
-BUILTIN_BEHAVIOR FindBuiltinBehavior( std::string_view aLibraryId )
+BUILTIN_BEHAVIOR FindBuiltinBehavior( std::string_view aLibraryId, std::string_view aDeviceHint )
 {
     static constexpr std::pair<std::string_view, BUILTIN_BEHAVIOR> catalogue[] = {
         { "Device:R", BUILTIN_BEHAVIOR::RESISTOR },
@@ -26,6 +26,17 @@ BUILTIN_BEHAVIOR FindBuiltinBehavior( std::string_view aLibraryId )
     for( const auto& [id, behavior] : catalogue )
         if( id == aLibraryId )
             return behavior;
+    // A project may embed/copy R or C under its own library nickname. The nickname
+    // is not an electrical property (e.g. rectifier_schlib:R has the same two pins).
+    auto name = aLibraryId.substr( aLibraryId.find_last_of( ':' ) + 1 );
+    for( const auto& [id, behavior] : catalogue )
+    {
+        if( ( behavior == BUILTIN_BEHAVIOR::RESISTOR || behavior == BUILTIN_BEHAVIOR::CAPACITOR )
+            && name == id.substr( id.find_last_of( ':' ) + 1 ) )
+            return behavior;
+    }
+    if( aDeviceHint == "R" ) return BUILTIN_BEHAVIOR::RESISTOR;
+    if( aDeviceHint == "C" ) return BUILTIN_BEHAVIOR::CAPACITOR;
     return BUILTIN_BEHAVIOR::UNKNOWN;
 }
 }
