@@ -165,3 +165,6 @@ qa/data/**/*.spice
 
 # Versioned XSPICE ABI configuration for the bundled memory module.
 !thirdparty/ngspice-xspice/include/ngspice/config.h
+
+# Gradle local caches and build locks.
+.gradle/
