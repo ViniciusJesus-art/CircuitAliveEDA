@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "mosfet_irf3205",
+  "name": "IRF3205 N-channel MOSFET",
+  "description": "Own native VDMOS approximation at selected datasheet operating points; see docs/circuitalive/MODEL_CATALOG.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "d",
+      "label": "Drain",
+      "default_pin": "2",
+      "role": "passive"
+    },
+    {
+      "id": "g",
+      "label": "Gate",
+      "default_pin": "1",
+      "role": "input"
+    },
+    {
+      "id": "s",
+      "label": "Source",
+      "default_pin": "3",
+      "role": "reference"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "threshold",
+      "label": "Channel threshold (not the fully-on gate voltage)",
+      "default": "3",
+      "unit": "V",
+      "min": 0.1,
+      "max": 10
+    },
+    {
+      "id": "transconductance",
+      "label": "Channel transconductance factor",
+      "default": "120",
+      "unit": "A/V2",
+      "min": 1e-05,
+      "max": 10000.0
+    },
+    {
+      "id": "drain_resistance",
+      "label": "Drain series resistance",
+      "default": ".003",
+      "unit": "Ohm",
+      "min": 1e-05,
+      "max": 10000.0
+    },
+    {
+      "id": "source_resistance",
+      "label": "Source series resistance",
+      "default": ".002",
+      "unit": "Ohm",
+      "min": 1e-05,
+      "max": 10000.0
+    },
+    {
+      "id": "gate_resistance",
+      "label": "Internal gate resistance",
+      "default": "2",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 10000.0
+    },
+    {
+      "id": "gate_source_capacitance",
+      "label": "Gate-source capacitance",
+      "default": "3000p",
+      "unit": "F",
+      "min": 1e-15,
+      "max": 0.001
+    },
+    {
+      "id": "miller_min",
+      "label": "Gate-drain capacitance at positive Vds",
+      "default": "200p",
+      "unit": "F",
+      "min": 1e-15,
+      "max": 0.001
+    },
+    {
+      "id": "miller_max",
+      "label": "Gate-drain capacitance near reverse conduction",
+      "default": "1500p",
+      "unit": "F",
+      "min": 1e-15,
+      "max": 0.001
+    },
+    {
+      "id": "body_capacitance",
+      "label": "Zero-bias body junction capacitance",
+      "default": "1800p",
+      "unit": "F",
+      "min": 1e-15,
+      "max": 0.001
+    },
+    {
+      "id": "body_transit",
+      "label": "Body diode reverse transit parameter",
+      "default": "100n",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "breakdown",
+      "label": "Drain-source avalanche voltage",
+      "default": "55",
+      "unit": "V",
+      "min": 1,
+      "max": 10000.0
+    },
+    {
+      "id": "current_warning",
+      "label": "Drain current warning (not a current limiter)",
+      "default": "110",
+      "unit": "A",
+      "min": 0,
+      "max": 1000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vdrain_${id} ${pin:d} drain_${id} 0",
+      "M${id} drain_${id} ${pin:g} ${pin:s} mosfet_${id}",
+      "Rgate_leak_${id} ${pin:g} ${pin:s} 1e12"
+    ],
+    "definitions": [
+      ".model mosfet_${id} VDMOS(Vto=${param:threshold} Kp=${param:transconductance} Lambda=0.002 Rd=${param:drain_resistance} Rs=${param:source_resistance} Rg=${param:gate_resistance} Cgs=${param:gate_source_capacitance} Cgdmin=${param:miller_min} Cgdmax=${param:miller_max} A=0.3 Cjo=${param:body_capacitance} M=0.5 Vj=0.8 Is=10n N=1.2 Rb=0.05 Bv=${param:breakdown} Ibv=250u Tt=${param:body_transit} Rds=1e10)",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "Transistor_FET:IRF3205"
+    ],
+    "part_names": [
+      "IRF3205"
+    ],
+    "pin_names": {
+      "d": [
+        "D"
+      ],
+      "g": [
+        "G"
+      ],
+      "s": [
+        "S"
+      ]
+    },
+    "symbol_names": [
+      "IRF3205"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "measurement_ports": {
+    "positive": "d",
+    "negative": "s"
+  },
+  "sources": [
+    "https://www.infineon.com/assets/row/public/documents/24/49/infineon-irf3205-datasheet-en.pdf"
+  ],
+  "model_notes": [
+    "One native VDMOS with body diode, approximate Miller capacitance, avalanche and gate/lead resistance.",
+    "Own approximation; no vendor SPICE source copied. Gate charge and timing are approximate, not full datasheet curve fits.",
+    "No self-heating, destructive avalanche/ESD, SOA or board-dependent thermal derating. Rating warns without limiting current.",
+    "Threshold parameter is a positive magnitude; channel polarity and internal threshold sign are defined by this file.",
+    "Requests circuit-wide Gear order 2 integration to damp numerical ringing after abrupt interactive gate changes; does not impose a small global timestep."
+  ],
+  "current_warning": {
+    "signal": "i(Vdrain_${id})",
+    "limit_parameter": "current_warning"
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "MOSFET"
+}

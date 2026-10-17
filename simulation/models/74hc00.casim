@@ -216,7 +216,9 @@
     "library_ids": [
       "74xx:74HC00"
     ],
-    "symbol_names": []
+    "symbol_names": [
+      "74HC00"
+    ]
   },
   "logic": {
     "vcc": "vcc",
@@ -241,5 +243,7 @@
   "measurement_ports": {
     "positive": "vcc",
     "negative": "gnd"
-  }
+  },
+  "category": "Digital/Logic ICs",
+  "family": "74HC"
 }

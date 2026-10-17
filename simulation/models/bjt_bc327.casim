@@ -88,10 +88,29 @@
     "library_ids": [
       "Transistor_BJT:BC327"
     ],
-    "symbol_names": []
+    "symbol_names": [
+      "BC327"
+    ],
+    "part_names": [
+      "BC327",
+      "QBC327"
+    ],
+    "pin_names": {
+      "b": [
+        "B"
+      ],
+      "c": [
+        "C"
+      ],
+      "e": [
+        "E"
+      ]
+    }
   },
   "measurement_ports": {
     "positive": "c",
     "negative": "e"
-  }
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "Bipolar"
 }

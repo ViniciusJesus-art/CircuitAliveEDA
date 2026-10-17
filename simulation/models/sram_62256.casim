@@ -292,6 +292,9 @@
   "matches": {
     "library_ids": [
       "Memory_RAM:CY62256-70PC"
+    ],
+    "symbol_names": [
+      "CY62256-70PC"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -362,7 +365,8 @@
         "select": [
           "!cs"
         ],
-        "initial": 2
+        "initial": 2,
+        "memory": "main"
       }
     ],
     "outputs": {
@@ -399,5 +403,32 @@
         "enable": "reading"
       }
     }
-  }
+  },
+  "category": "Digital/Memory",
+  "family": "RAM",
+  "resources": [
+    {
+      "id": "image",
+      "label": "Initial memory image",
+      "kind": "memory_image",
+      "formats": [
+        "bin",
+        "ihex",
+        "camem"
+      ],
+      "required": false,
+      "max_bytes": 8388608
+    }
+  ],
+  "memories": [
+    {
+      "id": "main",
+      "label": "SRAM 32K x 8",
+      "resource": "image",
+      "address_bits": 15,
+      "word_bits": 8,
+      "writable": true,
+      "fill": -1
+    }
+  ]
 }

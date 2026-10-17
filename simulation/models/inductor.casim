@@ -49,5 +49,13 @@
   "measurement_ports": {
     "positive": "p",
     "negative": "n"
+  },
+  "category": "Analog/Passive components",
+  "family": "Inductors",
+  "legacy_parameters": {
+    "map": {
+      "l": "inductance"
+    },
+    "only_if_value_invalid": true
   }
 }

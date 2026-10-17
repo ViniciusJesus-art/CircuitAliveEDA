@@ -226,6 +226,9 @@
   "matches": {
     "library_ids": [
       "74xx:74HC125"
+    ],
+    "symbol_names": [
+      "74HC125"
     ]
   },
   "logic": {
@@ -251,5 +254,7 @@
   "measurement_ports": {
     "positive": "vcc",
     "negative": "gnd"
-  }
+  },
+  "category": "Digital/Logic ICs",
+  "family": "74HC"
 }

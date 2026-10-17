@@ -83,10 +83,15 @@
       "Device:D",
       "Device:D_Small"
     ],
-    "symbol_names": []
+    "symbol_names": [
+      "D",
+      "D_Small"
+    ]
   },
   "measurement_ports": {
     "positive": "a",
     "negative": "k"
-  }
+  },
+  "category": "Semiconductors/Diodes",
+  "family": "Rectifier and switching"
 }

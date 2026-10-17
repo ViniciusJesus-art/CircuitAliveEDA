@@ -24,6 +24,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include <wx/debug.h>
 
 // For some obscure reason, needed on msys2 with some wxWidgets versions (3.0) to avoid
@@ -138,10 +139,7 @@ SIMULATOR_FRAME::SIMULATOR_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_schematicFrame = (SCH_EDIT_FRAME*) Kiway().Player( FRAME_SCH, false );
     wxASSERT( m_schematicFrame );
 
-    // Give an icon
-    wxIcon icon;
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::simulator ) );
-    SetIcon( icon );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     wxBoxSizer* mainSizer = new wxBoxSizer( wxVERTICAL );
     SetSizer( mainSizer );

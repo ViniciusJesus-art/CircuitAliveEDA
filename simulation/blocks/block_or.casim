@@ -157,5 +157,7 @@
       }
     }
   },
-  "ignore_legacy_spice_fields": true
+  "ignore_legacy_spice_fields": true,
+  "category": "Building blocks",
+  "family": "Analog and mixed signal"
 }

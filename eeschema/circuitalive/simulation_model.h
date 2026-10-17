@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <sim/memory_image.h>
 
 namespace CIRCUITALIVE
 {
@@ -28,21 +29,51 @@ struct MODEL_PARAMETER
     double maximum;
 };
 
+struct MODEL_ADJUSTMENT
+{
+    std::string id, label, source, parameter, unit;
+    double minimum = 0, maximum = 1, step = .01;
+};
+
+struct MODEL_RESOURCE
+{
+    std::string id, label, kind;
+    std::vector<std::string> formats;
+    bool required = false;
+    std::size_t maxBytes = MAX_MEMORY_BYTES;
+};
+struct MODEL_MEMORY
+{
+    std::string id, label, resource;
+    unsigned addressBits = 0, wordBits = 8;
+    bool writable = false;
+    int fill = -1;
+};
+
 struct SIMULATION_MODEL
 {
     std::filesystem::path file;
     std::string id;
     std::string name;
     std::string description;
+    std::string category, family;
     std::vector<MODEL_PIN> pins;
     std::vector<MODEL_PARAMETER> parameters;
     std::vector<std::string> libraryIds, symbolNames, deviceHints;
+    std::vector<std::string> partNames;
+    std::map<std::string, std::vector<std::string>> pinNames;
+    std::map<std::string, std::string> legacyParameterMap, legacyParameterDefaults;
+    std::vector<std::string> legacyIgnoredParameters;
+    bool legacyParametersOnlyIfValueInvalid = false;
     std::vector<std::string> instance, definitions;
     std::vector<std::vector<std::string>> electricalGroups;
     std::string referencePin;
     std::string indicatorSignal, brightnessParameter, ratingParameter;
     std::string controlSource;
     double controlOn = 5, controlOff = 0;
+    std::vector<MODEL_ADJUSTMENT> adjustments;
+    std::vector<MODEL_RESOURCE> resources;
+    std::vector<MODEL_MEMORY> memories;
     bool ignoreLegacyFields = false;
     std::map<std::string, std::string> legacyFields;
     std::string measurePositive, measureNegative;
@@ -64,6 +95,7 @@ struct RESOLVED_MODEL
     std::map<std::string, std::string> parameterText;
     std::map<std::string, double> parameters;
     std::map<std::string, std::string> driveExpressions;
+    std::map<std::string, std::size_t> memorySlots;
 };
 
 /// Model data is read afresh for each Play; no schematic/library pointers or code loading.
@@ -85,4 +117,5 @@ private:
 
 std::string ExpandModelTemplate( const std::string& aText, const RESOLVED_MODEL& aModel,
         const std::map<std::string, std::string>& aPhysicalNodes, std::size_t aIndex );
+std::vector<MEMORY_REGION_CONFIG> InitialModelMemories( const CIRCUIT_COMPONENT&, const SIMULATION_MODEL& );
 }

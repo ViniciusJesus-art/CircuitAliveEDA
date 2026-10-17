@@ -2,6 +2,7 @@
 #pragma once
 
 #include "circuit_snapshot.h"
+#include "scope_history.h"
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -19,12 +20,17 @@ struct EDITOR_SESSION_VIEW
     EDITOR_SESSION_STATE state = EDITOR_SESSION_STATE::STOPPED;
     SIM_SESSION_SNAPSHOT sample;
     std::vector<bool> switches;
+    std::vector<double> adjustments;
     std::vector<double> ledCurrents;
     std::vector<double> measurements;
-    std::vector<SIM_SAMPLE> scopeHistory;
+    std::shared_ptr<const SCOPE_HISTORY> scopeHistory;
     std::vector<std::string> warnings;
     std::vector<LOGIC_LEVEL> logicLevels;
     std::string error;
+    std::shared_ptr<const MEMORY_SNAPSHOT> memory;
+    std::uint64_t memorySequence = 0;
+    std::string memoryError;
+    double speed = 1;
 };
 
 /// One owner thread for all blocking engine operations. GUI polls copied, bounded state.
@@ -38,16 +44,21 @@ public:
     void Pause();
     void Stop();
     void ToggleSwitch( std::size_t aIndex );
+    void SetAdjustment( std::size_t aIndex, double aValue );
+    void SetSpeed( double aSpeed );
+    void Step();
+    void CaptureMemory( std::size_t aRegion );
     EDITOR_SESSION_VIEW View() const;
 
 private:
-    enum class COMMAND_TYPE { START, RESUME, PAUSE, STOP, TOGGLE };
+    enum class COMMAND_TYPE { START, RESUME, PAUSE, STOP, TOGGLE, ADJUST, SPEED, STEP, MEMORY };
     struct COMMAND
     {
         COMMAND_TYPE type;
         std::uint64_t revision;
         CIRCUIT_SNAPSHOT circuit;
         std::size_t index = 0;
+        double value = 0;
     };
     void enqueue( COMMAND_TYPE aType, std::size_t aIndex = 0 );
     void run();
@@ -58,6 +69,7 @@ private:
     EDITOR_SESSION_VIEW m_view;
     std::uint64_t m_revision = 0;
     bool m_quit = false;
+    double m_speed = 1;
     std::thread m_thread;
 };
 }

@@ -8,8 +8,8 @@
 namespace CIRCUITALIVE::PROTOCOL
 {
 using JSON = nlohmann::json;
-constexpr std::size_t MAX_MESSAGE = 4 * 1024 * 1024;
-constexpr int VERSION = 1;
+constexpr std::size_t MAX_MESSAGE = 8 * 1024 * 1024;
+constexpr int VERSION = 2;
 
 inline const char* StateName( SIM_SESSION_STATE aState )
 {

@@ -136,6 +136,24 @@
   "matches": {
     "library_ids": [
       "Transistor_BJT:2N3904"
+    ],
+    "part_names": [
+      "2N3904",
+      "Q2N3904"
+    ],
+    "pin_names": {
+      "b": [
+        "B"
+      ],
+      "c": [
+        "C"
+      ],
+      "e": [
+        "E"
+      ]
+    },
+    "symbol_names": [
+      "2N3904"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -155,5 +173,7 @@
   "current_warning": {
     "signal": "i(Vcollector_${id})",
     "limit_parameter": "current_warning"
-  }
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "Bipolar"
 }

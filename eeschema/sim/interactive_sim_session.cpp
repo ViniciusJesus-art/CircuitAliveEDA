@@ -233,6 +233,9 @@ void INTERACTIVE_SIM_SESSION::Configure( const std::string& aNetlist,
                       { "step", aConfig.step }, { "horizon", aConfig.horizon },
                       { "max_step", aConfig.maxStep }, { "uic", aConfig.useInitialConditions },
                       { "capacity", aConfig.historyCapacity }, { "signals", aConfig.signals } };
+    request["memories"]=JSON::array();
+    for(const auto& region:aConfig.memories)request["memories"].push_back({{"id",region.id},{"label",region.label},
+        {"word_bits",region.wordBits},{"writable",region.writable},{"data",MemoryHex(region.initial.data)},{"known",MemoryHex(region.initial.known)}});
     m_impl->Request( request );
     m_impl->configuration = std::move( request );
 }
@@ -290,6 +293,13 @@ int INTERACTIVE_SIM_SESSION::WorkerPid() const
 {
     std::lock_guard lock( m_impl->mutex );
     return m_impl->pid;
+}
+
+MEMORY_SNAPSHOT INTERACTIVE_SIM_SESSION::ReadMemory(const std::string& id,std::size_t offset,std::size_t length)
+{
+    std::lock_guard lock(m_impl->mutex);
+    const auto response=m_impl->Request({{"op","memory"},{"id",id},{"offset",offset},{"length",length}});
+    return {id,response.at("time"),{MemoryUnhex(response.at("data")),MemoryUnhex(response.at("known"))}};
 }
 
 SIM_SESSION_SNAPSHOT INTERACTIVE_SIM_SESSION::Snapshot( bool aDrainHistory )

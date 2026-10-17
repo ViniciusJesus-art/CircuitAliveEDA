@@ -31,6 +31,7 @@
  */
 
 #include <circuitalive/branding.h>
+#include <circuitalive/desktop_integration.h>
 #include <wx/html/htmlwin.h>
 #include <wx/fs_zip.h>
 #include <wx/dir.h>
@@ -487,6 +488,9 @@ bool PGM_BASE::InitPgm( bool aHeadless, bool aSkipPyInit, bool aIsUnitTest )
 
     // Load common settings from disk after setting up env vars
     GetSettingsManager().Load( commonSettings );
+
+    if( !aHeadless )
+        CIRCUITALIVE::InitializeDesktopIdentity();
 
 #ifdef KICAD_IPC_API
     // If user doesn't have a saved Python interpreter, try (potentially again) to find one

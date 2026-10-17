@@ -112,5 +112,7 @@
     "driver_value": {
       "out": "v(code_${id})"
     }
-  }
+  },
+  "category": "Building blocks",
+  "family": "Analog and mixed signal"
 }

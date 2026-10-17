@@ -2,6 +2,7 @@
 #include "simulation_overlay.h"
 #include <base_units.h>
 #include <algorithm>
+#include <set>
 
 namespace CIRCUITALIVE
 {
@@ -61,6 +62,22 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
         SetStrokeColor( KIGFX::COLOR4D( 1, 0.3, 0.05, brightness * 0.6 ) );
         Circle( VECTOR2D( location.position ), schIUScale.mmToIU( 2.3 ) );
     }
+    std::set<std::size_t> adjusted;
+    for( std::size_t i = 0; i < aCircuit.circuit.adjustments.size(); ++i )
+    {
+        const auto& control = aCircuit.circuit.adjustments[i];
+        if( !adjusted.insert( control.component ).second ) continue;
+        const auto& location = aCircuit.locations.at( control.component );
+        if( location.sheet != aCurrentSheet ) continue;
+        const double value = i < aSession.adjustments.size() ? aSession.adjustments[i] : control.initial;
+        SetIsFill( false ); SetIsStroke( true ); SetStrokeColor( KIGFX::COLOR4D( .05, .7, .75, 1 ) );
+        BOX2I box = location.body; box.Inflate( schIUScale.mmToIU( .6 ) );
+        Rectangle( VECTOR2D( box.GetOrigin() ), VECTOR2D( box.GetEnd() ) );
+        SetGlyphSize( VECTOR2I( schIUScale.mmToIU( 1 ), schIUScale.mmToIU( 1 ) ) );
+        const auto text = control.unit == "%" ? wxString::Format( "%.1f%%", 100 * value )
+            : wxString::Format( "%.3g %s", value, wxString::FromUTF8( control.unit ) );
+        BitmapText( text, box.GetOrigin() - VECTOR2I( 0, schIUScale.mmToIU( 1.5 ) ), ANGLE_0 );
+    }
     for( std::size_t i = 0; i < aCircuit.circuit.switches.size(); ++i )
     {
         const auto& location = aCircuit.locations.at( aCircuit.circuit.switches[i].component );
@@ -91,6 +108,18 @@ int SIMULATION_OVERLAY::SwitchAt( const SCHEMATIC_SNAPSHOT& aCircuit,
         box.Inflate( schIUScale.mmToIU( 0.8 ) );
         if( location.sheet == aCurrentSheet && box.Contains( aPosition ) )
             return static_cast<int>( i );
+    }
+    return -1;
+}
+
+int SIMULATION_OVERLAY::AdjustmentAt( const SCHEMATIC_SNAPSHOT& circuit,
+                                    const wxString& sheet, const VECTOR2I& position ) const
+{
+    for( std::size_t i = 0; i < circuit.circuit.adjustments.size(); ++i )
+    {
+        const auto& location = circuit.locations.at( circuit.circuit.adjustments[i].component );
+        BOX2I box = location.body; box.Inflate( schIUScale.mmToIU( .8 ) );
+        if( location.sheet == sheet && box.Contains( position ) ) return i;
     }
     return -1;
 }

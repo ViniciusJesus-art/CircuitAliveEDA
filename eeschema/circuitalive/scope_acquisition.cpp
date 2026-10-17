@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "scope_acquisition.h"
+#include "scope_waveform.h"
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -18,14 +19,12 @@ double value( const MEASUREMENT_CHANNEL& channel, const SIM_SAMPLE& sample )
     try { return MeasurementValue( channel, sample ); }
     catch( const std::out_of_range& ) { return NAN; }
 }
-void trim( std::vector<SIM_SAMPLE>& samples, std::size_t capacity )
-{
-    if( samples.size() > capacity ) samples.erase( samples.begin(), samples.end() - capacity );
-}
+
 }
 
 void SCOPE_ACQUISITION::Configure( SCOPE_TIMEBASE timebase, SCOPE_TRIGGER trigger,
-                                  MEASUREMENT_CHANNEL source, std::size_t capacity )
+                                  MEASUREMENT_CHANNEL source, std::size_t capacity,
+                                  std::vector<MEASUREMENT_CHANNEL> channels )
 {
     if( !std::isfinite( timebase.perDivision ) || timebase.perDivision < 1e-12
         || timebase.perDivision > 1e9 || !std::isfinite( timebase.offset )
@@ -34,8 +33,11 @@ void SCOPE_ACQUISITION::Configure( SCOPE_TIMEBASE timebase, SCOPE_TRIGGER trigge
         || trigger.hysteresis < 0 || !std::isfinite( trigger.holdoff ) || trigger.holdoff < 0 )
         throw std::invalid_argument( "Invalid oscilloscope acquisition settings" );
     m_timebase = timebase; m_trigger = trigger; m_source = std::move( source );
+    m_channels = channels.empty() ? std::vector<MEASUREMENT_CHANNEL>{ m_source } : std::move( channels );
+    m_reducedUntil = -1;
     m_capacity = std::clamp<std::size_t>( capacity, 2, 8192 );
-    m_frame = {}; m_hold = false; m_buffer.clear(); m_previous.reset(); m_pending.reset();
+    const auto nextSerial = m_frame.serial + 1;
+    m_frame = {}; m_frame.serial = nextSerial; m_hold = false; m_buffer.clear(); m_previous.reset(); m_pending.reset();
     m_lastTime = m_lastCapture = m_nextTrigger = -1;
     m_edgeArmed = m_singleDone = false; m_state = SCOPE_CAPTURE_STATE::WAITING;
 }
@@ -87,7 +89,8 @@ SCOPE_CAPTURE_STATE SCOPE_ACQUISITION::State() const
 
 void SCOPE_ACQUISITION::publish( SCOPE_FRAME frame )
 {
-    trim( frame.samples, m_capacity );
+    if( frame.samples.size() > m_capacity )
+    { ScopeCompact( frame.samples, m_capacity, m_channels, frame.triggerTime ); frame.decimated = true; }
     frame.partial = frame.samples.size() < 2 || frame.samples.front().time > frame.begin + 1e-12
                     || frame.samples.back().time < frame.end - 1e-12;
     frame.serial = m_frame.serial + 1;
@@ -106,7 +109,8 @@ void SCOPE_ACQUISITION::rolling( bool automatic )
     auto last = std::upper_bound( first, m_buffer.end(), frame.end,
                                  []( double t, const auto& s ) { return t < s.time; } );
     if( last != m_buffer.end() ) ++last;
-    frame.samples.assign( first, last ); publish( std::move( frame ) );
+    frame.samples.assign( first, last ); frame.decimated = !frame.samples.empty() && frame.samples.front().time <= m_reducedUntil;
+    publish( std::move( frame ) );
     m_lastCapture = m_lastTime;
     m_state = automatic ? SCOPE_CAPTURE_STATE::AUTO : SCOPE_CAPTURE_STATE::ROLL;
 }
@@ -114,58 +118,97 @@ void SCOPE_ACQUISITION::rolling( bool automatic )
 void SCOPE_ACQUISITION::Feed( const std::vector<SIM_SAMPLE>& history )
 {
     if( m_hold || m_singleDone || history.empty() ) return;
-    if( history.back().time < m_lastTime )
-        Configure( m_timebase, m_trigger, m_source, m_capacity ); // Never join separate runs.
-    bool changed = false;
-    for( const auto& sample : history )
+    if( history.back().time < m_lastTime ) Configure( m_timebase, m_trigger, m_source, m_capacity, m_channels );
+    const auto first = std::upper_bound( history.begin(), history.end(), m_lastTime,
+        []( double t, const auto& s ) { return t < s.time; } );
+    if( first == history.end() ) return;
+    for( auto it = first; it != history.end(); ++it ) if( !consume( *it ) ) break;
+    finishFeed();
+}
+void SCOPE_ACQUISITION::Feed( const SCOPE_HISTORY& history )
+{
+    if( m_hold || m_singleDone || history.empty() ) return;
+    if( history.back().time < m_lastTime ) Configure( m_timebase, m_trigger, m_source, m_capacity, m_channels );
+    if( history.back().time <= m_lastTime ) return;
+    history.ForEachAfter( m_lastTime, [this]( const auto& sample ) { return consume( sample ); } );
+    finishFeed();
+}
+void SCOPE_ACQUISITION::SetTriggerLevel( double level )
+{
+    if( !std::isfinite( level ) ) return;
+    m_trigger.level = level;
+    if( !m_hold && !m_singleDone )
+    { m_pending.reset(); m_edgeArmed = false; m_state = SCOPE_CAPTURE_STATE::WAITING; }
+}
+
+bool SCOPE_ACQUISITION::consume( const SIM_SAMPLE& sample )
+{
+    if( !std::isfinite( sample.time ) || sample.time <= m_lastTime ) return true;
+    m_lastTime = sample.time;
+    m_buffer.push_back( sample );
+    const double retain = std::max( m_timebase.Span(), m_timebase.Span() * m_timebase.pretrigger - m_timebase.offset );
+    while( m_buffer.size() > 2 && m_buffer[1].time < sample.time - retain ) m_buffer.pop_front();
+    if( m_buffer.size() > m_capacity * 2 )
     {
-        if( !std::isfinite( sample.time ) || sample.time <= m_lastTime ) continue;
-        changed = true; m_lastTime = sample.time;
-        m_buffer.push_back( sample );
-        // Amortized trimming; memory remains bounded even on long captures.
-        if( m_buffer.size() > m_capacity ) m_buffer.pop_front();
-        if( m_lastCapture < 0 ) m_lastCapture = sample.time;
-        const double current = value( m_source, sample );
-        const double previous = m_previous ? value( m_source, *m_previous ) : NAN;
-        const bool lowSide = m_trigger.rising ? current <= m_trigger.level - m_trigger.hysteresis
-                                              : current >= m_trigger.level + m_trigger.hysteresis;
-        const bool crossing = std::isfinite( current ) && std::isfinite( previous ) && m_edgeArmed
-                && ( m_trigger.rising ? previous < m_trigger.level && current >= m_trigger.level
-                                      : previous > m_trigger.level && current <= m_trigger.level );
-        if( !m_pending && crossing && sample.time >= m_nextTrigger
-            && m_trigger.mode != SCOPE_TRIGGER_MODE::ROLL )
+        std::vector<SIM_SAMPLE> compact;
+        compact.reserve( m_buffer.size() );
+        for( auto& s : m_buffer ) compact.push_back( std::move( s ) );
+        m_reducedUntil = sample.time;
+        ScopeCompact( compact, m_capacity, m_channels );
+        m_buffer.assign( std::make_move_iterator( compact.begin() ), std::make_move_iterator( compact.end() ) );
+    }
+    if( m_lastCapture < 0 ) m_lastCapture = sample.time;
+    const double current = value( m_source, sample );
+    const double previous = m_previous ? value( m_source, *m_previous ) : NAN;
+    const bool lowSide = m_trigger.rising ? current <= m_trigger.level - m_trigger.hysteresis
+                                          : current >= m_trigger.level + m_trigger.hysteresis;
+    const bool crossing = std::isfinite( current ) && std::isfinite( previous ) && m_edgeArmed
+            && ( m_trigger.rising ? previous < m_trigger.level && current >= m_trigger.level
+                                  : previous > m_trigger.level && current <= m_trigger.level );
+    if( !m_pending && crossing && m_trigger.mode != SCOPE_TRIGGER_MODE::ROLL )
+    {
+        const double edge = m_previous->time + ( sample.time - m_previous->time )
+                * ( m_trigger.level - previous ) / ( current - previous );
+        SCOPE_FRAME frame; frame.triggerTime = edge;
+        frame.begin = std::max( 0., edge - m_timebase.Span() * m_timebase.pretrigger + m_timebase.offset );
+        frame.end = frame.begin + m_timebase.Span();
+        // Warm up the pretrigger buffer instead of repeatedly publishing an empty left half.
+        if( edge >= m_nextTrigger && m_buffer.front().time <= frame.begin + 1e-12 )
         {
-            const double edge = m_previous->time + ( sample.time - m_previous->time )
-                    * ( m_trigger.level - previous ) / ( current - previous );
-            SCOPE_FRAME frame; frame.triggerTime = edge;
-            frame.begin = edge - m_timebase.Span() * m_timebase.pretrigger + m_timebase.offset;
-            frame.end = frame.begin + m_timebase.Span();
             auto first = std::lower_bound( m_buffer.begin(), m_buffer.end(), frame.begin,
-                                          []( const auto& s, double t ) { return s.time < t; } );
+                []( const auto& s, double t ) { return s.time < t; } );
             if( first != m_buffer.begin() ) --first;
             frame.samples.assign( first, m_buffer.end() );
+            // Compaction of the rolling buffer may have removed the exact edge neighbour.
+            const auto neighbour = std::lower_bound( frame.samples.begin(), frame.samples.end(), m_previous->time,
+                []( const auto& s, double t ) { return s.time < t; } );
+            if( neighbour == frame.samples.end() || neighbour->time != m_previous->time ) frame.samples.insert( neighbour, *m_previous );
+            frame.decimated = frame.samples.front().time <= m_reducedUntil;
             m_pending = std::move( frame ); m_state = SCOPE_CAPTURE_STATE::POST_TRIGGER;
         }
-        else if( m_pending )
-        {
-            m_pending->samples.push_back( sample );
-            if( m_pending->samples.size() > m_capacity + 128 ) trim( m_pending->samples, m_capacity );
-        }
-        if( crossing ) m_edgeArmed = false;
-        if( lowSide && std::isfinite( current ) ) m_edgeArmed = true;
-        m_previous = sample;
-        if( m_pending && sample.time >= m_pending->end )
-        {
-            m_nextTrigger = sample.time + m_trigger.holdoff;
-            publish( std::move( *m_pending ) ); m_pending.reset();
-            m_lastCapture = sample.time;
-            m_singleDone = m_trigger.mode == SCOPE_TRIGGER_MODE::SINGLE;
-            m_state = m_singleDone ? SCOPE_CAPTURE_STATE::SINGLE_DONE : SCOPE_CAPTURE_STATE::TRIGGERED;
-            if( m_singleDone ) break;
-        }
     }
-    if( !changed ) return;
-    if( m_pending ) trim( m_pending->samples, m_capacity );
+    else if( m_pending )
+    {
+        m_pending->samples.push_back( sample );
+        if( m_pending->samples.size() > m_capacity * 2 )
+        { ScopeCompact( m_pending->samples, m_capacity, m_channels, m_pending->triggerTime ); m_pending->decimated = true; }
+    }
+    if( crossing ) m_edgeArmed = false;
+    if( lowSide && std::isfinite( current ) ) m_edgeArmed = true;
+    m_previous = sample;
+    if( m_pending && sample.time >= m_pending->end )
+    {
+        m_nextTrigger = sample.time + m_trigger.holdoff;
+        publish( std::move( *m_pending ) ); m_pending.reset();
+        m_lastCapture = sample.time;
+        m_singleDone = m_trigger.mode == SCOPE_TRIGGER_MODE::SINGLE;
+        m_state = m_singleDone ? SCOPE_CAPTURE_STATE::SINGLE_DONE : SCOPE_CAPTURE_STATE::TRIGGERED;
+        if( m_singleDone ) return false;
+    }
+    return true;
+}
+void SCOPE_ACQUISITION::finishFeed()
+{
     if( m_trigger.mode == SCOPE_TRIGGER_MODE::ROLL ) rolling( false );
     else if( m_trigger.mode == SCOPE_TRIGGER_MODE::AUTO && !m_pending
              && ( m_frame.samples.empty() || m_lastTime - m_lastCapture >= m_timebase.Span() ) ) rolling( true );

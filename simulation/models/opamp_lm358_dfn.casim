@@ -1,0 +1,272 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "opamp_lm358_dfn",
+  "name": "LM358_DFN operational amplifier",
+  "description": "Compact nominal 25 C behavior; see docs/circuitalive/ANALOG_MODEL_CATALOG.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "vp",
+      "label": "Positive supply",
+      "default_pin": "8",
+      "role": "power"
+    },
+    {
+      "id": "vn",
+      "label": "Negative supply / reference",
+      "default_pin": "4",
+      "role": "reference"
+    },
+    {
+      "id": "in1p",
+      "label": "Input 1 +",
+      "default_pin": "3",
+      "role": "input"
+    },
+    {
+      "id": "in1n",
+      "label": "Input 1 -",
+      "default_pin": "2",
+      "role": "input"
+    },
+    {
+      "id": "out1",
+      "label": "Output 1",
+      "default_pin": "1",
+      "role": "output"
+    },
+    {
+      "id": "in2p",
+      "label": "Input 2 +",
+      "default_pin": "5",
+      "role": "input"
+    },
+    {
+      "id": "in2n",
+      "label": "Input 2 -",
+      "default_pin": "6",
+      "role": "input"
+    },
+    {
+      "id": "out2",
+      "label": "Output 2",
+      "default_pin": "7",
+      "role": "output"
+    },
+    {
+      "id": "aux9",
+      "label": "PAD",
+      "default_pin": "9",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "aol",
+      "label": "Open-loop gain",
+      "default": "100k",
+      "unit": "",
+      "min": 1,
+      "max": 100000000.0
+    },
+    {
+      "id": "gbw",
+      "label": "Gain bandwidth product",
+      "default": "700k",
+      "unit": "Hz",
+      "min": 1,
+      "max": 10000000000.0
+    },
+    {
+      "id": "slew",
+      "label": "Slew rate",
+      "default": "300k",
+      "unit": "V/s",
+      "min": 1,
+      "max": 10000000000.0
+    },
+    {
+      "id": "source_limit",
+      "label": "Output source current limit per channel",
+      "default": "30m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 10
+    },
+    {
+      "id": "sink_limit",
+      "label": "Output sink current limit per channel",
+      "default": "20m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 10
+    },
+    {
+      "id": "rout",
+      "label": "Output stage resistance",
+      "default": "50",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000.0
+    },
+    {
+      "id": "high_drop",
+      "label": "Upper output headroom",
+      "default": "1.5",
+      "unit": "V",
+      "min": 0,
+      "max": 20
+    },
+    {
+      "id": "low_drop",
+      "label": "Lower output headroom",
+      "default": ".02",
+      "unit": "V",
+      "min": 0,
+      "max": 20
+    },
+    {
+      "id": "vmin",
+      "label": "Minimum supply difference",
+      "default": "3",
+      "unit": "V",
+      "min": 0.1,
+      "max": 100
+    },
+    {
+      "id": "vmax",
+      "label": "Maximum supply difference",
+      "default": "30",
+      "unit": "V",
+      "min": 0.1,
+      "max": 100
+    },
+    {
+      "id": "offset",
+      "label": "Input offset voltage",
+      "default": "2m",
+      "unit": "V",
+      "min": -0.1,
+      "max": 0.1
+    },
+    {
+      "id": "bias",
+      "label": "Input bias current; negative flows out",
+      "default": "-20n",
+      "unit": "A",
+      "min": -0.001,
+      "max": 0.001
+    },
+    {
+      "id": "rin",
+      "label": "Differential input resistance",
+      "default": "1G",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Input capacitance",
+      "default": "3p",
+      "unit": "F",
+      "min": 1e-15,
+      "max": 1e-06
+    },
+    {
+      "id": "cout",
+      "label": "Output capacitance",
+      "default": "20p",
+      "unit": "F",
+      "min": 1e-15,
+      "max": 1e-06
+    },
+    {
+      "id": "iq",
+      "label": "Package quiescent current",
+      "default": "700u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "warning_current",
+      "label": "Output current warning per channel",
+      "default": "20m",
+      "unit": "A",
+      "min": 0,
+      "max": 10
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Amplifier_Operational:LM358_DFN"
+    ],
+    "symbol_names": [
+      "LM358_DFN"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Rtie_aux9_${id} ${pin:aux9} ${pin:vn} 1m",
+      "Bpower_${id} power_${id} 0 V={v(${pin:vp},${pin:vn}) >= ${param:vmin} && v(${pin:vp},${pin:vn}) <= ${param:vmax}}",
+      "Biq_${id} ${pin:vp} ${pin:vn} I={v(power_${id}) > .5 ? ${param:iq} : 0}",
+      "Rin1_${id} ${pin:in1p} ${pin:in1n} ${param:rin}",
+      "Cin1p_${id} ${pin:in1p} ${pin:vn} ${param:cin}",
+      "Cin1n_${id} ${pin:in1n} ${pin:vn} ${param:cin}",
+      "Bib1p_${id} ${pin:in1p} ${pin:vn} I={v(power_${id}) > .5 ? ${param:bias} : 0}",
+      "Bib1n_${id} ${pin:in1n} ${pin:vn} I={v(power_${id}) > .5 ? ${param:bias} : 0}",
+      "Cdom1_${id} state1_${id} 0 1n ic=0",
+      "Rdom1_${id} state1_${id} 0 {${param:aol}/(6.28318530718*${param:gbw}*1n)}",
+      "Berror1_${id} 0 state1_${id} I={v(power_${id}) > .5 ? 1n*${param:slew}*tanh(6.28318530718*${param:gbw}*(v(${pin:in1p},${pin:in1n})+${param:offset})/${param:slew}) : 0}",
+      "Bclamp1_${id} state1_${id} 0 I={max(0,v(state1_${id})-(max(${param:low_drop},v(${pin:vp},${pin:vn})-${param:high_drop})))-max(0,${param:low_drop}-v(state1_${id}))}",
+      "Vout1_${id} ${pin:out1} out1_${id} 0",
+      "Bsource1_${id} out1_${id} ${pin:vp} I={v(power_${id}) > .5 ? -max(0,${param:source_limit}*tanh(((min(max(${param:low_drop},v(${pin:vp},${pin:vn})-${param:high_drop}),max(${param:low_drop},v(state1_${id}))))-v(out1_${id},${pin:vn}))/(${param:rout}*${param:source_limit}))) : 0}",
+      "Bsink1_${id} out1_${id} ${pin:vn} I={v(power_${id}) > .5 ? max(0,${param:sink_limit}*tanh((v(out1_${id},${pin:vn})-(min(max(${param:low_drop},v(${pin:vp},${pin:vn})-${param:high_drop}),max(${param:low_drop},v(state1_${id})))))/(${param:rout}*${param:sink_limit}))) : 0}",
+      "Cout1_${id} out1_${id} ${pin:vn} ${param:cout}",
+      "Roff1_${id} out1_${id} ${pin:vn} 1G",
+      "Rin2_${id} ${pin:in2p} ${pin:in2n} ${param:rin}",
+      "Cin2p_${id} ${pin:in2p} ${pin:vn} ${param:cin}",
+      "Cin2n_${id} ${pin:in2n} ${pin:vn} ${param:cin}",
+      "Bib2p_${id} ${pin:in2p} ${pin:vn} I={v(power_${id}) > .5 ? ${param:bias} : 0}",
+      "Bib2n_${id} ${pin:in2n} ${pin:vn} I={v(power_${id}) > .5 ? ${param:bias} : 0}",
+      "Cdom2_${id} state2_${id} 0 1n ic=0",
+      "Rdom2_${id} state2_${id} 0 {${param:aol}/(6.28318530718*${param:gbw}*1n)}",
+      "Berror2_${id} 0 state2_${id} I={v(power_${id}) > .5 ? 1n*${param:slew}*tanh(6.28318530718*${param:gbw}*(v(${pin:in2p},${pin:in2n})+${param:offset})/${param:slew}) : 0}",
+      "Bclamp2_${id} state2_${id} 0 I={max(0,v(state2_${id})-(max(${param:low_drop},v(${pin:vp},${pin:vn})-${param:high_drop})))-max(0,${param:low_drop}-v(state2_${id}))}",
+      "Vout2_${id} ${pin:out2} out2_${id} 0",
+      "Bsource2_${id} out2_${id} ${pin:vp} I={v(power_${id}) > .5 ? -max(0,${param:source_limit}*tanh(((min(max(${param:low_drop},v(${pin:vp},${pin:vn})-${param:high_drop}),max(${param:low_drop},v(state2_${id}))))-v(out2_${id},${pin:vn}))/(${param:rout}*${param:source_limit}))) : 0}",
+      "Bsink2_${id} out2_${id} ${pin:vn} I={v(power_${id}) > .5 ? max(0,${param:sink_limit}*tanh((v(out2_${id},${pin:vn})-(min(max(${param:low_drop},v(${pin:vp},${pin:vn})-${param:high_drop}),max(${param:low_drop},v(state2_${id})))))/(${param:rout}*${param:sink_limit}))) : 0}",
+      "Cout2_${id} out2_${id} ${pin:vn} ${param:cout}",
+      "Roff2_${id} out2_${id} ${pin:vn} 1G"
+    ],
+    "definitions": [
+      ".options method=gear maxord=2"
+    ]
+  },
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own compact model; manufacturer data supplies nominal parameters, not copied vendor SPICE code.",
+    "No thermal drift, damage, production spread or exact noise/EMI/PSRR reproduction.",
+    "Finite open-loop gain, one dominant pole/GBW, slew limit, output rail headroom and independent source/sink current limits per output.",
+    "Compensation state is clamped to avoid unrealistically long saturation recovery; secondary poles, exact capacitive-load stability and input common-mode phase inversion are not reproduced.",
+    "Use inputs inside the datasheet common-mode range; NULL pins have no physical trimming effect (use the offset parameter).",
+    "Zero supply or a supply outside vmin/vmax leaves the output high impedance through a 1G leakage resistor.",
+    "Requests circuit-wide Gear order 2 integration; no fixed small global maximum timestep."
+  ],
+  "measurement_ports": {
+    "positive": "vp",
+    "negative": "vn"
+  },
+  "current_warning": {
+    "signal": "max(abs(i(Vout1_${id})),abs(i(Vout2_${id})))",
+    "limit_parameter": "warning_current"
+  },
+  "sources": [
+    "https://www.ti.com/lit/ds/symlink/lm358.pdf"
+  ],
+  "category": "Analog/Operational amplifiers",
+  "family": "LMx58 and LMx24"
+}

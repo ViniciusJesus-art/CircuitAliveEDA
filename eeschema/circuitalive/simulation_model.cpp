@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
+#include <cctype>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -24,6 +25,82 @@ static bool Identifier( const std::string& text )
     return !text.empty() && text.size() <= 80 && std::all_of( text.begin(), text.end(),
         []( unsigned char c ) { return ( c >= 'a' && c <= 'z' ) || ( c >= 'A' && c <= 'Z' )
                 || ( c >= '0' && c <= '9' ) || c == '_'; } );
+}
+
+static std::string FoldName( std::string value )
+{
+    const auto first = value.find_first_not_of( " \t\r\n" );
+    if( first == std::string::npos ) return {};
+    value = value.substr( first, value.find_last_not_of( " \t\r\n" ) - first + 1 );
+    for( auto& c : value ) if( static_cast<unsigned char>( c ) < 128 )
+        c = std::toupper( static_cast<unsigned char>( c ) );
+    return value;
+}
+
+static bool HasPartName( const SIMULATION_MODEL& model, const std::string& name )
+{
+    const auto folded = FoldName( name );
+    return !folded.empty() && std::any_of( model.partNames.begin(), model.partNames.end(),
+            [&]( const auto& alias ) { return FoldName( alias ) == folded; } );
+}
+
+static SIMULATION_MODEL BindNamedPins( SIMULATION_MODEL model, const CIRCUIT_COMPONENT& component )
+{
+    std::set<std::string> used;
+    for( auto& port : model.pins )
+    {
+        std::string physical;
+        const auto& aliases = model.pinNames.at( port.id );
+        for( const auto& [number, name] : component.pinNames )
+            if( component.pins.contains( number ) && std::any_of( aliases.begin(), aliases.end(),
+                    [&]( const auto& alias ) { return FoldName( alias ) == FoldName( name ); } ) )
+            {
+                if( !physical.empty() ) throw std::runtime_error( "Ambiguous physical pin for model port " + port.id );
+                physical = number;
+            }
+        if( physical.empty() || !used.insert( physical ).second )
+            throw std::runtime_error( "Cannot associate " + model.name + ": check electrical pin names for " + port.id );
+        port.defaultPin = physical;
+    }
+    if( used.size() != component.pins.size() )
+        throw std::runtime_error( "Cannot associate " + model.name + ": physical pin count differs" );
+    return model;
+}
+
+// Read literal key=value fields only. Expressions remain the responsibility of
+// a behavioral model; they must never silently turn into different waveforms.
+static std::map<std::string, std::string> LegacyParameters( const std::string& text )
+{
+    if( text.size() > 16384 ) throw std::runtime_error( "Oversized Sim.Params" );
+    std::map<std::string, std::string> result;
+    std::size_t at = 0;
+    auto spaces = [&]() { while( at < text.size() && std::isspace( static_cast<unsigned char>( text[at] ) ) ) ++at; };
+    while( at < text.size() )
+    {
+        spaces(); if( at == text.size() ) break;
+        auto start = at;
+        while( at < text.size() && ( std::isalnum( static_cast<unsigned char>( text[at] ) ) || text[at] == '_' ) ) ++at;
+        const auto key = FoldName( text.substr( start, at - start ) ); spaces();
+        if( key.empty() || at == text.size() || text[at++] != '=' ) throw std::runtime_error( "Invalid Sim.Params assignment" );
+        spaces(); if( at == text.size() ) throw std::runtime_error( "Missing Sim.Params value" );
+        std::string value;
+        if( text[at] == '\'' || text[at] == '"' )
+        {
+            const auto quote = text[at++]; start = at;
+            while( at < text.size() && text[at] != quote ) ++at;
+            if( at == text.size() ) throw std::runtime_error( "Unclosed Sim.Params value" );
+            value = text.substr( start, at++ - start );
+        }
+        else
+        {
+            start = at;
+            while( at < text.size() && !std::isspace( static_cast<unsigned char>( text[at] ) ) ) ++at;
+            value = text.substr( start, at - start );
+        }
+        if( !result.emplace( key, value ).second || result.size() > 128 )
+            throw std::runtime_error( "Repeated or excessive Sim.Params assignments" );
+    }
+    return result;
 }
 
 MODEL_REPOSITORY::MODEL_REPOSITORY( std::vector<fs::path> aDirectories ) :
@@ -97,6 +174,67 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
         m.libraryIds = matches.value( "library_ids", std::vector<std::string>{} );
         m.symbolNames = matches.value( "symbol_names", std::vector<std::string>{} );
         m.deviceHints = matches.value( "device_hints", std::vector<std::string>{} );
+        m.partNames = matches.value( "part_names", std::vector<std::string>{} );
+        m.pinNames = matches.value( "pin_names", std::map<std::string, std::vector<std::string>>{} );
+        if( !m.partNames.empty() )
+        {
+            if( m.partNames.size() > 512 || m.pinNames.size() != ports.size() )
+                throw std::runtime_error( "Part aliases require names for every model port" );
+            for( const auto& name : m.partNames )
+                if( FoldName( name ).empty() || name.size() > 128 ) throw std::runtime_error( "Invalid part alias" );
+            for( const auto& [port, names] : m.pinNames )
+            {
+                if( !ports.contains( port ) || names.empty() || names.size() > 16 ) throw std::runtime_error( "Invalid pin-name mapping" );
+                for( const auto& name : names ) if( FoldName( name ).empty() ) throw std::runtime_error( "Empty pin-name alias" );
+            }
+        }
+        if( j.contains( "legacy_parameters" ) )
+        {
+            const auto& legacy = j.at( "legacy_parameters" );
+            m.legacyParameterMap = legacy.at( "map" ).get<std::map<std::string, std::string>>();
+            m.legacyParameterDefaults = legacy.value( "defaults", std::map<std::string, std::string>{} );
+            m.legacyIgnoredParameters = legacy.value( "ignored", std::vector<std::string>{} );
+            m.legacyParametersOnlyIfValueInvalid = legacy.value( "only_if_value_invalid", false );
+            for( const auto& [key, parameter] : m.legacyParameterMap )
+                if( !Identifier( key ) || !parameters.contains( parameter ) ) throw std::runtime_error( "Invalid legacy parameter mapping" );
+            for( const auto& [parameter, value] : m.legacyParameterDefaults )
+                if( !parameters.contains( parameter ) ) throw std::runtime_error( "Unknown legacy default parameter" );
+        }
+        std::set<std::string> resourceIds, memoryIds;
+        for( const auto& r : j.value( "resources", JSON::array() ) )
+        {
+            MODEL_RESOURCE resource{ r.at( "id" ),
+                                     r.at( "label" ),
+                                     r.value( "kind", "data" ),
+                                     r.at( "formats" ).get<std::vector<std::string>>(),
+                                     r.value( "required", false ),
+                                     r.value( "max_bytes", MAX_MEMORY_BYTES ) };
+            if( !Identifier( resource.id ) || !resourceIds.insert( resource.id ).second || resource.label.empty() ||
+                resource.formats.empty() || !resource.maxBytes || resource.maxBytes > 8 * MAX_MEMORY_BYTES ||
+                resourceIds.size() > 16 )
+                throw std::runtime_error( "Invalid model resource" );
+            for( const auto& format : resource.formats )
+                if( !Identifier( format ) )
+                    throw std::runtime_error( "Invalid resource format" );
+            m.resources.push_back( std::move( resource ) );
+        }
+        for( const auto& r : j.value( "memories", JSON::array() ) )
+        {
+            MODEL_MEMORY memory{ r.at( "id" ),
+                                 r.at( "label" ),
+                                 r.value( "resource", "" ),
+                                 r.at( "address_bits" ),
+                                 r.value( "word_bits", 8u ),
+                                 r.value( "writable", false ),
+                                 r.value( "fill", -1 ) };
+            if( !Identifier( memory.id ) || !memoryIds.insert( memory.id ).second || memory.label.empty() ||
+                !memory.addressBits || memory.addressBits > 20 || !memory.wordBits || memory.wordBits > 32 ||
+                memory.fill < -1 || memory.fill > 255 || memoryIds.size() > 16 ||
+                ( ( std::size_t( 1 ) << memory.addressBits ) * ( ( memory.wordBits + 7 ) / 8 ) ) > MAX_MEMORY_BYTES ||
+                ( !memory.resource.empty() && !resourceIds.contains( memory.resource ) ) )
+                throw std::runtime_error( "Invalid model memory region" );
+            m.memories.push_back( std::move( memory ) );
+        }
         const auto spice = j.value( "spice", JSON::object() );
         m.instance = spice.value( "instance", std::vector<std::string>{} );
         m.definitions = spice.value( "definitions", std::vector<std::string>{} );
@@ -143,6 +281,28 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
             m.controlOn = c.value( "on", 5.0 ); m.controlOff = c.value( "off", 0.0 );
             if( !std::isfinite( m.controlOn ) || !std::isfinite( m.controlOff ) )
                 throw std::runtime_error( "Invalid control levels" );
+        }
+        m.category = j.value( "category", "" );
+        m.family = j.value( "family", "" );
+        std::set<std::string> adjustmentIds, adjustmentSources;
+        for( const auto& control : j.value( "adjustments", JSON::array() ) )
+        {
+            MODEL_ADJUSTMENT a{ control.at( "id" ), control.at( "label" ),
+                control.at( "source" ), control.at( "parameter" ), control.value( "unit", "" ),
+                control.at( "min" ), control.at( "max" ), control.value( "step", .01 ) };
+            const auto parameter = std::find_if( m.parameters.begin(), m.parameters.end(),
+                [&]( const auto& p ) { return p.id == a.parameter; } );
+            if( !Identifier( a.id ) || !adjustmentIds.insert( a.id ).second
+                || !adjustmentSources.insert( a.source ).second || a.source.empty()
+                || a.source.find_first_of( " \t\r\n" ) != std::string::npos
+                || ( a.source.front() != 'V' && a.source.front() != 'v'
+                     && a.source.front() != 'I' && a.source.front() != 'i' )
+                || parameter == m.parameters.end() || !std::isfinite( a.minimum )
+                || !std::isfinite( a.maximum ) || !std::isfinite( a.step )
+                || a.minimum >= a.maximum || a.step <= 0 || a.step > a.maximum - a.minimum
+                || a.minimum < parameter->minimum || a.maximum > parameter->maximum )
+                throw std::runtime_error( "Invalid live adjustment" );
+            m.adjustments.push_back( std::move( a ) );
         }
         m.ignoreLegacyFields = j.value( "ignore_legacy_spice_fields", false );
         m.legacyFields = j.value( "legacy_spice_fields", std::map<std::string, std::string>{} );
@@ -248,10 +408,27 @@ SIMULATION_MODEL MODEL_REPOSITORY::SelectModel( const CIRCUIT_COMPONENT& c ) con
             int score = 0;
             if( !c.modelFile.empty() ) score = c.modelFile == "builtin:" + model.id ? 100 : 0;
             else if( has( model.libraryIds, c.libraryId ) ) score = 3;
-            else if( has( model.symbolNames, shortName ) ) score = 2;
+            else if( has( model.symbolNames, shortName ) && c.pins.size() == model.pins.size()
+                     && std::all_of( model.pins.begin(), model.pins.end(),
+                             [&]( const auto& pin ) { return c.pins.contains( pin.defaultPin ); } ) ) score = 2;
             else if( !c.deviceHint.empty() && has( model.deviceHints, c.deviceHint ) ) score = 1;
+            std::optional<SIMULATION_MODEL> candidate;
+            if( c.modelFile.empty() && !model.partNames.empty() && !c.pinNames.empty() )
+            {
+                auto spice = c.legacySpiceFields.find( "Sim.Name" );
+                const bool byValue = HasPartName( model, c.value )
+                        || ( spice != c.legacySpiceFields.end() && HasPartName( model, spice->second ) );
+                if( byValue || HasPartName( model, shortName ) )
+                {
+                    candidate = BindNamedPins( model, c );
+                    score = std::max( score, byValue ? 4 : 3 );
+                }
+            }
             if( score > 0 && score == best ) ambiguous = true;
-            if( score > best ) { best = score; selected = model; ambiguous = false; }
+            if( score > best )
+            {
+                best = score; selected = candidate ? std::move( *candidate ) : model; ambiguous = false;
+            }
         }
         if( ambiguous ) throw std::runtime_error( "Ambiguous model association; choose a model file for " + c.reference );
         if( !best ) throw std::runtime_error( "No simulation model associated with " + c.libraryId
@@ -264,12 +441,40 @@ RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
 {
     RESOLVED_MODEL r;
     r.model = SelectModel( c );
+    for( std::size_t i = 0; i < r.model.memories.size(); ++i )
+        r.memorySlots[r.model.memories[i].id] = i;
+    for( const auto& [id, selection] : c.resources )
+        if( !selection.path.empty() && std::none_of( r.model.resources.begin(), r.model.resources.end(),
+                                                     [&]( const auto& item ) { return item.id == id; } ) )
+            throw std::runtime_error( "Unknown model resource: " + id );
+    for( const auto& spec : r.model.resources )
+    {
+        auto it = c.resources.find( spec.id );
+        if( it == c.resources.end() || it->second.path.empty() )
+        {
+            if( spec.required )
+                throw std::runtime_error( "Choose a file for " + spec.label );
+            continue;
+        }
+        const auto& selection = it->second;
+        if( selection.format != "auto" &&
+            std::find( spec.formats.begin(), spec.formats.end(), selection.format ) == spec.formats.end() )
+            throw std::runtime_error( "Unsupported file format for " + spec.label );
+        auto path = fs::path( selection.path );
+        if( path.is_relative() )
+            path = fs::path( c.projectDirectory ) / path;
+        std::error_code error;
+        const auto size = fs::file_size( path, error );
+        if( error || size > spec.maxBytes )
+            throw std::runtime_error( "Missing or oversized resource: " + path.string() );
+    }
     const bool explicitFile = !c.modelFile.empty();
     if( !explicitFile && c.explicitSpiceModel && !r.model.ignoreLegacyFields )
     {
         if( c.legacySpiceFields.empty() ) throw std::runtime_error( "Custom SPICE fields require an explicit model file" );
         for( const auto& [key, value] : c.legacySpiceFields )
         {
+            if( key == "Sim.Params" && !r.model.legacyParameterMap.empty() ) continue;
             auto allowed = r.model.legacyFields.find( key );
             if( allowed == r.model.legacyFields.end() || allowed->second != value )
                 throw std::runtime_error( "Custom SPICE fields require an explicit model file: " + key );
@@ -288,11 +493,37 @@ RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
         throw std::runtime_error( "Every physical symbol pin needs a model port (open wires are allowed)" );
     for( const auto& [port, physical] : c.modelPins )
         if( !r.pins.contains( port ) ) throw std::runtime_error( "Unknown mapped model port: " + port );
+    std::map<std::string, std::string> inheritedParameters;
+    if( !explicitFile && !r.model.legacyParameterMap.empty() )
+    {
+        bool use = true;
+        if( r.model.legacyParametersOnlyIfValueInvalid )
+        {
+            try { ParseComponentValue( c.value ); use = false; } catch( const std::exception& ) {}
+        }
+        if( use )
+        {
+            inheritedParameters = r.model.legacyParameterDefaults;
+            auto field = c.legacySpiceFields.find( "Sim.Params" );
+            if( field != c.legacySpiceFields.end() )
+                for( const auto& [key, value] : LegacyParameters( field->second ) )
+                {
+                    auto mapped = std::find_if( r.model.legacyParameterMap.begin(), r.model.legacyParameterMap.end(),
+                            [&]( const auto& entry ) { return FoldName( entry.first ) == key; } );
+                    if( mapped != r.model.legacyParameterMap.end() ) inheritedParameters[mapped->second] = value;
+                    else if( !std::any_of( r.model.legacyIgnoredParameters.begin(), r.model.legacyIgnoredParameters.end(),
+                                [&]( const auto& ignored ) { return FoldName( ignored ) == key; } ) )
+                        throw std::runtime_error( "Unsupported Sim.Params parameter: " + key );
+                }
+        }
+    }
     for( const auto& p : r.model.parameters )
     {
         auto it = c.modelParameters.find( p.id );
         auto text = it == c.modelParameters.end() ? p.defaultValue : it->second;
         if( text.empty() ) text = p.defaultValue;
+        if( ( it == c.modelParameters.end() || it->second.empty() ) && inheritedParameters.contains( p.id ) )
+            text = inheritedParameters.at( p.id );
         r.parameterText[p.id] = text;
         const double value = ParseComponentValue( text == "$value" ? c.value : text );
         if( value < p.minimum || value > p.maximum )
@@ -339,6 +570,7 @@ std::string ExpandModelTemplate( const std::string& text, const RESOLVED_MODEL& 
             number << std::setprecision( 17 ) << model.parameters.at( token.substr( 6 ) );
             result += number.str();
         }
+        else if( token.starts_with( "memory:" ) ) result += std::to_string(model.memorySlots.at(token.substr(7)));
         else if( token.starts_with( "drive:" ) )
         {
             const auto port = token.substr( 6 );
@@ -351,4 +583,29 @@ std::string ExpandModelTemplate( const std::string& text, const RESOLVED_MODEL& 
     }
     return result;
 }
+
+std::vector<MEMORY_REGION_CONFIG> InitialModelMemories( const CIRCUIT_COMPONENT& c, const SIMULATION_MODEL& m )
+{
+    std::vector<MEMORY_REGION_CONFIG> regions;
+    for( const auto& spec : m.memories )
+    {
+        MEMORY_REGION_CONFIG region;
+        region.id = spec.id;
+        region.label = spec.label;
+        region.wordBits = spec.wordBits;
+        region.writable = spec.writable;
+        region.initial =
+                EmptyMemory( ( std::size_t( 1 ) << spec.addressBits ) * ( ( spec.wordBits + 7 ) / 8 ), spec.fill );
+        auto it = c.resources.find( spec.resource );
+        if( it != c.resources.end() && !it->second.path.empty() )
+        {
+            auto path = fs::path( it->second.path );
+            if( path.is_relative() )
+                path = fs::path( c.projectDirectory ) / path;
+            LoadMemoryImage( region.initial, path, it->second.format, it->second.address );
+        }
+        regions.push_back( std::move( region ) );
+    }
+    return regions;
 }
+} // namespace CIRCUITALIVE

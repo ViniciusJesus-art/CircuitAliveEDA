@@ -1,6 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #pragma once
 #include "measurements.h"
+#include "scope_history.h"
 #include <cmath>
 #include <deque>
 #include <optional>
@@ -30,7 +31,7 @@ struct SCOPE_FRAME
     std::vector<SIM_SAMPLE> samples;
     double begin = 0, end = 0;
     std::optional<double> triggerTime;
-    bool partial = true;
+    bool partial = true, decimated = false;
     std::uint64_t serial = 0;
 };
 
@@ -40,20 +41,28 @@ class SCOPE_ACQUISITION
 {
 public:
     void Configure( SCOPE_TIMEBASE aTimebase, SCOPE_TRIGGER aTrigger,
-                    MEASUREMENT_CHANNEL aSource, std::size_t aCapacity = 8192 );
+                    MEASUREMENT_CHANNEL aSource, std::size_t aCapacity = 8192,
+                    std::vector<MEASUREMENT_CHANNEL> aChannels = {} );
     void Feed( const std::vector<SIM_SAMPLE>& aHistory );
+    void Feed( const SCOPE_HISTORY& aHistory );
+    void SetTriggerLevel( double aLevel );
     void SetHold( bool aHold );
     void Reframe( SCOPE_TIMEBASE aTimebase ); ///< Zoom/pan a held capture without resuming acquisition.
     void Arm( const std::vector<SIM_SAMPLE>& aRecentHistory = {} );
+    void Arm( const SCOPE_HISTORY& aHistory ) { Arm( aHistory.Copy() ); }
     const SCOPE_FRAME& Frame() const { return m_frame; }
     SCOPE_CAPTURE_STATE State() const;
 
 private:
+    bool consume( const SIM_SAMPLE& );
+    void finishFeed();
     void publish( SCOPE_FRAME aFrame );
     void rolling( bool aAuto );
     SCOPE_TIMEBASE m_timebase;
     SCOPE_TRIGGER m_trigger;
     MEASUREMENT_CHANNEL m_source;
+    std::vector<MEASUREMENT_CHANNEL> m_channels;
+    double m_reducedUntil = -1;
     std::size_t m_capacity = 8192;
     std::deque<SIM_SAMPLE> m_buffer;
     SCOPE_FRAME m_frame;

@@ -103,6 +103,23 @@
   "matches": {
     "library_ids": [
       "Triac_Thyristor:TIC106"
+    ],
+    "part_names": [
+      "TIC106"
+    ],
+    "pin_names": {
+      "a": [
+        "A"
+      ],
+      "g": [
+        "G"
+      ],
+      "k": [
+        "K"
+      ]
+    },
+    "symbol_names": [
+      "TIC106"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -122,5 +139,7 @@
   "current_warning": {
     "signal": "i(Vanode_${id})",
     "limit_parameter": "current_warning"
-  }
+  },
+  "category": "Semiconductors/Thyristors",
+  "family": "SCR"
 }

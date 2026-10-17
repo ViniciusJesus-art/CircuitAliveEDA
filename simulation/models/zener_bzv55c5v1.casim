@@ -79,6 +79,20 @@
   "matches": {
     "library_ids": [
       "Diode:BZV55C5V1"
+    ],
+    "part_names": [
+      "BZV55C5V1"
+    ],
+    "pin_names": {
+      "a": [
+        "A"
+      ],
+      "k": [
+        "K"
+      ]
+    },
+    "symbol_names": [
+      "BZV55C5V1"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -97,5 +111,7 @@
   "current_warning": {
     "signal": "i(Vanode_${id})",
     "limit_parameter": "current_warning"
-  }
+  },
+  "category": "Semiconductors/Diodes",
+  "family": "Zener"
 }

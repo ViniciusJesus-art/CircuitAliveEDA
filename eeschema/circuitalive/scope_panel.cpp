@@ -1,9 +1,9 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "scope_panel.h"
+#include "scope_plot.h"
 #include <wx/button.h>
 #include <wx/checkbox.h>
-#include <wx/choice.h>
-#include <wx/combobox.h>
+#include "choice_controls.h"
 #include <wx/dcbuffer.h>
 #include <wx/filedlg.h>
 #include <wx/listctrl.h>
@@ -30,9 +30,9 @@ wxString utf8( const std::string& text ) { return wxString::FromUTF8( text ); }
 const wxColour COLORS[] = { { 85, 225, 115 }, { 255, 208, 70 }, { 80, 185, 255 },
                            { 255, 120, 185 }, { 195, 150, 255 }, { 80, 225, 215 } };
 wxColour color( std::size_t channel ) { return COLORS[channel % 6]; }
-wxChoice* choice( wxWindow* parent, std::initializer_list<wxString> labels )
+CLICK_CHOICE* choice( wxWindow* parent, std::initializer_list<wxString> labels )
 {
-    auto* control = new wxChoice( parent, wxID_ANY );
+    auto* control = new CLICK_CHOICE( parent, wxID_ANY );
     for( const auto& label : labels ) control->Append( label );
     control->SetMinSize( wxSize( 100, -1 ) );
     return control;
@@ -57,11 +57,11 @@ wxScrolledWindow* page( wxNotebook* tabs, const wxString& name, wxFlexGridSizer*
 }
 void change( wxTextCtrl* control, const std::string& value )
 {
-    if( !control->HasFocus() ) control->ChangeValue( utf8( value ) );
+    if( !control->HasFocus() && control->GetValue() != utf8( value ) ) control->ChangeValue( utf8( value ) );
 }
-void change( wxComboBox* control, const std::string& value )
+void change( CLICK_CHOICE* control, const std::string& value )
 {
-    if( !control->HasFocus() ) control->ChangeValue( utf8( value ) );
+    if( !control->HasFocus() && control->GetValue() != utf8( value ) ) control->ChangeValue( utf8( value ) );
 }
 // Invalid entries stay highlighted on Enter; leaving the field restores its last valid text.
 void bindNumber( wxWindow* control, std::function<bool( const std::string& )> apply )
@@ -85,211 +85,18 @@ void bindNumber( wxWindow* control, std::function<bool( const std::string& )> ap
     };
     control->Bind( wxEVT_TEXT_ENTER, [commit]( wxCommandEvent& ) { commit( false ); } );
     control->Bind( wxEVT_KILL_FOCUS, [commit]( wxFocusEvent& e ) { commit( true ); e.Skip(); } );
-    if( dynamic_cast<wxComboBox*>( control ) )
+    if( dynamic_cast<CLICK_CHOICE*>( control ) )
         control->Bind( wxEVT_COMBOBOX, [commit]( wxCommandEvent& ) { commit( false ); } );
 }
-wxComboBox* scales( wxWindow* parent, const std::string& unit, int first, int last )
+CLICK_CHOICE* scales( wxWindow* parent, const std::string& unit, int first, int last )
 {
-    auto* combo = new wxComboBox( parent, wxID_ANY, "", wxDefaultPosition, wxSize( 110, -1 ), 0, nullptr, wxTE_PROCESS_ENTER );
+    auto* combo = new CLICK_CHOICE( parent, wxID_ANY, "", wxDefaultPosition, wxSize( 110, -1 ), 0, nullptr, wxTE_PROCESS_ENTER );
     for( int decade = first; decade <= last; ++decade )
         for( double factor : { 1., 2., 5. } ) combo->Append( utf8( ScopeFormat( factor * std::pow( 10., decade ), unit ) ) );
     combo->SetToolTip( _( "Choose a scale or type an SI value, for example 20 ms or 500 mV. Press Enter to apply." ) );
     return combo;
 }
 }
-
-class SCOPE_PLOT : public wxPanel
-{
-public:
-    SCOPE_PLOT( wxWindow* parent, SCOPE_PANEL& owner ) : wxPanel( parent ), m_owner( owner )
-    {
-        SetBackgroundStyle( wxBG_STYLE_PAINT ); SetMinSize( wxSize( 240, 200 ) );
-        SetToolTip( _( "Drag cursor lines or click for A, Shift-click for B. Wheel: time scale; Shift-wheel: selected signal scale." ) );
-        Bind( wxEVT_PAINT, &SCOPE_PLOT::paint, this );
-        Bind( wxEVT_SIZE, [this]( wxSizeEvent& e ) { Refresh(); e.Skip(); } );
-        Bind( wxEVT_LEFT_DOWN, &SCOPE_PLOT::down, this );
-        Bind( wxEVT_MOTION, [this]( wxMouseEvent& e ) { if( m_drag && e.Dragging() ) move( e.GetPosition() ); } );
-        Bind( wxEVT_LEFT_UP, [this]( wxMouseEvent& ) { m_drag = 0; if( HasCapture() ) ReleaseMouse(); } );
-        Bind( wxEVT_MOUSE_CAPTURE_LOST, [this]( wxMouseCaptureLostEvent& ) { m_drag = 0; } );
-        Bind( wxEVT_MOUSEWHEEL, [this]( wxMouseEvent& e )
-        {
-            auto& preferences = m_owner.m_preferences;
-            const double factor = e.GetWheelRotation() > 0 ? .45 : 1.8;
-            if( e.ShiftDown() && !m_owner.m_channels.empty() )
-            {
-                auto& channel = m_owner.style( m_owner.selected() ); channel.automatic = false;
-                channel.perDivision = std::clamp( ScopeNiceScale( channel.perDivision * factor ), 1e-12, 1e12 );
-                m_owner.syncControls(); Refresh();
-            }
-            else
-            {
-                preferences.timebase.perDivision = std::clamp( ScopeNiceScale( preferences.timebase.perDivision * factor ), 1e-9, 1e3 );
-                m_owner.retime(); m_owner.syncControls();
-            }
-        } );
-    }
-private:
-    wxRect area() const { const auto s = GetClientSize(); return { 51, 30, std::max( 1, s.x - 66 ), std::max( 1, s.y - 65 ) }; }
-    double fraction( double time ) const
-    {
-        const auto& f = m_owner.m_acquisition.Frame(); return ( time - f.begin ) / ( f.end - f.begin );
-    }
-    int x( double f ) const { return area().x + std::clamp( int( f * area().width ), -1000000, 1000000 ); }
-    int y( double value, std::size_t channel ) const
-    {
-        const auto& c = m_owner.style( channel ); const auto plot = area();
-        const double divisions = ( value - c.center ) / c.perDivision * ( c.inverted ? -1 : 1 );
-        return plot.y + plot.height / 2 - int( std::clamp( divisions * plot.height / 8, -1000000., 1000000. ) );
-    }
-    void down( wxMouseEvent& e )
-    {
-        const auto p = area(); const auto pos = e.GetPosition();
-        const auto& pref = m_owner.m_preferences;
-        if( !p.Contains( pos ) || !pref.cursorMode || m_owner.m_channels.empty() ) return;
-        int nearest = 12;
-        auto consider = [&]( int distance, int id ) { if( distance < nearest ) { nearest = distance; m_drag = id; } };
-        if( pref.cursorMode & 1 )
-        { consider( std::abs( pos.x - x( pref.cursorA ) ), 1 ); consider( std::abs( pos.x - x( pref.cursorB ) ), 2 ); }
-        if( pref.cursorMode & 2 )
-        { consider( std::abs( pos.y - y( pref.levelA, m_owner.selected() ) ), 3 ); consider( std::abs( pos.y - y( pref.levelB, m_owner.selected() ) ), 4 ); }
-        if( !m_drag ) m_drag = ( pref.cursorMode & 1 ? 1 : 3 ) + ( e.ShiftDown() ? 1 : 0 );
-        CaptureMouse(); move( pos );
-    }
-    void move( wxPoint pos )
-    {
-        const auto p = area(); auto& pref = m_owner.m_preferences;
-        if( m_drag <= 2 )
-        {
-            const double f = std::clamp( double( pos.x - p.x ) / p.width, 0., 1. );
-            ( m_drag == 1 ? pref.cursorA : pref.cursorB ) = f;
-        }
-        else
-        {
-            const auto& c = m_owner.style( m_owner.selected() );
-            const double v = c.center + ( .5 - std::clamp( double( pos.y - p.y ) / p.height, 0., 1. ) )
-                    * 8 * c.perDivision * ( c.inverted ? -1 : 1 );
-            ( m_drag == 3 ? pref.levelA : pref.levelB ) = v;
-        }
-        m_owner.updateCursors(); Refresh();
-    }
-    void paint( wxPaintEvent& )
-    {
-        wxAutoBufferedPaintDC dc( this ); const auto plot = area();
-        dc.SetBackground( wxBrush( wxColour( 18, 23, 28 ) ) ); dc.Clear();
-        dc.SetFont( GetFont().Smaller() );
-        const auto& frame = m_owner.m_acquisition.Frame(); const auto& pref = m_owner.m_preferences;
-        dc.SetPen( wxPen( wxColour( 43, 55, 64 ) ) );
-        for( int i = 0; i <= 10; ++i ) dc.DrawLine( plot.x + plot.width * i / 10, plot.y, plot.x + plot.width * i / 10, plot.GetBottom() );
-        for( int i = 0; i <= 8; ++i ) dc.DrawLine( plot.x, plot.y + plot.height * i / 8, plot.GetRight(), plot.y + plot.height * i / 8 );
-        dc.SetPen( wxPen( wxColour( 84, 99, 109 ), 1, wxPENSTYLE_DOT ) );
-        dc.DrawLine( plot.x, plot.y + plot.height / 2, plot.GetRight(), plot.y + plot.height / 2 );
-        if( frame.end > frame.begin )
-        {
-            dc.SetTextForeground( wxColour( 185, 200, 211 ) );
-            for( int i = 0; i <= 10; i += plot.width < 450 ? 5 : 2 )
-            {
-                double tick = frame.begin + ( frame.end - frame.begin ) * i / 10 - m_owner.origin();
-                if( std::abs( tick ) < ( frame.end - frame.begin ) * 1e-10 ) tick = 0;
-                const auto label = utf8( ScopeFormat( tick, "s" ) );
-                const auto width = dc.GetTextExtent( label ).x;
-                dc.DrawText( label, std::clamp( plot.x + plot.width * i / 10 - width / 2, 0, std::max( 0, GetClientSize().x - width ) ), plot.GetBottom() + 7 );
-            }
-        }
-        if( !m_owner.m_channels.empty() )
-        {
-            const auto selected = m_owner.selected(); const auto& c = m_owner.style( selected );
-            dc.SetTextForeground( color( selected ) );
-            auto label = [&]( double divisions, int top )
-            {
-                dc.DrawText( utf8( ScopeFormat( c.center + divisions * c.perDivision * ( c.inverted ? -1 : 1 ), "V" ) ), 2, top );
-            };
-            label( 4, plot.y ); label( 0, plot.y + plot.height / 2 - 7 ); label( -4, plot.GetBottom() - 14 );
-        }
-        if( frame.triggerTime && frame.end > frame.begin )
-        {
-            const int tx = x( fraction( *frame.triggerTime ) );
-            dc.SetPen( wxPen( wxColour( 255, 165, 55 ), 1, wxPENSTYLE_DOT ) );
-            if( tx >= plot.x && tx <= plot.GetRight() )
-            { dc.DrawLine( tx, plot.y, tx, plot.GetBottom() ); dc.DrawText( "T", tx + 3, plot.y ); }
-        }
-        if( pref.trigger.mode != SCOPE_TRIGGER_MODE::ROLL )
-        {
-            for( std::size_t c = 0; c < m_owner.m_channels.size(); ++c )
-            {
-                if( m_owner.m_channels[c].name != pref.triggerSource ) continue;
-                const int level = y( pref.trigger.level, c );
-                if( level < plot.y || level > plot.GetBottom() ) break;
-                dc.SetPen( wxPen( wxColour( 255, 165, 55 ), 1, wxPENSTYLE_DOT ) );
-                dc.SetTextForeground( wxColour( 255, 165, 55 ) );
-                dc.DrawLine( plot.x, level, plot.GetRight(), level );
-                dc.DrawText( utf8( "T " + ScopeFormat( pref.trigger.level, "V" ) ), plot.x + 4, level + 2 );
-                break;
-            }
-        }
-        int legend = 5;
-        for( std::size_t c = 0; c < m_owner.m_channels.size(); ++c )
-        {
-            const auto& channel = m_owner.m_channels[c]; const auto& style = m_owner.style( c );
-            if( !style.visible ) continue;
-            dc.SetTextForeground( color( c ) );
-            const auto name = utf8( channel.name + " " + ScopeFormat( style.perDivision, "V" ) + "/div" );
-            if( legend < GetClientSize().x - 40 )
-            { dc.DrawText( name, legend, 7 ); legend += dc.GetTextExtent( name ).x + 16; }
-            if( frame.end <= frame.begin ) continue;
-            std::vector<double> minimum( plot.width + 1, INFINITY ), maximum( plot.width + 1, -INFINITY );
-            auto point = [&]( double time, double v )
-            {
-                if( !std::isfinite( v ) || time < frame.begin || time > frame.end ) return;
-                const int bucket = std::clamp( int( fraction( time ) * plot.width ), 0, plot.width );
-                minimum[bucket] = std::min( minimum[bucket], v ); maximum[bucket] = std::max( maximum[bucket], v );
-            };
-            for( const auto& sample : frame.samples )
-            {
-                if( sample.time < frame.begin || sample.time > frame.end ) continue;
-                try { point( sample.time, MeasurementValue( channel, sample ) ); } catch( const std::out_of_range& ) {}
-            }
-            point( frame.begin, ScopeValueAt( frame, channel, frame.begin ) );
-            point( frame.end, ScopeValueAt( frame, channel, frame.end ) );
-            dc.SetClippingRegion( plot ); dc.SetPen( wxPen( color( c ), 2 ) );
-            wxPoint previous; bool connected = false;
-            for( int i = 0; i <= plot.width; ++i )
-            {
-                if( !std::isfinite( minimum[i] ) ) continue;
-                const wxPoint current( plot.x + i, y( ( minimum[i] + maximum[i] ) / 2, c ) );
-                dc.DrawLine( current.x, y( minimum[i], c ), current.x, y( maximum[i], c ) );
-                if( connected ) dc.DrawLine( previous, current );
-                previous = current; connected = true;
-            }
-            // Each channel has its own physical zero marker.
-            dc.SetPen( wxPen( color( c ) ) );
-            const int zero = y( 0, c ); dc.DrawLine( plot.x, zero, plot.x + 8, zero );
-            dc.DestroyClippingRegion();
-        }
-        if( !m_owner.m_channels.empty() && pref.cursorMode )
-        {
-            dc.SetClippingRegion( plot );
-            dc.SetPen( wxPen( wxColour( 230, 235, 240 ), 1, wxPENSTYLE_SHORT_DASH ) );
-            dc.SetTextForeground( wxColour( 230, 235, 240 ) );
-            if( pref.cursorMode & 1 )
-            {
-                dc.DrawLine( x( pref.cursorA ), plot.y, x( pref.cursorA ), plot.GetBottom() );
-                dc.DrawLine( x( pref.cursorB ), plot.y, x( pref.cursorB ), plot.GetBottom() );
-                dc.DrawText( "A", x( pref.cursorA ) + 3, plot.y + 18 ); dc.DrawText( "B", x( pref.cursorB ) + 3, plot.y + 34 );
-            }
-            if( pref.cursorMode & 2 )
-            {
-                const int a = y( pref.levelA, m_owner.selected() ), b = y( pref.levelB, m_owner.selected() );
-                dc.DrawLine( plot.x, a, plot.GetRight(), a ); dc.DrawLine( plot.x, b, plot.GetRight(), b );
-                dc.DrawText( "YA", plot.x + 12, a - 16 ); dc.DrawText( "YB", plot.x + 12, b - 16 );
-            }
-            dc.DestroyClippingRegion();
-        }
-        if( frame.samples.empty() )
-        { dc.SetTextForeground( wxColour( 205, 220, 225 ) ); dc.DrawText( _( "Waiting for capture" ), plot.x + 8, plot.y + 60 ); }
-    }
-    SCOPE_PANEL& m_owner;
-    int m_drag = 0;
-};
 
 SCOPE_PANEL::SCOPE_PANEL( wxWindow* parent, SCOPE_PREFERENCES& preferences, std::function<void()> expand ) :
         wxPanel( parent ), m_preferences( preferences )
@@ -308,9 +115,11 @@ SCOPE_PANEL::SCOPE_PANEL( wxWindow* parent, SCOPE_PREFERENCES& preferences, std:
     auto* enlarge = new wxButton( this, wxID_ANY, _( "Expand / dock" ), wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT );
     actions->Add( m_hold, 0, wxRIGHT, 4 ); actions->Add( arm, 0, wxRIGHT, 4 ); actions->AddStretchSpacer(); actions->Add( enlarge, 0 );
     layout->Add( actions, 0, wxEXPAND | wxLEFT | wxRIGHT, 5 );
-    m_status = new wxStaticText( this, wxID_ANY, "" ); layout->Add( m_status, 0, wxEXPAND | wxALL, 5 );
+    m_status = new wxStaticText( this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxST_NO_AUTORESIZE | wxST_ELLIPSIZE_END );
+    m_status->SetMinSize( wxSize( 0, FromDIP( 20 ) ) ); layout->Add( m_status, 0, wxEXPAND | wxALL, 5 );
     m_plot = new SCOPE_PLOT( this, *this ); layout->Add( m_plot, 3, wxEXPAND | wxLEFT | wxRIGHT, 4 );
-    m_cursorSummary = new wxStaticText( this, wxID_ANY, "" );
+    m_cursorSummary = new wxStaticText( this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxST_NO_AUTORESIZE );
+    m_cursorSummary->SetMinSize( wxSize( 0, FromDIP( 36 ) ) );
     layout->Add( m_cursorSummary, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5 ); m_cursorSummary->Hide();
     m_controls = new wxNotebook( this, wxID_ANY ); m_controls->SetMinSize( wxSize( 260, 260 ) );
     wxFlexGridSizer* grid;
@@ -345,7 +154,8 @@ SCOPE_PANEL::SCOPE_PANEL( wxWindow* parent, SCOPE_PREFERENCES& preferences, std:
     m_cursorB = text( cursors ); row( grid, cursors, _( "Time B (s)" ), m_cursorB );
     m_levelA = text( cursors ); row( grid, cursors, _( "Amplitude A (V)" ), m_levelA );
     m_levelB = text( cursors ); row( grid, cursors, _( "Amplitude B (V)" ), m_levelB );
-    m_cursorInfo = new wxStaticText( cursors, wxID_ANY, "" ); cursors->GetSizer()->Add( m_cursorInfo, 0, wxEXPAND | wxALL, 8 );
+    m_cursorInfo = new wxStaticText( cursors, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxST_NO_AUTORESIZE );
+    m_cursorInfo->SetMinSize( wxSize( 0, FromDIP( 100 ) ) ); cursors->GetSizer()->Add( m_cursorInfo, 0, wxEXPAND | wxALL, 8 );
     auto* readings = new wxPanel( m_controls ); auto* readingsLayout = new wxBoxSizer( wxVERTICAL );
     auto* exportButton = new wxButton( readings, wxID_ANY, _( "Export capture CSV…" ) );
     readingsLayout->Add( exportButton, 0, wxALL, 4 );
@@ -358,39 +168,47 @@ SCOPE_PANEL::SCOPE_PANEL( wxWindow* parent, SCOPE_PREFERENCES& preferences, std:
     readingsLayout->Add( m_readings, 1, wxEXPAND | wxALL, 4 ); readings->SetSizer( readingsLayout );
     m_controls->AddPage( readings, _( "Readings" ) );
     layout->Add( m_controls, 2, wxEXPAND | wxALL, 4 );
-    m_info = new wxStaticText( this, wxID_ANY, "" ); layout->Add( m_info, 0, wxEXPAND | wxALL, 5 );
+    m_info = new wxStaticText( this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxST_NO_AUTORESIZE );
+    m_info->SetMinSize( wxSize( 0, FromDIP( 54 ) ) ); layout->Add( m_info, 0, wxEXPAND | wxALL, 5 );
     SetSizer( layout );
 
     automatic->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& ) { autoScale(); } );
     enlarge->Bind( wxEVT_BUTTON, [expand]( wxCommandEvent& ) { expand(); } );
     arm->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& )
-    { m_hold->SetValue( false ); m_acquisition.Arm( m_history ); present(); } );
+    { m_hold->SetValue( false ); m_acquisition.Arm( history() ); present(); } );
     m_hold->Bind( wxEVT_TOGGLEBUTTON, [this]( wxCommandEvent& )
-    { if( m_hold->GetValue() ) m_acquisition.SetHold( true ); else m_acquisition.Arm( m_history ); present(); } );
-    m_mode->Bind( wxEVT_CHOICE, [this]( wxCommandEvent& e )
+    { if( m_hold->GetValue() ) m_acquisition.SetHold( true ); else m_acquisition.Arm( history() ); present(); } );
+    m_mode->Bind( wxEVT_COMBOBOX, [this]( wxCommandEvent& e )
     {
         m_preferences.trigger.mode = static_cast<SCOPE_TRIGGER_MODE>( e.GetSelection() ); configure();
-        if( m_preferences.trigger.mode == SCOPE_TRIGGER_MODE::SINGLE ) { m_acquisition.Arm( m_history ); present(); }
+        if( m_preferences.trigger.mode == SCOPE_TRIGGER_MODE::SINGLE ) { m_acquisition.Arm( history() ); present(); }
     } );
-    m_source->Bind( wxEVT_CHOICE, [this]( wxCommandEvent& e )
+    m_source->Bind( wxEVT_COMBOBOX, [this]( wxCommandEvent& e )
     { m_preferences.triggerSource = m_channels.at( e.GetSelection() ).name; configure(); } );
-    m_edge->Bind( wxEVT_CHOICE, [this]( wxCommandEvent& e )
+    m_edge->Bind( wxEVT_COMBOBOX, [this]( wxCommandEvent& e )
     { m_preferences.trigger.rising = e.GetSelection() == 0; configure(); } );
-    m_channel->Bind( wxEVT_CHOICE, [this]( wxCommandEvent& e )
+    m_channel->Bind( wxEVT_COMBOBOX, [this]( wxCommandEvent& e )
     { m_preferences.selectedChannel = m_channels.at( e.GetSelection() ).name; syncControls(); updateCursors(); m_plot->Refresh(); } );
-    m_cursorSource->Bind( wxEVT_CHOICE, [this]( wxCommandEvent& e )
+    m_cursorSource->Bind( wxEVT_COMBOBOX, [this]( wxCommandEvent& e )
     { m_preferences.selectedChannel = m_channels.at( e.GetSelection() ).name; syncControls(); updateCursors(); m_plot->Refresh(); } );
     m_readings->Bind( wxEVT_LIST_ITEM_SELECTED, [this]( wxListEvent& e )
     { m_preferences.selectedChannel = m_channels.at( e.GetIndex() ).name; syncControls(); updateCursors(); m_plot->Refresh(); } );
     m_visible->Bind( wxEVT_CHECKBOX, [this]( wxCommandEvent& )
     { if( !m_channels.empty() ) style( selected() ).visible = m_visible->GetValue(); m_plot->Refresh(); } );
     m_inverted->Bind( wxEVT_CHECKBOX, [this]( wxCommandEvent& )
-    { if( !m_channels.empty() ) style( selected() ).inverted = m_inverted->GetValue(); m_plot->Refresh(); } );
+    {
+        if( !m_channels.empty() )
+        {
+            auto& c = style( selected() ); const double zero = ScopeVerticalFraction( 0, c );
+            c.inverted = m_inverted->GetValue(); c.center = ScopeCenterForZero( zero, c ); syncControls();
+        }
+        m_plot->Refresh( false );
+    } );
     m_automatic->Bind( wxEVT_CHECKBOX, [this]( wxCommandEvent& )
     { if( !m_channels.empty() ) style( selected() ).automatic = m_automatic->GetValue(); m_serial = 0; present(); } );
     fit->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& )
     { if( !m_channels.empty() ) style( selected() ).automatic = true; m_serial = 0; present(); } );
-    m_cursorMode->Bind( wxEVT_CHOICE, [this]( wxCommandEvent& e )
+    m_cursorMode->Bind( wxEVT_COMBOBOX, [this]( wxCommandEvent& e )
     { m_preferences.cursorMode = e.GetSelection(); updateCursors(); m_plot->Refresh(); } );
     exportButton->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& ) { exportCsv(); } );
     bindNumber( m_timebase, [this]( const std::string& s )
@@ -418,7 +236,8 @@ SCOPE_PANEL::SCOPE_PANEL( wxWindow* parent, SCOPE_PREFERENCES& preferences, std:
     bindNumber( m_scale, [this]( const std::string& s )
     {
         const auto v = ScopeParse( s, "V" ); if( !v || *v < 1e-12 || *v > 1e12 || m_channels.empty() ) return false;
-        auto& c = style( selected() ); c.automatic = false; c.perDivision = *v;
+        auto& c = style( selected() ); const double zero = ScopeVerticalFraction( 0, c );
+        c.automatic = false; c.perDivision = *v; c.center = ScopeCenterForZero( zero, c );
         m_automatic->SetValue( false ); m_plot->Refresh(); return true;
     } );
     bindNumber( m_center, [this]( const std::string& s )
@@ -447,6 +266,7 @@ SCOPE_PANEL::SCOPE_PANEL( wxWindow* parent, SCOPE_PREFERENCES& preferences, std:
         } );
     };
     amplitudeCursor( m_levelA, preferences.levelA ); amplitudeCursor( m_levelB, preferences.levelB );
+    m_controls->Bind( wxEVT_NOTEBOOK_PAGE_CHANGED, [this]( wxBookCtrlEvent& e ) { present(); e.Skip(); } );
     syncControls();
 }
 
@@ -476,9 +296,9 @@ void SCOPE_PANEL::configure()
     if( source == m_channels.end() ) source = m_channels.begin();
     m_preferences.triggerSource = source->name;
     m_hold->SetValue( false );
-    m_acquisition.Configure( m_preferences.timebase, m_preferences.trigger, *source, m_capacity );
+    m_acquisition.Configure( m_preferences.timebase, m_preferences.trigger, *source, m_capacity, m_channels );
     m_serial = std::numeric_limits<std::uint64_t>::max();
-    m_acquisition.Feed( m_history ); present();
+    m_acquisition.Feed( history() ); syncControls(); present();
 }
 
 void SCOPE_PANEL::retime()
@@ -492,30 +312,40 @@ void SCOPE_PANEL::retime()
 void SCOPE_PANEL::syncControls()
 {
     const auto& p = m_preferences;
+    auto select = []( CLICK_CHOICE* field, int value )
+    { if( field->GetSelection() != value ) field->SetSelection( value ); };
+    auto check = []( wxCheckBox* field, bool value )
+    { if( field->GetValue() != value ) field->SetValue( value ); };
     change( m_timebase, ScopeFormat( p.timebase.perDivision, "s" ) );
-    m_mode->SetSelection( static_cast<int>( p.trigger.mode ) ); m_edge->SetSelection( p.trigger.rising ? 0 : 1 );
-    m_cursorMode->SetSelection( p.cursorMode );
+    select( m_mode, static_cast<int>( p.trigger.mode ) ); select( m_edge, p.trigger.rising ? 0 : 1 );
+    select( m_cursorMode, p.cursorMode );
     change( m_level, ScopeFormat( p.trigger.level, "V" ) ); change( m_hysteresis, ScopeFormat( p.trigger.hysteresis, "V" ) );
     change( m_holdoff, ScopeFormat( p.trigger.holdoff, "s" ) ); change( m_delay, ScopeFormat( p.timebase.offset, "s" ) );
     change( m_pretrigger, ScopeFormat( p.timebase.pretrigger * 100, "%" ) );
     const bool triggering = p.trigger.mode != SCOPE_TRIGGER_MODE::ROLL;
-    for( wxWindow* c : std::initializer_list<wxWindow*>{ m_source, m_edge, m_level, m_hysteresis, m_holdoff, m_pretrigger } ) c->Enable( triggering );
+    for( wxWindow* field : std::initializer_list<wxWindow*>{ m_source, m_edge, m_level, m_hysteresis, m_holdoff, m_pretrigger } )
+        if( field->IsEnabled() != triggering ) field->Enable( triggering );
     for( std::size_t i = 0; i < m_channels.size(); ++i )
-        if( m_channels[i].name == p.triggerSource ) m_source->SetSelection( i );
+        if( m_channels[i].name == p.triggerSource ) select( m_source, i );
     if( m_channels.empty() ) return;
-    m_channel->SetSelection( selected() ); m_cursorSource->SetSelection( selected() );
-    const auto& c = style( selected() ); m_visible->SetValue( c.visible ); m_inverted->SetValue( c.inverted );
-    m_automatic->SetValue( c.automatic ); change( m_scale, ScopeFormat( c.perDivision, "V" ) ); change( m_center, ScopeFormat( c.center, "V" ) );
+    select( m_channel, selected() ); select( m_cursorSource, selected() );
+    const auto& c = style( selected() );
+    check( m_visible, c.visible ); check( m_inverted, c.inverted ); check( m_automatic, c.automatic );
+    change( m_scale, ScopeFormat( c.perDivision, "V" ) ); change( m_center, ScopeFormat( c.center, "V" ) );
 }
 
+const SCOPE_HISTORY& SCOPE_PANEL::history() const
+{
+    static const SCOPE_HISTORY empty;
+    return m_history ? *m_history : empty;
+}
 void SCOPE_PANEL::UpdateSession( const CIRCUIT_SNAPSHOT& circuit, const EDITOR_SESSION_VIEW& session )
 {
-    if( m_latest == session.sample.latest.time && !m_channels.empty() ) return;
+    const bool changed = m_history != session.scopeHistory;
     m_latest = session.sample.latest.time; m_maxStep = circuit.config.maxStep;
     m_history = session.scopeHistory;
     if( m_channels.empty() )
     {
-        // Keep disconnected channels visible in the controls with unavailable readings.
         for( const auto& c : circuit.measurements ) if( c.scope )
         {
             m_channels.push_back( c ); m_source->Append( utf8( c.name ) ); m_channel->Append( utf8( c.name ) );
@@ -526,39 +356,79 @@ void SCOPE_PANEL::UpdateSession( const CIRCUIT_SNAPSHOT& circuit, const EDITOR_S
         m_capacity = std::min<std::size_t>( 8192, 65536 / std::max<std::size_t>( 1, circuit.config.signals.size() ) );
         configure();
     }
-    else { m_acquisition.Feed( m_history ); present(); }
+    else if( changed ) m_acquisition.Feed( history() );
+    const bool visible = IsShownOnScreen();
+    const auto now = std::chrono::steady_clock::now();
+    if( visible && ( !m_wasVisible || now - m_lastPresentation >= std::chrono::milliseconds( 50 ) ) )
+    { present(); m_lastPresentation = now; }
+    m_wasVisible = visible;
 }
-
+void SCOPE_PANEL::triggerDragged()
+{
+    m_acquisition.SetTriggerLevel( m_preferences.trigger.level );
+    syncControls(); present();
+}
 void SCOPE_PANEL::present()
 {
+    if( !IsShownOnScreen() ) return;
     const auto& frame = m_acquisition.Frame();
+    const bool changed = m_serial != frame.serial;
     const wxString states[] = { _( "Waiting for trigger" ), _( "Acquiring post-trigger" ), _( "Triggered" ), _( "Auto · no edge" ),
         _( "Hold · capture frozen" ), _( "Single · capture complete" ), _( "Roll · trigger off" ) };
-    m_status->SetLabel( states[static_cast<int>( m_acquisition.State() )] + ( frame.partial && !frame.samples.empty() ? _( " · partial history" ) : "" ) );
-    m_status->Wrap( std::max( 240, GetClientSize().x - 15 ) );
-    if( m_serial != frame.serial )
+    const auto status = states[static_cast<int>( m_acquisition.State() )] + ( frame.partial && !frame.samples.empty() ? _( " · partial history" ) : "" );
+    if( m_status->GetLabel() != status ) m_status->SetLabel( status );
+    bool scaleChanged = false;
+    if( changed )
     {
-        m_serial = frame.serial; m_statistics.clear();
+        m_serial = frame.serial; m_frameGap = 0;
+        for( std::size_t i = 1; i < frame.samples.size(); ++i )
+            if( frame.samples[i].time >= frame.begin && frame.samples[i-1].time <= frame.end )
+                m_frameGap = std::max( m_frameGap, frame.samples[i].time - frame.samples[i-1].time );
+        for( std::size_t i = 0; i < m_channels.size(); ++i )
+        {
+            auto& c = style( i ); if( !c.automatic ) continue;
+            double low = INFINITY, high = -INFINITY;
+            for( const auto& sample : frame.samples )
+            {
+                if( sample.time < frame.begin || sample.time > frame.end ) continue;
+                double v = NAN; try { v = MeasurementValue( m_channels[i], sample ); } catch( const std::out_of_range& ) {}
+                if( !std::isfinite( v ) ) continue;
+                low = std::min( low, v ); high = std::max( high, v );
+            }
+            if( std::isfinite( low ) )
+            {
+                const auto oldScale = c.perDivision, oldCenter = c.center;
+                ScopeFitRange( c, low, high, .8 - .15 * ( i % 4 ) );
+                scaleChanged |= oldScale != c.perDivision || oldCenter != c.center;
+            }
+        }
+    }
+    // Full statistics and the native list are only updated while their page is visible, at <=5 Hz.
+    const auto now = std::chrono::steady_clock::now();
+    if( m_controls->GetSelection() == 3 && ( m_readingsSerial != frame.serial )
+        && now - m_lastReadings >= std::chrono::milliseconds( 200 ) )
+    {
+        m_lastReadings = now; m_readingsSerial = frame.serial; m_statistics.clear();
+        m_readings->Freeze();
         for( std::size_t i = 0; i < m_channels.size(); ++i )
         {
             const auto stats = ScopeStatistics( frame, m_channels[i] ); m_statistics.push_back( stats );
-            auto& c = style( i );
-            if( c.automatic && std::isfinite( stats.minimum ) )
-            { c.center = ( stats.minimum + stats.maximum ) / 2; c.perDivision = ScopeNiceScale( std::max( stats.peakToPeak / 6, std::max( .01, std::abs( c.center ) * .02 ) ) ); }
             const std::string values[] = { ScopeFormat( stats.minimum, "V" ), ScopeFormat( stats.maximum, "V" ), ScopeFormat( stats.peakToPeak, "V" ),
                 ScopeFormat( stats.mean, "V" ), ScopeFormat( stats.rms, "V" ), ScopeFormat( stats.frequency, "Hz" ), ScopeFormat( stats.period, "s" ),
                 ScopeFormat( stats.duty, "%" ), std::to_string( stats.samples ) };
-            for( int j = 0; j < 9; ++j ) m_readings->SetItem( i, j + 1, utf8( values[j] ) );
+            for( int j = 0; j < 9; ++j )
+                if( m_readings->GetItemText( i, j + 1 ) != utf8( values[j] ) ) m_readings->SetItem( i, j + 1, utf8( values[j] ) );
         }
+        m_readings->Thaw();
     }
-    double gap = 0; bool undersampled = false;
-    for( const auto& stats : m_statistics ) { gap = std::max( gap, stats.maxGap ); undersampled |= stats.undersampled; }
-    const double historySpan = m_history.size() > 1 ? m_history.back().time - m_history.front().time : 0;
-    wxString info = _( "Solver max step: " ) + utf8( ScopeFormat( m_maxStep, "s" ) ) + _( " · largest displayed gap: " ) + utf8( ScopeFormat( gap, "s" ) );
-    info += "\n" + _( "History: " ) + utf8( ScopeFormat( historySpan, "s" ) ) + wxString::Format( " · %zu samples", m_history.size() );
-    if( undersampled || ( gap > 0 && gap > m_preferences.timebase.perDivision / 2 ) ) info += "\n" + _( "Sparse samples: zoom cannot add signal detail." );
-    m_info->SetLabel( info ); m_info->Wrap( std::max( 240, GetClientSize().x - 15 ) );
-    syncControls(); updateCursors(); m_plot->Refresh(); Layout();
+    const auto& h = history(); const double span = h.empty() ? 0 : h.back().time - h.front().time;
+    wxString info = _( "Solver step ≤ " ) + utf8( ScopeFormat( m_maxStep, "s" ) ) + _( " · gap " ) + utf8( ScopeFormat( m_frameGap, "s" ) );
+    info += "\n" + _( "Input history: " ) + utf8( ScopeFormat( span, "s" ) ) + wxString::Format( " · %zu points", h.size() );
+    if( frame.decimated ) info += "\n" + _( "Envelope capture · measurements are estimates" );
+    else if( m_frameGap > m_preferences.timebase.perDivision / 2 ) info += "\n" + _( "Sparse samples · zoom adds no detail" );
+    if( m_info->GetLabel() != info ) m_info->SetLabel( info );
+    if( scaleChanged ) syncControls();
+    if( changed ) { updateCursors(); m_plot->Refresh( false ); }
 }
 
 void SCOPE_PANEL::autoScale()
@@ -571,8 +441,8 @@ void SCOPE_PANEL::autoScale()
     SCOPE_FRAME frame = frozen ? m_acquisition.Frame() : SCOPE_FRAME{};
     if( !frozen )
     {
-        frame.samples = m_history;
-        if( !m_history.empty() ) { frame.begin = m_history.front().time; frame.end = m_history.back().time; }
+        frame.samples = history().Copy();
+        if( !history().empty() ) { frame.begin = history().front().time; frame.end = history().back().time; }
     }
     const auto stats = ScopeStatistics( frame, m_channels[selected()] );
     if( std::isfinite( stats.period ) ) m_preferences.timebase.perDivision = ScopeNiceScale( stats.period * .2 );
@@ -594,8 +464,11 @@ void SCOPE_PANEL::updateCursors()
 {
     const auto& f = m_acquisition.Frame(); const auto& p = m_preferences;
     const bool time = p.cursorMode & 1, amplitude = p.cursorMode & 2;
-    m_cursorSummary->Show( p.cursorMode != 0 );
-    m_cursorA->Enable( time ); m_cursorB->Enable( time ); m_levelA->Enable( amplitude ); m_levelB->Enable( amplitude );
+    const bool layoutChanged = m_cursorSummary->IsShown() != ( p.cursorMode != 0 );
+    if( layoutChanged ) m_cursorSummary->Show( p.cursorMode != 0 );
+    for( auto* field : { m_cursorA, m_cursorB } ) if( field->IsEnabled() != time ) field->Enable( time );
+    for( auto* field : { m_levelA, m_levelB } ) if( field->IsEnabled() != amplitude ) field->Enable( amplitude );
+    if( !p.cursorMode ) { if( layoutChanged ) Layout(); return; }
     const double a = f.begin + ( f.end - f.begin ) * p.cursorA, b = f.begin + ( f.end - f.begin ) * p.cursorB;
     change( m_cursorA, ScopeFormat( a - origin(), "s" ) ); change( m_cursorB, ScopeFormat( b - origin(), "s" ) );
     change( m_levelA, ScopeFormat( p.levelA, "V" ) ); change( m_levelB, ScopeFormat( p.levelB, "V" ) );
@@ -609,12 +482,12 @@ void SCOPE_PANEL::updateCursors()
         result += "\nΔt: " + ScopeFormat( dt, "s" ) + "    1/|Δt|: " + ScopeFormat( dt ? 1 / std::abs( dt ) : NAN, "Hz" );
         result += "\nΔV(t): " + ScopeFormat( vb - va, "V" ) + "    ΔV/Δt: " + ScopeFormat( dt ? ( vb - va ) / dt : NAN, "V/s" );
         summary += " · Δt " + ScopeFormat( dt, "s" ) + " · ΔV " + ScopeFormat( vb - va, "V" )
-                + " · 1/|Δt| " + ScopeFormat( dt ? 1 / std::abs( dt ) : NAN, "Hz" );
+                + "\n1/|Δt| " + ScopeFormat( dt ? 1 / std::abs( dt ) : NAN, "Hz" );
     }
     if( amplitude ) { result += "\nΔY: " + ScopeFormat( p.levelB - p.levelA, "V" ); summary += " · ΔY " + ScopeFormat( p.levelB - p.levelA, "V" ); }
-    m_cursorSummary->SetLabel( utf8( summary ) ); m_cursorSummary->Wrap( std::max( 240, GetClientSize().x - 15 ) );
-    m_cursorInfo->SetLabel( utf8( result ) ); m_cursorInfo->Wrap( std::max( 240, GetClientSize().x - 35 ) );
-    Layout();
+    if( m_cursorSummary->GetLabel() != utf8( summary ) ) m_cursorSummary->SetLabel( utf8( summary ) );
+    if( m_cursorInfo->GetLabel() != utf8( result ) ) m_cursorInfo->SetLabel( utf8( result ) );
+    if( layoutChanged ) Layout();
 }
 
 void SCOPE_PANEL::exportCsv()

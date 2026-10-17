@@ -1,10 +1,13 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "model_dialog.h"
+#include "resource_dialog.h"
 #include "simulation_model.h"
 #include "model_profiles.h"
 #include <dialog_shim.h>
 #include <wx/button.h>
-#include <wx/choice.h>
+#include "choice_controls.h"
+#include "model_browser.h"
+#include <wx/textctrl.h>
 #include <wx/checkbox.h>
 #include <wx/filedlg.h>
 #include <wx/grid.h>
@@ -18,7 +21,7 @@ namespace CIRCUITALIVE
 class MODEL_DIALOG : public DIALOG_SHIM
 {
 public:
-    MODEL_DIALOG( wxWindow* parent, const CIRCUIT_COMPONENT& component ) :
+    MODEL_DIALOG( wxWindow* parent, const CIRCUIT_COMPONENT& component, bool excluded ) :
         DIALOG_SHIM( parent, wxID_ANY, _( "Simulation model" ), wxDefaultPosition,
                      wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER ), m_component( component ),
         m_repository( MODEL_REPOSITORY::DefaultDirectories( component.projectDirectory ) )
@@ -31,16 +34,24 @@ public:
         layout->Add( new wxStaticText( this, wxID_ANY, wxString::Format( "%s — %s   Value: %s",
             wxString::FromUTF8( component.reference ), wxString::FromUTF8( component.libraryId ),
             wxString::FromUTF8( component.value ) ) ), 0, wxALL, 10 );
+        m_exclude = new wxCheckBox( this, wxID_ANY, _( "Exclude this component from simulation" ) );
+        m_exclude->SetValue( excluded );
+        m_exclude->SetToolTip( _( "This instance is omitted before loading or validating its model. Existing model settings are kept. This does not change defaults for new symbols." ) );
+        layout->Add( m_exclude, 0, wxLEFT | wxRIGHT | wxBOTTOM, 10 );
         auto* row = new wxBoxSizer( wxHORIZONTAL );
-        m_choice = new wxChoice( this, wxID_ANY );
-        m_choice->Append( _( "Automatic association" ) );
+        m_choice = new wxTextCtrl( this, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize, wxTE_READONLY );
+        auto* chooseModel = new wxButton( this, wxID_ANY, _( "Choose model…" ) );
+        auto* automatic = new wxButton( this, wxID_ANY, _( "Automatic" ) );
         m_models = m_repository.List();
-        for( const auto& model : m_models ) m_choice->Append( wxString::FromUTF8( model.name ) );
-        row->Add( m_choice, 1, wxRIGHT, 8 );
+        row->Add( m_choice, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8 );
+        row->Add( chooseModel, 0, wxRIGHT, 8 ); row->Add( automatic, 0, wxRIGHT, 8 );
         auto* browse = new wxButton( this, wxID_ANY, _( "Load file..." ) );
         auto* reload = new wxButton( this, wxID_ANY, _( "Reload file" ) );
         row->Add( browse, 0, wxRIGHT, 8 ); row->Add( reload );
         layout->Add( row, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
+        m_files=new wxButton(this,wxID_ANY,_("Data files…"));
+        m_files->Hide();layout->Add(m_files,0,wxLEFT|wxRIGHT|wxBOTTOM,10);
+        m_files->Bind(wxEVT_BUTTON,[this](wxCommandEvent&){if(m_model)EditModelResources(this,m_component,*m_model);});
         m_details = new wxStaticText( this, wxID_ANY, "" );
         layout->Add( m_details, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
         layout->Add( new wxStaticText( this, wxID_ANY, _( "Model ports → physical symbol pins" ) ),
@@ -73,7 +84,7 @@ public:
         for( auto* check : { m_voltage, m_current, m_power } ) checks->Add( check, 0, wxRIGHT, 20 );
         measurements->Add( checks, 0, wxBOTTOM, 6 );
         auto* ports = new wxBoxSizer( wxHORIZONTAL );
-        m_positive = new wxChoice( this, wxID_ANY ); m_negative = new wxChoice( this, wxID_ANY );
+        m_positive = new CLICK_CHOICE( this, wxID_ANY ); m_negative = new CLICK_CHOICE( this, wxID_ANY );
         ports->Add( new wxStaticText( this, wxID_ANY, _( "From (+):" ) ), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 6 );
         ports->Add( m_positive, 1, wxRIGHT, 12 );
         ports->Add( new wxStaticText( this, wxID_ANY, _( "To (−):" ) ), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 6 );
@@ -84,7 +95,7 @@ public:
         auto* defaults = new wxBoxSizer( wxHORIZONTAL );
         m_remember = new wxCheckBox( this, wxID_ANY,
             wxString::Format( _( "Use these settings for new %s symbols" ), wxString::FromUTF8( component.libraryId ) ) );
-        m_remember->SetValue( true );
+        m_remember->SetValue( !excluded );
         m_remember->SetToolTip( _( "Copies the model, pin mapping, parameters and measurement choices into new symbols. Existing symbols keep their settings. $value follows each symbol's Value." ) );
         defaults->Add( m_remember, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8 );
         auto* forget = new wxButton( this, wxID_ANY, _( "Forget saved default" ) );
@@ -101,19 +112,27 @@ public:
         int selected = 0;
         for( std::size_t i = 0; i < m_models.size(); ++i )
             if( component.modelFile == "builtin:" + m_models[i].id ) selected = static_cast<int>( i + 1 );
-        if( !component.modelFile.empty() && !component.modelFile.starts_with( "builtin:" ) )
+        m_selected = selected;
+        if( !excluded ) { selectExternalFile(); load( true ); }
+        else m_details->SetLabel( _( "Excluded — no simulation model is required." ) );
+        m_editingControls = { m_choice, chooseModel, automatic, browse, reload, m_files, m_pins, m_parameters,
+            m_voltage, m_current, m_power, m_positive, m_negative, m_remember, forget };
+        enableModelControls();
+        m_exclude->Bind( wxEVT_CHECKBOX, [this]( wxCommandEvent& )
         {
-            try
-            {
-                auto path = std::filesystem::path( component.modelFile );
-                if( path.is_relative() ) path = std::filesystem::path( component.projectDirectory ) / path;
-                selected = addModel( MODEL_REPOSITORY::Load( path ) );
-            }
-            catch( const std::exception& e ) { wxMessageBox( wxString::FromUTF8( e.what() ), _( "Simulation model" ), wxOK, this ); }
-        }
-        m_choice->SetSelection( selected );
-        load( true );
-        m_choice->Bind( wxEVT_CHOICE, [this]( wxCommandEvent& ) { load( false ); } );
+            enableModelControls();
+            if( !m_exclude->GetValue() && !m_model ) { selectExternalFile(); load( true ); }
+        } );
+        chooseModel->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& )
+        {
+            int current = m_selected - 1;
+            if( current < 0 && m_model )
+                for( std::size_t i = 0; i < m_models.size(); ++i )
+                    if( m_models[i].id == m_model->id ) current = i;
+            if( const auto picked = ChooseSimulationModel( this, m_models, current ) )
+            { m_selected = *picked + 1; load( false ); }
+        } );
+        automatic->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& ) { m_selected = 0; load( false ); } );
         browse->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& )
         {
             wxFileDialog picker( this, _( "Load simulation model" ),
@@ -122,7 +141,7 @@ public:
             if( picker.ShowModal() != wxID_OK ) return;
             try
             {
-                m_choice->SetSelection( addModel( MODEL_REPOSITORY::Load( picker.GetPath().ToStdString() ) ) );
+                m_selected = addModel( MODEL_REPOSITORY::Load( picker.GetPath().ToStdString() ) );
                 load( false );
             }
             catch( const std::exception& e ) { showError( e.what() ); }
@@ -135,7 +154,7 @@ public:
                 {
                     collect();
                     auto refreshed = MODEL_REPOSITORY::Load( m_model->file );
-                    if( m_choice->GetSelection() > 0 ) m_models.at( m_choice->GetSelection() - 1 ) = refreshed;
+                    if( m_selected > 0 ) m_models.at( m_selected - 1 ) = refreshed;
                     m_repository = MODEL_REPOSITORY( MODEL_REPOSITORY::DefaultDirectories( m_component.projectDirectory ) );
                     load( true );
                 }
@@ -146,8 +165,10 @@ public:
         {
             try
             {
+                if( m_exclude->GetValue() ) { EndQuasiModal( wxID_OK ); return; }
                 collect();
                 const auto resolved = m_repository.Resolve( m_component );
+                InitialModelMemories(m_component,resolved.model);
                 std::map<std::string, std::string> nodes;
                 for( const auto& [pin, net] : m_component.pins ) nodes[pin] = "n" + std::to_string( nodes.size() + 1 );
                 for( const auto& line : resolved.model.instance ) ExpandModelTemplate( line, resolved, nodes, 0 );
@@ -166,8 +187,24 @@ public:
         SetInitialFocus( m_pins );
     }
     const CIRCUIT_COMPONENT& Result() const { return m_component; }
+    bool Excluded() const { return m_exclude->GetValue(); }
 
 private:
+    void enableModelControls()
+    {
+        for( auto* control : m_editingControls ) control->Enable( !m_exclude->GetValue() );
+    }
+    void selectExternalFile()
+    {
+        if( m_component.modelFile.empty() || m_component.modelFile.starts_with( "builtin:" ) ) return;
+        try
+        {
+            auto path = std::filesystem::path( m_component.modelFile );
+            if( path.is_relative() ) path = std::filesystem::path( m_component.projectDirectory ) / path;
+            m_selected = addModel( MODEL_REPOSITORY::Load( path ) );
+        }
+        catch( const std::exception& e ) { showError( e.what() ); }
+    }
     int addModel( SIMULATION_MODEL model )
     {
         for( std::size_t i = 0; i < m_models.size(); ++i )
@@ -176,22 +213,20 @@ private:
             if( std::filesystem::equivalent( model.file, m_models[i].file, error ) )
             {
                 m_models[i] = std::move( model );
-                m_choice->SetString( i + 1, wxString::FromUTF8( m_models[i].name ) );
                 return static_cast<int>( i + 1 );
             }
         }
         m_models.push_back( std::move( model ) );
-        m_choice->Append( wxString::FromUTF8( m_models.back().name ) );
         return static_cast<int>( m_models.size() );
     }
     void showError( const std::string& text ) { wxMessageBox( wxString::FromUTF8( text ), _( "Simulation model" ), wxOK | wxICON_INFORMATION, this ); }
     void load( bool preserve )
     {
-        if( !preserve ) { m_component.modelPins.clear(); m_component.modelParameters.clear(); }
+        if( !preserve ) { m_component.modelPins.clear(); m_component.modelParameters.clear(); m_component.resources.clear(); }
         m_model.reset();
         try
         {
-            const auto selected = m_choice->GetSelection();
+            const auto selected = m_selected;
             if( selected == 0 )
             {
                 m_component.modelFile.clear();
@@ -217,14 +252,23 @@ private:
                             ? relative.string() : m_model->file.string();
                 }
             }
+            m_choice->ChangeValue( ( m_selected == 0 ? _( "Automatic: " ) : wxString() ) + wxString::FromUTF8( m_model->name ) );
             m_details->SetLabel( wxString::FromUTF8( m_model->file.string() + "\n" + m_model->description ) );
         }
-        catch( const std::exception& e ) { m_details->SetLabel( wxString::FromUTF8( e.what() ) ); }
+        catch( const std::exception& e ) { m_choice->ChangeValue( _( "No model selected" ) ); m_details->SetLabel( wxString::FromUTF8( e.what() ) ); }
         if( m_pins->GetNumberRows() ) m_pins->DeleteRows( 0, m_pins->GetNumberRows() );
         if( m_parameters->GetNumberRows() ) m_parameters->DeleteRows( 0, m_parameters->GetNumberRows() );
         m_positive->Clear(); m_negative->Clear();
         if( m_model )
         {
+            std::map<std::string, std::string> inherited;
+            if( m_component.modelFile.empty() && !m_model->legacyParameterMap.empty() )
+            {
+                // Show migrated waveform/passive values before OK; a broken
+                // parameter must still leave the dialog usable for correction/exclusion.
+                try { inherited = m_repository.Resolve( m_component ).parameterText; }
+                catch( const std::exception& ) {}
+            }
             wxArrayString physical;
             for( const auto& [pin, net] : m_component.pins ) physical.Add( wxString::FromUTF8( pin ) );
             for( const auto& pin : m_model->pins )
@@ -235,11 +279,11 @@ private:
                 auto it = m_component.modelPins.find( pin.id );
                 m_pins->SetCellValue( row, 2, wxString::FromUTF8( it == m_component.modelPins.end() ? pin.defaultPin : it->second ) );
                 m_pins->SetReadOnly( row, 0 ); m_pins->SetReadOnly( row, 1 );
-                m_pins->SetCellEditor( row, 2, new wxGridCellChoiceEditor( physical, false ) );
+                m_pins->SetCellEditor( row, 2, new CLICK_CHOICE_EDITOR( physical, false ) );
                 m_positive->Append( wxString::FromUTF8( pin.label + " [" + pin.id + "]" ) );
                 m_negative->Append( wxString::FromUTF8( pin.label + " [" + pin.id + "]" ) );
             }
-            auto choose = [&]( wxChoice* choice, const std::string& selected, const std::string& fallback, int defaultIndex )
+            auto choose = [&]( CLICK_CHOICE* choice, const std::string& selected, const std::string& fallback, int defaultIndex )
             {
                 int index = defaultIndex;
                 for( std::size_t i = 0; i < m_model->pins.size(); ++i )
@@ -255,7 +299,10 @@ private:
                 const int row = m_parameters->GetNumberRows(); m_parameters->AppendRows();
                 m_parameters->SetCellValue( row, 0, wxString::FromUTF8( parameter.label ) );
                 auto it = m_component.modelParameters.find( parameter.id );
-                m_parameters->SetCellValue( row, 1, wxString::FromUTF8( it == m_component.modelParameters.end() ? "" : it->second ) );
+                auto value = it == m_component.modelParameters.end() ? std::string() : it->second;
+                if( value.empty() && inherited.contains( parameter.id ) && inherited.at( parameter.id ) != parameter.defaultValue )
+                    value = inherited.at( parameter.id );
+                m_parameters->SetCellValue( row, 1, wxString::FromUTF8( value ) );
                 m_parameters->SetCellValue( row, 2, wxString::FromUTF8( parameter.unit ) );
                 m_parameters->SetCellValue( row, 3, wxString::FromUTF8( parameter.defaultValue ) );
                 for( const int col : { 0, 2, 3 } ) m_parameters->SetReadOnly( row, col );
@@ -268,6 +315,7 @@ private:
         m_parameters->SetColSize( 0, 350 );
         m_parameters->SetColSize( 1, 130 );
         m_parameters->SetColSize( 3, 130 );
+        m_files->Show(m_model && !m_model->resources.empty());
         m_details->Wrap( 830 ); Layout();
     }
     void collect()
@@ -298,21 +346,26 @@ private:
     MODEL_REPOSITORY m_repository;
     std::vector<SIMULATION_MODEL> m_models;
     std::optional<SIMULATION_MODEL> m_model;
-    wxChoice* m_choice;
+    wxButton* m_files;
+    wxTextCtrl* m_choice;
+    int m_selected = 0;
     wxStaticText* m_details;
     wxGrid* m_pins;
     wxGrid* m_parameters;
     wxCheckBox *m_voltage, *m_current, *m_power;
-    wxChoice *m_positive, *m_negative;
+    CLICK_CHOICE *m_positive, *m_negative;
     wxCheckBox* m_remember;
+    wxCheckBox* m_exclude;
+    std::vector<wxWindow*> m_editingControls;
     bool m_forget = false;
 };
 
-bool EditSimulationModel( wxWindow* parent, CIRCUIT_COMPONENT& component )
+bool EditSimulationModel( wxWindow* parent, CIRCUIT_COMPONENT& component, bool& excluded )
 {
-    MODEL_DIALOG dialog( parent, component );
+    MODEL_DIALOG dialog( parent, component, excluded );
     if( dialog.ShowQuasiModal() != wxID_OK ) return false;
     component = dialog.Result();
+    excluded = dialog.Excluded();
     return true;
 }
 }

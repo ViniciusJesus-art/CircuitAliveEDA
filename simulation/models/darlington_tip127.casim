@@ -124,6 +124,24 @@
   "matches": {
     "library_ids": [
       "Transistor_BJT:TIP127"
+    ],
+    "part_names": [
+      "QTIP127",
+      "TIP127"
+    ],
+    "pin_names": {
+      "b": [
+        "B"
+      ],
+      "c": [
+        "C"
+      ],
+      "e": [
+        "E"
+      ]
+    },
+    "symbol_names": [
+      "TIP127"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -143,5 +161,7 @@
   "current_warning": {
     "signal": "i(Vcollector_${id})",
     "limit_parameter": "current_warning"
-  }
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "Bipolar"
 }

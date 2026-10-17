@@ -24,6 +24,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include "dialog_footprint_properties_fp_editor.h"
 
 #include <wx/debug.h>
@@ -196,10 +197,7 @@ DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR( FO
     m_delayedFocusColumn = -1;
     m_delayedFocusPage = NOTEBOOK_PAGES::PAGE_UNKNOWN;
 
-    // Give an icon
-    wxIcon icon;
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_modedit ) );
-    SetIcon( icon );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     m_itemsGrid->SetTable( m_fields );
     m_itemsGrid->OverrideMinSize( 1.0, 1.0 );

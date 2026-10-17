@@ -187,3 +187,7 @@ proprietários desses fabricantes.
 
 Logs locais: `.circuitalive/logs/test-complex-final-session.log`,
 `test-complex-final-spice.log` e capturas `complex-profile-*.png`.
+
+## Imagens e inspeção de memória
+
+RAM e ROM agora podem declarar recursos e regiões inspecionáveis. Veja [MEMORY_IMAGES.md](MEMORY_IMAGES.md) para BIN, Intel HEX, snapshots com X, EPROM 27C512-55 e o contrato dos blocos `ram`/`rom`. Os limites de 16 bits/2 Mibit descritos acima continuam aplicáveis ao bloco legado sem `memory`; regiões novas seguem o limite agregado de 1 MiB do circuito.

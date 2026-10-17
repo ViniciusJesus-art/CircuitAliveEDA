@@ -2,7 +2,7 @@
   "schema_version": 1,
   "backend": "ngspice",
   "id": "bjt_pn2222a",
-  "name": "PN2222A NPN transistor",
+  "name": "PN2222A / 2N2222 family NPN transistor",
   "description": "Room-temperature compact approximation calibrated against datasheet operating points. See docs/circuitalive/DISCRETE_MODELS.md.",
   "license": "GPL-3.0-or-later",
   "pins": [
@@ -136,6 +136,32 @@
   "matches": {
     "library_ids": [
       "Transistor_BJT:PN2222A"
+    ],
+    "part_names": [
+      "2N2222",
+      "2N2222A",
+      "MMBT2222A",
+      "PMBT2222A",
+      "PN2222",
+      "PN2222A",
+      "PZT2222A",
+      "Q2N2222",
+      "Q2N2222A",
+      "QPN2222A"
+    ],
+    "pin_names": {
+      "b": [
+        "B"
+      ],
+      "c": [
+        "C"
+      ],
+      "e": [
+        "E"
+      ]
+    },
+    "symbol_names": [
+      "PN2222A"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -150,10 +176,13 @@
     "Fitted electrical approximation, not copied vendor SPICE code.",
     "No destructive breakdown, SOA or thermal self-heating. Current rating reports an overload, without clamping it.",
     "Physical pins follow the installed KiCad symbol, including E-B-C for PN2222A.",
-    "Requests circuit-wide Gear order 2 integration to damp numerical charge-storage ringing, without imposing a small maximum timestep."
+    "Requests circuit-wide Gear order 2 integration to damp numerical charge-storage ringing, without imposing a small maximum timestep.",
+    "2N2222/2N2222A and SMD aliases reuse this compact nominal family approximation; pin order is resolved from C/B/E names. Package-specific breakdown, ratings and exact gain differences are not reproduced. The 0.6 A warning remains conservative."
   ],
   "current_warning": {
     "signal": "i(Vcollector_${id})",
     "limit_parameter": "current_warning"
-  }
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "Bipolar"
 }

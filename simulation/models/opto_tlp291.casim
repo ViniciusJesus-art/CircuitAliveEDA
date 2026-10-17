@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "opto_tlp291",
+  "name": "TLP291 phototransistor optocoupler",
+  "description": "Compact nominal 25 C behavior; see docs/circuitalive/ANALOG_MODEL_CATALOG.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "anode",
+      "label": "LED anode",
+      "default_pin": "1",
+      "role": "passive"
+    },
+    {
+      "id": "cathode",
+      "label": "LED cathode",
+      "default_pin": "2",
+      "role": "passive"
+    },
+    {
+      "id": "emitter",
+      "label": "Phototransistor emitter",
+      "default_pin": "3",
+      "role": "passive"
+    },
+    {
+      "id": "collector",
+      "label": "Phototransistor collector",
+      "default_pin": "4",
+      "role": "output"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "ctr",
+      "label": "Nominal current transfer ratio (1 = 100%)",
+      "default": "1",
+      "unit": "",
+      "min": 0.01,
+      "max": 10
+    },
+    {
+      "id": "response",
+      "label": "Optical response time constant",
+      "default": "1.5u",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 1
+    },
+    {
+      "id": "collector_limit",
+      "label": "Collector current limit",
+      "default": "50m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 1
+    },
+    {
+      "id": "sat_scale",
+      "label": "Collector saturation scale",
+      "default": ".1",
+      "unit": "V",
+      "min": 0.001,
+      "max": 5
+    },
+    {
+      "id": "led_warning",
+      "label": "LED current warning",
+      "default": "50m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "led_is",
+      "label": "LED saturation current",
+      "default": "50f",
+      "unit": "A",
+      "min": 1e-20,
+      "max": 0.001
+    },
+    {
+      "id": "led_n",
+      "label": "LED emission coefficient",
+      "default": "1.8",
+      "unit": "",
+      "min": 0.5,
+      "max": 5
+    },
+    {
+      "id": "led_rs",
+      "label": "LED series resistance",
+      "default": "2",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "id": "led_c",
+      "label": "LED junction capacitance",
+      "default": "30p",
+      "unit": "F",
+      "min": 0,
+      "max": 1e-06
+    },
+    {
+      "id": "collector_c",
+      "label": "Collector capacitance",
+      "default": "6p",
+      "unit": "F",
+      "min": 0,
+      "max": 1e-06
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Isolator:TLP291"
+    ],
+    "symbol_names": [
+      "TLP291"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Vled_${id} ${pin:anode} led_${id} 0",
+      "Dled_${id} led_${id} ${pin:cathode} ledmodel_${id} temp=25",
+      "Bphoto_${id} drive_${id} 0 V={max(0,i(Vled_${id}))*${param:ctr}}",
+      "Rresponse_${id} drive_${id} response_${id} {${param:response}/1n}",
+      "Cresponse_${id} response_${id} 0 1n ic=0",
+      "Vcollector_${id} ${pin:collector} collector_${id} 0",
+      "Bcollector_${id} collector_${id} ${pin:emitter} I={min(${param:collector_limit},max(0,v(response_${id})))*tanh(max(0,v(collector_${id},${pin:emitter}))/${param:sat_scale})}",
+      "Ccollector_${id} collector_${id} ${pin:emitter} ${param:collector_c}",
+      "Roff_${id} collector_${id} ${pin:emitter} 1G"
+    ],
+    "definitions": [
+      ".model ledmodel_${id} D(Is=${param:led_is} N=${param:led_n} Rs=${param:led_rs} Cjo=${param:led_c} Tt=10n Tnom=25)",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own compact model; manufacturer data supplies nominal parameters, not copied vendor SPICE code.",
+    "No thermal drift, damage, production spread or exact noise/EMI/PSRR reproduction.",
+    "Input and output have separate electrical groups; optical coupling is controlled by measured LED current, not a wire between the domains.",
+    "CTR is a nominal editable ratio, not all bin/current/voltage curves; response is a first-order approximation.",
+    "Collector saturation and current cap are represented; insulation breakdown, reverse phototransistor operation and stored-charge tails are not.",
+    "Component V/I/P refers to the LED pair by default; use an output-wire current probe for collector current.",
+    "Requests circuit-wide Gear order 2 integration without a small fixed maximum timestep."
+  ],
+  "measurement_ports": {
+    "positive": "anode",
+    "negative": "cathode"
+  },
+  "electrical_groups": [
+    [
+      "anode",
+      "cathode"
+    ],
+    [
+      "collector",
+      "emitter"
+    ]
+  ],
+  "current_warning": {
+    "signal": "i(Vled_${id})",
+    "limit_parameter": "led_warning"
+  },
+  "sources": [
+    "https://toshiba.semicon-storage.com/info/docget.jsp?did=12884&prodName=TLP291"
+  ],
+  "category": "Analog/Optocouplers",
+  "family": "Phototransistor"
+}

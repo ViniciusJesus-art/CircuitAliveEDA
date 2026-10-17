@@ -37,10 +37,10 @@
   "matches": {
     "symbol_names": [
       "R",
-      "R_US",
+      "R_45deg",
       "R_Small",
       "R_Small_US",
-      "R_45deg"
+      "R_US"
     ],
     "device_hints": [
       "R"
@@ -50,5 +50,13 @@
   "measurement_ports": {
     "positive": "p",
     "negative": "n"
+  },
+  "category": "Analog/Passive components",
+  "family": "Resistors",
+  "legacy_parameters": {
+    "map": {
+      "r": "resistance"
+    },
+    "only_if_value_invalid": true
   }
 }

@@ -96,7 +96,9 @@
     "library_ids": [
       "Simulation_SPICE:VPULSE"
     ],
-    "symbol_names": []
+    "symbol_names": [
+      "VPULSE"
+    ]
   },
   "measurement_ports": {
     "positive": "p",
@@ -106,5 +108,22 @@
   "current_warning": {
     "signal": "i(V${id})",
     "limit_parameter": "current_warning"
+  },
+  "category": "Sources",
+  "family": "Voltage and current",
+  "legacy_parameters": {
+    "map": {
+      "y1": "low",
+      "y2": "high",
+      "td": "delay",
+      "tr": "rise",
+      "tf": "fall",
+      "tw": "width",
+      "per": "period"
+    },
+    "ignored": [
+      "ac",
+      "ph"
+    ]
   }
 }

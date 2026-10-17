@@ -82,10 +82,25 @@
     "library_ids": [
       "Diode:1N5819"
     ],
-    "symbol_names": []
+    "symbol_names": [
+      "1N5819"
+    ],
+    "part_names": [
+      "1N5819"
+    ],
+    "pin_names": {
+      "a": [
+        "A"
+      ],
+      "k": [
+        "K"
+      ]
+    }
   },
   "measurement_ports": {
     "positive": "a",
     "negative": "k"
-  }
+  },
+  "category": "Semiconductors/Diodes",
+  "family": "Schottky"
 }

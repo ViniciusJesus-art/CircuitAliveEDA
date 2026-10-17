@@ -1,13 +1,13 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #pragma once
 #include "scope_acquisition.h"
+#include "scope_waveform.h"
+#include <chrono>
 #include "session_runner.h"
 #include <wx/panel.h>
 #include <functional>
 #include <map>
 
-class wxChoice;
-class wxComboBox;
 class wxTextCtrl;
 class wxStaticText;
 class wxCheckBox;
@@ -17,12 +17,7 @@ class wxNotebook;
 
 namespace CIRCUITALIVE
 {
-struct SCOPE_CHANNEL_STYLE
-{
-    bool visible = true, automatic = true, inverted = false;
-    double perDivision = 1, center = 0;
-};
-
+class CLICK_CHOICE;
 /// Owned by the instruments panel, so Stop/Play preserves controls in this editor.
 struct SCOPE_PREFERENCES
 {
@@ -51,6 +46,8 @@ private:
     void autoScale();
     void updateCursors();
     void exportCsv();
+    const SCOPE_HISTORY& history() const;
+    void triggerDragged();
     std::size_t selected() const;
     double origin() const;
     SCOPE_CHANNEL_STYLE& style( std::size_t );
@@ -58,14 +55,18 @@ private:
     SCOPE_ACQUISITION m_acquisition;
     std::vector<MEASUREMENT_CHANNEL> m_channels;
     std::vector<SCOPE_STATISTICS> m_statistics;
-    std::vector<SIM_SAMPLE> m_history;
+    std::shared_ptr<const SCOPE_HISTORY> m_history;
+    std::chrono::steady_clock::time_point m_lastPresentation{}, m_lastReadings{};
+    std::uint64_t m_readingsSerial = 0;
+    double m_frameGap = 0;
+    bool m_wasVisible = false;
     double m_maxStep = 0, m_latest = -1;
     std::size_t m_capacity = 8192;
     std::uint64_t m_serial = 0;
     wxNotebook* m_controls;
     SCOPE_PLOT* m_plot;
-    wxComboBox *m_timebase, *m_scale;
-    wxChoice *m_mode, *m_source, *m_edge, *m_channel, *m_cursorMode, *m_cursorSource;
+    CLICK_CHOICE *m_timebase, *m_scale;
+    CLICK_CHOICE *m_mode, *m_source, *m_edge, *m_channel, *m_cursorMode, *m_cursorSource;
     wxTextCtrl *m_level, *m_hysteresis, *m_holdoff, *m_pretrigger, *m_delay, *m_center;
     wxTextCtrl *m_cursorA, *m_cursorB, *m_levelA, *m_levelB;
     wxCheckBox *m_visible, *m_automatic, *m_inverted;

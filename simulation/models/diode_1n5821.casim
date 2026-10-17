@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "diode_1n5821",
+  "name": "1N5821 Schottky diode",
+  "description": "Native compact diode fitted to selected room-temperature datasheet points. See docs/circuitalive/MODEL_CATALOG.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "k",
+      "label": "Cathode (K)",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "a",
+      "label": "Anode (A)",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "saturation_current",
+      "label": "Saturation current",
+      "default": "30u",
+      "unit": "A",
+      "min": 1e-20,
+      "max": 1
+    },
+    {
+      "id": "emission",
+      "label": "Emission coefficient",
+      "default": "1.1",
+      "unit": "",
+      "min": 0.5,
+      "max": 5
+    },
+    {
+      "id": "series_resistance",
+      "label": "Series resistance",
+      "default": ".025",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "breakdown",
+      "label": "Breakdown voltage (configure for exact part)",
+      "default": "30",
+      "unit": "V",
+      "min": 1,
+      "max": 1000000.0
+    },
+    {
+      "id": "junction_capacitance",
+      "label": "Zero-bias junction capacitance",
+      "default": "1000p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "transit_time",
+      "label": "Transit time",
+      "default": "0",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "current_warning",
+      "label": "Average current rating warning (not a current limiter)",
+      "default": "3",
+      "unit": "A",
+      "min": 0,
+      "max": 1000
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vanode_${id} ${pin:a} anode_${id} 0",
+      "D${id} anode_${id} ${pin:k} model_${id}"
+    ],
+    "definitions": [
+      ".model model_${id} D(Is=${param:saturation_current} N=${param:emission} Rs=${param:series_resistance} BV=${param:breakdown} Cjo=${param:junction_capacitance} Tt=${param:transit_time})"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Diode:1N5821"
+    ],
+    "part_names": [
+      "1N5821"
+    ],
+    "pin_names": {
+      "a": [
+        "A"
+      ],
+      "k": [
+        "K"
+      ]
+    },
+    "symbol_names": [
+      "1N5821"
+    ]
+  },
+  "measurement_ports": {
+    "positive": "a",
+    "negative": "k"
+  },
+  "current_warning": {
+    "signal": "i(Vanode_${id})",
+    "limit_parameter": "current_warning"
+  },
+  "sources": [
+    "https://www.vishay.com/docs/88526/1n5820.pdf"
+  ],
+  "model_notes": [
+    "Own native D model, no vendor SPICE source copied.",
+    "Approximation at room temperature; no self-heating, destructive failure, thermal derating or surge-energy model.",
+    "Average-current rating is an instantaneous warning threshold here, not an enforced current limit or a thermal assessment.",
+    "Zero-bias junction capacitance is approximate; it is not the capacitance at every reverse bias.",
+    "Schottky storage time is zero; switching displacement current comes from junction capacitance."
+  ],
+  "category": "Semiconductors/Diodes",
+  "family": "Schottky"
+}

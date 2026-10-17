@@ -123,18 +123,20 @@ BOOST_AUTO_TEST_CASE( ScopeHistoryIsBoundedOrderedAndFreezesDuringPause )
         { { PROBE_KIND::OSCILLOSCOPE, "RC", "", { { "1", "capacitor" } }, 1 } } );
     SESSION_RUNNER runner( CIRCUITALIVE_TEST_WORKER ); runner.Start( circuit );
     auto view = WaitFor( runner, []( const auto& v ) { return v.sample.latest.time > 1.; } );
-    BOOST_REQUIRE( !view.scopeHistory.empty() );
-    BOOST_CHECK_LE( view.scopeHistory.size() * circuit.config.signals.size(), 65536 );
-    BOOST_CHECK_LE( view.scopeHistory.size(), 8192 );
-    for( std::size_t i = 1; i < view.scopeHistory.size(); ++i ) BOOST_CHECK_GT( view.scopeHistory[i].time, view.scopeHistory[i-1].time );
+    BOOST_REQUIRE( view.scopeHistory );
+    BOOST_REQUIRE( !view.scopeHistory->empty() );
+    BOOST_CHECK_LE( view.scopeHistory->size() * circuit.config.signals.size(), 65536 );
+    BOOST_CHECK_LE( view.scopeHistory->size(), 8192 );
+    const auto points = view.scopeHistory->Copy();
+    for( std::size_t i = 1; i < points.size(); ++i ) BOOST_CHECK_GT( points[i].time, points[i-1].time );
     BOOST_CHECK_GT( view.measurements.at( 0 ), 4.9 );
     runner.Pause(); view = WaitFor( runner, []( const auto& v ) { return v.state == EDITOR_SESSION_STATE::PAUSED; } );
-    const auto time = view.sample.latest.time, first = view.scopeHistory.front().time;
+    const auto time = view.sample.latest.time, first = view.scopeHistory->front().time;
     std::this_thread::sleep_for( 60ms );
     BOOST_CHECK_EQUAL( runner.View().sample.latest.time, time );
-    BOOST_CHECK_EQUAL( runner.View().scopeHistory.front().time, first );
+    BOOST_CHECK_EQUAL( runner.View().scopeHistory->front().time, first );
     runner.Resume(); WaitFor( runner, [&]( const auto& v ) { return v.sample.latest.time > time; } );
-    runner.Stop(); view = runner.View(); BOOST_CHECK( view.scopeHistory.empty() ); BOOST_CHECK( view.measurements.empty() );
+    runner.Stop(); view = runner.View(); BOOST_CHECK( !view.scopeHistory ); BOOST_CHECK( view.measurements.empty() );
 }
 
 BOOST_AUTO_TEST_CASE( OvercurrentWarningIsLatchedUntilStop )

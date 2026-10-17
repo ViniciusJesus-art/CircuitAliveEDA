@@ -9,11 +9,8 @@
 #include <sch_screen.h>
 #include <sch_sheet_path.h>
 #include <sch_symbol.h>
-#include <sch_text.h>
-#include <sch_textbox.h>
 #include <schematic.h>
 #include <algorithm>
-#include <sstream>
 #include <stdexcept>
 
 namespace CIRCUITALIVE
@@ -28,7 +25,7 @@ static std::string SimulationNet( const SCH_PIN& pin, SCH_SHEET_PATH& sheet )
 }
 
 CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& sheet,
-        const wxString& variant, const std::string& projectDirectory )
+        const wxString& variant, const std::string& projectDirectory, bool forEditing )
 {
     CIRCUIT_COMPONENT component;
     component.libraryId = symbol.GetLibId().Format().c_str();
@@ -48,10 +45,27 @@ CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& s
         if( value.empty() ) return {};
         try { return nlohmann::json::parse( value ).get<std::map<std::string, std::string>>(); }
         catch( const std::exception& )
-            { throw std::runtime_error( component.reference + ": invalid " + name.ToStdString() ); }
+        {
+            // Allow opening the dialog to exclude a broken/unsupported instance.
+            // Exclusion never rewrites its existing model fields.
+            if( forEditing ) return {};
+            throw std::runtime_error( component.reference + ": invalid " + name.ToStdString() );
+        }
     };
     component.modelPins = map( "CA.Pins" );
     component.modelParameters = map( "CA.Parameters" );
+    if(const auto resources=field("CA.Resources");!resources.empty())
+    {
+        try
+        {
+            const auto object=nlohmann::json::parse(resources);
+            if(!object.is_object()||object.size()>16)throw std::runtime_error("Invalid resources");
+            for(const auto& [id,value]:object.items())
+                component.resources[id]={value.at("path"),value.value("format","auto"),value.value("address",std::uint64_t(0))};
+        }
+        catch(const std::exception&)
+        {if(!forEditing)throw std::runtime_error(component.reference+": invalid CA.Resources");component.resources.clear();}
+    }
     const auto measurements = field( "CA.Measurements" );
     if( !measurements.empty() )
     {
@@ -64,22 +78,36 @@ CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& s
             component.measurements.positive = j.value( "positive", "" );
             component.measurements.negative = j.value( "negative", "" );
         }
-        catch( const std::exception& ) { throw std::runtime_error( component.reference + ": invalid CA.Measurements" ); }
+        catch( const std::exception& )
+        {
+            if( !forEditing ) throw std::runtime_error( component.reference + ": invalid CA.Measurements" );
+            component.measurements = {};
+        }
     }
     for( const wxString name : { "Sim.Library", "Sim.Name", "Sim.Params", "Sim.Device", "Sim.Type", "Sim.Pins" } )
         if( auto value = field( name ); !value.empty() ) component.legacySpiceFields[name.ToStdString()] = value;
     component.explicitSpiceModel = !component.legacySpiceFields.empty();
     for( const SCH_PIN* pin : symbol.GetPins( &sheet ) )
+    {
         component.pins[pin->GetShownNumber().ToStdString()] = "";
+        component.pinNames[pin->GetShownNumber().ToStdString()] = pin->GetShownName().ToStdString();
+    }
     if( symbol.IsMultiUnit() )
         for( const SCH_PIN* pin : symbol.GetAllLibPins() )
+        {
             component.pins.try_emplace( pin->GetShownNumber().ToStdString(), "" );
+            component.pinNames.try_emplace( pin->GetShownNumber().ToStdString(), pin->GetShownName().ToStdString() );
+        }
     return component;
 }
 
 void WriteSymbolModelSettings( SCH_SYMBOL& symbol, const CIRCUIT_COMPONENT& settings )
 {
+    auto resources=nlohmann::json::object();
+    for(const auto& [id,value]:settings.resources)if(!value.path.empty())
+        resources[id]={{"path",value.path},{"format",value.format},{"address",value.address}};
     const std::map<wxString, std::string> fields = {
+        { "CA.Resources", resources.empty()?"":resources.dump() },
         { "CA.Model", settings.modelFile },
         { "CA.Pins", settings.modelPins.empty() ? "" : nlohmann::json( settings.modelPins ).dump() },
         { "CA.Parameters", settings.modelParameters.empty() ? "" : nlohmann::json( settings.modelParameters ).dump() },
@@ -118,29 +146,13 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators 
     {
         if( sheet.GetExcludedFromSim( variant ) )
             continue;
-        for( SCH_ITEM* item : sheet.LastScreen()->Items() )
-        {
-            if( item->ResolveExcludedFromSim() )
-                continue;
-            wxString text;
-            if( item->Type() == SCH_TEXT_T )
-                text = static_cast<SCH_TEXT*>( item )->GetShownText( &sheet, false );
-            else if( item->Type() == SCH_TEXTBOX_T )
-                text = static_cast<SCH_TEXTBOX*>( item )->GetShownText( nullptr, &sheet, false );
-            std::istringstream lines( text.ToStdString() );
-            std::string line;
-            while( std::getline( lines, line ) )
-            {
-                auto start = line.find_first_not_of( " \t\r" );
-                if( start != std::string::npos && line[start] == '.' )
-                    throw std::runtime_error( "SPICE text directives are not supported in interactive mode. "
-                            "Remove/exclude them or use the traditional Simulator. Sheet: "
-                            + sheet.PathAsString().ToStdString() );
-            }
-        }
+        // Text, text boxes and titles are annotations. Interactive decks come
+        // exclusively from model files; legacy SPICE text stays with the native simulator.
         for( SCH_ITEM* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
         {
             auto* symbol = static_cast<SCH_SYMBOL*>( item );
+            if( symbol->ResolveExcludedFromSim( &sheet, variant ) || symbol->GetFullPinCount() == 0 )
+                continue;
             std::string lib = symbol->GetLibId().Format().c_str();
             auto* probeField = symbol->GetField( "CA.Probe" );
             if( probeField )
@@ -169,8 +181,6 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators 
                     symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition() } );
                 continue;
             }
-            if( symbol->GetExcludedFromSim( &sheet, variant ) )
-                continue;
             if( symbol->IsPower() || lib.starts_with( "power:" ) )
             {
                 for( const auto* pin : symbol->GetPins( &sheet ) )
@@ -193,7 +203,8 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators 
                 index = existing->second;
                 auto& package = components[index];
                 if( package.libraryId != component.libraryId || package.modelFile != component.modelFile
-                    || package.modelPins != component.modelPins || package.modelParameters != component.modelParameters )
+                    || package.modelPins != component.modelPins || package.modelParameters != component.modelParameters
+                    || package.resources != component.resources )
                     throw std::runtime_error( component.reference + ": units must share one simulation model and parameters" );
                 for( const SCH_PIN* pin : symbol->GetPins( &sheet ) )
                 {

@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "memory_image.h"
 
 namespace CIRCUITALIVE
 {
@@ -26,6 +27,7 @@ struct SIM_SESSION_CONFIG
     bool                     useInitialConditions = true;
     std::size_t              historyCapacity = 256;
     std::vector<std::string> signals;
+    std::vector<MEMORY_REGION_CONFIG> memories;
 };
 
 struct SIM_SAMPLE
@@ -84,6 +86,7 @@ public:
 
     /// Change a V/I source's DC value at the confirmed paused time, in request order.
     void SetSourceValue( const std::string& aReference, double aValue );
+    MEMORY_SNAPSHOT ReadMemory( const std::string& id, std::size_t offset, std::size_t length );
 
     SIM_SESSION_SNAPSHOT Snapshot( bool aDrainHistory = false );
     int WorkerPid() const;

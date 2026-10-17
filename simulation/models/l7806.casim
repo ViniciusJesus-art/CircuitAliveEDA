@@ -78,6 +78,9 @@
   "matches": {
     "library_ids": [
       "Regulator_Linear:L7806"
+    ],
+    "symbol_names": [
+      "L7806"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -93,5 +96,7 @@
   "measurement_ports": {
     "positive": "in",
     "negative": "gnd"
-  }
+  },
+  "category": "Power/Linear regulators",
+  "family": "LM78xx"
 }

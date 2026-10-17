@@ -1,0 +1,417 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "eprom_27c512_55",
+  "name": "27C512-55 EPROM 64K x 8",
+  "description": "Read-only 64 KiB image; 55 ns address access at nominal 25 C. BIN, Intel HEX or CAMEM. CE/OE high disables outputs; erased bytes are FF. Programming voltage is not simulated.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "gnd",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "14"
+    },
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "role": "power",
+      "default_pin": "28"
+    },
+    {
+      "id": "a15",
+      "label": "A15",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "a12",
+      "label": "A12",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "a7",
+      "label": "A7",
+      "role": "input",
+      "default_pin": "3"
+    },
+    {
+      "id": "a6",
+      "label": "A6",
+      "role": "input",
+      "default_pin": "4"
+    },
+    {
+      "id": "a5",
+      "label": "A5",
+      "role": "input",
+      "default_pin": "5"
+    },
+    {
+      "id": "a4",
+      "label": "A4",
+      "role": "input",
+      "default_pin": "6"
+    },
+    {
+      "id": "a3",
+      "label": "A3",
+      "role": "input",
+      "default_pin": "7"
+    },
+    {
+      "id": "a2",
+      "label": "A2",
+      "role": "input",
+      "default_pin": "8"
+    },
+    {
+      "id": "a1",
+      "label": "A1",
+      "role": "input",
+      "default_pin": "9"
+    },
+    {
+      "id": "a0",
+      "label": "A0",
+      "role": "input",
+      "default_pin": "10"
+    },
+    {
+      "id": "d0",
+      "label": "D0",
+      "role": "output",
+      "default_pin": "11"
+    },
+    {
+      "id": "d1",
+      "label": "D1",
+      "role": "output",
+      "default_pin": "12"
+    },
+    {
+      "id": "d2",
+      "label": "D2",
+      "role": "output",
+      "default_pin": "13"
+    },
+    {
+      "id": "d3",
+      "label": "D3",
+      "role": "output",
+      "default_pin": "15"
+    },
+    {
+      "id": "d4",
+      "label": "D4",
+      "role": "output",
+      "default_pin": "16"
+    },
+    {
+      "id": "d5",
+      "label": "D5",
+      "role": "output",
+      "default_pin": "17"
+    },
+    {
+      "id": "d6",
+      "label": "D6",
+      "role": "output",
+      "default_pin": "18"
+    },
+    {
+      "id": "d7",
+      "label": "D7",
+      "role": "output",
+      "default_pin": "19"
+    },
+    {
+      "id": "cs",
+      "label": "~{CS}",
+      "role": "input",
+      "default_pin": "20"
+    },
+    {
+      "id": "a10",
+      "label": "A10",
+      "role": "input",
+      "default_pin": "21"
+    },
+    {
+      "id": "oe",
+      "label": "~{OE}",
+      "role": "input",
+      "default_pin": "22"
+    },
+    {
+      "id": "a11",
+      "label": "A11",
+      "role": "input",
+      "default_pin": "23"
+    },
+    {
+      "id": "a9",
+      "label": "A9",
+      "role": "input",
+      "default_pin": "24"
+    },
+    {
+      "id": "a8",
+      "label": "A8",
+      "role": "input",
+      "default_pin": "25"
+    },
+    {
+      "id": "a13",
+      "label": "A13",
+      "role": "input",
+      "default_pin": "26"
+    },
+    {
+      "id": "a14",
+      "label": "A14",
+      "role": "input",
+      "default_pin": "27"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Vil",
+      "default": "0.16",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "Vih",
+      "default": "0.4",
+      "unit": "",
+      "min": 0.1,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Vmin",
+      "default": "4.5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Vmax",
+      "default": "5.5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "rise_delay",
+      "label": "Rise delay",
+      "default": "1n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "fall_delay",
+      "label": "Fall delay",
+      "default": "1n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Transition",
+      "default": "2n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "50",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Cin",
+      "default": "3.5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Iq",
+      "default": "8m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "read_delay",
+      "label": "Read delay",
+      "default": "55n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "high_drop",
+      "label": "High drop",
+      "unit": "V",
+      "default": "0.2",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Low drop",
+      "unit": "V",
+      "default": "0.1",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "powerup_delay",
+      "label": "Power recovery address holdoff",
+      "default": "100n",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 1
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Memory_EPROM:27C512"
+    ],
+    "symbol_names": [
+      "27C512",
+      "27C512-55",
+      "AT27C512R-55",
+      "M27C512-55"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "behavioral": {
+    "version": 1,
+    "supply": {
+      "vcc": "vcc",
+      "gnd": "gnd"
+    },
+    "blocks": [
+      {
+        "type": "and",
+        "inputs": [
+          "!cs",
+          "!oe"
+        ],
+        "out": "reading"
+      },
+      {
+        "type": "rom",
+        "memory": "main",
+        "address": [
+          "a0",
+          "a1",
+          "a2",
+          "a3",
+          "a4",
+          "a5",
+          "a6",
+          "a7",
+          "a8",
+          "a9",
+          "a10",
+          "a11",
+          "a12",
+          "a13",
+          "a14",
+          "a15"
+        ],
+        "data_out": [
+          "q0",
+          "q1",
+          "q2",
+          "q3",
+          "q4",
+          "q5",
+          "q6",
+          "q7"
+        ],
+        "select": [
+          "!cs"
+        ]
+      }
+    ],
+    "outputs": {
+      "d0": {
+        "signal": "q0",
+        "enable": "reading"
+      },
+      "d1": {
+        "signal": "q1",
+        "enable": "reading"
+      },
+      "d2": {
+        "signal": "q2",
+        "enable": "reading"
+      },
+      "d3": {
+        "signal": "q3",
+        "enable": "reading"
+      },
+      "d4": {
+        "signal": "q4",
+        "enable": "reading"
+      },
+      "d5": {
+        "signal": "q5",
+        "enable": "reading"
+      },
+      "d6": {
+        "signal": "q6",
+        "enable": "reading"
+      },
+      "d7": {
+        "signal": "q7",
+        "enable": "reading"
+      }
+    }
+  },
+  "category": "Digital/Memory",
+  "family": "EPROM",
+  "resources": [
+    {
+      "id": "image",
+      "label": "EPROM contents",
+      "kind": "memory_image",
+      "formats": [
+        "bin",
+        "ihex",
+        "camem"
+      ],
+      "required": false,
+      "max_bytes": 8388608
+    }
+  ],
+  "memories": [
+    {
+      "id": "main",
+      "label": "EPROM 64K x 8",
+      "resource": "image",
+      "address_bits": 16,
+      "word_bits": 8,
+      "writable": false,
+      "fill": 255
+    }
+  ]
+}

@@ -1,0 +1,273 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "comparator_lmv393",
+  "name": "LMV393 open-collector comparator",
+  "description": "Compact nominal 25 C behavior; see docs/circuitalive/ANALOG_MODEL_CATALOG.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "vp",
+      "label": "Positive supply",
+      "default_pin": "8",
+      "role": "power"
+    },
+    {
+      "id": "vn",
+      "label": "Negative supply / reference",
+      "default_pin": "4",
+      "role": "reference"
+    },
+    {
+      "id": "in1p",
+      "label": "Input 1 +",
+      "default_pin": "3",
+      "role": "input"
+    },
+    {
+      "id": "in1n",
+      "label": "Input 1 -",
+      "default_pin": "2",
+      "role": "input"
+    },
+    {
+      "id": "out1",
+      "label": "Output 1",
+      "default_pin": "1",
+      "role": "output"
+    },
+    {
+      "id": "in2p",
+      "label": "Input 2 +",
+      "default_pin": "5",
+      "role": "input"
+    },
+    {
+      "id": "in2n",
+      "label": "Input 2 -",
+      "default_pin": "6",
+      "role": "input"
+    },
+    {
+      "id": "out2",
+      "label": "Output 2",
+      "default_pin": "7",
+      "role": "output"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vmin",
+      "label": "Minimum supply difference",
+      "default": "2.7",
+      "unit": "V",
+      "min": 0.1,
+      "max": 100
+    },
+    {
+      "id": "vmax",
+      "label": "Maximum supply difference",
+      "default": "5.5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 100
+    },
+    {
+      "id": "delay_rise",
+      "label": "Nominal propagation delay low to high",
+      "default": "300n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "delay_fall",
+      "label": "Nominal propagation delay high to low",
+      "default": "200n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Output switch transition",
+      "default": "20n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "sink_limit",
+      "label": "Maximum collector sink current per channel",
+      "default": "15m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Collector on resistance",
+      "default": "25",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000.0
+    },
+    {
+      "id": "vsat",
+      "label": "Collector saturation floor",
+      "default": ".1",
+      "unit": "V",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "offset",
+      "label": "Input offset voltage",
+      "default": "2m",
+      "unit": "V",
+      "min": -0.1,
+      "max": 0.1
+    },
+    {
+      "id": "bias",
+      "label": "Input bias current; negative flows out",
+      "default": "5p",
+      "unit": "A",
+      "min": -0.001,
+      "max": 0.001
+    },
+    {
+      "id": "cin",
+      "label": "Input capacitance",
+      "default": "3p",
+      "unit": "F",
+      "min": 1e-15,
+      "max": 1e-06
+    },
+    {
+      "id": "cout",
+      "label": "Collector capacitance",
+      "default": "5p",
+      "unit": "F",
+      "min": 1e-15,
+      "max": 1e-06
+    },
+    {
+      "id": "iq",
+      "label": "Package quiescent current",
+      "default": "50u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "warning_current",
+      "label": "Collector current warning per channel",
+      "default": "6m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "vil",
+      "label": "Logic display low ratio",
+      "default": ".3",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "Logic display high ratio",
+      "default": ".7",
+      "unit": "",
+      "min": 0.51,
+      "max": 1
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Comparator:LMV393"
+    ],
+    "symbol_names": [
+      "LMV393"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Bpower_${id} power_${id} 0 V={v(${pin:vp},${pin:vn}) >= ${param:vmin} && v(${pin:vp},${pin:vn}) <= ${param:vmax}}",
+      "Biq_${id} ${pin:vp} ${pin:vn} I={v(power_${id}) > .5 ? ${param:iq} : 0}",
+      "Bcompare1_${id} compare1_${id} 0 V={v(${pin:in1p},${pin:in1n})+${param:offset} > 0 ? 1 : 0}",
+      "Aadc1_${id} [compare1_${id}] [raw1_${id}] adc_${id}",
+      "Adelay1_${id} raw1_${id} delayed1_${id} delay_${id}",
+      "Adac1_${id} [delayed1_${id}] [state1_${id}] dac_${id}",
+      "Vout1_${id} ${pin:out1} out1_${id} 0",
+      "Bsink1_${id} out1_${id} ${pin:vn} I={v(power_${id}) > .5 ? (1-v(state1_${id}))*${param:sink_limit}*tanh(max(0,v(out1_${id},${pin:vn})-${param:vsat})/(${param:rout}*${param:sink_limit})) : 0}",
+      "Cout1_${id} out1_${id} ${pin:vn} ${param:cout}",
+      "Roff1_${id} out1_${id} ${pin:vn} 1G",
+      "Cin1p_${id} ${pin:in1p} ${pin:vn} ${param:cin}",
+      "Cin1n_${id} ${pin:in1n} ${pin:vn} ${param:cin}",
+      "Bib1p_${id} ${pin:in1p} ${pin:vn} I={v(power_${id}) > .5 ? ${param:bias} : 0}",
+      "Bib1n_${id} ${pin:in1n} ${pin:vn} I={v(power_${id}) > .5 ? ${param:bias} : 0}",
+      "Rin1p_${id} ${pin:in1p} ${pin:vn} 1T",
+      "Rin1n_${id} ${pin:in1n} ${pin:vn} 1T",
+      "Bcompare2_${id} compare2_${id} 0 V={v(${pin:in2p},${pin:in2n})+${param:offset} > 0 ? 1 : 0}",
+      "Aadc2_${id} [compare2_${id}] [raw2_${id}] adc_${id}",
+      "Adelay2_${id} raw2_${id} delayed2_${id} delay_${id}",
+      "Adac2_${id} [delayed2_${id}] [state2_${id}] dac_${id}",
+      "Vout2_${id} ${pin:out2} out2_${id} 0",
+      "Bsink2_${id} out2_${id} ${pin:vn} I={v(power_${id}) > .5 ? (1-v(state2_${id}))*${param:sink_limit}*tanh(max(0,v(out2_${id},${pin:vn})-${param:vsat})/(${param:rout}*${param:sink_limit})) : 0}",
+      "Cout2_${id} out2_${id} ${pin:vn} ${param:cout}",
+      "Roff2_${id} out2_${id} ${pin:vn} 1G",
+      "Cin2p_${id} ${pin:in2p} ${pin:vn} ${param:cin}",
+      "Cin2n_${id} ${pin:in2n} ${pin:vn} ${param:cin}",
+      "Bib2p_${id} ${pin:in2p} ${pin:vn} I={v(power_${id}) > .5 ? ${param:bias} : 0}",
+      "Bib2n_${id} ${pin:in2n} ${pin:vn} I={v(power_${id}) > .5 ? ${param:bias} : 0}",
+      "Rin2p_${id} ${pin:in2p} ${pin:vn} 1T",
+      "Rin2n_${id} ${pin:in2n} ${pin:vn} 1T"
+    ],
+    "definitions": [
+      ".model adc_${id} adc_bridge(in_low=.3 in_high=.7)",
+      ".model delay_${id} d_buffer(rise_delay=${param:delay_rise} fall_delay=${param:delay_fall})",
+      ".model dac_${id} dac_bridge(out_low=0 out_high=1 out_undef=.5 t_rise=${param:transition} t_fall=${param:transition})"
+    ]
+  },
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own compact model; manufacturer data supplies nominal parameters, not copied vendor SPICE code.",
+    "No thermal drift, damage, production spread or exact noise/EMI/PSRR reproduction.",
+    "Output only sinks current: use an external pull-up, including for logic HIGH. It does not source a high level.",
+    "Fixed nominal propagation time at 25 C, approximate offset/bias, on resistance and collector current limit.",
+    "Use inputs inside the datasheet common-mode range; overdrive-dependent timing and phase inversion outside that range are not reproduced."
+  ],
+  "measurement_ports": {
+    "positive": "vp",
+    "negative": "vn"
+  },
+  "logic": {
+    "vcc": "vp",
+    "gnd": "vn",
+    "low_parameter": "vil",
+    "high_parameter": "vih",
+    "min_supply_parameter": "vmin",
+    "max_supply_parameter": "vmax",
+    "driver_enable": {
+      "out1": "v(power_${id}) > .5 && v(state1_${id}) < .25",
+      "out2": "v(power_${id}) > .5 && v(state2_${id}) < .25"
+    },
+    "driver_value": {
+      "out1": "0",
+      "out2": "0"
+    }
+  },
+  "current_warning": {
+    "signal": "max(abs(i(Vout1_${id})),abs(i(Vout2_${id})))",
+    "limit_parameter": "warning_current"
+  },
+  "sources": [
+    "https://www.ti.com/lit/ds/symlink/lmv393.pdf"
+  ],
+  "category": "Analog/Comparators",
+  "family": "Low voltage"
+}

@@ -136,6 +136,23 @@
   "matches": {
     "library_ids": [
       "Transistor_FET:2N7000"
+    ],
+    "part_names": [
+      "2N7000"
+    ],
+    "pin_names": {
+      "d": [
+        "D"
+      ],
+      "g": [
+        "G"
+      ],
+      "s": [
+        "S"
+      ]
+    },
+    "symbol_names": [
+      "2N7000"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -155,5 +172,7 @@
   "current_warning": {
     "signal": "i(Vdrain_${id})",
     "limit_parameter": "current_warning"
-  }
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "MOSFET"
 }

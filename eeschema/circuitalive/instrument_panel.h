@@ -12,13 +12,15 @@ class wxTextCtrl;
 class wxStaticText;
 class wxListCtrl;
 class wxToggleButton;
+class wxButton;
 namespace CIRCUITALIVE
 {
 
 class INSTRUMENT_PANEL : public wxPanel
 {
 public:
-    INSTRUMENT_PANEL( wxWindow* aParent, std::function<void( PROBE_KIND )> aChooseProbe );
+    INSTRUMENT_PANEL( wxWindow* aParent, std::function<void( PROBE_KIND )> aChooseProbe,
+        std::function<void( double )> aSpeed, std::function<void()> aStep );
     ~INSTRUMENT_PANEL() override;
     std::string ProbeName() const;
     void ClearProbeName();
@@ -30,6 +32,8 @@ private:
     wxNotebook* m_tabs;
     wxTextCtrl* m_name;
     wxStaticText* m_help;
+    CLICK_CHOICE* m_speed;
+    wxButton* m_step;
     std::vector<wxToggleButton*> m_buttons;
     wxPanel *m_measurePage = nullptr, *m_scopePage = nullptr;
     wxListCtrl* m_values = nullptr;
@@ -37,5 +41,6 @@ private:
     SCOPE_PREFERENCES m_scopePreferences;
     std::vector<std::string> m_rows;
     bool m_wasActive = false;
+    std::chrono::steady_clock::time_point m_lastValues{};
 };
 }

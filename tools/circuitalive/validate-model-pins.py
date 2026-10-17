@@ -2,37 +2,8 @@
 """Check .casim associations against installed KiCad symbol pin numbers and terminal names."""
 import argparse
 import json
-import re
 from pathlib import Path
-
-
-def library_symbols(path):
-    text = path.read_text()
-    roots = list(re.finditer(r'^\t\(symbol "([^"\n]+)"', text, re.MULTILINE))
-    if not roots:
-        raise ValueError(f'{path}: no top-level library symbols found')
-    return {match.group(1): text[match.start(): roots[i + 1].start() if i + 1 < len(roots) else len(text)]
-            for i, match in enumerate(roots)}
-
-
-def symbol_pins(symbols, name):
-    visited = set()
-    while True:
-        if name in visited:
-            raise ValueError(f'cyclic symbol inheritance: {name}')
-        visited.add(name)
-        body = symbols[name]
-        parent = re.search(r'\(extends "([^"]+)"', body)
-        if not parent:
-            break
-        name = parent.group(1)
-    result = {}
-    for body in re.split(r'\(pin (?:input|output|bidirectional|tri_state|passive|free|unspecified|power_in|power_out|open_collector|open_emitter|no_connect) ', body)[1:]:
-        number = re.search(r'\(number "([^"]+)"', body)
-        label = re.search(r'\(name "([^"]+)"', body)
-        if number and label:
-            result[number.group(1)] = label.group(1)
-    return result
+from symbol_library import library_symbols, symbol_pins
 
 
 def main():
@@ -52,6 +23,11 @@ def main():
             if library not in cache:
                 cache[library] = library_symbols(args.symbols / (library + '.kicad_sym'))
             pins = symbol_pins(cache[library], name)
+            mapped = {port['default_pin'] for port in model['pins']}
+            if mapped != set(pins):
+                raise ValueError(f'{association}: physical pins differ; '
+                                 f'unmodeled={sorted(set(pins) - mapped)}, '
+                                 f'missing={sorted(mapped - set(pins))}')
             for port in model['pins']:
                 physical = port['default_pin']
                 if physical not in pins:

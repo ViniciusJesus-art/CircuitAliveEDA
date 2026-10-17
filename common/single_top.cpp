@@ -34,6 +34,7 @@
 */
 
 
+#include <circuitalive/branding.h>
 #include <typeinfo>
 #include <wx/cmdline.h>
 #include <wx/dialog.h>
@@ -438,7 +439,8 @@ bool PGM_SINGLE_TOP::OnPgmInit()
     GetLibraryManager().LoadGlobalTables();
 
     App().SetTopWindow( frame );      // wxApp gets a face.
-    App().SetAppDisplayName( frame->GetAboutTitle() );
+    // wxGTK also uses this name as the X11 window class for newly opened dialogs.
+    App().SetAppDisplayName( CIRCUITALIVE::ProductName() );
 
     wxString relaunchDisplayName = frame->GetAboutTitle() + " " + GetMajorMinorVersion();
     KIPLATFORM::ENV::SetAppDetailsForWindow( frame, PATHS::GetExecutablePath(), relaunchDisplayName );

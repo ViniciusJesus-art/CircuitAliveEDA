@@ -47,6 +47,11 @@
       "Simulation_SPICE:VDC",
       "Device:Battery",
       "Device:Battery_Cell"
+    ],
+    "symbol_names": [
+      "Battery",
+      "Battery_Cell",
+      "VDC"
     ]
   },
   "reference_pin": "n",
@@ -63,5 +68,20 @@
     "signal": "i(V${id})",
     "limit_parameter": "current_warning"
   },
-  "voltage_constraint_parameter": "voltage"
+  "voltage_constraint_parameter": "voltage",
+  "category": "Sources",
+  "family": "Voltage and current",
+  "legacy_parameters": {
+    "map": {
+      "dc": "voltage"
+    },
+    "defaults": {
+      "voltage": "0"
+    },
+    "ignored": [
+      "ac",
+      "ph"
+    ],
+    "only_if_value_invalid": true
+  }
 }

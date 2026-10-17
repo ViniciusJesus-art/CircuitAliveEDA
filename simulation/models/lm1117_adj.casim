@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "lm1117_adj",
+  "name": "LM1117DT-ADJ adjustable regulator",
+  "description": "Compact nominal 25 C behavior; see docs/circuitalive/ANALOG_MODEL_CATALOG.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "adj",
+      "label": "ADJ",
+      "default_pin": "1",
+      "role": "reference"
+    },
+    {
+      "id": "out",
+      "label": "VO",
+      "default_pin": "2",
+      "role": "output"
+    },
+    {
+      "id": "in",
+      "label": "VI",
+      "default_pin": "3",
+      "role": "power"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vref",
+      "label": "Reference voltage",
+      "default": "1.25",
+      "unit": "V",
+      "min": 0.1,
+      "max": 40
+    },
+    {
+      "id": "dropout",
+      "label": "Nominal dropout",
+      "default": "1.2",
+      "unit": "V",
+      "min": 0,
+      "max": 20
+    },
+    {
+      "id": "imax",
+      "label": "Output current limit",
+      "default": ".8",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 10
+    },
+    {
+      "id": "rout",
+      "label": "Pass resistance",
+      "default": ".05",
+      "unit": "Ohm",
+      "min": 0.001,
+      "max": 1000
+    },
+    {
+      "id": "response",
+      "label": "Nominal response time",
+      "default": "5u",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Adjust pin current",
+      "default": "50u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "vmax",
+      "label": "Maximum input-reference difference",
+      "default": "15",
+      "unit": "V",
+      "min": 0.1,
+      "max": 100
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Regulator_Linear:LM1117DT-ADJ",
+      "Regulator_Linear:LM1117MP-ADJ"
+    ],
+    "symbol_names": [
+      "LM1117DT-ADJ",
+      "LM1117MP-ADJ"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Bpower_${id} power_${id} 0 V={v(${pin:in},${pin:adj}) > 0 && v(${pin:in},${pin:adj}) <= ${param:vmax}}",
+      "Btarget_${id} target_${id} 0 V={max(0,min(${param:vref},v(${pin:in},${pin:adj})-${param:dropout}))}",
+      "Rresponse_${id} target_${id} response_${id} {${param:response}/1n}",
+      "Cresponse_${id} response_${id} 0 1n ic=0",
+      "Vout_${id} ${pin:out} out_${id} 0",
+      "Bpass_${id} ${pin:in} out_${id} I={v(power_${id}) > .5 ? max(0,min(${param:imax},(v(response_${id})-v(out_${id},${pin:adj}))/${param:rout})) : 0}",
+      "Biq_${id} ${pin:in} ${pin:adj} I={v(power_${id}) > .5 ? ${param:iq} : 0}"
+    ],
+    "definitions": []
+  },
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own compact model; manufacturer data supplies nominal parameters, not copied vendor SPICE code.",
+    "No thermal drift, damage, production spread or exact noise/EMI/PSRR reproduction.",
+    "Nominal dropout, output/reference voltage, response, quiescent/adjust-pin current and output-current cap; requires normal external decoupling in a physical circuit.",
+    "Stability versus capacitor ESR, thermal shutdown and current-limit foldback are not modeled. A current cap is a nominal approximation, not a promise of safe continuous dissipation.",
+    "Rtie elements join package supply/output pads through 1 milliohm; NC pins stay open."
+  ],
+  "measurement_ports": {
+    "positive": "in",
+    "negative": "adj"
+  },
+  "sources": [
+    "https://www.ti.com/lit/ds/symlink/lm1117.pdf"
+  ],
+  "category": "Power/Linear regulators",
+  "family": "LM1117"
+}

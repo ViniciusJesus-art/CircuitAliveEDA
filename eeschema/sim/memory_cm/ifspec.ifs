@@ -1,0 +1,94 @@
+NAME_TABLE:
+C_Function_Name: cm_ca_memory
+Spice_Model_Name: ca_memory
+Description: "CircuitAlive inspectable event-driven memory"
+
+PORT_TABLE:
+Port_Name: address
+Description: "address"
+Direction: in
+Default_Type: d
+Allowed_Types: [d]
+Vector: yes
+Vector_Bounds: [1 32]
+Null_Allowed: no
+
+PORT_TABLE:
+Port_Name: data_in
+Description: "data_in"
+Direction: in
+Default_Type: d
+Allowed_Types: [d]
+Vector: yes
+Vector_Bounds: [1 32]
+Null_Allowed: no
+
+PORT_TABLE:
+Port_Name: data_out
+Description: "data_out"
+Direction: out
+Default_Type: d
+Allowed_Types: [d]
+Vector: yes
+Vector_Bounds: [1 32]
+Null_Allowed: no
+
+PORT_TABLE:
+Port_Name: write
+Description: "write"
+Direction: in
+Default_Type: d
+Allowed_Types: [d]
+Vector: no
+Vector_Bounds: -
+Null_Allowed: no
+
+PORT_TABLE:
+Port_Name: select
+Description: "select"
+Direction: in
+Default_Type: d
+Allowed_Types: [d]
+Vector: no
+Vector_Bounds: -
+Null_Allowed: no
+
+PORT_TABLE:
+Port_Name: power
+Description: "power"
+Direction: in
+Default_Type: d
+Allowed_Types: [d]
+Vector: no
+Vector_Bounds: -
+Null_Allowed: no
+
+PORT_TABLE:
+Port_Name: ready
+Description: "ready"
+Direction: in
+Default_Type: d
+Allowed_Types: [d]
+Vector: no
+Vector_Bounds: -
+Null_Allowed: no
+
+PARAMETER_TABLE:
+Parameter_Name: slot
+Description: "Worker memory region"
+Data_Type: int
+Default_Value: 0
+Limits: [0 127]
+Vector: no
+Vector_Bounds: -
+Null_Allowed: yes
+
+PARAMETER_TABLE:
+Parameter_Name: read_delay
+Description: "Read access time"
+Data_Type: real
+Default_Value: 55e-9
+Limits: [1e-12 -]
+Vector: no
+Vector_Bounds: -
+Null_Allowed: yes

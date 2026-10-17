@@ -88,10 +88,29 @@
     "library_ids": [
       "Transistor_BJT:BC548"
     ],
-    "symbol_names": []
+    "symbol_names": [
+      "BC548"
+    ],
+    "part_names": [
+      "BC548",
+      "QBC548"
+    ],
+    "pin_names": {
+      "b": [
+        "B"
+      ],
+      "c": [
+        "C"
+      ],
+      "e": [
+        "E"
+      ]
+    }
   },
   "measurement_ports": {
     "positive": "c",
     "negative": "e"
-  }
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "Bipolar"
 }

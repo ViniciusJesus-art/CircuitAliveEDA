@@ -24,6 +24,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include <3d_viewer/eda_3d_viewer_frame.h>
 #include <bitmaps.h>
 #include <board_commit.h>
@@ -91,10 +92,7 @@ DIALOG_FOOTPRINT_PROPERTIES::DIALOG_FOOTPRINT_PROPERTIES( PCB_EDIT_FRAME* aParen
     m_delayedFocusColumn = -1;
     m_initialFocus = false;
 
-    // Give an icon
-    wxIcon  icon;
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::icon_modedit ) );
-    SetIcon( icon );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     m_itemsGrid->SetTable( m_fields );
     m_itemsGrid->OverrideMinSize( 1.0, 1.0 );

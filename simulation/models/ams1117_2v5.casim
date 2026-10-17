@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "ams1117_2v5",
+  "name": "AMS1117-2.5 2.5V regulator",
+  "description": "Compact nominal 25 C behavior; see docs/circuitalive/ANALOG_MODEL_CATALOG.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "gnd",
+      "label": "GND",
+      "default_pin": "1",
+      "role": "reference"
+    },
+    {
+      "id": "out",
+      "label": "VO",
+      "default_pin": "2",
+      "role": "output"
+    },
+    {
+      "id": "in",
+      "label": "VI",
+      "default_pin": "3",
+      "role": "power"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vout",
+      "label": "Output voltage magnitude",
+      "default": "2.5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 40
+    },
+    {
+      "id": "dropout",
+      "label": "Nominal dropout",
+      "default": "1.3",
+      "unit": "V",
+      "min": 0,
+      "max": 20
+    },
+    {
+      "id": "imax",
+      "label": "Output current limit",
+      "default": "1",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 10
+    },
+    {
+      "id": "rout",
+      "label": "Pass resistance",
+      "default": ".05",
+      "unit": "Ohm",
+      "min": 0.001,
+      "max": 1000
+    },
+    {
+      "id": "response",
+      "label": "Nominal response time",
+      "default": "5u",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Quiescent current",
+      "default": "8m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "vmax",
+      "label": "Maximum input-reference difference",
+      "default": "15",
+      "unit": "V",
+      "min": 0.1,
+      "max": 100
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Regulator_Linear:AMS1117-2.5",
+      "Regulator_Linear:AMS1117CD-2.5"
+    ],
+    "symbol_names": [
+      "AMS1117-2.5",
+      "AMS1117CD-2.5"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Bpower_${id} power_${id} 0 V={v(${pin:in},${pin:gnd}) > 0 && v(${pin:in},${pin:gnd}) <= ${param:vmax}}",
+      "Btarget_${id} target_${id} 0 V={max(0,min(${param:vout},v(${pin:in},${pin:gnd})-${param:dropout}))}",
+      "Rresponse_${id} target_${id} response_${id} {${param:response}/1n}",
+      "Cresponse_${id} response_${id} 0 1n ic=0",
+      "Vout_${id} ${pin:out} out_${id} 0",
+      "Bpass_${id} ${pin:in} out_${id} I={v(power_${id}) > .5 ? max(0,min(${param:imax},(v(response_${id})-v(out_${id},${pin:gnd}))/${param:rout})) : 0}",
+      "Biq_${id} ${pin:in} ${pin:gnd} I={v(power_${id}) > .5 ? ${param:iq} : 0}"
+    ],
+    "definitions": []
+  },
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own compact model; manufacturer data supplies nominal parameters, not copied vendor SPICE code.",
+    "No thermal drift, damage, production spread or exact noise/EMI/PSRR reproduction.",
+    "Nominal dropout, output/reference voltage, response, quiescent/adjust-pin current and output-current cap; requires normal external decoupling in a physical circuit.",
+    "Stability versus capacitor ESR, thermal shutdown and current-limit foldback are not modeled. A current cap is a nominal approximation, not a promise of safe continuous dissipation.",
+    "Rtie elements join package supply/output pads through 1 milliohm; NC pins stay open."
+  ],
+  "measurement_ports": {
+    "positive": "in",
+    "negative": "gnd"
+  },
+  "sources": [
+    "http://www.advanced-monolithic.com/pdf/ds1117.pdf"
+  ],
+  "category": "Power/Linear regulators",
+  "family": "AMS1117"
+}

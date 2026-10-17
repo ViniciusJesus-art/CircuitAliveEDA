@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "potentiometer_dual",
+  "name": "Dual potentiometer",
+  "description": "Linear potentiometer with live wiper adjustment. Click the symbol during simulation to adjust its position.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "top1",
+      "label": "Top 1",
+      "default_pin": "1",
+      "role": "passive"
+    },
+    {
+      "id": "wiper1",
+      "label": "Wiper 1",
+      "default_pin": "2",
+      "role": "passive"
+    },
+    {
+      "id": "bottom1",
+      "label": "Bottom 1",
+      "default_pin": "3",
+      "role": "passive"
+    },
+    {
+      "id": "top2",
+      "label": "Top 2",
+      "default_pin": "4",
+      "role": "passive"
+    },
+    {
+      "id": "wiper2",
+      "label": "Wiper 2",
+      "default_pin": "5",
+      "role": "passive"
+    },
+    {
+      "id": "bottom2",
+      "label": "Bottom 2",
+      "default_pin": "6",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "resistance",
+      "label": "Total resistance",
+      "default": "$value",
+      "unit": "Ohm",
+      "min": 1e-06,
+      "max": 1000000000000.0
+    },
+    {
+      "id": "position",
+      "label": "Wiper position (0 = bottom, 1 = top)",
+      "default": ".5",
+      "unit": "",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Device:R_Potentiometer_Dual",
+      "Device:R_Potentiometer_Dual_Separate"
+    ],
+    "symbol_names": [
+      "R_Potentiometer_Dual",
+      "R_Potentiometer_Dual_Separate"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Vposition_${id} position_${id} 0 ${param:position}",
+      "Bupper1_${id} ${pin:top1} ${pin:wiper1} I={v(${pin:top1},${pin:wiper1})/max(1u,${param:resistance}*(1-min(1,max(0,v(position_${id})))) )}",
+      "Blower1_${id} ${pin:wiper1} ${pin:bottom1} I={v(${pin:wiper1},${pin:bottom1})/max(1u,${param:resistance}*min(1,max(0,v(position_${id})))))}",
+      "Bupper2_${id} ${pin:top2} ${pin:wiper2} I={v(${pin:top2},${pin:wiper2})/max(1u,${param:resistance}*(1-min(1,max(0,v(position_${id})))) )}",
+      "Blower2_${id} ${pin:wiper2} ${pin:bottom2} I={v(${pin:wiper2},${pin:bottom2})/max(1u,${param:resistance}*min(1,max(0,v(position_${id})))))}"
+    ],
+    "definitions": []
+  },
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own compact model; manufacturer data supplies nominal parameters, not copied vendor SPICE code.",
+    "No thermal drift, damage, production spread or exact noise/EMI/PSRR reproduction.",
+    "Linear taper, live position adjustable during simulation; initial position in Simulation model; uses the symbol Value as total resistance.",
+    "Dual tracks share position while remaining electrically separate; mounting pins are isolated.",
+    "No mechanical noise/wear or logarithmic taper; 1 microohm floor avoids zero-resistance singularities at endpoints."
+  ],
+  "measurement_ports": {
+    "positive": "top1",
+    "negative": "bottom1"
+  },
+  "electrical_groups": [
+    [
+      "top1",
+      "wiper1",
+      "bottom1"
+    ],
+    [
+      "top2",
+      "wiper2",
+      "bottom2"
+    ]
+  ],
+  "sources": [
+    "https://ngspice.sourceforge.io/docs/ngspice-manual.pdf"
+  ],
+  "adjustments": [
+    {
+      "id": "position",
+      "label": "Wiper position",
+      "source": "Vposition_${id}",
+      "parameter": "position",
+      "unit": "%",
+      "min": 0,
+      "max": 1,
+      "step": 0.01
+    }
+  ],
+  "category": "Analog/Passive components",
+  "family": "Potentiometers and trimmers"
+}

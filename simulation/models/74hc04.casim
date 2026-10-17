@@ -192,6 +192,9 @@
   "matches": {
     "library_ids": [
       "74xx:74HC04"
+    ],
+    "symbol_names": [
+      "74HC04"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -265,5 +268,7 @@
         "signal": "q6"
       }
     }
-  }
+  },
+  "category": "Digital/Logic ICs",
+  "family": "74HC"
 }

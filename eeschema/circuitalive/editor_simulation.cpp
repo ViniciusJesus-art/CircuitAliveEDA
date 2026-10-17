@@ -5,8 +5,11 @@
 #include "simulation_overlay.h"
 #include "simulation_toolbar.h"
 #include "model_dialog.h"
+#include "memory_viewer.h"
+#include "simulation_model.h"
 #include "instrument_panel.h"
 #include "probe_placement.h"
+#include "live_control_popup.h"
 #include <tool/actions.h>
 #include <wx/textdlg.h>
 #include <algorithm>
@@ -27,6 +30,7 @@
 #include <wx/statusbr.h>
 #include <wx/stdpaths.h>
 #include <wx/timer.h>
+#include <wx/weakref.h>
 
 namespace CIRCUITALIVE
 {
@@ -52,7 +56,7 @@ public:
             Invalidate();
         SCH_TOOL_BASE<SCH_EDIT_FRAME>::Reset( aReason );
     }
-    void OnSchSheetChanged( SCHEMATIC& ) override { redraw(); }
+    void OnSchSheetChanged( SCHEMATIC& ) override { dismissControl(); redraw(); }
     void OnSchCurrentVariantChanged( SCHEMATIC& ) override { Invalidate(); }
 
 private:
@@ -61,6 +65,7 @@ private:
         Go( &EDITOR_SIMULATION_TOOL::Play, SIMULATION_ACTIONS::play.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Pause, SIMULATION_ACTIONS::pause.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Stop, SIMULATION_ACTIONS::stop.MakeEvent() );
+        Go( &EDITOR_SIMULATION_TOOL::Memory, SIMULATION_ACTIONS::memory.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Configure, SIMULATION_ACTIONS::configure.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::ToggleProbes, SIMULATION_ACTIONS::probes.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::ToggleLogic, SIMULATION_ACTIONS::logicLevels.MakeEvent() );
@@ -69,6 +74,7 @@ private:
     int Pause( const TOOL_EVENT& );
     int Stop( const TOOL_EVENT& );
     int Configure( const TOOL_EVENT& );
+    int Memory( const TOOL_EVENT& );
     int ToggleProbes( const TOOL_EVENT& );
     int ToggleLogic( const TOOL_EVENT& );
     void showInstruments( bool );
@@ -76,11 +82,13 @@ private:
     void click( wxMouseEvent& );
     void key( wxKeyEvent& );
     void chooseProbe( PROBE_KIND );
-    void redraw();
+    void redraw( bool aForce = true );
     void setStatus( const wxString& aText );
     void publishStatus();
+    void dismissControl();
 
     wxTimer m_timer;
+    std::chrono::steady_clock::time_point m_lastHud{}, m_lastToolbar{};
     bool m_installed = false;
     wxString m_status;
     bool m_statusPending = false;
@@ -94,6 +102,13 @@ private:
     bool m_errorShown = false;
     bool m_probePanel = false, m_logicLevels = false, m_instrumentsVisible = false;
     bool m_resultOpened = false;
+    bool m_overlayCached = false, m_overlayVisible = false, m_overlayLogic = false;
+    wxString m_overlaySheet;
+    std::vector<int> m_overlayBrightness;
+    std::vector<bool> m_overlaySwitches;
+    std::vector<double> m_overlayAdjustments;
+    std::vector<LOGIC_LEVEL> m_overlayLevels;
+    wxWeakRef<LIVE_CONTROL_POPUP> m_liveControl;
 };
 
 void EDITOR_SIMULATION_TOOL::Install()
@@ -109,6 +124,17 @@ void EDITOR_SIMULATION_TOOL::Install()
     selection->GetToolMenu().GetMenu().AddItem( SIMULATION_ACTIONS::configure,
         []( const SELECTION& selected )
         { return selected.Size() == 1 && selected.Front()->Type() == SCH_SYMBOL_T; } );
+    selection->GetToolMenu().GetMenu().AddItem( SIMULATION_ACTIONS::memory,
+        [this]( const SELECTION& selected )
+        {
+            if(selected.Size()!=1 || selected.Front()->Type()!=SCH_SYMBOL_T)return false;
+            auto* symbol=static_cast<SCH_SYMBOL*>(selected.Front());
+            if(symbol->GetExcludedFromSim(&m_frame->GetCurrentSheet(),m_frame->Schematic().GetCurrentVariant()))return false;
+            try{
+                auto component=ReadSymbolModelSettings(*symbol,m_frame->GetCurrentSheet(),m_frame->Schematic().GetCurrentVariant(),m_frame->Prj().GetProjectPath().ToStdString(),true);
+                return !MODEL_REPOSITORY(MODEL_REPOSITORY::DefaultDirectories(component.projectDirectory)).SelectModel(component).memories.empty();
+            }catch(const std::exception&){return false;}
+        } );
     auto* actions = m_toolMgr->GetActionManager();
     actions->SetConditions( SIMULATION_ACTIONS::probes, ACTION_CONDITIONS().Check(
         [this]( const SELECTION& ) { return m_probePanel; } ) );
@@ -123,7 +149,9 @@ void EDITOR_SIMULATION_TOOL::Install()
     actions->SetConditions( SIMULATION_ACTIONS::stop, ACTION_CONDITIONS().Enable(
             [this]( const SELECTION& ) { return m_active; } ) );
     EnsureSimulationToolbar( *m_frame );
-    m_instruments = std::make_unique<INSTRUMENT_PANEL>( m_frame, [this]( PROBE_KIND kind ) { chooseProbe( kind ); } );
+    m_instruments = std::make_unique<INSTRUMENT_PANEL>( m_frame,
+        [this]( PROBE_KIND kind ) { chooseProbe( kind ); },
+        [this]( double speed ) { m_runner->SetSpeed( speed ); }, [this]() { m_runner->Step(); } );
     if( auto* manager = wxAuiManager::GetManager( m_frame ) )
     {
         manager->AddPane( m_instruments.get(), wxAuiPaneInfo().Name( "CircuitAliveInstruments" )
@@ -143,6 +171,7 @@ void EDITOR_SIMULATION_TOOL::Shutdown()
     if( !m_installed )
         return;
     m_timer.Stop();
+    dismissControl();
     Unbind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
     m_frame->GetCanvas()->Unbind( wxEVT_LEFT_DOWN, &EDITOR_SIMULATION_TOOL::click, this );
     m_frame->Unbind( wxEVT_CHAR_HOOK, &EDITOR_SIMULATION_TOOL::key, this );
@@ -179,6 +208,7 @@ void EDITOR_SIMULATION_TOOL::publishStatus()
 
 void EDITOR_SIMULATION_TOOL::Invalidate()
 {
+    dismissControl();
     if( !m_runner || !m_active )
         return;
     m_runner->Stop();
@@ -259,6 +289,7 @@ int EDITOR_SIMULATION_TOOL::Pause( const TOOL_EVENT& )
 
 int EDITOR_SIMULATION_TOOL::Stop( const TOOL_EVENT& )
 {
+    dismissControl();
     if( m_runner )
         m_runner->Stop();
     m_active = false;
@@ -269,6 +300,50 @@ int EDITOR_SIMULATION_TOOL::Stop( const TOOL_EVENT& )
     if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, false );
     redraw();
     setStatus( _( "Stopped — t = 0 s" ) );
+    return 0;
+}
+
+int EDITOR_SIMULATION_TOOL::Memory( const TOOL_EVENT& )
+{
+    auto& selection = m_toolMgr->GetTool<SCH_SELECTION_TOOL>()->RequestSelection( { SCH_SYMBOL_T } );
+    if( selection.Size() != 1 )
+        return 0;
+    auto* symbol = static_cast<SCH_SYMBOL*>( selection.Front() );
+    try
+    {
+        auto component =
+                ReadSymbolModelSettings( *symbol, m_frame->GetCurrentSheet(), m_frame->Schematic().GetCurrentVariant(),
+                                         m_frame->Prj().GetProjectPath().ToStdString() );
+        std::vector<MEMORY_REGION_CONFIG> regions;
+        std::vector<std::size_t> slots;
+        if( m_active )
+        {
+            for( const auto& region : m_circuit.circuit.memories )
+            {
+                const auto& location = m_circuit.locations.at( region.component );
+                if( location.reference.ToStdString() == component.reference )
+                {
+                    slots.push_back( region.slot );
+                    regions.push_back( m_circuit.circuit.config.memories.at( region.slot ) );
+                }
+            }
+            if( regions.empty() )
+                throw std::runtime_error( "This component has no memory in the active simulation. Stop and restart "
+                                          "after changing its model." );
+            ShowMemoryViewer( m_frame, component.reference, regions, m_runner.get(), slots );
+        }
+        else
+        {
+            auto model = MODEL_REPOSITORY( MODEL_REPOSITORY::DefaultDirectories( component.projectDirectory ) )
+                                 .SelectModel( component );
+            regions = InitialModelMemories( component, model );
+            ShowMemoryViewer( m_frame, component.reference, regions );
+        }
+    }
+    catch( const std::exception& e )
+    {
+        wxMessageBox( wxString::FromUTF8( e.what() ), _( "Memory" ), wxOK | wxICON_INFORMATION, m_frame );
+    }
     return 0;
 }
 
@@ -293,8 +368,10 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
             return 0;
         }
         auto component = ReadSymbolModelSettings( *symbol, m_frame->GetCurrentSheet(),
-            m_frame->Schematic().GetCurrentVariant(), m_frame->Prj().GetProjectPath().ToStdString() );
-        if( EditSimulationModel( m_frame, component ) )
+            m_frame->Schematic().GetCurrentVariant(), m_frame->Prj().GetProjectPath().ToStdString(), true );
+        bool excluded = symbol->GetExcludedFromSim( &m_frame->GetCurrentSheet(),
+                                                   m_frame->Schematic().GetCurrentVariant() );
+        if( EditSimulationModel( m_frame, component, excluded ) )
         {
             SCH_COMMIT commit( m_frame );
             for( auto& sheet : m_frame->Schematic().Hierarchy() )
@@ -303,7 +380,9 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
                     auto* unit = static_cast<SCH_SYMBOL*>( item );
                     if( unit != symbol && ( !symbol->IsMultiUnit() || unit->GetRef( &sheet ).ToStdString() != component.reference
                         || unit->GetLibId() != symbol->GetLibId() ) ) continue;
-                    commit.Modify( unit, sheet.LastScreen() ); WriteSymbolModelSettings( *unit, component );
+                    commit.Modify( unit, sheet.LastScreen() );
+                    unit->SetExcludedFromSim( excluded, &sheet, m_frame->Schematic().GetCurrentVariant() );
+                    if( !excluded ) WriteSymbolModelSettings( *unit, component );
                 }
             commit.Push( _( "Configure simulation model" ) );
             Invalidate();
@@ -336,6 +415,20 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
     {
         VECTOR2D position = m_frame->GetCanvas()->GetView()->ToWorld(
                 VECTOR2D( aEvent.GetPosition().x, aEvent.GetPosition().y ) );
+        const int adjustment = m_overlay->AdjustmentAt( m_circuit,
+            m_frame->GetCurrentSheet().PathAsString(), VECTOR2I( position ) );
+        if( adjustment >= 0 )
+        {
+            dismissControl();
+            const auto component = m_circuit.circuit.adjustments.at( adjustment ).component;
+            m_liveControl = new LIVE_CONTROL_POPUP( m_frame,
+                m_circuit.locations.at( component ).reference.ToStdString(),
+                m_circuit.circuit.adjustments, m_session.adjustments, component,
+                [this]( std::size_t index, double value ) { m_runner->SetAdjustment( index, value ); } );
+            m_liveControl->Position( m_frame->GetCanvas()->ClientToScreen( aEvent.GetPosition() ), wxSize( 0, 16 ) );
+            m_liveControl->Popup();
+            return;
+        }
         int index = m_overlay->SwitchAt( m_circuit, m_frame->GetCurrentSheet().PathAsString(),
                                         VECTOR2I( position ) );
         if( index >= 0 )
@@ -346,6 +439,11 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
         }
     }
     aEvent.Skip();
+}
+
+void EDITOR_SIMULATION_TOOL::dismissControl()
+{
+    if( m_liveControl ) { m_liveControl->Dismiss(); m_liveControl->Destroy(); m_liveControl = nullptr; }
 }
 
 void EDITOR_SIMULATION_TOOL::chooseProbe( PROBE_KIND kind )
@@ -366,10 +464,26 @@ void EDITOR_SIMULATION_TOOL::key( wxKeyEvent& event )
     event.Skip();
 }
 
-void EDITOR_SIMULATION_TOOL::redraw()
+void EDITOR_SIMULATION_TOOL::redraw( bool force )
 {
     if( !m_overlay )
         return;
+    const bool visible = m_session.state != EDITOR_SESSION_STATE::STOPPED
+                         && m_session.state != EDITOR_SESSION_STATE::ERROR;
+    const auto sheet = m_frame->GetCurrentSheet().PathAsString();
+    std::vector<int> brightness;
+    for( std::size_t i = 0; visible && i < m_circuit.circuit.leds.size(); ++i )
+        brightness.push_back( int( 255 * LedBrightness( i < m_session.ledCurrents.size() ? m_session.ledCurrents[i] : 0,
+                                                      m_circuit.circuit.leds[i].brightnessCurrent ) ) );
+    if( !force && m_overlayCached && visible == m_overlayVisible && sheet == m_overlaySheet
+        && m_logicLevels == m_overlayLogic && brightness == m_overlayBrightness
+        && m_session.switches == m_overlaySwitches
+        && m_session.adjustments == m_overlayAdjustments
+        && ( !m_logicLevels || m_session.logicLevels == m_overlayLevels ) ) return;
+    m_overlayCached = true; m_overlayVisible = visible; m_overlaySheet = sheet; m_overlayLogic = m_logicLevels;
+    m_overlayBrightness = std::move( brightness ); m_overlaySwitches = m_session.switches;
+    m_overlayAdjustments = m_session.adjustments;
+    m_overlayLevels = m_logicLevels ? m_session.logicLevels : std::vector<LOGIC_LEVEL>{};
     auto* view = m_frame->GetCanvas()->GetView();
     m_overlay->Render( m_circuit, m_session, m_frame->GetCurrentSheet().PathAsString(), m_logicLevels );
     if( !view->HasItem( m_overlay.get() ) )
@@ -382,7 +496,13 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
 {
     if( !m_runner )
         return;
-    EnsureSimulationToolbar( *m_frame );
+    const auto now = std::chrono::steady_clock::now();
+    if( now - m_lastToolbar >= std::chrono::seconds( 1 ) )
+    { EnsureSimulationToolbar( *m_frame ); m_lastToolbar = now; }
+    const auto oldState = m_session.state;
+    const auto oldTime = m_session.sample.latest.time;
+    const auto oldEvents = m_session.sample.eventsApplied;
+    const auto oldSpeed = m_session.speed;
     m_session = m_runner->View();
     const auto state = m_session.state;
     if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, m_active );
@@ -393,10 +513,15 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
         publishStatus();
         return;
     }
+    if( state == oldState && m_session.sample.latest.time == oldTime
+        && m_session.sample.eventsApplied == oldEvents && m_session.speed == oldSpeed ) { publishStatus(); return; }
+    if( state == oldState && state == EDITOR_SESSION_STATE::RUNNING
+        && now - m_lastHud < std::chrono::milliseconds( 100 ) ) return;
+    m_lastHud = now;
     const wxString names[] = { _( "Stopped" ), _( "Preparing" ), _( "Running" ),
                               _( "Paused" ), _( "Completed" ), _( "Error" ) };
-    wxString status = wxString::Format( "%s — t = %.3f s", names[static_cast<int>( state )],
-                                       m_session.sample.latest.time );
+    wxString status = wxString::Format( "%s — t = %.6f s   %.3g×", names[static_cast<int>( state )],
+                                       m_session.sample.latest.time, m_session.speed );
     for( std::size_t i = 0; i < std::min<std::size_t>( 2, m_session.warnings.size() ); ++i )
         status += "   " + wxString::FromUTF8( m_session.warnings[i] );
     if( m_session.warnings.size() > 2 ) status += wxString::Format( _( "   +%zu warnings" ), m_session.warnings.size() - 2 );
@@ -405,7 +530,7 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     if( state == EDITOR_SESSION_STATE::ERROR ) status += "   " + wxString::FromUTF8( m_session.error ).Left( 140 );
     setStatus( status );
     publishStatus();
-    redraw();
+    redraw( false );
     if( state == EDITOR_SESSION_STATE::ERROR && !m_errorShown )
     {
         m_errorShown = true;

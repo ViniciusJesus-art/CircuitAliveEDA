@@ -129,6 +129,99 @@ BOOST_FIXTURE_TEST_CASE( AutomaticAssociationsComeFromModelFilesAndAmbiguityIsEx
     BOOST_CHECK_EQUAL( MODEL_REPOSITORY( { directory } ).Resolve( component ).model.id, "divider" );
 }
 
+BOOST_AUTO_TEST_CASE( NamedTransistorsResolveAllPinOrdersAndSwitchElectrically )
+{
+    MODEL_REPOSITORY repository;
+    for( const std::string order : { "CBE", "CEB", "BCE", "BEC", "EBC", "ECB" } ) BOOST_TEST_CONTEXT( order )
+    {
+        CIRCUIT_COMPONENT q{ "Q1", "Custom:Generic_NPN", "2n2222", {} };
+        for( std::size_t i = 0; i < order.size(); ++i )
+        {
+            const auto number = std::to_string( i + 1 );
+            q.pinNames[number] = std::string( 1, order[i] );
+            q.pins[number] = order[i] == 'C' ? "collector" : order[i] == 'B' ? "base" : "0";
+        }
+        const auto resolved = repository.Resolve( q );
+        BOOST_CHECK_EQUAL( resolved.model.id, "bjt_pn2222a" );
+        const auto collector = resolved.pins.at( "c" );
+        BOOST_CHECK_EQUAL( q.pinNames.at( collector ), "C" );
+        BOOST_CHECK_EQUAL( q.pinNames.at( resolved.pins.at( "e" ) ), "E" );
+        auto c = BuildCircuitSnapshot( {
+            {"VS","Simulation_SPICE:VDC","5",{{"1","vcc"},{"2","0"}}},
+            {"VB","Simulation_SPICE:VDC","0",{{"1","drive"},{"2","0"}}},
+            {"RC","Device:R","1k",{{"1","vcc"},{"2","collector"}}},
+            {"RB","Device:R","10k",{{"1","drive"},{"2","base"}}},q } );
+        c.config.signals = { "v(" + c.pinNodes[4].at( collector ) + ")" };
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER ); session.Configure( c.netlist, c.config );
+        session.AdvanceTo( .001 ); BOOST_CHECK_GT( session.Snapshot().latest.values[0], 4.9 );
+        session.SetSourceValue( "Vca2", 5 ); session.AdvanceTo( .002 );
+        BOOST_CHECK_LT( session.Snapshot().latest.values[0], .3 );
+    }
+}
+
+BOOST_AUTO_TEST_CASE( NamedPartsUseLegacyIdentityAndRejectAmbiguousOrIncompletePinNames )
+{
+    MODEL_REPOSITORY repository;
+    CIRCUIT_COMPONENT d{ "D1", "rectifier_schlib:D", "D", {{"1","0"},{"2","in"}} };
+    d.pinNames = {{"1","K"},{"2","A"}};
+    d.explicitSpiceModel = true; d.legacySpiceFields = {{"Sim.Name","1N4148"},{"Sim.Library","diode.mod"}};
+    BOOST_CHECK_EQUAL( repository.Resolve( d ).model.id, "diode_1n4148" );
+    d.value = "1N4007"; BOOST_CHECK_THROW( repository.Resolve( d ), std::runtime_error );
+    d.value = "D"; d.pinNames["1"] = "A"; BOOST_CHECK_THROW( repository.Resolve( d ), std::runtime_error );
+    d.pinNames = {{"1","K"},{"2","A"},{"3","A"}}; d.pins["3"] = "other";
+    BOOST_CHECK_THROW( repository.Resolve( d ), std::runtime_error );
+    d.modelFile = "builtin:diode"; d.pins.erase("3"); d.pinNames.clear();
+    BOOST_CHECK_EQUAL( repository.Resolve( d ).model.id, "diode" ); // Explicit choice wins.
+}
+
+BOOST_FIXTURE_TEST_CASE( NamedPartAssociationsAreExtensibleAndAmbiguityIsExplicit, MODEL_FILES )
+{
+    std::string text = dividerModel;
+    text.insert( 1, R"JSON("matches":{"part_names":["ACME123"],"pin_names":{"in":["VIN"],"out":["OUT"],"gnd":["GND"]}},)JSON" );
+    Write( "divider.casim", text );
+    CIRCUIT_COMPONENT c{ "U1", "Uncompiled:Drawing", " acme123 ", {{"A","in"},{"B","out"},{"C","0"}} };
+    c.pinNames = {{"A","VIN"},{"B","OUT"},{"C","GND"}};
+    MODEL_REPOSITORY repository( { directory } ); const auto r = repository.Resolve( c );
+    BOOST_CHECK_EQUAL( r.pins.at("in"), "A" ); BOOST_CHECK_EQUAL( r.pins.at("gnd"), "C" );
+    auto other = text; const auto at = other.find("\"id\":\"divider\"");
+    other.replace(at,std::string("\"id\":\"divider\"").size(),"\"id\":\"other\"");
+    Write( "other.casim", other ); BOOST_CHECK_THROW( MODEL_REPOSITORY( { directory } ).Resolve( c ), std::runtime_error );
+}
+
+BOOST_AUTO_TEST_CASE( LegacySourceParametersKeepTheirWaveformAndExplicitOverrides )
+{
+    MODEL_REPOSITORY repository;
+    CIRCUIT_COMPONENT source{ "V1", "rectifier_schlib:VSIN", "VSIN", {{"1","supply"},{"2","0"}} };
+    source.legacySpiceFields = {{"Sim.Params","dc = 0 ampl=\"1\" f=1k td=0 theta=0 phase=90 ac=1"}};
+    auto r = repository.Resolve( source );
+    BOOST_CHECK_EQUAL( r.model.id, "ac_voltage" ); BOOST_CHECK_EQUAL( r.parameters.at("frequency"), 1000 );
+    BOOST_CHECK_EQUAL( r.parameters.at("amplitude"), 1 ); BOOST_CHECK_EQUAL( r.parameters.at("phase"), 90 );
+    auto c = BuildCircuitSnapshot( {source,{"R1","Device:R","1k",{{"1","supply"},{"2","0"}}}} );
+    c.config.signals = {"v("+c.pinNodes[0].at("1")+")"};
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER ); session.Configure(c.netlist,c.config);
+    session.AdvanceTo(.001); BOOST_CHECK_CLOSE(session.Snapshot().latest.values[0],1,1);
+    source.modelParameters["amplitude"]="2"; BOOST_CHECK_EQUAL(repository.Resolve(source).parameters.at("amplitude"),2);
+    source.legacySpiceFields["Sim.Params"]="ampl='time > 1 ? 2 : 1' f=1k";
+    source.modelParameters.clear(); BOOST_CHECK_THROW(repository.Resolve(source),std::runtime_error);
+    source.legacySpiceFields["Sim.Params"]="ampl=1 f=1k f=2k"; BOOST_CHECK_THROW(repository.Resolve(source),std::runtime_error);
+    source.legacySpiceFields["Sim.Params"]="ampl=1 unknown=2"; BOOST_CHECK_THROW(repository.Resolve(source),std::runtime_error);
+    source.libraryId="legacy:VPULSE"; source.legacySpiceFields["Sim.Params"]="y1=0 y2=3 td=100n tr=1n tf=2n tw=20n per=100n";
+    r=repository.Resolve(source); BOOST_CHECK_EQUAL(r.parameters.at("high"),3); BOOST_CHECK_CLOSE(r.parameters.at("period"),1e-7,1e-6);
+}
+
+BOOST_AUTO_TEST_CASE( LegacyPassiveParametersAreFallbacksAndDoNotReplaceNumericValues )
+{
+    MODEL_REPOSITORY repository;
+    CIRCUIT_COMPONENT r{"R1","Device:R","470R",{{"1","in"},{"2","0"}}};
+    r.legacySpiceFields={{"Sim.Params","r=999"}};
+    BOOST_CHECK_EQUAL(repository.Resolve(r).parameters.at("resistance"),470);
+    r.value="r=999"; BOOST_CHECK_EQUAL(repository.Resolve(r).parameters.at("resistance"),999);
+    r.modelParameters["resistance"]="2k"; BOOST_CHECK_EQUAL(repository.Resolve(r).parameters.at("resistance"),2000);
+    CIRCUIT_COMPONENT dc{"V1","sallen_key_schlib:VDC","ac=1",{{"1","in"},{"2","0"}}};
+    dc.explicitSpiceModel=true; dc.legacySpiceFields={{"Sim.Device","V"},{"Sim.Type","DC"},{"Sim.Pins","1=+ 2=-"},{"Sim.Params","ac=1"}};
+    BOOST_CHECK_EQUAL(repository.Resolve(dc).parameters.at("voltage"),0);
+}
+
 BOOST_AUTO_TEST_CASE( LedParametersArePerInstanceAndCurrentIsCalculatedByTheCircuit )
 {
     std::vector<CIRCUIT_COMPONENT> components = {

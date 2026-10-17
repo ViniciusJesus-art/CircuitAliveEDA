@@ -192,6 +192,9 @@
   "matches": {
     "library_ids": [
       "74xx:74HC74"
+    ],
+    "symbol_names": [
+      "74HC74"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -236,6 +239,15 @@
       "nq2": {
         "signal": "ns2"
       }
-    }
-  }
+    },
+    "clock_hysteresis": true
+  },
+  "category": "Digital/Logic ICs",
+  "family": "74HC",
+  "sources": [
+    "https://assets.nexperia.com/documents/data-sheet/74HC_HCT74.pdf"
+  ],
+  "model_notes": [
+    "Clock inputs use supply-relative Schmitt action (vil/vih) so a dip into the threshold band cannot clock the next stage twice. Data and asynchronous control pins retain 0/X/1 input behavior. Thresholds are a compact nominal approximation, not exact Schmitt curves."
+  ]
 }

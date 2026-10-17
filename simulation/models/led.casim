@@ -82,6 +82,10 @@
     "library_ids": [
       "Device:LED",
       "Device:LED_Small"
+    ],
+    "symbol_names": [
+      "LED",
+      "LED_Small"
     ]
   },
   "legacy_spice_fields": {
@@ -96,5 +100,7 @@
   "measurement_ports": {
     "positive": "a",
     "negative": "k"
-  }
+  },
+  "category": "Semiconductors/LEDs",
+  "family": "LEDs"
 }

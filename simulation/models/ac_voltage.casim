@@ -61,6 +61,14 @@
       "max": 360
     },
     {
+      "id": "damping",
+      "label": "Exponential damping",
+      "default": "0",
+      "unit": "1/s",
+      "min": 0,
+      "max": 1e+18
+    },
+    {
       "id": "current_warning",
       "label": "Current warning (0 disables)",
       "default": "10",
@@ -71,7 +79,7 @@
   ],
   "spice": {
     "instance": [
-      "V${id} ${pin:p} ${pin:n} SIN(${param:offset} ${param:amplitude} ${param:frequency} ${param:delay} 0 ${param:phase})"
+      "V${id} ${pin:p} ${pin:n} SIN(${param:offset} ${param:amplitude} ${param:frequency} ${param:delay} ${param:damping} ${param:phase})"
     ],
     "definitions": []
   },
@@ -80,7 +88,9 @@
     "library_ids": [
       "Simulation_SPICE:VSIN"
     ],
-    "symbol_names": []
+    "symbol_names": [
+      "VSIN"
+    ]
   },
   "frequency_parameter": "frequency",
   "voltage_constraint_parameter": "amplitude",
@@ -92,5 +102,21 @@
   "current_warning": {
     "signal": "i(V${id})",
     "limit_parameter": "current_warning"
+  },
+  "category": "Sources",
+  "family": "Voltage and current",
+  "legacy_parameters": {
+    "map": {
+      "dc": "offset",
+      "ampl": "amplitude",
+      "f": "frequency",
+      "td": "delay",
+      "theta": "damping",
+      "phase": "phase"
+    },
+    "ignored": [
+      "ac",
+      "ph"
+    ]
   }
 }

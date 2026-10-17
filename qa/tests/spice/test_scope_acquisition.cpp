@@ -1,6 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include <boost/test/unit_test.hpp>
 #include <circuitalive/scope_acquisition.h>
+#include <circuitalive/scope_waveform.h>
 #include <cmath>
 #include <functional>
 
@@ -86,7 +87,7 @@ BOOST_AUTO_TEST_CASE( HoldoffSeparatesCapturesAndPretriggerPositionIsHonored )
     SCOPE_ACQUISITION scope; SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::NORMAL;
     trigger.level = 0; trigger.hysteresis = .1; trigger.holdoff = .025;
     scope.Configure( { .001, .3, .002 }, trigger, channel() );
-    std::vector<double> edges; std::uint64_t serial = 0;
+    std::vector<double> edges; std::uint64_t serial = scope.Frame().serial;
     for( const auto& s : samples( 0, .15, .0001, []( double t ) { return std::sin( 2 * M_PI * 100 * t ); } ) )
     {
         scope.Feed( { s } );
@@ -97,12 +98,13 @@ BOOST_AUTO_TEST_CASE( HoldoffSeparatesCapturesAndPretriggerPositionIsHonored )
     BOOST_REQUIRE_GT( edges.size(), 2 );
     for( std::size_t i = 1; i < edges.size(); ++i ) BOOST_CHECK_GE( edges[i] - edges[i-1], .034 );
 }
-BOOST_AUTO_TEST_CASE( LongCapturesStayBoundedAndReportPartialHistory )
+BOOST_AUTO_TEST_CASE( LongCapturesStayBoundedAndRetainTheirFullTimeWindow )
 {
     SCOPE_ACQUISITION scope; SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::SINGLE;
     scope.Configure( { .1, .5, 0 }, trigger, channel(), 16 );
     scope.Feed( samples( 0, 1, .001, []( double t ) { return t < .01 ? 0. : 5.; } ) );
-    BOOST_CHECK_LE( scope.Frame().samples.size(), 16 ); BOOST_CHECK( scope.Frame().partial );
+    BOOST_CHECK_LE( scope.Frame().samples.size(), 16 ); BOOST_CHECK( !scope.Frame().partial );
+    BOOST_CHECK( scope.Frame().decimated );
     BOOST_CHECK( scope.State() == SCOPE_CAPTURE_STATE::SINGLE_DONE );
 }
 BOOST_AUTO_TEST_CASE( NewRunDoesNotJoinOldHistory )
@@ -187,3 +189,96 @@ BOOST_AUTO_TEST_CASE( AcquisitionRejectsInvalidConfiguration )
     trigger.level = NAN; BOOST_CHECK_THROW( scope.Configure( {}, trigger, channel() ), std::invalid_argument );
 }
 BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_CASE( ScopeHistorySharesImmutableBlocksAndBoundsIncrementalReads )
+{
+    SCOPE_HISTORY builder( 100 );
+    builder.Append( samples( 0, .049, .001, []( double t ) { return t; } ) );
+    const auto saved = builder;
+    BOOST_CHECK( &builder.front().values.front() == &saved.front().values.front() );
+    builder.Append( samples( .04, .15, .001, []( double t ) { return t; } ) );
+    BOOST_CHECK_EQUAL( builder.size(), 100 ); BOOST_CHECK_EQUAL( saved.size(), 50 );
+    BOOST_CHECK_SMALL( saved.front().time, 1e-12 ); BOOST_CHECK_CLOSE( saved.back().time, .049, 1e-8 );
+    int visited = 0;
+    builder.ForEachAfter( .14501, [&]( const auto& ) { ++visited; return true; } );
+    BOOST_CHECK_EQUAL( visited, 5 );
+    SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::ROLL; SCOPE_ACQUISITION scope;
+    scope.Configure( { .002, .5, 0 }, trigger, channel() ); scope.Feed( builder );
+    const auto serial = scope.Frame().serial; scope.Feed( builder ); BOOST_CHECK_EQUAL( scope.Frame().serial, serial );
+}
+BOOST_AUTO_TEST_CASE( DenseTriggerCapturesKeepBothHalvesAndBothChannelPeaks )
+{
+    auto other = channel(); other.name = "Other"; other.positive = 1;
+    SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::SINGLE;
+    SCOPE_ACQUISITION scope; scope.Configure( { .02, .5, 0 }, trigger, channel(), 256, { channel(), other } );
+    std::vector<SIM_SAMPLE> block;
+    for( int i = 0; i <= 30000; ++i )
+    {
+        const double t = i * 1e-5;
+        const double peak = i == 6001 ? 20 : i == 24001 ? -7 : 1;
+        block.push_back( { t, { t < .15 ? 0. : 5., peak } } );
+        if( block.size() == 250 || i == 30000 ) { scope.Feed( block ); block.clear(); }
+    }
+    const auto& f = scope.Frame(); BOOST_REQUIRE( f.triggerTime );
+    BOOST_CHECK( !f.partial ); BOOST_CHECK( f.decimated ); BOOST_CHECK_LE( f.samples.size(), 256 );
+    BOOST_CHECK_LE( f.samples.front().time, f.begin ); BOOST_CHECK_GE( f.samples.back().time, f.end );
+    BOOST_CHECK_CLOSE( f.end - f.begin, .2, 1e-8 );
+    BOOST_CHECK_CLOSE( ScopeValueAt( f, channel(), *f.triggerTime ), 2.5, 1e-6 );
+    const auto stats = ScopeStatistics( f, other ); BOOST_CHECK_EQUAL( stats.maximum, 20 ); BOOST_CHECK_EQUAL( stats.minimum, -7 );
+}
+BOOST_AUTO_TEST_CASE( TriggerWarmupDoesNotPublishMissingPretriggerHalf )
+{
+    SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::NORMAL; trigger.level = 0;
+    SCOPE_ACQUISITION scope; scope.Configure( { .02, .5, 0 }, trigger, channel(), 512 );
+    scope.Feed( samples( 1, 1.08, 1e-4, []( double t ) { return std::sin( 2 * M_PI * 50 * t ); } ) );
+    BOOST_CHECK( scope.Frame().samples.empty() );
+    scope.Feed( samples( 1.07, 1.5, 1e-4, []( double t ) { return std::sin( 2 * M_PI * 50 * t ); } ) );
+    BOOST_REQUIRE( !scope.Frame().samples.empty() ); BOOST_CHECK( !scope.Frame().partial );
+    BOOST_CHECK_LE( scope.Frame().samples.front().time, scope.Frame().begin );
+}
+BOOST_AUTO_TEST_CASE( ZeroMarkerMovesWholeSignalWithoutChangingScaleOrMeasuredVoltage )
+{
+    SCOPE_CHANNEL_STYLE c; c.perDivision = .5;
+    for( bool inverted : { false, true } )
+    {
+        c.inverted = inverted; c.center = ScopeCenterForZero( .8, c );
+        const auto before = ScopeVerticalFraction( 1, c );
+        c.center = ScopeCenterForZero( .3, c );
+        BOOST_CHECK_CLOSE( ScopeVerticalFraction( 0, c ), .3, 1e-8 );
+        BOOST_CHECK_SMALL( ScopeVerticalFraction( 1, c ) - before + .5, 1e-12 );
+        for( double v : { -2., 0., .25, 4. } ) BOOST_CHECK_SMALL( ScopeVerticalValue( ScopeVerticalFraction( v, c ), c ) - v, 1e-12 );
+        BOOST_CHECK_EQUAL( c.perDivision, .5 );
+    }
+}
+BOOST_AUTO_TEST_CASE( AutomaticRangeKeepsPhysicalZeroVisible )
+{
+    for( bool inverted : { false, true } )
+    for( const auto range : { std::pair( 3., 6. ), std::pair( -24., -12. ), std::pair( -5., 10. ) } )
+    {
+        SCOPE_CHANNEL_STYLE c; c.inverted = inverted; ScopeFitRange( c, range.first, range.second, .65 );
+        BOOST_CHECK_CLOSE( ScopeVerticalFraction( 0, c ), .65, 1e-8 );
+        BOOST_CHECK_GT( ScopeVerticalFraction( range.first, c ), 0 ); BOOST_CHECK_LT( ScopeVerticalFraction( range.first, c ), 1 );
+        BOOST_CHECK_GT( ScopeVerticalFraction( range.second, c ), 0 ); BOOST_CHECK_LT( ScopeVerticalFraction( range.second, c ), 1 );
+    }
+}
+BOOST_AUTO_TEST_CASE( ChangingTriggerLevelKeepsTheHeldCapture )
+{
+    SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::ROLL;
+    SCOPE_ACQUISITION scope; scope.Configure( { .002, .5, 0 }, trigger, channel() );
+    scope.Feed( samples( 0, .1, .0001, []( double t ) { return t; } ) ); scope.SetHold( true );
+    const auto serial = scope.Frame().serial;
+    scope.SetTriggerLevel( 3 ); BOOST_CHECK_EQUAL( scope.Frame().serial, serial );
+    BOOST_CHECK( scope.State() == SCOPE_CAPTURE_STATE::HOLD );
+}
+
+BOOST_AUTO_TEST_CASE( ScopeFrameRevisionNeverRepeatsWhenControlsReconfigureAcquisition )
+{
+    SCOPE_ACQUISITION scope; SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::ROLL;
+    const auto points = samples( 0, .1, .0001, []( double t ) { return t; } );
+    scope.Configure( { .002, .5, 0 }, trigger, channel() ); scope.Feed( points );
+    const auto serial = scope.Frame().serial;
+    scope.Configure( { .001, .5, 0 }, trigger, channel() );
+    BOOST_CHECK_GT( scope.Frame().serial, serial );
+    scope.Feed( points ); BOOST_CHECK_GT( scope.Frame().serial, serial );
+    BOOST_CHECK_CLOSE( scope.Frame().end - scope.Frame().begin, .01, 1e-8 );
+}

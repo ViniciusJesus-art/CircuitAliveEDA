@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "instrument_panel.h"
+#include "choice_controls.h"
 #include <wx/aui/aui.h>
 #include <wx/button.h>
 #include <wx/listctrl.h>
@@ -11,9 +12,24 @@
 
 namespace CIRCUITALIVE
 {
-INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_KIND )> choose ) : wxPanel( parent )
+INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_KIND )> choose,
+        std::function<void( double )> speed, std::function<void()> step ) : wxPanel( parent )
 {
     auto* layout = new wxBoxSizer( wxVERTICAL );
+    auto* time = new wxBoxSizer( wxHORIZONTAL );
+    time->Add( new wxStaticText( this, wxID_ANY, _( "Speed" ) ), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 6 );
+    m_speed = new CLICK_CHOICE( this );
+    for( const char* label : { "1×", "0.1×", "0.01×", "0.001×" } ) m_speed->Append( wxString::FromUTF8( label ) );
+    m_speed->SetSelection( 0 );
+    m_speed->SetToolTip( _( "Slow the simulation to see sequential logic. This changes the playback rate, not component timing." ) );
+    m_speed->Bind( wxEVT_COMBOBOX, [speed]( wxCommandEvent& event )
+    { const double rates[] = { 1, .1, .01, .001 }; speed( rates[event.GetSelection()] ); } );
+    time->Add( m_speed, 1, wxRIGHT, 8 );
+    m_step = new wxButton( this, wxID_ANY, _( "Step" ) );
+    m_step->SetToolTip( _( "While paused, advance one slice (20 ms × selected speed), preserving the circuit state." ) );
+    m_step->Bind( wxEVT_BUTTON, [step]( wxCommandEvent& ) { step(); } );
+    m_step->Disable(); time->Add( m_step );
+    layout->Add( time, 0, wxEXPAND | wxALL, 6 );
     m_tabs = new wxNotebook( this, wxID_ANY );
     auto* tools = new wxPanel( m_tabs );
     auto* contents = new wxBoxSizer( wxVERTICAL );
@@ -61,6 +77,10 @@ void INSTRUMENT_PANEL::SetPlacement( std::optional<PROBE_KIND> kind )
 
 void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const EDITOR_SESSION_VIEW& session, bool active )
 {
+    m_step->Enable( active && session.state == EDITOR_SESSION_STATE::PAUSED );
+    const double rates[] = { 1, .1, .01, .001 };
+    for( int i = 0; i < 4; ++i )
+        if( session.speed == rates[i] && m_speed->GetSelection() != i ) m_speed->SetSelection( i );
     bool values = false, scope = false;
     for( const auto& channel : snapshot.circuit.measurements )
         if( channel.scope ) scope = true; else values = true;
@@ -102,8 +122,10 @@ void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const 
         layout->Add( m_scope, 1, wxEXPAND );
         m_scopePage->SetSizer( layout ); m_tabs->AddPage( m_scopePage, _( "Oscilloscope" ) );
     }
-    if( m_values )
+    const auto now = std::chrono::steady_clock::now();
+    if( m_values && m_values->IsShownOnScreen() && now - m_lastValues >= std::chrono::milliseconds( 100 ) )
     {
+        m_lastValues = now;
         std::size_t row = 0;
         for( std::size_t i = 0; i < snapshot.circuit.measurements.size(); ++i )
         {
@@ -113,10 +135,11 @@ void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const 
                 m_values->InsertItem( row, wxString::FromUTF8( channel.name ) );
                 m_values->SetItem( row, 1, wxString::FromUTF8( QuantityUnit( channel.quantity ) ) ); m_rows.push_back( channel.name );
             }
-            m_values->SetItem( row, 0, wxString::FromUTF8( channel.name ) );
+            if( m_values->GetItemText( row ) != wxString::FromUTF8( channel.name ) ) m_values->SetItem( row, 0, wxString::FromUTF8( channel.name ) );
             const auto value = i < session.measurements.size() && session.state != EDITOR_SESSION_STATE::ERROR
                     ? FormatMeasurement( session.measurements[i], channel.quantity ) : "—";
-            m_values->SetItem( row, 2, wxString::FromUTF8( value ) ); ++row;
+            if( m_values->GetItemText( row, 2 ) != wxString::FromUTF8( value ) ) m_values->SetItem( row, 2, wxString::FromUTF8( value ) );
+            ++row;
         }
     }
     if( m_scope ) m_scope->UpdateSession( snapshot.circuit, session );

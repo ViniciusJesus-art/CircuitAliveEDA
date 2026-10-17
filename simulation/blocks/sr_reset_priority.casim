@@ -143,5 +143,7 @@
       "q": "v(qcode_${id})",
       "nq": "v(nqcode_${id})"
     }
-  }
+  },
+  "category": "Building blocks",
+  "family": "Analog and mixed signal"
 }

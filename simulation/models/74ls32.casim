@@ -192,6 +192,9 @@
   "matches": {
     "library_ids": [
       "74xx:74LS32"
+    ],
+    "symbol_names": [
+      "74LS32"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -249,5 +252,7 @@
         "signal": "q4"
       }
     }
-  }
+  },
+  "category": "Digital/Logic ICs",
+  "family": "74LS"
 }

@@ -27,7 +27,7 @@ Path={root}
 Terminal=false
 Categories=Science;Electronics;
 Keywords=EDA;PCB;Schematic;Simulation;CircuitAliveEDA;
-StartupWMClass=CircuitAliveEDA
+StartupWMClass=org.circuitaliveeda.CircuitAliveEDA
 ''')
 print(destination)
 PY

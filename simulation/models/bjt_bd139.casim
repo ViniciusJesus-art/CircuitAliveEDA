@@ -136,6 +136,24 @@
   "matches": {
     "library_ids": [
       "Transistor_BJT:BD139"
+    ],
+    "part_names": [
+      "BD139",
+      "QBD139"
+    ],
+    "pin_names": {
+      "b": [
+        "B"
+      ],
+      "c": [
+        "C"
+      ],
+      "e": [
+        "E"
+      ]
+    },
+    "symbol_names": [
+      "BD139"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -155,5 +173,7 @@
   "current_warning": {
     "signal": "i(Vcollector_${id})",
     "limit_parameter": "current_warning"
-  }
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "Bipolar"
 }

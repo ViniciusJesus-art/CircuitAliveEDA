@@ -88,10 +88,29 @@
     "library_ids": [
       "Transistor_BJT:BC557"
     ],
-    "symbol_names": []
+    "symbol_names": [
+      "BC557"
+    ],
+    "part_names": [
+      "BC557",
+      "QBC557"
+    ],
+    "pin_names": {
+      "b": [
+        "B"
+      ],
+      "c": [
+        "C"
+      ],
+      "e": [
+        "E"
+      ]
+    }
   },
   "measurement_ports": {
     "positive": "c",
     "negative": "e"
-  }
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "Bipolar"
 }

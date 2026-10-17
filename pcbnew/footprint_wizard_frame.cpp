@@ -24,6 +24,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
+#include <circuitalive/branding.h>
 #include "footprint_wizard_frame.h"
 
 #include <wx/listbox.h>
@@ -99,10 +100,7 @@ FOOTPRINT_WIZARD_FRAME::FOOTPRINT_WIZARD_FRAME( KIWAY* aKiway, wxWindow* aParent
     // This frame is always show modal:
     SetModal( true );
 
-    // Give an icon
-    wxIcon  icon;
-    icon.CopyFromBitmap( KiBitmap( BITMAPS::module_wizard ) );
-    SetIcon( icon );
+    SetIcons( CIRCUITALIVE::WindowIcons() );
 
     m_wizardName.Empty();
 

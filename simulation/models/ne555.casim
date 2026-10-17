@@ -173,6 +173,10 @@
     "library_ids": [
       "Timer:NE555D",
       "Timer:NE555P"
+    ],
+    "symbol_names": [
+      "NE555D",
+      "NE555P"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -204,5 +208,7 @@
   "measurement_ports": {
     "positive": "vcc",
     "negative": "gnd"
-  }
+  },
+  "category": "Analog/Timers",
+  "family": "555"
 }

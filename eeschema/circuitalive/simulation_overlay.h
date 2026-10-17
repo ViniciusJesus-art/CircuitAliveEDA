@@ -13,5 +13,7 @@ public:
                  const wxString& aCurrentSheet, bool aLogicLevels = false );
     int SwitchAt( const SCHEMATIC_SNAPSHOT& aCircuit, const wxString& aCurrentSheet,
                   const VECTOR2I& aPosition ) const;
+    int AdjustmentAt( const SCHEMATIC_SNAPSHOT& aCircuit, const wxString& aCurrentSheet,
+                      const VECTOR2I& aPosition ) const;
 };
 }

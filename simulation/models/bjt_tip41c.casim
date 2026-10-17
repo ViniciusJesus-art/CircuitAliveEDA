@@ -136,6 +136,24 @@
   "matches": {
     "library_ids": [
       "Transistor_BJT:TIP41C"
+    ],
+    "part_names": [
+      "QTIP41C",
+      "TIP41C"
+    ],
+    "pin_names": {
+      "b": [
+        "B"
+      ],
+      "c": [
+        "C"
+      ],
+      "e": [
+        "E"
+      ]
+    },
+    "symbol_names": [
+      "TIP41C"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -155,5 +173,7 @@
   "current_warning": {
     "signal": "i(Vcollector_${id})",
     "limit_parameter": "current_warning"
-  }
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "Bipolar"
 }

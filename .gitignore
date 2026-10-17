@@ -86,6 +86,7 @@ pcbnew/Info.plist
 .idea
 .DS_Store
 *.png
+!resources/screenshot/*.png
 *.kiface
 *.o
 *.o.*
@@ -161,3 +162,6 @@ qa/data/**/*.spice
 # CircuitAliveEDA: local dependencies, credentials, installation and runtime data
 /.circuitalive/
 !CMakePresets.json
+
+# Versioned XSPICE ABI configuration for the bundled memory module.
+!thirdparty/ngspice-xspice/include/ngspice/config.h

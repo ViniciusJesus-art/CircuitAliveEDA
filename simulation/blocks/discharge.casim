@@ -94,5 +94,7 @@
     "driver_value": {
       "out": "0"
     }
-  }
+  },
+  "category": "Building blocks",
+  "family": "Analog and mixed signal"
 }

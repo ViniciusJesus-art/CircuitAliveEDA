@@ -128,7 +128,18 @@ Na aba **Signals**, escolha o sinal e ajuste **Amplitude / div**, **Center (V)**
 visibilidade e inversão do desenho. O centro é a tensão da linha central da grade
 de oito divisões verticais. Cada canal tem sua própria escala; as cores e as
 legendas identificam essas escalas. Os valores no eixo vertical correspondem
-ao sinal selecionado. O pequeno traço à esquerda indica o zero de cada canal.
+ao sinal selecionado. As setas coloridas na margem esquerda indicam o **0 V físico** de cada canal,
+com o nome da probe. Arraste uma seta para cima/baixo para deslocar toda a curva;
+a escala e os valores medidos permanecem iguais. O arraste desliga o ajuste
+automático desse canal. Alterar V/div ou inverter a curva conserva a posição
+do seu zero. Nomes longos podem aparecer abreviados na margem; o tooltip mostra
+o nome completo. Marcadores fora da faixa aparecem vazados com `!`, permitindo
+trazer o zero de volta com o arraste.
+
+A seta laranja **T**, também fora da área das curvas, muda o nível do trigger
+por arraste. Ela usa a escala e o zero da fonte escolhida, inclusive quando
+essa curva está deslocada ou invertida. A linha horizontal acompanha a seta;
+o detector aplica o novo nível ao soltar o mouse. Isso não apaga uma captura em Hold.
 Editar escala ou centro desliga o ajuste automático desse canal;
 **Fit this signal** volta ao automático. Inverter o desenho não troca o sinal
 das medições nem altera o circuito.
@@ -168,7 +179,7 @@ O duty cycle mede o tempo acima desse ponto médio entre a primeira e a última
 borda de subida. Sinais constantes ou sem ciclos suficientes mostram `—`.
 
 **Export capture CSV…** grava tempo absoluto de simulação em segundos e tensões
-em volts, usando as amostras brutas da captura visível. A exportação usa uma
+em volts, usando as amostras conservadas da captura visível. A exportação usa uma
 cópia consistente da captura, mesmo se a simulação continuar durante a escolha
 do arquivo. Os ajustes de escala, canais, trigger e cursores sobrevivem a
 Stop/Play durante a mesma janela do editor; os dados de aquisição são descartados
@@ -179,9 +190,24 @@ por Stop. Esses ajustes ainda não são gravados no projeto ou entre execuções
 O texto inferior informa o passo máximo do solver, o maior intervalo entre
 amostras da captura e o tamanho do histórico disponível. O passo padrão é
 100 µs, reduzido automaticamente por determinados modelos, como fontes AC e 555.
-O histórico contém até 8192 amostras e 65536 valores; mais sinais salvos reduzem
-a duração disponível. Capturas que excedem esse espaço indicam **partial history**
-e deixam as regiões ausentes sem desenho. O limite também vale durante Single.
+O histórico de entrada contém até 8192 pontos e 65536 valores; mais sinais
+salvos reduzem a duração desse histórico. Seus blocos são compartilhados entre
+o runner e a interface, sem copiar todos os vetores a cada atualização.
+A aquisição consome apenas os pontos novos e mantém uma memória separada para
+pré-trigger e para a captura em andamento.
+
+Quando a janela excede o orçamento de pontos da captura, ela usa uma **redução
+por envelopes temporais**, preservando as extremidades, os mínimos/máximos de
+cada canal e as amostras vizinhas ao disparo. Assim, uma captura longa conserva
+ambos os lados do trigger em vez de apagar sua metade esquerda. O painel
+identifica essas capturas como **Envelope capture**; as medições e o CSV usam
+os pontos conservados e são aproximações do sinal original. O solver e as
+leituras instantâneas V/I/P do circuito não são alterados por essa redução.
+
+O modo Normal aguarda existir histórico anterior suficiente antes de aceitar
+um disparo. Para um disparo inicial que pediria tempos negativos, a primeira
+janela começa em zero e aguarda completar sua duração. Ausências reais de dados
+ainda aparecem como **partial history**, sem extrapolação.
 
 Zoom não recupera amostras inexistentes. O painel sinaliza espaçamento excessivo
 para a escala escolhida ou para o período estimado. A frequência detectada pode
@@ -217,8 +243,10 @@ a carga de C1; clique em SW1 para acompanhar sua descarga no osciloscópio.
 
 O código continua isolado em `eeschema/circuitalive/`: `measurements.*` define
 canais e unidades; `probe_placement.*` cria símbolos e modifica fios usando o
-histórico nativo; `instrument_panel.*` cuida das abas; `scope_panel.*` reúne os controles e o
-desenho; `scope_acquisition.*` implementa captura, trigger, interpolação, escalas
+histórico nativo; `instrument_panel.*` cuida das abas; `scope_panel.*` reúne os controles; `scope_plot.*` desenha curvas e marcadores
+com cache e polilinhas; `scope_history.*` compartilha blocos imutáveis de dados;
+`scope_waveform.*` reúne envelopes e transformações verticais;
+`scope_acquisition.*` implementa captura, trigger, interpolação, escalas
 e cálculos sem depender de wxWidgets. O adapter
 captura os símbolos, o snapshot cria os sensores e o runner coleta os valores
 e o histórico fora da thread gráfica. Nenhum formato do KiCad foi alterado.
@@ -228,3 +256,19 @@ holdoff, Single/rearme, Auto/Normal/Roll, Hold e zoom, sobreposição de histór
 reinício de sessão, memória limitada, integração de média/RMS com amostragem
 irregular, frequência/duty, cursores e entradas SI. A interface é conferida
 em Xvfb isolado com o exemplo `ne555_astable.kicad_sch`.
+
+A apresentação das curvas é limitada a 20 atualizações/s. As medições completas
+são calculadas a até 5 atualizações/s somente na aba Readings; controles com
+valores iguais não são reescritos. Abas recolhidas continuam adquirindo sem
+repintar ou recalcular layout. Cursores e marcadores usam a curva em cache,
+e a indicação no esquemático é atualizada separadamente a até 10 vezes/s,
+somente quando mudam LEDs, chaves, níveis lógicos ou o contexto do desenho.
+
+Ensaio local em Xvfb, renderização por software, editor 1680×1060 e duas
+probes no NE555: a CPU acumulada das threads da interface passou de
+727.6% para 22.7% em amostras de oito segundos
+(100% equivale a um núcleo). O cenário anterior apresentava a lentidão na
+abertura do painel; o cenário final manteve as duas curvas visíveis durante
+a aquisição. Esse diagnóstico local não é uma garantia para outros circuitos
+ou máquinas, nem mede a velocidade do solver. A memória residente não mostrou
+redução significativa nesse ensaio com o renderizador por software.

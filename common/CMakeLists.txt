@@ -312,6 +312,7 @@ set( KICOMMON_SRCS
 
     singleton.cpp
     pgm_base.cpp
+    circuitalive/desktop_integration.cpp
 
     ../scripting/python_scripting.cpp
 
@@ -459,6 +460,10 @@ target_compile_definitions( kicommon PRIVATE KICOMMON_DLL=1 )
 # so the compositor matches windows to the installed desktop files (regular, Flatpak,
 # and Nightly builds each install a different reverse-DNS prefix).
 if( UNIX AND NOT APPLE )
+    # Keep native GTK includes confined to CircuitAliveEDA's desktop integration.
+    set_source_files_properties( circuitalive/desktop_integration.cpp PROPERTIES
+        INCLUDE_DIRECTORIES "${GTK3_INCLUDE_DIRS}" )
+
     set_property( SOURCE pgm_base.cpp APPEND PROPERTY COMPILE_DEFINITIONS
         KICAD_DESKTOP_APP_NAME="${KICAD_APP_NAME}"
         KICAD_DESKTOP_APP_PREFIX="${KICAD_APP_PREFIX}" )

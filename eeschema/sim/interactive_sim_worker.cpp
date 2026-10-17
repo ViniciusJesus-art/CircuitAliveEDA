@@ -5,6 +5,10 @@
  */
 
 #include "interactive_sim_protocol.h"
+#include "runtime_memory.h"
+#include <filesystem>
+#include <dlfcn.h>
+#include <fcntl.h>
 #include <ngspice/sharedspice.h>
 
 #include <algorithm>
@@ -82,6 +86,8 @@ public:
             Advance( aRequest.at( "time" ) );
         else if( op == "source" )
             Source( aRequest.at( "reference" ), aRequest.at( "value" ) );
+        else if( op == "memory" )
+            return Memory( aRequest );
         else if( op == "snapshot" )
             return Snapshot( aRequest.value( "drain", false ) );
         else
@@ -190,6 +196,15 @@ private:
         deck += "\n.tran " + Number( cfg.step ) + " " + Number( cfg.horizon ) + " 0 "
                 + Number( cfg.maxStep ) + ( cfg.useInitialConditions ? " uic\n" : "\n" ) + ".end\n";
 
+        if( aRequest.contains( "memories" ) )
+            for( const auto& region : aRequest.at( "memories" ) )
+                cfg.memories.push_back(
+                        { region.at( "id" ),
+                          region.at( "label" ),
+                          region.at( "word_bits" ),
+                          region.at( "writable" ),
+                          { MemoryUnhex( region.at( "data" ) ), MemoryUnhex( region.at( "known" ) ) } } );
+        m_memory.Reset( cfg.memories );
         m_config = std::move( cfg );
         m_names = std::move( names );
         m_deck = std::move( deck );
@@ -234,6 +249,7 @@ private:
     void CheckError()
     {
         std::lock_guard lock( m_mutex );
+        if( m_error.empty() ) m_error = m_memory.Error();
         if( !m_error.empty() )
         {
             m_state = SIM_SESSION_STATE::ERROR;
@@ -250,6 +266,29 @@ private:
             std::lock_guard lock( m_mutex );
             Clear();
             ++m_generation;
+        }
+        m_memory.Reset( m_config.memories );
+        if( !m_config.memories.empty() && !m_memoryModule )
+        {
+            const auto path =
+                    ( std::filesystem::canonical( "/proc/self/exe" ).parent_path() / "circuitalive-memory.cm" )
+                            .string();
+            const int fd = open( path.c_str(), O_RDONLY | O_CLOEXEC );
+            if( fd < 0 )
+                throw std::runtime_error( "Memory engine file is missing: " + path );
+            const auto modulePath = "/proc/self/fd/" + std::to_string( fd );
+            m_memoryModule = dlopen( modulePath.c_str(), RTLD_NOW | RTLD_LOCAL );
+            if( !m_memoryModule )
+                throw std::runtime_error( std::string( "Cannot load memory engine: " ) + dlerror() );
+            auto bind = reinterpret_cast<void ( * )( const CA_MEMORY_BACKEND* )>(
+                    dlsym( m_memoryModule, "CircuitAliveMemorySetBackend" ) );
+            if( !bind )
+                throw std::runtime_error( "Invalid memory engine" );
+            auto backend = m_memory.Backend();
+            bind( &backend );
+            Command( "codemodel " + modulePath );
+            close( fd );
+            CheckError();
         }
         std::istringstream stream( m_deck );
         std::vector<std::string> lines;
@@ -400,6 +439,19 @@ private:
         m_eventTime = m_latest.time;
     }
 
+    JSON Memory( const JSON& request )
+    {
+        if( !Finished() || ( m_state != SIM_SESSION_STATE::PAUSED && m_state != SIM_SESSION_STATE::COMPLETED ) )
+            throw std::runtime_error( "Pause the simulation before reading memory" );
+        CheckError();
+        const std::size_t length = request.at( "length" );
+        if( length > 4096 )
+            throw std::runtime_error( "Memory page exceeds 4096 bytes" );
+        const auto image = m_memory.Read( request.at( "id" ), request.at( "offset" ), length );
+        return {
+                { "time", m_latest.time }, { "data", MemoryHex( image.data ) }, { "known", MemoryHex( image.known ) } };
+    }
+
     JSON Snapshot( bool aDrain )
     {
         // Never read a live ngspice vector. vecindex is an accepted-step counter,
@@ -511,6 +563,9 @@ private:
             }
             self.m_latest.values[i] = value->creal;
         }
+        try { self.m_memory.Commit(self.m_latest.time); }
+        catch( const std::exception& e ) { self.m_error=e.what(); return 0; }
+        if( !self.m_memory.Error().empty() ) { self.m_error=self.m_memory.Error(); return 0; }
         ++self.m_samples;
         const auto position = ( self.m_head + self.m_size ) % self.m_ring.size();
         self.m_ring[position] = self.m_latest;
@@ -525,6 +580,8 @@ private:
     }
 
     SIM_SESSION_STATE       m_state = SIM_SESSION_STATE::STOPPED; // Control thread only.
+    RUNTIME_MEMORY m_memory;
+    void* m_memoryModule = nullptr; // Kept loaded for the physical worker lifetime.
     SIM_SESSION_CONFIG      m_config;
     std::string             m_deck;
     std::vector<std::string> m_names;

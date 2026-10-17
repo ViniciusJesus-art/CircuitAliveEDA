@@ -81,6 +81,12 @@
       "Regulator_Linear:LM317_SOT-223",
       "Regulator_Linear:LM317_TO-252",
       "Regulator_Linear:LM317_TO-263"
+    ],
+    "symbol_names": [
+      "LM317_SOT-223",
+      "LM317_TO-220",
+      "LM317_TO-252",
+      "LM317_TO-263"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -96,5 +102,7 @@
   "measurement_ports": {
     "positive": "in",
     "negative": "adj"
-  }
+  },
+  "category": "Power/Linear regulators",
+  "family": "Adjustable"
 }

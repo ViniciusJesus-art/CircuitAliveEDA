@@ -3,7 +3,7 @@
   "backend": "ngspice",
   "id": "diode_1n4148",
   "name": "1N4148 switching diode",
-  "description": "Modelo did\u00e1tico configur\u00e1vel; n\u00e3o \u00e9 um macromodelo certificado pelo fabricante.",
+  "description": "Modelo didático configurável; não é um macromodelo certificado pelo fabricante.",
   "license": "GPL-3.0-or-later",
   "pins": [
     {
@@ -83,7 +83,22 @@
       "Diode:1N4148",
       "Diode:1N4148W"
     ],
-    "symbol_names": []
+    "symbol_names": [
+      "1N4148",
+      "1N4148W"
+    ],
+    "part_names": [
+      "1N4148",
+      "1N4148W"
+    ],
+    "pin_names": {
+      "a": [
+        "A"
+      ],
+      "k": [
+        "K"
+      ]
+    }
   },
   "measurement_ports": {
     "positive": "a",
@@ -95,5 +110,7 @@
   "model_notes": [
     "Existing compact D model retained; forward drop checked at 10mA and 100mA.",
     "Transit time is a compact charge-storage approximation; 4ns is not a universal reverse-recovery result for every circuit."
-  ]
+  ],
+  "category": "Semiconductors/Diodes",
+  "family": "Rectifier and switching"
 }

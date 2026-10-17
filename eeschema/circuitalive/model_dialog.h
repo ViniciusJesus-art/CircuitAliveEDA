@@ -6,5 +6,5 @@ class wxWindow;
 namespace CIRCUITALIVE
 {
 /// Edits a copy; the caller owns the schematic commit/undo boundary.
-bool EditSimulationModel( wxWindow* aParent, CIRCUIT_COMPONENT& aComponent );
+bool EditSimulationModel( wxWindow* aParent, CIRCUIT_COMPONENT& aComponent, bool& aExcluded );
 }

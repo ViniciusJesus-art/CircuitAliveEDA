@@ -18,7 +18,8 @@
 #include <nlohmann/json.hpp>
 #include <wx/button.h>
 #include <wx/checkbox.h>
-#include <wx/choice.h>
+#include "choice_controls.h"
+#include "model_browser.h"
 #include <wx/dcbuffer.h>
 #include <wx/filedlg.h>
 #include <wx/grid.h>
@@ -59,7 +60,7 @@ wxGrid* Grid( wxWindow* parent, const wxArrayString& columns )
 }
 void Reset( wxGrid* grid ) { if( grid->GetNumberRows() ) grid->DeleteRows( 0, grid->GetNumberRows() ); }
 void CommitGrid( wxGrid* grid ) { grid->SaveEditControlValue(); grid->HideCellEditControl(); }
-struct TEMPLATE { std::string name, json; };
+struct TEMPLATE { std::string name, json; fs::path file; };
 std::vector<TEMPLATE> Templates( const std::string& project )
 {
     auto dirs = MODEL_DESIGN::BlockDirectories(); auto models = MODEL_REPOSITORY::DefaultDirectories( project );
@@ -70,7 +71,7 @@ std::vector<TEMPLATE> Templates( const std::string& project )
         for( const auto& file : fs::directory_iterator( dir ) ) if( file.is_regular_file() && file.path().extension() == ".casim" )
         {
             auto text = Read( file.path() ); auto model = MODEL_REPOSITORY::LoadText( text );
-            if( ids.insert( model.id ).second ) result.push_back( { model.name, std::move( text ) } );
+            if( ids.insert( model.id ).second ) result.push_back( { model.name, std::move( text ), file.path() } );
         }
     }
     std::sort( result.begin(), result.end(), []( const auto& a, const auto& b ) { return a.name < b.name; } ); return result;
@@ -97,7 +98,7 @@ public:
             int r = m_pins->GetNumberRows(); m_pins->AppendRows(); m_ports.push_back( p.id );
             m_pins->SetCellValue( r, 0, W( p.label + " [" + p.id + "]" ) ); m_pins->SetCellValue( r, 1, W( p.role ) );
             auto it = block.connections.find( p.id ); if( it != block.connections.end() ) m_pins->SetCellValue( r, 2, W( it->second ) );
-            m_pins->SetReadOnly( r, 0 ); m_pins->SetReadOnly( r, 1 ); m_pins->SetCellEditor( r, 2, new wxGridCellChoiceEditor( choices, true ) );
+            m_pins->SetReadOnly( r, 0 ); m_pins->SetReadOnly( r, 1 ); m_pins->SetCellEditor( r, 2, new CLICK_CHOICE_EDITOR( choices, true ) );
         }
         m_pins->SetColSize( 0, 260 ); m_pins->SetColSize( 2, 220 ); s->Add( m_pins, 1, wxEXPAND | wxALL, 10 );
         s->Add( new wxStaticText( this, wxID_ANY, _( "Values: enter an SI value (10k, 100n, 5V), or choose @parameter to expose it in the component's configuration." ) ), 0, wxLEFT | wxRIGHT, 10 );
@@ -110,7 +111,7 @@ public:
             m_values->SetCellValue( r, 0, W( p.label ) ); m_values->SetReadOnly( r, 0 ); m_values->SetReadOnly( r, 2 );
             auto it = block.values.find( p.id ); m_values->SetCellValue( r, 1, W( it == block.values.end() ? p.defaultValue : it->second ) );
             m_values->SetCellValue( r, 2, W( p.unit ) );
-            m_values->SetCellEditor( r, 1, new wxGridCellChoiceEditor( parameterChoices, true ) );
+            m_values->SetCellEditor( r, 1, new CLICK_CHOICE_EDITOR( parameterChoices, true ) );
         }
         m_values->SetColSize( 0, 290 ); m_values->SetColSize( 1, 220 ); s->Add( m_values, 1, wxEXPAND | wxALL, 10 );
         s->Add( CreateSeparatedButtonSizer( wxOK | wxCANCEL ), 0, wxEXPAND | wxALL, 10 ); SetSizer( s );
@@ -389,7 +390,7 @@ private:
         {
             const int r = m_pins->GetNumberRows(); m_pins->AppendRows(); m_pins->SetCellValue( r, 0, W( p.defaultPin ) );
             m_pins->SetCellValue( r, 1, W( p.id ) ); m_pins->SetCellValue( r, 2, W( p.label ) ); m_pins->SetCellValue( r, 3, W( p.role ) );
-            m_pins->SetCellEditor( r, 3, new wxGridCellChoiceEditor( wxArrayString{ "input", "output", "bidirectional", "passive", "power", "reference" }, false ) );
+            m_pins->SetCellEditor( r, 3, new CLICK_CHOICE_EDITOR( wxArrayString{ "input", "output", "bidirectional", "passive", "power", "reference" }, false ) );
             m_stimuli->AppendRows(); m_stimuli->SetCellValue( r, 0, W( p.defaultPin + " — " + p.label ) ); m_stimuli->SetReadOnly( r, 0 );
             m_stimuli->SetCellValue( r, 1, p.role == "power" ? "5V" : p.role == "reference" || p.role == "input" ? "0V" : p.role == "output" ? "load:10k" : "" );
         }
@@ -485,11 +486,11 @@ private:
     void fromTemplate()
     {
         if( !discard() ) return;
-        auto choices = Templates( m_project ); wxArrayString names;
-        for( const auto& c : choices ) names.Add( W( c.name ) );
-        wxSingleChoiceDialog picker( this, _( "Choose an existing model to duplicate. Its current electrical core is preserved." ), _( "Start from model" ), names );
-        if( picker.ShowModal() != wxID_OK ) return;
-        m_design = MODEL_DESIGN::Open( choices.at( picker.GetSelection() ).json ); m_design.id = "custom_" + m_design.id;
+        auto choices = Templates( m_project );
+        std::vector<SIMULATION_MODEL> models;
+        for( const auto& c : choices ) models.push_back( MODEL_REPOSITORY::LoadText( c.json, c.file ) );
+        const auto selected = ChooseSimulationModel( this, models ); if( !selected ) return;
+        m_design = MODEL_DESIGN::Open( choices.at( *selected ).json ); m_design.id = "custom_" + m_design.id;
         m_design.name = "Custom " + m_design.name; m_file.clear(); refreshFields(); changed();
     }
     void timerExample()
@@ -502,11 +503,12 @@ private:
     void addBlock()
     {
         if( m_design.pins.empty() ) throw std::runtime_error( "Choose the component symbol before adding blocks" );
-        auto choices = Templates( m_project ); wxArrayString names; for( const auto& c : choices ) names.Add( W( c.name ) );
-        wxSingleChoiceDialog picker( this, _( "Choose a reusable circuit or logic block" ), _( "Add block" ), names );
-        if( picker.ShowModal() != wxID_OK ) return;
-        auto model = MODEL_REPOSITORY::LoadText( choices.at( picker.GetSelection() ).json );
-        DESIGN_BLOCK block; block.modelJson = choices.at( picker.GetSelection() ).json;
+        auto choices = Templates( m_project );
+        std::vector<SIMULATION_MODEL> models;
+        for( const auto& c : choices ) models.push_back( MODEL_REPOSITORY::LoadText( c.json, c.file ) );
+        const auto selected = ChooseSimulationModel( this, models ); if( !selected ) return;
+        const auto& model = models.at( *selected );
+        DESIGN_BLOCK block; block.modelJson = choices.at( *selected ).json;
         std::set<std::string> used; for( const auto& b : m_design.blocks ) used.insert( b.id );
         int n = 1; do { block.id = "B" + std::to_string( n++ ); } while( used.contains( block.id ) );
         block.x = 280 + int( m_design.blocks.size() % 3 ) * 280; block.y = 80 + int( m_design.blocks.size() / 3 ) * 230;

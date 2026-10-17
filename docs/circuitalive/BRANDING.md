@@ -31,7 +31,18 @@ Os nomes de janela, o gerenciador e o menu Sobre usam CircuitAliveEDA.
 O atalho local `org.circuitaliveeda.CircuitAliveEDA.desktop` aponta para o
 launcher deste checkout, com um caminho absoluto para o novo ícone. Sua
 identidade é separada da instalação KiCad do sistema. Não modifica os atalhos
-do KiCad instalado pelo Fedora. Feche o editor e o gerenciador antes de abrir
+do KiCad instalado pelo Fedora. A integração em
+`common/circuitalive/desktop_integration.cpp` também define esse ID para o
+GTK: ele é usado como `app_id` no Wayland e instância de `WM_CLASS` no X11,
+com o mesmo `StartupWMClass` no atalho. Isso funciona inclusive com wxWidgets
+3.2, que não usa `SetClassName()` para esses identificadores. O nome técnico
+de configuração de cada editor continua independente dessa identidade.
+Com as dependências locais atuais, o wxWidgets usa GLX e o aplicativo roda
+via XWayland na sessão Wayland do KDE; nesse caso a associação usa `WM_CLASS`.
+
+O conjunto de ícones também é o padrão dos diálogos GTK e janelas auxiliares;
+assim eles não procuram os ícones de `kicad` ou `eeschema` instalados pelo sistema.
+Feche o editor e o gerenciador antes de abrir
 novamente, pois os ícones são conservados em memória.
 
 Extensões `.kicad_*`, IDs de bibliotecas, variáveis `KICAD_*`, executáveis,

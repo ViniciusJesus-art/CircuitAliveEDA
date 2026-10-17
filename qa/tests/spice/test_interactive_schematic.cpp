@@ -5,11 +5,18 @@
 #include <schematic.h>
 #include <sch_symbol.h>
 #include <sch_field.h>
+#include <sch_text.h>
+#include <sch_textbox.h>
+#include <sch_io/kicad_sexpr/sch_io_kicad_sexpr.h>
 #include <sch_sheet_path.h>
 #include <sch_screen.h>
 #include <circuitalive/probe_placement.h>
 #include <circuitalive/model_profiles.h>
+#include <circuitalive/simulation_model.h>
 #include <filesystem>
+#include <fstream>
+#include <cmath>
+#include <algorithm>
 #include <cstdlib>
 #include <unistd.h>
 #include <connection_graph.h>
@@ -452,4 +459,256 @@ BOOST_FIXTURE_TEST_CASE( NativePowerSymbolsGenerateSuppliesAndKeepGlobalNetConne
     BOOST_CHECK_EQUAL( s.circuit.currentWarnings.size(), 3 );
     v = voltages( s ); BOOST_CHECK_CLOSE( v.at( "R2" ), 5, 1e-6 );
     BOOST_CHECK_EQUAL( s.circuit.pinNodes[parts.at( "R1" )].at( "1" ), s.circuit.pinNodes[parts.at( "R2" )].at( "1" ) );
+}
+
+namespace
+{
+void CheckNativePipeline( SCHEMATIC_SNAPSHOT snapshot, const wxString& reference )
+{
+    auto& c = snapshot.circuit;
+    std::size_t ff = 0;
+    while( ff < snapshot.locations.size() && snapshot.locations[ff].reference != reference ) ++ff;
+    BOOST_REQUIRE_LT( ff, c.pinNodes.size() );
+    const auto& nodes = c.pinNodes[ff];
+    BOOST_CHECK_EQUAL( nodes.at( "3" ), nodes.at( "11" ) );
+    BOOST_CHECK_EQUAL( nodes.at( "5" ), nodes.at( "12" ) );
+    c.config.signals.clear(); const std::size_t first = 0;
+    for( const auto& pin : { "3", "5", "9" } ) c.config.signals.push_back( "v(" + nodes.at( pin ) + ")" );
+    BOOST_REQUIRE_EQUAL( c.switches.size(), 1u );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER ); session.Configure( c.netlist, c.config );
+    session.AdvanceTo( .1 );
+    session.SetSourceValue( c.switches[0].controlSource, c.switches[0].off ); session.AdvanceTo( .2 );
+    auto sample = session.Snapshot().latest;
+    BOOST_CHECK_LT( sample.values[first+1], .1 ); BOOST_CHECK_LT( sample.values[first+2], .1 );
+    for( const bool data : { true, false } ) BOOST_TEST_CONTEXT( "DATA=" << data )
+    {
+        session.SetSourceValue( c.switches[0].controlSource, data ? c.switches[0].on : c.switches[0].off );
+        bool previous = sample.values[first] > 3.5; unsigned edges = 0;
+        const auto start = sample.time; double firstEdge = 0;
+        for( unsigned tick = 1; tick < 15000; ++tick )
+        {
+            session.AdvanceTo( start + tick * 1e-5 ); sample = session.Snapshot().latest;
+            const bool high = sample.values[first] > 3.5;
+            if( high && !previous )
+            {
+                ++edges;
+                const auto q1 = sample.values[first+1], q2 = sample.values[first+2];
+                BOOST_TEST_MESSAGE( "edge=" << edges << " t=" << sample.time << " Q1=" << q1 << " Q2=" << q2 );
+                if( data ) BOOST_CHECK_GT( q1, 4.8 ); else BOOST_CHECK_LT( q1, .2 );
+                if( edges == 1 )
+                {
+                    firstEdge = sample.time;
+                    if( data ) BOOST_CHECK_LT( q2, .2 ); else BOOST_CHECK_GT( q2, 4.8 );
+                }
+                else
+                {
+                    if( data ) BOOST_CHECK_GT( q2, 4.8 ); else BOOST_CHECK_LT( q2, .2 );
+                    BOOST_TEST_MESSAGE( "Clock period=" << sample.time - firstEdge << " s" ); break;
+                }
+            }
+            previous = high;
+        }
+        BOOST_CHECK_EQUAL( edges, 2u );
+    }
+}
+}
+
+BOOST_FIXTURE_TEST_CASE( Native555PipelineDemoRegistersDataOnSeparateRisingEdges, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "digital_74hc74_pipeline.kicad_sch" );
+    LoadSchematic( file ); CheckNativePipeline( CaptureSchematic( *m_schematic ), "U2" );
+}
+
+BOOST_FIXTURE_TEST_CASE( AuditUserClockPipeline, KI_TEST::SCHEMATIC_TEST_FIXTURE, *boost::unit_test::disabled() )
+{
+    const char* path = std::getenv( "CIRCUITALIVE_PIPELINE_SCHEMATIC" ); BOOST_REQUIRE( path );
+    LoadSchematic( wxFileName( wxString::FromUTF8( path ) ) );
+    auto snapshot = CaptureSchematic( *m_schematic );
+    CheckNativePipeline( std::move( snapshot ), "U3" );
+}
+
+BOOST_FIXTURE_TEST_CASE( NativeTitlesAndTextBoxesAreAnnotationsDuringInteractiveSimulation,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    LoadSchematic( wxFileName( CIRCUITALIVE_TEST_SCHEMATIC ) );
+    const auto before = CaptureSchematic( *m_schematic );
+    m_schematic->RootScreen()->Append( new SCH_TEXT( VECTOR2I(), ".Circuit title\n.notes" ) );
+    m_schematic->RootScreen()->Append( new SCH_TEXTBOX( LAYER_NOTES, 0, FILL_T::NO_FILL,
+                                                      ".tran 1u 10m\nText box title" ) );
+    // A graphic/title symbol with no electrical pins must not require a model either.
+    auto* title = new SCH_SYMBOL(); title->SetLibId( LIB_ID( "Graphic", "Title" ) );
+    m_schematic->RootScreen()->Append( title );
+    const auto after = CaptureSchematic( *m_schematic );
+    BOOST_CHECK_EQUAL( before.circuit.netlist, after.circuit.netlist );
+    BOOST_CHECK_EQUAL( before.locations.size(), after.locations.size() );
+}
+
+BOOST_FIXTURE_TEST_CASE( NativeExcludedInstanceBypassesBrokenModelAndPersistsWithoutChangingSettings,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "standard_library_led.kicad_sch" );
+    LoadSchematic( file );
+    auto findLed = [&]() -> SCH_SYMBOL*
+    {
+        for( auto* item : m_schematic->RootScreen()->Items().OfType( SCH_SYMBOL_T ) )
+        {
+            auto* symbol = static_cast<SCH_SYMBOL*>( item );
+            if( symbol->GetRef( &m_schematic->CurrentSheet() ) == "D1" ) return symbol;
+        }
+        return nullptr;
+    };
+    auto* led = findLed(); BOOST_REQUIRE( led );
+    auto settings = ReadSymbolModelSettings( *led, m_schematic->CurrentSheet(), "", "" );
+    settings.modelFile = "missing-file.casim"; settings.modelParameters = {{ "forward_voltage", "3.2V" }};
+    WriteSymbolModelSettings( *led, settings );
+    BOOST_CHECK_THROW( CaptureSchematic( *m_schematic ), std::runtime_error );
+    led->GetField( "CA.Parameters" )->SetText( "{invalid json" );
+    BOOST_CHECK_THROW( ReadSymbolModelSettings( *led, m_schematic->CurrentSheet(), "", "" ), std::runtime_error );
+    BOOST_CHECK_NO_THROW( ReadSymbolModelSettings( *led, m_schematic->CurrentSheet(), "", "", true ) );
+    led->SetExcludedFromSim( true, &m_schematic->CurrentSheet(), "" );
+    const auto excluded = CaptureSchematic( *m_schematic );
+    BOOST_CHECK( excluded.circuit.leds.empty() );
+    for( const auto& location : excluded.locations ) BOOST_CHECK( location.reference != "D1" );
+    struct TEMP_PROJECT
+    {
+        std::filesystem::path path = std::filesystem::temp_directory_path()
+                / ( "ca-exclusion-" + std::to_string( getpid() ) );
+        TEMP_PROJECT() { std::filesystem::create_directories( path ); }
+        ~TEMP_PROJECT() { std::error_code ec; std::filesystem::remove_all( path, ec ); }
+    } temporary;
+    const auto saved = temporary.path / "standard_library_led.kicad_sch";
+    SCH_IO_KICAD_SEXPR().SaveSchematicFile( wxString::FromUTF8( saved.string() ),
+                                         m_schematic->GetTopLevelSheet( 0 ), m_schematic.get() );
+    LoadSchematic( wxFileName( wxString::FromUTF8( saved.string() ) ) );
+    led = findLed(); BOOST_REQUIRE( led );
+    BOOST_CHECK( led->GetExcludedFromSim( &m_schematic->CurrentSheet(), "" ) );
+    BOOST_CHECK_EQUAL( led->GetField( "CA.Model" )->GetText(), "missing-file.casim" );
+    BOOST_CHECK_EQUAL( led->GetField( "CA.Parameters" )->GetText(), "{invalid json" );
+    const auto circuit = CaptureSchematic( *m_schematic ).circuit;
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config ); session.AdvanceTo( .01 );
+    BOOST_CHECK( session.Snapshot().state == SIM_SESSION_STATE::PAUSED );
+    led->SetExcludedFromSim( false, &m_schematic->CurrentSheet(), "" );
+    BOOST_CHECK_THROW( CaptureSchematic( *m_schematic ), std::runtime_error );
+}
+
+BOOST_FIXTURE_TEST_CASE( CircuitAliveDemoSchematicsAllRunInteractively, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    const auto folder = std::filesystem::path( CIRCUITALIVE_TEST_SCHEMATIC ).parent_path();
+    std::size_t count = 0;
+    for( const auto& entry : std::filesystem::directory_iterator( folder ) )
+    {
+        if( entry.path().extension() != ".kicad_sch" ) continue;
+        BOOST_TEST_CONTEXT( entry.path().filename().string() )
+        {
+            auto project = entry.path(); project.replace_extension( ".kicad_pro" );
+            BOOST_REQUIRE_MESSAGE( std::filesystem::is_regular_file( project ), "Open Demo Project requires " << project );
+            try
+            {
+                LoadSchematic( wxFileName( wxString::FromUTF8( entry.path().string() ) ) );
+                const auto c = CaptureSchematic( *m_schematic ).circuit;
+                INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+                session.Configure( c.netlist, c.config ); session.AdvanceTo( .05 );
+                const auto view = session.Snapshot();
+                BOOST_CHECK( view.state == SIM_SESSION_STATE::PAUSED );
+                for( const double v : view.latest.values ) BOOST_CHECK( std::isfinite( v ) );
+                BOOST_TEST_MESSAGE( "PASS " << entry.path().filename().string() ); ++count;
+            }
+            catch( const std::exception& e ) { BOOST_ERROR( e.what() ); }
+        }
+    }
+    BOOST_CHECK_GE( count, 12u );
+}
+
+BOOST_FIXTURE_TEST_CASE( LegacyRectifierDemoAssociatesNamedDiodeAndOriginalSineSource, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    const auto file = std::filesystem::path(CIRCUITALIVE_TEST_SCHEMATIC).parent_path().parent_path()/"rectifier/rectifier.kicad_sch";
+    LoadSchematic( wxFileName(wxString::FromUTF8(file.string())) );
+    bool diode=false,source=false;
+    for(auto* item:m_schematic->RootScreen()->Items().OfType(SCH_SYMBOL_T))
+    {
+        auto* s=static_cast<SCH_SYMBOL*>(item);const auto ref=s->GetRef(&m_schematic->CurrentSheet());
+        if(ref!="D1"&&ref!="V1")continue;
+        const auto r=MODEL_REPOSITORY().Resolve(ReadSymbolModelSettings(*s,m_schematic->CurrentSheet(),"",file.parent_path().string()));
+        if(ref=="D1"){diode=true;BOOST_CHECK_EQUAL(r.model.id,"diode_1n4148");BOOST_CHECK_EQUAL(r.pins.at("k"),"1");}
+        else{source=true;BOOST_CHECK_EQUAL(r.parameters.at("frequency"),1000);BOOST_CHECK_EQUAL(r.parameters.at("amplitude"),1);}
+    }
+    BOOST_REQUIRE(diode&&source);const auto c=CaptureSchematic(*m_schematic).circuit;
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(c.netlist,c.config);session.AdvanceTo(.02);
+    BOOST_CHECK(session.Snapshot().state==SIM_SESSION_STATE::PAUSED);
+}
+
+BOOST_FIXTURE_TEST_CASE( LegacyAmplifierDemoAssociates2n2222TransistorsAndRuns, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    const auto file=std::filesystem::path(CIRCUITALIVE_TEST_SCHEMATIC).parent_path().parent_path()/"amplifier-ac/amplifier-ac.kicad_sch";
+    LoadSchematic(wxFileName(wxString::FromUTF8(file.string())));unsigned count=0;
+    for(auto* item:m_schematic->RootScreen()->Items().OfType(SCH_SYMBOL_T))
+    {
+        auto* s=static_cast<SCH_SYMBOL*>(item);if(!s->GetRef(&m_schematic->CurrentSheet()).StartsWith("Q"))continue;
+        const auto r=MODEL_REPOSITORY().Resolve(ReadSymbolModelSettings(*s,m_schematic->CurrentSheet(),"",file.parent_path().string()));
+        BOOST_CHECK_EQUAL(r.model.id,"bjt_pn2222a");BOOST_CHECK_EQUAL(r.pins.at("c"),"1");BOOST_CHECK_EQUAL(r.pins.at("e"),"3");++count;
+    }
+    BOOST_REQUIRE_EQUAL(count,3u);const auto c=CaptureSchematic(*m_schematic).circuit;
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(c.netlist,c.config);session.AdvanceTo(.02);
+    for(double value:session.Snapshot().latest.values)BOOST_CHECK(std::isfinite(value));
+}
+
+BOOST_FIXTURE_TEST_CASE( AuditAllSimulationDemos, KI_TEST::SCHEMATIC_TEST_FIXTURE,
+                         *boost::unit_test::disabled() )
+{
+    const char* report = std::getenv( "CIRCUITALIVE_DEMO_AUDIT_REPORT" );
+    std::ofstream output;
+    if( report ) output.open( report );
+    const auto root = std::filesystem::path( CIRCUITALIVE_TEST_SCHEMATIC ).parent_path().parent_path();
+    for( const auto& entry : std::filesystem::recursive_directory_iterator( root ) )
+    {
+        if( entry.path().extension() != ".kicad_sch" ) continue;
+        std::string status = "interactive", detail;
+        try
+        {
+            LoadSchematic( wxFileName( wxString::FromUTF8( entry.path().string() ) ) );
+            const auto c = CaptureSchematic( *m_schematic ).circuit;
+            INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+            session.Configure( c.netlist, c.config ); session.AdvanceTo( .02 );
+        }
+        catch( const std::exception& e )
+        {
+            status = "requires_adaptation"; detail = e.what();
+            std::replace( detail.begin(), detail.end(), '\n', ' ' );
+            std::replace( detail.begin(), detail.end(), '\t', ' ' );
+        }
+        const auto path = std::filesystem::relative( entry.path(), root ).generic_string();
+        BOOST_TEST_MESSAGE( status << " " << path << " " << detail );
+        if( output ) output << path << '\t' << status << '\t' << detail << '\n';
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( MemoryResourceFieldsPersistAndNativeDemoLoadsBothImages, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file(CIRCUITALIVE_TEST_SCHEMATIC);file.SetFullName("memory_images.kicad_sch");LoadSchematic(file);
+    auto c=CaptureSchematic(*m_schematic).circuit;
+    BOOST_REQUIRE_EQUAL(c.config.memories.size(),2);
+    std::size_t ram=0,rom=0;
+    for(std::size_t i=0;i<c.config.memories.size();++i)(c.config.memories[i].writable?ram:rom)=i;
+    BOOST_CHECK_EQUAL(c.config.memories[rom].initial.data[0],0x43);
+    BOOST_CHECK_EQUAL(c.config.memories[rom].initial.data[0x8000],0x3c);
+    BOOST_CHECK_EQUAL(c.config.memories[ram].initial.data[0],0x49);
+    BOOST_CHECK_EQUAL(c.config.memories[ram].initial.known[0x200],0);
+    for(auto* item:m_schematic->RootScreen()->Items().OfType(SCH_SYMBOL_T))
+    {
+        auto* symbol=static_cast<SCH_SYMBOL*>(item);
+        if(symbol->GetRef(&m_schematic->CurrentSheet())!="U1")continue;
+        auto settings=ReadSymbolModelSettings(*symbol,m_schematic->CurrentSheet(),"",file.GetPath().ToStdString());
+        BOOST_CHECK_EQUAL(settings.resources.at("image").path,"memory_images/eprom_27c512.hex");
+        settings.resources["image"]={"data/arquivo com espaços.bin","bin",0x100};WriteSymbolModelSettings(*symbol,settings);
+        BOOST_CHECK(!symbol->GetField("CA.Resources")->IsVisible());
+        auto read=ReadSymbolModelSettings(*symbol,m_schematic->CurrentSheet(),"",settings.projectDirectory);
+        BOOST_CHECK(read.resources==settings.resources);
+        symbol->GetField("CA.Resources")->SetText("invalid json");symbol->SetExcludedFromSim(true,&m_schematic->CurrentSheet(),"");
+        BOOST_CHECK_NO_THROW(CaptureSchematic(*m_schematic));
+        settings.resources.clear();WriteSymbolModelSettings(*symbol,settings);BOOST_CHECK(symbol->GetField("CA.Resources")==nullptr);
+    }
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(c.netlist,c.config);session.AdvanceTo(1e-6);
+    BOOST_CHECK_EQUAL(session.ReadMemory(c.config.memories[rom].id,0,1).image.data[0],0x43);
+    BOOST_CHECK_EQUAL(session.ReadMemory(c.config.memories[ram].id,0,1).image.data[0],0x49);
 }

@@ -26,6 +26,8 @@ struct CIRCUIT_COMPONENT
     std::string projectDirectory = {};
     std::map<std::string, std::string> legacySpiceFields = {};
     MEASUREMENT_SELECTION measurements = {};
+    std::map<std::string, std::string> pinNames = {}; // Physical number -> electrical pin name.
+    std::map<std::string, RESOURCE_SELECTION> resources = {};
 };
 
 struct CIRCUIT_INDICATOR
@@ -45,12 +47,20 @@ struct CIRCUIT_SWITCH
     double off = 0;
 };
 
+struct CIRCUIT_ADJUSTMENT
+{
+    std::size_t component;
+    std::string id, label, source, unit;
+    double minimum, maximum, step, initial;
+};
+
 struct CIRCUIT_SNAPSHOT
 {
     std::string netlist;
     SIM_SESSION_CONFIG config;
     std::vector<CIRCUIT_INDICATOR> leds;
     std::vector<CIRCUIT_SWITCH> switches;
+    std::vector<CIRCUIT_ADJUSTMENT> adjustments;
     std::vector<std::map<std::string, std::string>> pinNodes; // Physical pins -> solver nodes, including open pins.
     std::vector<std::string> automaticReferences; // Source reference + negative pin number.
     std::vector<std::string> floatingIslands;     // Representative component; no source or explicit ground.
@@ -58,6 +68,8 @@ struct CIRCUIT_SNAPSHOT
     std::vector<MEASUREMENT_CHANNEL> measurements;
     std::vector<CURRENT_WARNING> currentWarnings;
     std::vector<LOGIC_PIN> logicPins;
+    struct MEMORY_LOCATION { std::size_t component; std::string id, label; std::size_t slot; };
+    std::vector<MEMORY_LOCATION> memories;
 };
 
 /// Resolve model files, parameters and physical pins, then freeze a component deck.

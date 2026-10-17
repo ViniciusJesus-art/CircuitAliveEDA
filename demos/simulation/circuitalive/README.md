@@ -1,5 +1,16 @@
 # CircuitAliveEDA: RC, chave e LED
 
+Todos os 12 esquemas desta pasta são verificados por
+`tools/circuitalive/test-demos.sh`. Os demais exemplos em `demos/simulation/`
+vieram do KiCad e vários exigem o simulador SPICE tradicional e suas bibliotecas.
+Use `tools/circuitalive/test-demos.sh --audit` para gerar o relatório de
+compatibilidade interativa.
+
+Para abrir no gerenciador, use **File → Open Demo Project…** e escolha o
+`.kicad_pro` do exemplo. Cada esquemático tem seu projeto; a janela do gerenciador
+não mostra esquemáticos isolados. Veja também as
+[associações de modelos](../../../docs/circuitalive/MODEL_ASSOCIATIONS.md).
+
 `interactive_rc_led.kicad_sch` é a demonstração da etapa 2. Abra no editor
 CircuitAliveEDA e use os ícones Play/Pause/Stop no final da barra superior. Clique em SW1 durante execução ou
 pausa. A capacitância maior torna carga e descarga perceptíveis na tela.
@@ -73,3 +84,12 @@ dos pinos. FLOAT é uma entrada sem driver, e a saída correspondente é X.
 
 Veja [Componentes básicos e digital](../../../docs/circuitalive/BASIC_AND_DIGITAL_MODELS.md)
 para os modelos, as convenções de Z/X e os limites elétricos.
+
+`digital_74hc74_pipeline.kicad_sch` demonstra dois estágios de um 74HC74
+no mesmo clock NE555 (~480 Hz). No painel Simulation selecione **Speed 0.001×**
+e clique em SW1: Q1 recebe o dado na primeira borda de subida; Q2 recebe
+o Q1 anterior e muda na seguinte. Pause e Step permitem inspecionar fatias
+de tempo; o osciloscópio tem CLK, Q1 e Q2 (experimente 500 µs/div e trigger CLK).
+Detalhes em [Clock e inspeção](../../../docs/circuitalive/SEQUENTIAL_LOGIC_AND_DEMOS.md).
+
+- `memory_images.kicad_pro`: EPROM 27C512-55 e SRAM com imagens Intel HEX. Use Simulation model → Data files para escolher dados, e View memory no menu de contexto para inspecionar/exportar o estado pausado. As imagens de exemplo ficam em `memory_images/`.

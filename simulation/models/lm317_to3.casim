@@ -78,6 +78,9 @@
   "matches": {
     "library_ids": [
       "Regulator_Linear:LM317_TO3"
+    ],
+    "symbol_names": [
+      "LM317_TO3"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -93,5 +96,7 @@
   "measurement_ports": {
     "positive": "in",
     "negative": "adj"
-  }
+  },
+  "category": "Power/Linear regulators",
+  "family": "Adjustable"
 }

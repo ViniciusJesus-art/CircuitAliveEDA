@@ -80,9 +80,28 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         if( !component.projectDirectory.empty() ) { projectDirectory = component.projectDirectory; break; }
     MODEL_REPOSITORY repository( MODEL_REPOSITORY::DefaultDirectories( projectDirectory ) );
     std::vector<RESOLVED_MODEL> models;
+    std::size_t memoryBytes=0;
     for( const auto& component : aComponents )
     {
-        try { models.push_back( repository.Resolve( component ) ); }
+        try
+        {
+            auto model = repository.Resolve( component );
+            const auto componentIndex = models.size();
+            for( auto region : InitialModelMemories( component, model.model ) )
+            {
+                memoryBytes += region.initial.data.size();
+                if( memoryBytes > MAX_MEMORY_BYTES || result.config.memories.size() >= 128 )
+                    throw std::runtime_error( "Circuit memory limit: 1 MiB and 128 regions" );
+                const auto id = region.id;
+                const auto slot = result.config.memories.size();
+                model.memorySlots[id] = slot;
+                result.memories.push_back( { componentIndex, id, region.label, slot } );
+                region.id = "ca" + std::to_string( componentIndex + 1 ) + "_" + id;
+                region.label = component.reference + " — " + region.label;
+                result.config.memories.push_back( std::move( region ) );
+            }
+            models.push_back( std::move( model ) );
+        }
         catch( const std::exception& e ) { throw std::runtime_error( component.reference + ": " + e.what() ); }
     }
     auto allComponents = aComponents;
@@ -250,6 +269,14 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             if( !model.model.controlSource.empty() )
                 result.switches.push_back( { i, expand( model.model.controlSource ),
                                             model.model.controlOn, model.model.controlOff } );
+            for( const auto& control : model.model.adjustments )
+            {
+                const double initial = model.parameters.at( control.parameter );
+                if( initial < control.minimum || initial > control.maximum )
+                    throw std::runtime_error( "Live adjustment initial value is out of range" );
+                result.adjustments.push_back( { i, control.id, control.label, expand( control.source ),
+                    control.unit, control.minimum, control.maximum, control.step, initial } );
+            }
             if( !model.model.warningSignal.empty() && model.parameters.at( model.model.warningParameter ) > 0 )
                 warnings.push_back( { expand( model.model.warningSignal ),
                     { c.reference, NO_SIGNAL, model.parameters.at( model.model.warningParameter ) } } );

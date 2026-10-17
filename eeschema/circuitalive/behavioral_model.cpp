@@ -40,6 +40,24 @@ void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
     add( "Bbh_power_${id} bh_power_${id} 0 V={(v(" + vcc + "," + gnd + ") >= ${param:vmin} && v(" + vcc + "," + gnd + ") <= ${param:vmax})}" );
     add( "Bbh_iq_${id} " + vcc + " " + gnd + " I={v(bh_power_${id}) > 0.5 ? ${param:iq} : 0}" );
     def( ".model bh_adc_${id} adc_bridge(in_low=${param:vil} in_high=${param:vih})" );
+    const auto& blocks = b.at( "blocks" );
+    if( !blocks.is_array() || blocks.empty() || blocks.size() > 1024 ) throw std::runtime_error( "Invalid behavioral block count" );
+    std::set<std::string> clockInputs;
+    if( b.value( "clock_hysteresis", false ) )
+    {
+        for( const auto& block : blocks )
+            if( block.at( "type" ) == "dff" )
+            {
+                auto name = block.at( "clock" ).get<std::string>();
+                if( name.starts_with( '!' ) ) name.erase( 0, 1 );
+                clockInputs.insert( std::move( name ) );
+            }
+        // ngspice's ADC uses hysteresis when in_low > in_high. Clock inputs
+        // retain their phase in the threshold band instead of emitting X and
+        // then creating another rising edge on the return to HIGH. Data pins
+        // keep the ordinary 0/X/1 thresholds.
+        def( ".model bh_clock_adc_${id} adc_bridge(in_low=${param:vih} in_high=${param:vil})" );
+    }
     def( ".model bh_dac_${id} dac_bridge(out_low=0 out_high=1 out_undef=0.5 t_rise=${param:transition} t_fall=${param:transition})" );
     def( ".model bh_zero_${id} d_pulldown" ); def( ".model bh_one_${id} d_pullup" );
     add( "Abh_zero_${id} bh_d_0_${id} bh_zero_${id}" );
@@ -64,10 +82,9 @@ void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
         const auto d = output( p.id ), n = "bh_n_" + p.id + "_${id}", physical = "${pin:" + p.id + "}";
         add( "Bbh_in_" + p.id + "_${id} " + n + " 0 V={(v(bh_power_${id}) > 0.5 && ${drive:" + p.id + "} > 0.5) ? v(" + physical + "," + gnd + ")/max(v(" + vcc + "," + gnd + "),1u) : 0.5}" );
         add( "Cbh_in_" + p.id + "_${id} " + physical + " " + gnd + " ${param:cin}" );
-        add( "Abh_adc_" + p.id + "_${id} [" + n + "] [" + d + "] bh_adc_${id}" );
+        add( "Abh_adc_" + p.id + "_${id} [" + n + "] [" + d + "] "
+            + ( clockInputs.contains( p.id ) ? "bh_clock_adc_${id}" : "bh_adc_${id}" ) );
     }
-    const auto& blocks = b.at( "blocks" );
-    if( !blocks.is_array() || blocks.empty() || blocks.size() > 1024 ) throw std::runtime_error( "Invalid behavioral block count" );
     std::size_t index = 0, memoryBits = 0;
     for( const auto& block : blocks )
     {
@@ -111,6 +128,29 @@ void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
             }
             pins += " " + s( "set" ) + " " + s( "reset" ) + " " + o( "q" ) + " " + o( "nq" );
             spec += " set_delay=${param:rise_delay} reset_delay=${param:fall_delay} rise_delay=1p fall_delay=1p ic=" + std::to_string( initial ) + ")";
+        }
+        else if( type == "rom" || (type == "ram" && block.contains("memory")) )
+        {
+            const auto id=block.at("memory").get<std::string>();
+            const auto region=std::find_if(m.memories.begin(),m.memories.end(),[&](const auto& r){return r.id==id;});
+            if(region==m.memories.end() || region->addressBits!=block.at("address").size()
+               || region->wordBits!=block.at("data_out").size()
+               || region->writable!=(type=="ram"))
+                throw std::runtime_error("Memory block shape/region mismatch: "+id);
+            add("A"+stem+"_power [bh_power_${id}] ["+stem+"_pd] bh_adc_${id}");
+            add("A"+stem+"_ready "+stem+"_pd "+stem+"_rd "+stem+"_ready_model");
+            def(".model "+stem+"_ready_model d_buffer(rise_delay="+par("powerup_delay")+" fall_delay=1p)");
+            const auto address=vector("address",false);
+            std::string input;
+            if(type=="ram")
+            {
+                if(block.at("data_in").size()!=region->wordBits)throw std::runtime_error("Memory data width mismatch");
+                input=vector("data_in",false);
+            }
+            else { input="["; for(unsigned i=0;i<region->wordBits;++i)input+=" "+signal("0");input+=" ]"; }
+            pins=address+" "+input+" "+vector("data_out",true)+" "+(type=="ram" ? s("write") : signal("0"))
+                +" "+signal(block.at("select").at(0))+" "+stem+"_pd "+stem+"_rd";
+            spec="ca_memory(slot=${memory:"+id+"} read_delay="+par("read_delay")+")";
         }
         else if( type == "ram" )
         {

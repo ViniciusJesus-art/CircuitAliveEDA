@@ -1,5 +1,8 @@
 # Arquivos de modelo e configuração por componente
 
+Para reconhecer cópias de símbolos, nomes de peças e pinagens diferentes da mesma
+família, veja [Associações automáticas e demos](MODEL_ASSOCIATIONS.md).
+
 Esta etapa substitui o catálogo de componentes em C++ por **arquivos carregados
 em tempo de execução**. O símbolo descreve o desenho e os pinos físicos; o
 arquivo descreve o comportamento elétrico, os parâmetros e os terminais do modelo.
@@ -234,3 +237,11 @@ exige somente novos arquivos e suas associações.
   foi carregado e salvo como caminho relativo `models/test_led.casim`.
 - Evidências locais em `.circuitalive/logs/`: `test-model-files-session.log`,
   `test-model-files-spice.log`, `model-files-ui-results.json` e `model-files-*.png`.
+
+## Seleção e ajustes ao vivo
+
+O [navegador de modelos e os controles ao vivo](LIVE_CONTROLS.md) documentam
+os campos opcionais `category`, `family` e `adjustments`. Potenciômetros e
+trimpots podem mudar de posição durante a execução, sem reiniciar o circuito.
+
+Imagens por instância e regiões de memória são descritas em [MEMORY_IMAGES.md](MEMORY_IMAGES.md). O campo oculto `CA.Resources` guarda as escolhas de cada componente.
