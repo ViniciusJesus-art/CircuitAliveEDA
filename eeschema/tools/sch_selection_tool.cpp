@@ -65,6 +65,7 @@
 #include <view/view.h>
 #include <view/view_controls.h>
 #include <wx/log.h>
+#include <circuitalive/right_click_gesture.h>
 
 #include "symb_transforms_utils.h"
 
@@ -399,6 +400,15 @@ bool SCH_SELECTION_TOOL::Init()
     Connect( m_disambiguateTimer.GetId(), wxEVT_TIMER,
              wxTimerEventHandler( SCH_SELECTION_TOOL::onDisambiguationExpire ), nullptr, this );
 
+    m_rightClickGesture = std::make_unique<CIRCUITALIVE::RIGHT_CLICK_GESTURE>(
+            [this]( const TOOL_EVENT& aContextEvent )
+            {
+                if( m_frame->ToolStackIsEmpty() )
+                    m_toolMgr->ProcessEvent( aContextEvent );
+                else
+                    m_rightClickGesture->Cancel();
+            } );
+
     return true;
 }
 
@@ -406,6 +416,9 @@ bool SCH_SELECTION_TOOL::Init()
 void SCH_SELECTION_TOOL::Reset( RESET_REASON aReason )
 {
     m_frame = getEditFrame<SCH_BASE_FRAME>();
+
+    if( m_rightClickGesture )
+        m_rightClickGesture->Cancel();
 
     if( aReason != TOOL_BASE::REDRAW )
     {
@@ -493,6 +506,18 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
     // Main loop: keep receiving events
     while( TOOL_EVENT* evt = Wait() )
     {
+        const bool deferredContext = evt->Matches( CIRCUITALIVE::RIGHT_CLICK_GESTURE::ContextEvent() );
+
+        if( deferredContext )
+        {
+            if( !m_rightClickGesture->Consume( *evt ) || !m_frame->ToolStackIsEmpty() )
+                continue;
+        }
+        else if( !evt->IsMotion() && !evt->IsClick( BUT_RIGHT ) && !evt->IsMouseDown( BUT_RIGHT ) )
+        {
+            m_rightClickGesture->Cancel();
+        }
+
         bool selCancelled = false;
         bool displayWireCursor = false;
         bool displayBusCursor = false;
@@ -640,9 +665,35 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
                 m_selection.SetIsHover( false );
             }
         }
-        else if( evt->IsClick( BUT_RIGHT ) )
+        else if( evt->IsDblClick( BUT_RIGHT ) && !m_isSymbolEditor && !m_isSymbolViewer
+                 && m_frame->ToolStackIsEmpty() )
         {
             m_disambiguateTimer.Stop();
+            m_rightClickGesture->Cancel();
+
+            if( SCH_EDIT_FRAME* schframe = dynamic_cast<SCH_EDIT_FRAME*>( m_frame ) )
+                schframe->ClearFocus();
+
+            // Target the item at the pointer, never an unrelated previous selection.
+            ClearSelection();
+            SelectPoint( evt->Position(), SCH_COLLECTOR::DeletableItems, nullptr, &selCancelled );
+
+            if( !selCancelled && !m_selection.Empty() )
+            {
+                m_selection.SetIsHover( true );
+                m_toolMgr->RunAction( ACTIONS::doDelete );
+            }
+        }
+        else if( evt->IsClick( BUT_RIGHT ) || deferredContext )
+        {
+            m_disambiguateTimer.Stop();
+
+            if( !deferredContext && !m_isSymbolEditor && !m_isSymbolViewer
+                && m_frame->ToolStackIsEmpty() )
+            {
+                m_rightClickGesture->Defer( *evt );
+                continue;
+            }
 
             // right click? if there is any object - show the context menu
             if( m_selection.Empty() )

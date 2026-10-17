@@ -77,16 +77,119 @@ Mudar essas opções encerra a sessão anterior; Play reconstrói o circuito.
 - Pause congela o tempo, as leituras e as curvas. Play retoma a sessão;
   Stop descarta os dados e recolhe as duas abas. A aba Probes permanece disponível.
 
-O osciloscópio oferece janelas de 1, 10, 50, 100, 250 e 500 ms, com escala de
-tensão automática. O eixo horizontal usa tempo de simulação. O texto abaixo
-informa a quantidade e o intervalo de amostras disponíveis. O histórico é
-limitado; com muitos sinais, uma janela de 500 ms pode conter dados apenas em
-parte dela. O desenho conserva os extremos das amostras agrupadas por pixel.
+## Osciloscópio
 
-O passo máximo atual do solver é **100 µs**. Este osciloscópio inicial serve
-para acompanhar transientes compatíveis com essa resolução; ainda não oferece
-trigger, cursores, RMS, FFT ou captura de sinais de alta frequência. A sessão
-aceita até 256 sinais salvos, incluindo indicadores e monitores internos.
+**Time/div** controla o tempo de cada uma das dez divisões horizontais. A lista
+usa a sequência 1–2–5; também aceita valores digitados com unidade, como
+`250 us`, `2 ms` ou `0,05 s`, aplicados com Enter ou ao sair do campo.
+A faixa manual é 1 ns/div a 1000 s/div; isso controla a apresentação,
+não muda o passo do solver nem aumenta o histórico disponível.
+A roda do mouse sobre o gráfico muda Time/div; **Shift + roda** muda a escala
+do sinal selecionado. **Expand / dock** abre o painel em uma janela maior e
+permite devolvê-lo à lateral. Também é possível redimensionar a janela.
+
+**Auto** ajusta a amplitude de cada sinal, centraliza o nível de trigger e,
+quando há ciclos suficientes, escolhe uma escala de tempo para alguns períodos.
+A janela escolhida é limitada ao histórico disponível naquele momento.
+O desenho preserva mínimo e máximo de cada grupo de amostras por pixel.
+
+### Trigger
+
+Na aba **Trigger**, escolha a fonte, a borda de subida/descida e o nível em V.
+A linha laranja horizontal mostra o nível na escala do canal de trigger;
+a linha vertical T marca o instante de disparo. Os tempos do eixo e dos
+cursores passam a ser relativos a T.
+
+| Modo | Aquisição |
+|---|---|
+| Auto | Dispara pela borda; sem disparo por uma janela de tempo, mostra uma captura livre |
+| Normal | Atualiza somente depois de uma borda válida e da aquisição do intervalo posterior; conserva a última captura enquanto aguarda |
+| Single | Arma para a próxima borda e conserva uma única captura; **Rearm** espera uma nova borda |
+| Off / roll | Atualiza continuamente, sem sincronização por trigger |
+
+**Hysteresis** exige que o sinal volte além do nível antes de armar outra borda,
+reduzindo disparos por ruído. O disparo usa interpolação linear entre as duas
+amostras da borda; não depende de uma amostra atingir exatamente o nível.
+**Pretrigger (%)** posiciona o disparo na janela; 50% reserva metade do intervalo
+para antes dele. **Holdoff** define o tempo mínimo entre o fim de uma captura
+e a aceitação da próxima borda. **Time offset** desloca a janela em segundos:
+positivo para depois, negativo para antes. No modo roll, valores negativos
+permitem examinar uma parte anterior do histórico ainda disponível.
+
+**Hold** congela apenas a captura do osciloscópio, enquanto o circuito continua
+simulando. É possível mudar a escala de tempo, posição e amplitude durante Hold
+ou depois de Single sem perder a captura. Sair de Hold ou usar Rearm retoma a
+busca a partir das amostras mais recentes. O Pause da barra superior congela
+a própria simulação e todas as medições.
+
+### Escala de cada sinal
+
+Na aba **Signals**, escolha o sinal e ajuste **Amplitude / div**, **Center (V)**,
+visibilidade e inversão do desenho. O centro é a tensão da linha central da grade
+de oito divisões verticais. Cada canal tem sua própria escala; as cores e as
+legendas identificam essas escalas. Os valores no eixo vertical correspondem
+ao sinal selecionado. O pequeno traço à esquerda indica o zero de cada canal.
+Editar escala ou centro desliga o ajuste automático desse canal;
+**Fit this signal** volta ao automático. Inverter o desenho não troca o sinal
+das medições nem altera o circuito.
+
+### Cursores
+
+Na aba **Cursors**, escolha **Time**, **Amplitude** ou **Time + amplitude** e o
+sinal de referência. Arraste as linhas no gráfico ou digite os valores A e B.
+Um clique posiciona A; Shift-clique posiciona B. Perto de uma linha, o arraste
+move essa linha. Nos modos de tempo, os campos usam o mesmo zero do eixo.
+
+- Cursores verticais: tensão interpolada em A/B, **Δt**, **ΔV(t)**,
+  **1/|Δt|** e **ΔV/Δt**. O inverso de Δt representa uma frequência somente
+  quando os cursores delimitam um período.
+- Cursores horizontais YA/YB: níveis manuais e **ΔY**, diferença de amplitude.
+- Um resumo permanece sob o gráfico mesmo ao trocar a aba de controles.
+
+As leituras usam a escala física do canal escolhido. Fora do intervalo
+realmente adquirido, mostram `—`; não extrapolam partes ausentes do histórico.
+
+### Medições dos sinais
+
+A aba **Readings** mostra todos os sinais do osciloscópio, mesmo os ocultos:
+**mínimo, máximo, pico a pico, média, RMS, frequência, período, duty cycle** e
+quantidade de amostras. Selecionar uma linha escolhe esse canal para o eixo e
+os cursores. Na lateral estreita, use a rolagem horizontal da tabela ou
+**Expand / dock** para ver todas as colunas.
+
+Média e RMS são ponderados pelo tempo, integrando a interpolação linear entre
+amostras; RMS inclui a componente DC. Os cálculos usam apenas a parte disponível
+da janela visível, incluindo suas fronteiras interpoladas. Frequência e período
+são estimados por bordas de subida no ponto médio entre mínimo e máximo, com
+histerese de 10% da amplitude. Exigem pelo menos duas bordas de subida e aparecem como estimativas.
+São úteis para sinais periódicos; transientes não periódicos podem produzir
+uma estimativa sem significado físico.
+O duty cycle mede o tempo acima desse ponto médio entre a primeira e a última
+borda de subida. Sinais constantes ou sem ciclos suficientes mostram `—`.
+
+**Export capture CSV…** grava tempo absoluto de simulação em segundos e tensões
+em volts, usando as amostras brutas da captura visível. A exportação usa uma
+cópia consistente da captura, mesmo se a simulação continuar durante a escolha
+do arquivo. Os ajustes de escala, canais, trigger e cursores sobrevivem a
+Stop/Play durante a mesma janela do editor; os dados de aquisição são descartados
+por Stop. Esses ajustes ainda não são gravados no projeto ou entre execuções.
+
+### Resolução e limites
+
+O texto inferior informa o passo máximo do solver, o maior intervalo entre
+amostras da captura e o tamanho do histórico disponível. O passo padrão é
+100 µs, reduzido automaticamente por determinados modelos, como fontes AC e 555.
+O histórico contém até 8192 amostras e 65536 valores; mais sinais salvos reduzem
+a duração disponível. Capturas que excedem esse espaço indicam **partial history**
+e deixam as regiões ausentes sem desenho. O limite também vale durante Single.
+
+Zoom não recupera amostras inexistentes. O painel sinaliza espaçamento excessivo
+para a escala escolhida ou para o período estimado. A frequência detectada pode
+sofrer aliasing; essa indicação não detecta todos os casos. Para frentes muito
+rápidas ou alta frequência, será necessário ampliar os controles de resolução
+da aquisição/solver. Esta etapa não inclui FFT nem simulação de largura de banda,
+ruído ou carga de uma probe física. A sessão aceita até 256 sinais salvos,
+incluindo indicadores e monitores internos.
 
 ## Status e avisos
 
@@ -114,11 +217,14 @@ a carga de C1; clique em SW1 para acompanhar sua descarga no osciloscópio.
 
 O código continua isolado em `eeschema/circuitalive/`: `measurements.*` define
 canais e unidades; `probe_placement.*` cria símbolos e modifica fios usando o
-histórico nativo; `instrument_panel.*` cuida das abas e do gráfico. O adapter
+histórico nativo; `instrument_panel.*` cuida das abas; `scope_panel.*` reúne os controles e o
+desenho; `scope_acquisition.*` implementa captura, trigger, interpolação, escalas
+e cálculos sem depender de wxWidgets. O adapter
 captura os símbolos, o snapshot cria os sensores e o runner coleta os valores
 e o histórico fora da thread gráfica. Nenhum formato do KiCad foi alterado.
 
-Validação: 42 casos do núcleo interativo e 61 casos SPICE, incluindo direção
-da corrente, balanço de potência, nomes, probes em arquivos salvos, carga RC,
-histórico limitado, pausa/retomada, avisos e pinagem física. A interface foi
-verificada em sessão Xvfb isolada com colocação, gravação e reabertura.
+Validação do osciloscópio: testes de pré/pós-trigger, bordas, histerese,
+holdoff, Single/rearme, Auto/Normal/Roll, Hold e zoom, sobreposição de históricos,
+reinício de sessão, memória limitada, integração de média/RMS com amostragem
+irregular, frequência/duty, cursores e entradas SI. A interface é conferida
+em Xvfb isolado com o exemplo `ne555_astable.kicad_sch`.

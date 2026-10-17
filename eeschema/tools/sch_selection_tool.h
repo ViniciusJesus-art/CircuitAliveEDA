@@ -41,6 +41,11 @@ class SCH_TABLE;
 class EE_GRID_HELPER;
 class SCH_TABLECELL;
 
+namespace CIRCUITALIVE
+{
+class RIGHT_CLICK_GESTURE;
+}
+
 namespace KIGFX
 {
 class GAL;
@@ -399,6 +404,8 @@ private:
     SELECTION_MODE m_selectionMode; // Current selection mode
 
     SCH_TABLECELL* m_previous_first_cell; // First selected cell for shift+click selection range
+
+    std::unique_ptr<CIRCUITALIVE::RIGHT_CLICK_GESTURE> m_rightClickGesture;
 };
 
 #endif //SCH_SELECTION_TOOL_H

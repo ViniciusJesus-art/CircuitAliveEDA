@@ -77,6 +77,7 @@ DIALOG_SYMBOL_CHOOSER::DIALOG_SYMBOL_CHOOSER( SCH_BASE_FRAME* aParent, const LIB
     wxBoxSizer* buttonsSizer = new wxBoxSizer( wxHORIZONTAL );
 
     m_keepSymbol = new wxCheckBox( this, wxID_ANY, _( "Place repeated copies" ) );
+    m_keepSymbol->SetValue( true );
     m_keepSymbol->SetToolTip( _( "Keep the symbol selected for subsequent clicks." ) );
 
     m_useUnits = new wxCheckBox( this, wxID_ANY, _( "Place all units" ) );

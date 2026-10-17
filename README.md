@@ -20,11 +20,16 @@ probes de tensão/corrente/potência, osciloscópio e modelos digitais XSPICE.
 - [Integração ao editor — etapa 2](docs/circuitalive/EDITOR_SIMULATION.md):
   demonstração, componentes suportados e organização modular para atualizar a base.
 - [Medições e osciloscópio](docs/circuitalive/MEASUREMENTS.md): ferramentas no
-  painel lateral, configuração V/I/P por componente e exemplos prontos.
+  painel lateral, configuração V/I/P, escalas por sinal, trigger, cursores, RMS
+  e exportação CSV das capturas.
 - [Componentes básicos e digital](docs/circuitalive/BASIC_AND_DIGITAL_MODELS.md):
   fontes AC, diodos, transistores, 74HC00/74HC125 e indicação 0/1/Z/X nos pinos.
+- [Mais componentes discretos](docs/circuitalive/DISCRETE_MODELS.md): 15 modelos
+  de transistores, MOSFETs, Zeners e SCR, com pinagens e pontos elétricos verificados.
 - [Editor visual de modelos](docs/circuitalive/MODEL_AUTHOR.md): ferramenta na
   janela principal para escolher símbolos, montar blocos e salvar modelos sem escrever JSON.
+- [Mouse e colocação de símbolos](docs/circuitalive/EDITOR_GESTURES.md): duplo
+  clique direito para excluir e colocação contínua por padrão.
 - [Mapa do projeto](docs/circuitalive/Mapa_KiCad_Simulacao_Interativa.md), preservado como
   referência original; a revisão nele citada foi substituída pela base estável acima.
 

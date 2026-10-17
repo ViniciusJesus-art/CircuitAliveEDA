@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "zener_bzv55c5v1",
+  "name": "BZV55C5V1 Zener diode",
+  "description": "Room-temperature compact approximation calibrated against datasheet operating points. See docs/circuitalive/DISCRETE_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "k",
+      "label": "Cathode",
+      "default_pin": "1",
+      "role": "passive"
+    },
+    {
+      "id": "a",
+      "label": "Anode",
+      "default_pin": "2",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "zener_voltage",
+      "label": "Zener voltage at test current",
+      "default": "5.1",
+      "unit": "V",
+      "min": 2,
+      "max": 100
+    },
+    {
+      "id": "test_current",
+      "label": "Zener calibration current",
+      "default": "5m",
+      "unit": "A",
+      "min": 1e-05,
+      "max": 0.1
+    },
+    {
+      "id": "zener_resistance",
+      "label": "Reverse branch series resistance",
+      "default": "33.8",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "capacitance",
+      "label": "Lumped terminal capacitance",
+      "default": "200p",
+      "unit": "F",
+      "min": 0,
+      "max": 0.001
+    },
+    {
+      "id": "current_warning",
+      "label": "Reverse current warning (~400mW / Vz)",
+      "default": "0.07843137254901962",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vanode_${id} ${pin:a} anode_${id} 0",
+      "Dforward_${id} anode_${id} ${pin:k} forward_${id}",
+      "Rzener_${id} ${pin:k} zener_${id} {max(0.001,${param:zener_resistance})}",
+      "Dreverse_${id} zener_${id} offset_${id} clamp_${id}",
+      "Voffset_${id} offset_${id} anode_${id} {${param:zener_voltage}-1.2*0.02585*ln(${param:test_current}/1e-12)-${param:zener_resistance}*${param:test_current}}",
+      "Cleak_${id} ${pin:k} anode_${id} ${param:capacitance}",
+      "Rleak_${id} ${pin:k} anode_${id} 4Meg"
+    ],
+    "definitions": [
+      ".model forward_${id} D(Is=1n N=1.5 Rs=0.5)",
+      ".model clamp_${id} D(Is=1p N=1.2)"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "Diode:BZV55C5V1"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "measurement_ports": {
+    "positive": "a",
+    "negative": "k"
+  },
+  "sources": [
+    "https://assets.nexperia.com/documents/data-sheet/BZV55_SER.pdf"
+  ],
+  "model_notes": [
+    "Separate forward and reverse branches keep the forward diode drop independent of Zener dynamic resistance.",
+    "Nominal Vz is calibrated at 5mA; reverse dynamic resistance approximately 40/10 Ohm at that point.",
+    "Voltage tolerance, temperature coefficients and self-heating are not simulated."
+  ],
+  "current_warning": {
+    "signal": "i(Vanode_${id})",
+    "limit_parameter": "current_warning"
+  }
+}

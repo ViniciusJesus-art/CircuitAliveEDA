@@ -6,6 +6,9 @@ sem a pretensão de reproduzir um lote ou um macromodelo certificado do fabrican
 
 ## Modelos disponíveis
 
+O catálogo foi ampliado com [15 modelos de componentes discretos](DISCRETE_MODELS.md),
+incluindo TIP122/TIP127, TIP41C/TIP42C, BD139/BD140, MOSFETs, Zeners e TIC106.
+
 Além de R, C, fonte DC, LED e chave, foram acrescentados:
 
 | Símbolo | Modelo e configuração |

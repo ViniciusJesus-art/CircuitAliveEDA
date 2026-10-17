@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "scr_tic106",
+  "name": "TIC106 sensitive-gate SCR",
+  "description": "Room-temperature compact approximation calibrated against datasheet operating points. See docs/circuitalive/DISCRETE_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "k",
+      "label": "Cathode",
+      "default_pin": "1",
+      "role": "reference"
+    },
+    {
+      "id": "a",
+      "label": "Anode",
+      "default_pin": "2",
+      "role": "passive"
+    },
+    {
+      "id": "g",
+      "label": "Gate",
+      "default_pin": "3",
+      "role": "input"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "trigger_current",
+      "label": "Gate trigger current (conservative 25C value)",
+      "default": "200u",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 0.02
+    },
+    {
+      "id": "holding_current",
+      "label": "Holding current",
+      "default": "5m",
+      "unit": "A",
+      "min": 1e-05,
+      "max": 0.1
+    },
+    {
+      "id": "on_drop",
+      "label": "On-state knee voltage",
+      "default": "0.85",
+      "unit": "V",
+      "min": 0.1,
+      "max": 2
+    },
+    {
+      "id": "on_resistance",
+      "label": "On-state slope resistance",
+      "default": "0.17",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 10
+    },
+    {
+      "id": "response",
+      "label": "Approximate state response time",
+      "default": "2u",
+      "unit": "s",
+      "min": 1e-07,
+      "max": 0.001
+    },
+    {
+      "id": "gate_resistance",
+      "label": "Internal gate resistance",
+      "default": "5",
+      "unit": "Ohm",
+      "min": 0.1,
+      "max": 1000.0
+    },
+    {
+      "id": "current_warning",
+      "label": "Anode current warning (not a current limiter)",
+      "default": "5",
+      "unit": "A",
+      "min": 0,
+      "max": 100
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vanode_${id} ${pin:a} anode_${id} 0",
+      "Vgate_${id} ${pin:g} gate_${id} 0",
+      "Rgate_${id} gate_${id} junction_${id} ${param:gate_resistance}",
+      "Dgate_${id} junction_${id} ${pin:k} gate_diode_${id}",
+      "Rgate_leak_${id} ${pin:g} ${pin:k} 1e9",
+      "Roff_${id} anode_${id} ${pin:k} 1e9",
+      "Btarget_${id} target_${id} 0 V={(i(Vgate_${id}) >= ${param:trigger_current} && v(anode_${id},${pin:k}) > ${param:on_drop}) ? 1 : ((v(state_${id}) > 0.5 && i(Vanode_${id}) >= ${param:holding_current} && v(anode_${id},${pin:k}) > 0) ? 1 : 0)}",
+      "Rstate_${id} target_${id} state_${id} {${param:response}/1n}",
+      "Cstate_${id} state_${id} 0 1n ic=0",
+      "Bmain_${id} anode_${id} ${pin:k} I={max(0,min(1,v(state_${id})))*max(0,(v(anode_${id},${pin:k})-${param:on_drop})/${param:on_resistance})}"
+    ],
+    "definitions": [
+      ".model gate_diode_${id} D(Is=1p N=1.2 Rs=0.1 Cjo=20p)"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "Triac_Thyristor:TIC106"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "measurement_ports": {
+    "positive": "a",
+    "negative": "k"
+  },
+  "sources": [
+    "https://www.farnell.com/datasheets/56920.pdf"
+  ],
+  "model_notes": [
+    "Gate current is measured electrically, not inferred from a logic voltage.",
+    "State remains on after the gate pulse, and resets below holding current or reverse bias.",
+    "On-state fit gives 1.7V at 5A. Response time is an approximation, not a full charge-storage recovery model.",
+    "400-800V suffix ratings are not a destructive breakdown model. No dv/dt triggering, thermal effects or SOA."
+  ],
+  "current_warning": {
+    "signal": "i(Vanode_${id})",
+    "limit_parameter": "current_warning"
+  }
+}

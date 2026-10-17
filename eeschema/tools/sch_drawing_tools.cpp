@@ -300,18 +300,10 @@ int SCH_DRAWING_TOOLS::PlaceSymbol( const TOOL_EVENT& aEvent )
             if( symbol )
             {
                 cleanup();
+            }
 
-                if( keepSymbol )
-                {
-                    // Re-enter symbol chooser
-                    m_toolMgr->PostAction( ACTIONS::cursorClick );
-                }
-            }
-            else
-            {
-                m_frame->PopTool( aEvent );
-                break;
-            }
+            m_frame->PopTool( aEvent );
+            break;
         }
         else if( evt->IsActivate() && !isSyntheticClick )
         {
@@ -324,9 +316,8 @@ int SCH_DRAWING_TOOLS::PlaceSymbol( const TOOL_EVENT& aEvent )
 
             if( symbol )
             {
-                m_frame->ShowInfoBarMsg( _( "Press <ESC> to cancel symbol creation." ) );
-                evt->SetPassEvent( false );
-                continue;
+                // A repeated preview must not prevent switching to another tool.
+                cleanup();
             }
 
             if( evt->IsMoveTool() )

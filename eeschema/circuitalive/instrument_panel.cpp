@@ -1,105 +1,16 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "instrument_panel.h"
+#include <wx/aui/aui.h>
 #include <wx/button.h>
-#include <wx/choice.h>
-#include <wx/dcbuffer.h>
 #include <wx/listctrl.h>
 #include <wx/notebook.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 #include <wx/tglbtn.h>
-#include <algorithm>
-#include <cmath>
-#include <limits>
 
 namespace CIRCUITALIVE
 {
-class SCOPE_PLOT : public wxPanel
-{
-public:
-    explicit SCOPE_PLOT( wxWindow* parent ) : wxPanel( parent )
-    {
-        SetBackgroundStyle( wxBG_STYLE_PAINT ); SetMinSize( wxSize( 240, 260 ) );
-        Bind( wxEVT_PAINT, &SCOPE_PLOT::paint, this );
-        Bind( wxEVT_SIZE, [this]( wxSizeEvent& e ) { Refresh(); e.Skip(); } );
-    }
-    void SetWindow( double duration ) { m_window = duration; Refresh(); }
-    void SetData( const CIRCUIT_SNAPSHOT& circuit, const EDITOR_SESSION_VIEW& session )
-    {
-        if( m_time == session.sample.latest.time && !m_history.empty() ) return;
-        m_time = session.sample.latest.time;
-        m_channels.clear();
-        for( const auto& c : circuit.measurements ) if( c.scope && c.connected ) m_channels.push_back( c );
-        m_history = session.scopeHistory; Refresh();
-    }
-private:
-    void paint( wxPaintEvent& )
-    {
-        wxAutoBufferedPaintDC dc( this );
-        dc.SetBackground( wxBrush( wxColour( 18, 23, 28 ) ) ); dc.Clear();
-        dc.SetTextForeground( wxColour( 205, 220, 225 ) );
-        const auto size = GetClientSize();
-        const wxRect plot( 55, 32, std::max( 1, size.x - 66 ), std::max( 1, size.y - 68 ) );
-        const double end = std::max( m_window, m_time ), begin = end - m_window;
-        double low = std::numeric_limits<double>::infinity(), high = -low;
-        for( const auto& sample : m_history )
-            if( sample.time >= begin )
-                for( const auto& channel : m_channels )
-                {
-                    const auto value = MeasurementValue( channel, sample );
-                    if( std::isfinite( value ) ) { low = std::min( low, value ); high = std::max( high, value ); }
-                }
-        if( !std::isfinite( low ) ) { low = -1; high = 1; }
-        if( high - low < 1e-6 ) { low -= .5; high += .5; }
-        else { const auto margin = ( high - low ) * .1; low -= margin; high += margin; }
-        dc.SetPen( wxPen( wxColour( 47, 60, 69 ) ) );
-        for( int i = 0; i <= 10; ++i ) dc.DrawLine( plot.x + plot.width * i / 10, plot.y, plot.x + plot.width * i / 10, plot.GetBottom() );
-        for( int i = 0; i <= 8; ++i ) dc.DrawLine( plot.x, plot.y + plot.height * i / 8, plot.GetRight(), plot.y + plot.height * i / 8 );
-        dc.DrawText( wxString::Format( "%.3g V", high ), 2, plot.y );
-        dc.DrawText( wxString::Format( "%.3g V", low ), 2, plot.GetBottom() - 12 );
-        dc.DrawText( wxString::Format( "%.4g s", begin ), plot.x, plot.GetBottom() + 8 );
-        dc.DrawText( wxString::Format( "%.4g s", end ), std::max( plot.x, plot.GetRight() - 60 ), plot.GetBottom() + 8 );
-        const wxColour colors[] = { wxColour( 85, 225, 115 ), wxColour( 255, 208, 70 ),
-            wxColour( 80, 185, 255 ), wxColour( 255, 120, 185 ), wxColour( 195, 150, 255 ) };
-        auto y = [&]( double value ) { return plot.GetBottom() - int( ( value - low ) / ( high - low ) * plot.height ); };
-        int legendX = 6;
-        for( std::size_t c = 0; c < m_channels.size(); ++c )
-        {
-            const auto& channel = m_channels[c];
-            dc.SetTextForeground( colors[c % 5] );
-            const auto label = wxString::FromUTF8( channel.name );
-            if( legendX < size.x - 30 ) { dc.DrawText( label, legendX, 6 ); legendX += dc.GetTextExtent( label ).x + 16; }
-            std::vector<double> minimum( plot.width + 1, std::numeric_limits<double>::infinity() );
-            std::vector<double> maximum( plot.width + 1, -std::numeric_limits<double>::infinity() );
-            for( const auto& sample : m_history )
-            {
-                if( sample.time < begin || sample.time > end ) continue;
-                const double value = MeasurementValue( channel, sample );
-                if( !std::isfinite( value ) ) continue;
-                const int x = std::clamp( int( ( sample.time - begin ) / m_window * plot.width ), 0, plot.width );
-                minimum[x] = std::min( minimum[x], value ); maximum[x] = std::max( maximum[x], value );
-            }
-            dc.SetClippingRegion( plot ); dc.SetPen( wxPen( colors[c % 5], 2 ) );
-            wxPoint previous; bool connected = false;
-            for( int x = 0; x <= plot.width; ++x )
-            {
-                if( !std::isfinite( minimum[x] ) ) continue;
-                wxPoint point( plot.x + x, y( ( minimum[x] + maximum[x] ) / 2 ) );
-                dc.DrawLine( point.x, y( minimum[x] ), point.x, y( maximum[x] ) );
-                if( connected ) dc.DrawLine( previous, point );
-                previous = point; connected = true;
-            }
-            dc.DestroyClippingRegion();
-        }
-        if( m_history.empty() )
-        { dc.SetTextForeground( wxColour( 205, 220, 225 ) ); dc.DrawText( _( "Waiting for samples" ), plot.x + 8, plot.y + 12 ); }
-    }
-    double m_window = .25, m_time = -1;
-    std::vector<MEASUREMENT_CHANNEL> m_channels;
-    std::vector<SIM_SAMPLE> m_history;
-};
-
 INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_KIND )> choose ) : wxPanel( parent )
 {
     auto* layout = new wxBoxSizer( wxVERTICAL );
@@ -132,6 +43,12 @@ INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_
     layout->Add( m_tabs, 1, wxEXPAND ); SetSizer( layout );
 }
 
+INSTRUMENT_PANEL::~INSTRUMENT_PANEL()
+{
+    // Scope controls reference m_scopePreferences; destroy them before that member.
+    delete m_tabs;
+}
+
 std::string INSTRUMENT_PANEL::ProbeName() const { return m_name->GetValue().ToStdString(); }
 void INSTRUMENT_PANEL::ClearProbeName() { m_name->Clear(); }
 void INSTRUMENT_PANEL::SelectTools() { m_tabs->SetSelection( 0 ); }
@@ -156,7 +73,7 @@ void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const 
         page = nullptr;
     };
     if( !values ) { remove( m_measurePage ); m_values = nullptr; m_rows.clear(); }
-    if( !scope ) { remove( m_scopePage ); m_plot = nullptr; m_scopeInfo = nullptr; }
+    if( !scope ) { remove( m_scopePage ); m_scope = nullptr; }
     if( values && !m_measurePage )
     {
         m_measurePage = new wxPanel( m_tabs ); auto* layout = new wxBoxSizer( wxVERTICAL );
@@ -172,14 +89,17 @@ void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const 
     if( scope && !m_scopePage )
     {
         m_scopePage = new wxPanel( m_tabs ); auto* layout = new wxBoxSizer( wxVERTICAL );
-        auto* timebase = new wxChoice( m_scopePage, wxID_ANY );
-        for( const wxString label : { "1 ms", "10 ms", "50 ms", "100 ms", "250 ms", "500 ms" } ) timebase->Append( label );
-        timebase->SetSelection( 4 ); layout->Add( new wxStaticText( m_scopePage, wxID_ANY, _( "Time window · automatic voltage range" ) ), 0, wxALL, 6 );
-        layout->Add( timebase, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 6 );
-        m_plot = new SCOPE_PLOT( m_scopePage ); layout->Add( m_plot, 1, wxEXPAND | wxALL, 4 );
-        timebase->Bind( wxEVT_CHOICE, [this]( wxCommandEvent& event )
-            { const double windows[] = { .001, .01, .05, .1, .25, .5 }; if( m_plot ) m_plot->SetWindow( windows[event.GetSelection()] ); } );
-        m_scopeInfo = new wxStaticText( m_scopePage, wxID_ANY, "" ); layout->Add( m_scopeInfo, 0, wxEXPAND | wxALL, 6 );
+        m_scope = new SCOPE_PANEL( m_scopePage, m_scopePreferences, [this]()
+        {
+            if( auto* manager = wxAuiManager::GetManager( GetParent() ) )
+            {
+                auto& pane = manager->GetPane( this );
+                if( pane.IsFloating() ) pane.Dock().Right().BestSize( 350, 650 );
+                else pane.Float().FloatingSize( 1100, 900 ).FloatingPosition( GetParent()->GetScreenPosition() + wxPoint( 40, 40 ) );
+                manager->Update();
+            }
+        } );
+        layout->Add( m_scope, 1, wxEXPAND );
         m_scopePage->SetSizer( layout ); m_tabs->AddPage( m_scopePage, _( "Oscilloscope" ) );
     }
     if( m_values )
@@ -199,13 +119,7 @@ void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const 
             m_values->SetItem( row, 2, wxString::FromUTF8( value ) ); ++row;
         }
     }
-    if( m_plot )
-    {
-        m_plot->SetData( snapshot.circuit, session );
-        const double span = session.scopeHistory.size() > 1 ? session.scopeHistory.back().time - session.scopeHistory.front().time : 0;
-        m_scopeInfo->SetLabel( wxString::Format( _( "Max step: %.4g µs\nAvailable history: %.4g ms (%zu samples)" ),
-            snapshot.circuit.config.maxStep * 1e6, span * 1e3, session.scopeHistory.size() ) );
-    }
+    if( m_scope ) m_scope->UpdateSession( snapshot.circuit, session );
     if( active && !m_wasActive )
     {
         auto* page = m_measurePage ? m_measurePage : m_scopePage;

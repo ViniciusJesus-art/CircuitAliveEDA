@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "darlington_tip122",
+  "name": "TIP122 NPN power Darlington",
+  "description": "Room-temperature compact approximation calibrated against datasheet operating points. See docs/circuitalive/DISCRETE_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "b",
+      "label": "Base",
+      "default_pin": "1",
+      "role": "input"
+    },
+    {
+      "id": "c",
+      "label": "Collector",
+      "default_pin": "2",
+      "role": "passive"
+    },
+    {
+      "id": "e",
+      "label": "Emitter",
+      "default_pin": "3",
+      "role": "reference"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "driver_gain",
+      "label": "First transistor nominal gain",
+      "default": "70",
+      "unit": "",
+      "min": 1,
+      "max": 500
+    },
+    {
+      "id": "output_gain",
+      "label": "Output transistor nominal gain",
+      "default": "60",
+      "unit": "",
+      "min": 1,
+      "max": 500
+    },
+    {
+      "id": "knee_current",
+      "label": "Output gain roll-off current",
+      "default": "3",
+      "unit": "A",
+      "min": 0.01,
+      "max": 100
+    },
+    {
+      "id": "bleed_input",
+      "label": "Internal input B-E resistor",
+      "default": "7k",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 10000000.0
+    },
+    {
+      "id": "bleed_output",
+      "label": "Internal output B-E resistor",
+      "default": "70",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 10000000.0
+    },
+    {
+      "id": "collector_resistance",
+      "label": "Output collector resistance",
+      "default": "0.07",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "emitter_resistance",
+      "label": "Output emitter resistance",
+      "default": "0.02",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "transit_time",
+      "label": "Output forward transit time",
+      "default": "2n",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "storage_time",
+      "label": "Output reverse transit parameter",
+      "default": "1u",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "current_warning",
+      "label": "Collector current warning (not a current limiter)",
+      "default": "5",
+      "unit": "A",
+      "min": 0,
+      "max": 100
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vcollector_${id} ${pin:c} collector_${id} 0",
+      "Qdriver_${id} collector_${id} ${pin:b} middle_${id} driver_${id}",
+      "Qoutput_${id} collector_${id} middle_${id} ${pin:e} output_${id}",
+      "Rinput_${id} ${pin:b} middle_${id} ${param:bleed_input}",
+      "Routput_${id} middle_${id} ${pin:e} ${param:bleed_output}"
+    ],
+    "definitions": [
+      ".model driver_${id} NPN(Is=100f Bf=${param:driver_gain} Ikf=0.15 Vaf=60 Rb=10 Rc=0.5 Re=0.1 Cje=50p Cjc=20p Tf=1n Tr=100n)",
+      ".model output_${id} NPN(Is=100p Bf=${param:output_gain} Ikf=${param:knee_current} Vaf=60 Rb=0.5 Rc=${param:collector_resistance} Re=${param:emitter_resistance} Cje=600p Cjc=200p Tf=${param:transit_time} Tr=${param:storage_time})",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "Transistor_BJT:TIP122"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "measurement_ports": {
+    "positive": "c",
+    "negative": "e"
+  },
+  "sources": [
+    "https://www.st.com/resource/en/datasheet/tip122.pdf"
+  ],
+  "model_notes": [
+    "Two actual bipolar junction stages; preserves the two-junction base voltage and nonzero saturation voltage.",
+    "Internal B-E resistor values follow the ST datasheet. Other compact parameters are fitted approximations.",
+    "No temperature, SOA or destructive avalanche model.",
+    "Requests circuit-wide Gear order 2 integration to damp numerical charge-storage ringing, without imposing a small maximum timestep."
+  ],
+  "current_warning": {
+    "signal": "i(Vcollector_${id})",
+    "limit_parameter": "current_warning"
+  }
+}

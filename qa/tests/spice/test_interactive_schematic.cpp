@@ -18,6 +18,36 @@
 
 using namespace CIRCUITALIVE;
 
+BOOST_FIXTURE_TEST_CASE( StandardLibraryPowerDiscreteDemoResolvesModelsAndRetainsScrState,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "common_discrete_models.kicad_sch" );
+    LoadSchematic( file );
+    for( SCH_ITEM* item : m_schematic->RootScreen()->Items().OfType( SCH_SYMBOL_T ) )
+    {
+        auto* symbol = static_cast<SCH_SYMBOL*>( item );
+        BOOST_CHECK( symbol->GetField( "CA.Model" ) == nullptr ); // Automatic model association.
+    }
+    auto captured = CaptureSchematic( *m_schematic ); const auto& c = captured.circuit;
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( c.netlist, c.config ); session.AdvanceTo( .01 ); const auto sample = session.Snapshot().latest;
+    int checked = 0;
+    for( const auto& channel : c.measurements )
+    {
+        const double value = MeasurementValue( channel, sample );
+        if( channel.quantity == MEASURE_QUANTITY::CURRENT && ( channel.name == "Q1" || channel.name == "Q2" || channel.name == "Q3" || channel.name == "Q4" ) )
+        {
+            BOOST_TEST_CONTEXT( channel.name ) { BOOST_CHECK_GT( std::abs( value ), .1 ); BOOST_CHECK_LT( std::abs( value ), .13 ); }
+            ++checked;
+        }
+        if( channel.quantity == MEASURE_QUANTITY::VOLTAGE && channel.name == "D1" )
+        {
+            BOOST_CHECK_GT( -value, 5.0 ); BOOST_CHECK_LT( -value, 5.4 ); ++checked;
+        }
+    }
+    BOOST_CHECK_EQUAL( checked, 5 );
+}
+
 BOOST_FIXTURE_TEST_CASE( ModelAssociationAndParametersPersistInSymbolFields, KI_TEST::SCHEMATIC_TEST_FIXTURE )
 {
     wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC );

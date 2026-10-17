@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "bjt_pn2222a",
+  "name": "PN2222A NPN transistor",
+  "description": "Room-temperature compact approximation calibrated against datasheet operating points. See docs/circuitalive/DISCRETE_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "c",
+      "label": "Collector",
+      "default_pin": "3",
+      "role": "passive"
+    },
+    {
+      "id": "b",
+      "label": "Base",
+      "default_pin": "2",
+      "role": "input"
+    },
+    {
+      "id": "e",
+      "label": "Emitter",
+      "default_pin": "1",
+      "role": "reference"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "beta",
+      "label": "Low-current forward gain",
+      "default": "220",
+      "unit": "",
+      "min": 1,
+      "max": 2000
+    },
+    {
+      "id": "saturation_current",
+      "label": "Transport saturation current",
+      "default": "6.7f",
+      "unit": "A",
+      "min": 1e-20,
+      "max": 0.001
+    },
+    {
+      "id": "knee_current",
+      "label": "High-current gain roll-off",
+      "default": "0.35",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 100
+    },
+    {
+      "id": "early_voltage",
+      "label": "Early voltage",
+      "default": "80",
+      "unit": "V",
+      "min": 1,
+      "max": 10000.0
+    },
+    {
+      "id": "base_resistance",
+      "label": "Base spreading resistance",
+      "default": "10",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 10000.0
+    },
+    {
+      "id": "collector_resistance",
+      "label": "Collector lead resistance",
+      "default": "0.15",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "emitter_resistance",
+      "label": "Emitter lead resistance",
+      "default": "0.05",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "base_capacitance",
+      "label": "Zero-bias base-emitter capacitance",
+      "default": "25p",
+      "unit": "F",
+      "min": 0,
+      "max": 0.001
+    },
+    {
+      "id": "collector_capacitance",
+      "label": "Zero-bias collector-base capacitance",
+      "default": "8p",
+      "unit": "F",
+      "min": 0,
+      "max": 0.001
+    },
+    {
+      "id": "transit_time",
+      "label": "Forward transit time",
+      "default": "0.35n",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "storage_time",
+      "label": "Reverse transit / saturation storage parameter",
+      "default": "50n",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "current_warning",
+      "label": "Collector current warning (not a current limiter)",
+      "default": "0.6",
+      "unit": "A",
+      "min": 0,
+      "max": 100
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vcollector_${id} ${pin:c} collector_${id} 0",
+      "Q${id} collector_${id} ${pin:b} ${pin:e} transistor_${id}"
+    ],
+    "definitions": [
+      ".model transistor_${id} NPN(Is=${param:saturation_current} Bf=${param:beta} Ikf=${param:knee_current} Vaf=${param:early_voltage} Rb=${param:base_resistance} Rc=${param:collector_resistance} Re=${param:emitter_resistance} Br=4 Cje=${param:base_capacitance} Cjc=${param:collector_capacitance} Vje=0.75 Vjc=0.75 Mje=0.33 Mjc=0.33 Tf=${param:transit_time} Tr=${param:storage_time})",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "Transistor_BJT:PN2222A"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "measurement_ports": {
+    "positive": "c",
+    "negative": "e"
+  },
+  "sources": [
+    "https://www.onsemi.com/download/data-sheet/pdf/p2n2222a-d.pdf"
+  ],
+  "model_notes": [
+    "Fitted electrical approximation, not copied vendor SPICE code.",
+    "No destructive breakdown, SOA or thermal self-heating. Current rating reports an overload, without clamping it.",
+    "Physical pins follow the installed KiCad symbol, including E-B-C for PN2222A.",
+    "Requests circuit-wide Gear order 2 integration to damp numerical charge-storage ringing, without imposing a small maximum timestep."
+  ],
+  "current_warning": {
+    "signal": "i(Vcollector_${id})",
+    "limit_parameter": "current_warning"
+  }
+}
