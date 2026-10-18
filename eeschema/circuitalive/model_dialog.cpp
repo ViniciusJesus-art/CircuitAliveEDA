@@ -149,7 +149,7 @@ public:
             if( picker.ShowModal() != wxID_OK ) return;
             try
             {
-                m_selected = addModel( MODEL_REPOSITORY::Load( picker.GetPath().ToStdString() ) );
+                m_selected = addModel( MODEL_REPOSITORY::Load( picker.GetPath().ToStdString(wxConvUTF8) ) );
                 load( false );
             }
             catch( const std::exception& e ) { showError( e.what() ); }
@@ -329,7 +329,7 @@ private:
             {
                 for(std::size_t r=0;r<m_model->parameters.size();++r)if(m_model->parameters[r].id==id)
                 {
-                    const auto& p=m_model->parameters[r];const auto raw=m_parameters->GetCellValue(r,1).ToStdString();
+                    const auto& p=m_model->parameters[r];const auto raw=m_parameters->GetCellValue(r,1).ToStdString(wxConvUTF8);
                     try{return ParseComponentValue(raw.empty()?p.defaultValue:raw);}catch(const std::exception&){return ParseComponentValue(p.defaultValue);}
                 }
                 throw std::runtime_error("Unknown LED appearance parameter");
@@ -363,9 +363,9 @@ private:
             selected.negative = m_model->pins.at( m_negative->GetSelection() ).id;
         }
         for( std::size_t i = 0; i < m_model->pins.size(); ++i )
-            m_component.modelPins[m_model->pins[i].id] = m_pins->GetCellValue( i, 2 ).ToStdString();
+            m_component.modelPins[m_model->pins[i].id] = m_pins->GetCellValue( i, 2 ).ToStdString(wxConvUTF8);
         for( std::size_t i = 0; i < m_model->parameters.size(); ++i )
-            if( auto value = m_parameters->GetCellValue( i, 1 ).ToStdString(); !value.empty() )
+            if( auto value = m_parameters->GetCellValue( i, 1 ).ToStdString(wxConvUTF8); !value.empty() )
                 m_component.modelParameters[m_model->parameters[i].id] = value;
     }
     CIRCUIT_COMPONENT m_component;

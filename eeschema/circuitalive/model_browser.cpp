@@ -111,7 +111,7 @@ private:
         if( prefer < 0 ) if( const auto current = selection() ) prefer = *current;
         m_list->Freeze(); m_list->SetItemCount( 0 );
         const auto item = m_tree->GetSelection();
-        m_list->rows = m_index.Find( m_search->GetValue().ToStdString(), item.IsOk() ? m_paths.at( item ) : "" );
+        m_list->rows = m_index.Find( m_search->GetValue().ToStdString(wxConvUTF8), item.IsOk() ? m_paths.at( item ) : "" );
         m_list->SetItemCount( m_list->rows.size() );
         if( !m_list->rows.empty() )
         {

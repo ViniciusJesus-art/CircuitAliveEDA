@@ -9,6 +9,9 @@
 #include <limits>
 #ifdef _WIN32
 #include <windows.h>
+#ifdef ERROR
+#undef ERROR
+#endif
 #include <tlhelp32.h>
 #include <io.h>
 #else

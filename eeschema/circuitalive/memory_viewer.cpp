@@ -199,7 +199,7 @@ void ShowMemoryViewer( wxWindow* parent, const std::string& reference, const std
                 try
                 {
                     const char* formats[] = { "camem", "bin", "ihex" };
-                    SaveMemoryImage( table->image, picker.GetPath().ToStdString(), formats[picker.GetFilterIndex()] );
+                    SaveMemoryImage( table->image, picker.GetPath().ToStdString(wxConvUTF8), formats[picker.GetFilterIndex()] );
                 }
                 catch( const std::exception& e )
                 {

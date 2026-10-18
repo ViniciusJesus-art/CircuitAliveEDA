@@ -29,6 +29,8 @@ else:
     for module in ('six.py','typing_extensions.py'):
      for directory in (Path('/usr/lib')/python_version/'site-packages',Path('/usr/lib64')/python_version/'site-packages'):
       if (directory/module).exists():shutil.copy2(directory/module,site/module);break
+    component_licenses=args.libraries.parent/'licenses'
+    if component_licenses.exists():shutil.copytree(component_licenses,app/'share/licenses/component-libraries',dirs_exist_ok=True)
     local_licenses=root/'.circuitalive/deps/usr/share/licenses'
     if local_licenses.exists():shutil.copytree(local_licenses,app/'share/licenses/local-dependencies',dirs_exist_ok=True)
     for license in ('LICENSE.README','LICENSE.GPLv2','LICENSE.GPLv3','AUTHORS.txt'):
@@ -59,6 +61,14 @@ else:
       directory=Path('/usr/share')/base/package
       if directory.exists():shutil.copytree(directory,app/'share'/base/package,dirs_exist_ok=True,ignore=ignore)
     (app/'DEPENDENCIES.txt').write_text(subprocess.check_output(['rpm','-q','--qf','%{NAME} %{VERSION}-%{RELEASE} source=%{SOURCERPM}\n',*sorted(packages)],text=True))
+native_python=app/'lib64'/python_version
+combined_python=app/'lib'/python_version
+if native_python.is_dir() and not native_python.is_symlink():
+    shutil.copytree(native_python,combined_python,dirs_exist_ok=True)
+    shutil.rmtree(native_python)
+if not native_python.exists():native_python.symlink_to(Path('../lib')/python_version,target_is_directory=True)
+component_licenses=args.libraries.parent/'licenses'
+if component_licenses.exists():shutil.copytree(component_licenses,app/'share/licenses/component-libraries',dirs_exist_ok=True)
 (app/'PACKAGE-INFO.json').write_text(json.dumps({'product':'CircuitAliveEDA','version':args.version,'commit':args.commit,'platform':'linux-x86_64','minimum_distribution':'Fedora 44 (glibc 2.43)','bundled_shared_libraries':sorted(copied)},indent=2))
 launcher=app/'CircuitAliveEDA'
 launcher.write_text('''#!/usr/bin/env bash
@@ -111,7 +121,10 @@ smoke_env=dict(os.environ)
 for name in ('LD_LIBRARY_PATH','PYTHONPATH','PYTHONHOME','KICAD_RUN_FROM_BUILD_DIR'):smoke_env.pop(name,None)
 smoke_env.update(XDG_CACHE_HOME=str(work/'smoke/cache'),XDG_DATA_HOME=str(work/'smoke/data'),KICAD_CONFIG_HOME=str(work/'smoke/config'),KICAD_CACHE_HOME=str(work/'smoke/cache'),KICAD_DOCUMENTS_HOME=str(work/'smoke/documents'),PATH='/usr/bin:/bin')
 subprocess.run([str(launcher),'cli','version'],check=True,timeout=60,env=smoke_env)
-rpmdir=work/'rpmbuild'
+rpm_alias=Path('/tmp')/('circuitalive-rpm-'+str(os.getuid())+'-'+hashlib.sha256(str(work).encode()).hexdigest()[:12])
+if not rpm_alias.exists():rpm_alias.symlink_to(work,target_is_directory=True)
+if rpm_alias.resolve()!=work.resolve():raise SystemExit('RPM build alias is occupied')
+rpmdir=rpm_alias/'rpmbuild'
 for directory in ('BUILD','BUILDROOT','RPMS','SOURCES','SPECS','SRPMS'):(rpmdir/directory).mkdir(parents=True,exist_ok=True)
 spec=rpmdir/'SPECS/circuitaliveeda.spec';numeric=args.version.split('-')[0]
 spec.write_text(f'''%global debug_package %{{nil}}
@@ -151,7 +164,7 @@ cp "{app}/share/icons/hicolor/128x128/apps/circuitaliveeda.png" %{{buildroot}}/u
 /usr/share/applications/circuitaliveeda.desktop
 /usr/share/icons/hicolor/128x128/apps/circuitaliveeda.png
 ''')
-temporary=work/'tmp';temporary.mkdir(exist_ok=True)
+temporary=rpm_alias/'tmp';temporary.mkdir(exist_ok=True)
 subprocess.run(['rpmbuild','-bb','--define',f'_topdir {rpmdir}','--define',f'_tmppath {temporary}',str(spec)],check=True)
 for file in (rpmdir/'RPMS').rglob('*.rpm'):shutil.copy2(file,out/f'CircuitAliveEDA-{args.version}-fedora44-x86_64.rpm')
 subprocess.run(['tar','--zstd','-cf',str(out/f'CircuitAliveEDA-{args.version}-linux-x86_64.tar.zst'),'-C',str(work),app.name],check=True)

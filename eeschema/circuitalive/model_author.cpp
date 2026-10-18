@@ -6,6 +6,7 @@
 #include "model_design_presets.h"
 #include "panel_led_appearance.h"
 #include <cctype>
+#include <charconv>
 #include "model_profiles.h"
 #include "session_runner.h"
 #include <circuitalive/branding.h>
@@ -54,6 +55,11 @@ namespace fs = std::filesystem;
 namespace
 {
 wxString W( const std::string& s ) { return wxString::FromUTF8( s ); }
+wxString ParameterNumber(double value)
+{
+    char buffer[64];const auto result=std::to_chars(buffer,buffer+sizeof(buffer),value,std::chars_format::general,12);
+    return W(std::string(buffer,result.ptr));
+}
 std::string Read( const fs::path& p )
 {
     std::error_code error;
@@ -135,7 +141,7 @@ public:
             appearance->Configure(model,[this,&model,&design](const std::string& id)
             {
                 const auto it=std::find(m_parameters.begin(),m_parameters.end(),id);const auto r=it-m_parameters.begin();
-                auto value=m_values->GetCellValue(r,1).ToStdString();
+                auto value=m_values->GetCellValue(r,1).ToStdString(wxConvUTF8);
                 if(value.starts_with('@'))for(const auto& p:design.parameters)if(p.id==value.substr(1)){value=p.defaultValue;break;}
                 try{return ParseComponentValue(value);}catch(const std::exception&){return ParseComponentValue(model.parameters.at(r).defaultValue);}
             },[this](const std::string& id,const std::string& value)
@@ -152,8 +158,8 @@ public:
             CommitGrid( m_pins ); CommitGrid( m_values );
             m_block.connections.clear(); m_block.values.clear();
             for( std::size_t r = 0; r < m_ports.size(); ++r )
-                if( auto v = m_pins->GetCellValue( r, 2 ).ToStdString(); !v.empty() ) m_block.connections[m_ports[r]] = v;
-            for( std::size_t r = 0; r < m_parameters.size(); ++r ) m_block.values[m_parameters[r]] = m_values->GetCellValue( r, 1 ).ToStdString();
+                if( auto v = m_pins->GetCellValue( r, 2 ).ToStdString(wxConvUTF8); !v.empty() ) m_block.connections[m_ports[r]] = v;
+            for( std::size_t r = 0; r < m_parameters.size(); ++r ) m_block.values[m_parameters[r]] = m_values->GetCellValue( r, 1 ).ToStdString(wxConvUTF8);
             EndModal( wxID_OK );
         }, wxID_OK );
     }
@@ -166,7 +172,7 @@ public:
     MODEL_AUTHOR( wxWindow* parent, KIWAY* kiway ) :
         DIALOG_SHIM( parent, wxID_ANY, _( "Simulation Model Editor — CircuitAliveEDA" ), wxDefaultPosition,
                      wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER ), m_kiway( kiway ),
-        m_project( kiway->Prj().GetProjectPath().ToStdString() )
+        m_project( kiway->Prj().GetProjectPath().ToStdString(wxConvUTF8) )
     {
         OptOut( this ); SetInitialFocus( nullptr ); auto* s = new wxBoxSizer( wxVERTICAL );
         s->Add( createToolbar(), 0, wxEXPAND | wxBOTTOM, 10 );
@@ -354,19 +360,19 @@ private:
     {
         for(const auto* role : {"input", "output", "bidirectional", "passive", "power", "reference"})
             if(label == ModelText(role)) return role;
-        return label.ToStdString();
+        return label.ToStdString(wxConvUTF8);
     }
     void collect()
     {
-        CommitGrid( m_pins ); CommitGrid( m_parameters ); m_design.name = m_name->GetValue().ToStdString(); m_design.id = m_id->GetValue().ToStdString();
+        CommitGrid( m_pins ); CommitGrid( m_parameters ); m_design.name = m_name->GetValue().ToStdString(wxConvUTF8); m_design.id = m_id->GetValue().ToStdString(wxConvUTF8);
         m_design.pins.clear(); m_design.parameters.clear();
         for( int r = 0; r < m_pins->GetNumberRows(); ++r ) m_design.pins.push_back( {
-            m_pins->GetCellValue( r, 1 ).ToStdString(), m_pins->GetCellValue( r, 2 ).ToStdString(),
-            roleId(m_pins->GetCellValue(r,3)), m_pins->GetCellValue( r, 0 ).ToStdString() } );
+            m_pins->GetCellValue( r, 1 ).ToStdString(wxConvUTF8), m_pins->GetCellValue( r, 2 ).ToStdString(wxConvUTF8),
+            roleId(m_pins->GetCellValue(r,3)), m_pins->GetCellValue( r, 0 ).ToStdString(wxConvUTF8) } );
         for( int r = 0; r < m_parameters->GetNumberRows(); ++r ) m_design.parameters.push_back( {
-            m_parameters->GetCellValue( r, 0 ).ToStdString(), m_parameters->GetCellValue( r, 1 ).ToStdString(),
-            m_parameters->GetCellValue( r, 3 ).ToStdString(), m_parameters->GetCellValue( r, 2 ).ToStdString(),
-            ParseComponentValue( m_parameters->GetCellValue( r, 4 ).ToStdString() ), ParseComponentValue( m_parameters->GetCellValue( r, 5 ).ToStdString() ) } );
+            m_parameters->GetCellValue( r, 0 ).ToStdString(wxConvUTF8), m_parameters->GetCellValue( r, 1 ).ToStdString(wxConvUTF8),
+            m_parameters->GetCellValue( r, 3 ).ToStdString(wxConvUTF8), m_parameters->GetCellValue( r, 2 ).ToStdString(wxConvUTF8),
+            ParseComponentValue( m_parameters->GetCellValue( r, 4 ).ToStdString(wxConvUTF8) ), ParseComponentValue( m_parameters->GetCellValue( r, 5 ).ToStdString(wxConvUTF8) ) } );
     }
     void refreshFields()
     {
@@ -387,7 +393,7 @@ private:
         {
             int r = m_parameters->GetNumberRows(); m_parameters->AppendRows();
             m_parameters->SetCellValue( r, 0, W( p.id ) ); m_parameters->SetCellValue( r, 1, W( p.label ) ); m_parameters->SetCellValue( r, 2, W( p.defaultValue ) );
-            m_parameters->SetCellValue( r, 3, W( p.unit ) ); m_parameters->SetCellValue( r, 4, wxString::Format( "%.12g", p.minimum ) ); m_parameters->SetCellValue( r, 5, wxString::Format( "%.12g", p.maximum ) );
+            m_parameters->SetCellValue( r, 3, W( p.unit ) ); m_parameters->SetCellValue( r, 4, ParameterNumber(p.minimum) ); m_parameters->SetCellValue( r, 5, ParameterNumber(p.maximum) );
         }
         m_canvas->selected = m_design.blocks.size()==1 ? 0 : -1;
         m_canvas->CancelConnection(); m_canvas->Refresh(); m_results->Clear(); inspectSelection();
@@ -406,9 +412,9 @@ private:
         if( !discard() ) return;
         wxFileDialog picker( this, _( "Open simulation model" ), W( m_project ), "", _("CircuitAlive model (*.casim)|*.casim"), wxFD_OPEN | wxFD_FILE_MUST_EXIST );
         if( picker.ShowModal() != wxID_OK ) return;
-        auto doc = MODEL_DESIGN::Open( Read( fs::path( picker.GetPath().ToStdString() ) ) );
+        auto doc = MODEL_DESIGN::Open( Read( fs::path( picker.GetPath().ToStdString(wxConvUTF8) ) ) );
         doc.MakeCoreVisible();
-        m_design = std::move( doc ); m_file = picker.GetPath().ToStdString(); refreshFields(); m_canvas->FitContent(); m_dirty = false;
+        m_design = std::move( doc ); m_file = picker.GetPath().ToStdString(wxConvUTF8); refreshFields(); m_canvas->FitContent(); m_dirty = false;
     }
     bool save( bool as )
     {
@@ -421,7 +427,7 @@ private:
             wxFileDialog picker( this, _( "Save simulation model" ), W( folder.string() ), W( m_design.id + ".casim" ),
                 _("CircuitAlive model (*.casim)|*.casim"), wxFD_SAVE | wxFD_OVERWRITE_PROMPT );
             if( picker.ShowModal() != wxID_OK ) return false;
-            path = picker.GetPath().ToStdString(); if( path.extension() != ".casim" ) path += ".casim";
+            path = picker.GetPath().ToStdString(wxConvUTF8); if( path.extension() != ".casim" ) path += ".casim";
         }
         const auto temporary = path.string() + ".tmp." + std::to_string( ProcessId() );
         try
@@ -445,16 +451,16 @@ private:
         bool accepted = chooser->ShowModal( &picked, this ); chooser->Destroy(); if( !accepted ) return;
         LIB_ID id; id.Parse( picked, true );
         auto* symbol = PROJECT_SCH::SymbolLibAdapter( &m_kiway->Prj() )->LoadSymbol( id );
-        if( !symbol ) throw std::runtime_error( _("Cannot load chosen symbol").ToStdString() );
+        if( !symbol ) throw std::runtime_error( _("Cannot load chosen symbol").ToStdString(wxConvUTF8) );
         auto flat = symbol->Flatten(); auto physical = flat->GetPins();
         std::sort( physical.begin(), physical.end(), []( const auto* a, const auto* b ) { return a->GetNumber() < b->GetNumber(); } );
         std::vector<MODEL_PIN> ports; std::set<std::string> used, numbers;
         for( const auto* p : physical )
         {
-            const auto number = p->GetNumber().ToStdString(); if( !numbers.insert( number ).second ) continue;
+            const auto number = p->GetNumber().ToStdString(wxConvUTF8); if( !numbers.insert( number ).second ) continue;
             auto existing = std::find_if( m_design.pins.begin(), m_design.pins.end(), [&]( const auto& pin ) { return pin.defaultPin == number; } );
             if( existing != m_design.pins.end() ) { ports.push_back( *existing ); used.insert( existing->id ); continue; }
-            std::string label = p->GetName().ToStdString(), logical;
+            std::string label = p->GetName().ToStdString(wxConvUTF8), logical;
             for( unsigned char c : label ) if( ( c >= 'A' && c <= 'Z' ) || ( c >= 'a' && c <= 'z' ) || ( c >= '0' && c <= '9' ) || c == '_' ) logical += char( std::tolower( c ) );
             if( logical.empty() || used.contains( logical ) ) logical = "pin" + number;
             while( used.contains( logical ) ) logical += "_";
@@ -472,7 +478,7 @@ private:
             if( logical == "gnd" || logical == "vss" || logical == "vee" ) role = "reference";
             ports.push_back( { logical, label.empty() ? number : label, role, number } );
         }
-        m_design.pins = std::move( ports ); m_design.libraryId = picked.ToStdString(); refreshFields(); changed();
+        m_design.pins = std::move( ports ); m_design.libraryId = picked.ToStdString(wxConvUTF8); refreshFields(); changed();
     }
     void fromTemplate()
     {
@@ -493,7 +499,7 @@ private:
     }
     void addBlock()
     {
-        if( m_design.pins.empty() ) throw std::runtime_error( _("Choose the component symbol before adding blocks").ToStdString() );
+        if( m_design.pins.empty() ) throw std::runtime_error( _("Choose the component symbol before adding blocks").ToStdString(wxConvUTF8) );
         auto choices = Templates( m_project );
         std::vector<SIMULATION_MODEL> models;
         for( const auto& c : choices ) models.push_back( MODEL_REPOSITORY::LoadText( c.json, c.file ) );
@@ -529,12 +535,12 @@ private:
         collect(); CommitGrid( m_stimuli ); const auto text = m_design.Export();
         const auto file = fs::temp_directory_path() / ( "circuitalive-author-test-" + std::to_string( ProcessId() ) + ".casim" );
         struct CLEANUP { fs::path path; ~CLEANUP() { std::error_code error; fs::remove( path, error ); } } cleanup{ file };
-        { std::ofstream out( file ); out << text; if( !out ) throw std::runtime_error( _("Cannot prepare model test").ToStdString() ); }
-        CIRCUIT_COMPONENT root; root.reference = "U1"; root.libraryId = m_design.libraryId; root.modelFile = file.string(); root.value = m_testValue->GetValue().ToStdString(); root.projectDirectory = m_project;
+        { std::ofstream out( file ); out << text; if( !out ) throw std::runtime_error( _("Cannot prepare model test").ToStdString(wxConvUTF8) ); }
+        CIRCUIT_COMPONENT root; root.reference = "U1"; root.libraryId = m_design.libraryId; root.modelFile = file.string(); root.value = m_testValue->GetValue().ToStdString(wxConvUTF8); root.projectDirectory = m_project;
         std::vector<CIRCUIT_COMPONENT> circuit;
         for( std::size_t i = 0; i < m_design.pins.size(); ++i )
         {
-            const auto& p = m_design.pins[i]; const auto stimulus = i < std::size_t( m_stimuli->GetNumberRows() ) ? m_stimuli->GetCellValue( i, 1 ).ToStdString() : "";
+            const auto& p = m_design.pins[i]; const auto stimulus = i < std::size_t( m_stimuli->GetNumberRows() ) ? m_stimuli->GetCellValue( i, 1 ).ToStdString(wxConvUTF8) : "";
             auto node = "pin" + std::to_string( i + 1 ); if( p.role == "reference" && ( stimulus == "0V" || stimulus == "0" ) ) node = "0";
             root.pins[p.defaultPin] = node;
             if( stimulus.empty() || stimulus == "open" || node == "0" ) continue;
@@ -550,9 +556,9 @@ private:
             if( node == "0" ) channels.push_back( NO_SIGNAL );
             else { channels.push_back( snapshot.config.signals.size() ); snapshot.config.signals.push_back( "v(" + node + ")" ); }
         }
-        if( snapshot.config.signals.empty() ) throw std::runtime_error( _("The test needs a non-ground terminal").ToStdString() );
-        const double duration = ParseComponentValue( m_testTime->GetValue().ToStdString() );
-        if( duration <= 0 || duration > 1 ) throw std::runtime_error( _("Test duration must be between 0 and 1 second").ToStdString() );
+        if( snapshot.config.signals.empty() ) throw std::runtime_error( _("The test needs a non-ground terminal").ToStdString(wxConvUTF8) );
+        const double duration = ParseComponentValue( m_testTime->GetValue().ToStdString(wxConvUTF8) );
+        if( duration <= 0 || duration > 1 ) throw std::runtime_error( _("Test duration must be between 0 and 1 second").ToStdString(wxConvUTF8) );
         wxBusyCursor busy;
         INTERACTIVE_SIM_SESSION session( FindSessionWorker( PathUtf8(ExecutablePath()) ) );
         session.Configure( snapshot.netlist, snapshot.config ); session.AdvanceTo( duration ); const auto sample = session.Snapshot().latest;

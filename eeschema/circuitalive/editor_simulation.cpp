@@ -124,7 +124,7 @@ void EDITOR_SIMULATION_TOOL::Install()
     if( m_installed )
         return;
     m_runner = std::make_unique<SESSION_RUNNER>( FindSessionWorker(
-            wxStandardPaths::Get().GetExecutablePath().ToStdString() ) );
+            wxStandardPaths::Get().GetExecutablePath().ToStdString(wxConvUTF8) ) );
     m_overlay = std::make_unique<SIMULATION_OVERLAY>();
     m_frame->Schematic().AddListener( this );
     m_installed = true;
@@ -139,7 +139,7 @@ void EDITOR_SIMULATION_TOOL::Install()
             auto* symbol=static_cast<SCH_SYMBOL*>(selected.Front());
             if(symbol->GetExcludedFromSim(&m_frame->GetCurrentSheet(),m_frame->Schematic().GetCurrentVariant()))return false;
             try{
-                auto component=ReadSymbolModelSettings(*symbol,m_frame->GetCurrentSheet(),m_frame->Schematic().GetCurrentVariant(),m_frame->Prj().GetProjectPath().ToStdString(),true);
+                auto component=ReadSymbolModelSettings(*symbol,m_frame->GetCurrentSheet(),m_frame->Schematic().GetCurrentVariant(),m_frame->Prj().GetProjectPath().ToStdString(wxConvUTF8),true);
                 return !MODEL_REPOSITORY(MODEL_REPOSITORY::DefaultDirectories(component.projectDirectory)).SelectModel(component).memories.empty();
             }catch(const std::exception&){return false;}
         } );
@@ -339,7 +339,7 @@ int EDITOR_SIMULATION_TOOL::Memory( const TOOL_EVENT& )
     {
         auto component =
                 ReadSymbolModelSettings( *symbol, m_frame->GetCurrentSheet(), m_frame->Schematic().GetCurrentVariant(),
-                                         m_frame->Prj().GetProjectPath().ToStdString() );
+                                         m_frame->Prj().GetProjectPath().ToStdString(wxConvUTF8) );
         std::vector<MEMORY_REGION_CONFIG> regions;
         std::vector<std::size_t> slots;
         if( m_active )
@@ -347,7 +347,7 @@ int EDITOR_SIMULATION_TOOL::Memory( const TOOL_EVENT& )
             for( const auto& region : m_circuit.circuit.memories )
             {
                 const auto& location = m_circuit.locations.at( region.component );
-                if( location.reference.ToStdString() == component.reference )
+                if( location.reference.ToStdString(wxConvUTF8) == component.reference )
                 {
                     slots.push_back( region.slot );
                     regions.push_back( m_circuit.circuit.config.memories.at( region.slot ) );
@@ -394,7 +394,7 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
             return 0;
         }
         auto component = ReadSymbolModelSettings( *symbol, m_frame->GetCurrentSheet(),
-            m_frame->Schematic().GetCurrentVariant(), m_frame->Prj().GetProjectPath().ToStdString(), true );
+            m_frame->Schematic().GetCurrentVariant(), m_frame->Prj().GetProjectPath().ToStdString(wxConvUTF8), true );
         bool excluded = symbol->GetExcludedFromSim( &m_frame->GetCurrentSheet(),
                                                    m_frame->Schematic().GetCurrentVariant() );
         if( EditSimulationModel( m_frame, component, excluded ) )
@@ -404,7 +404,7 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
                 for( auto* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
                 {
                     auto* unit = static_cast<SCH_SYMBOL*>( item );
-                    if( unit != symbol && ( !symbol->IsMultiUnit() || unit->GetRef( &sheet ).ToStdString() != component.reference
+                    if( unit != symbol && ( !symbol->IsMultiUnit() || unit->GetRef( &sheet ).ToStdString(wxConvUTF8) != component.reference
                         || unit->GetLibId() != symbol->GetLibId() ) ) continue;
                     commit.Modify( unit, sheet.LastScreen() );
                     unit->SetExcludedFromSim( excluded, &sheet, m_frame->Schematic().GetCurrentVariant() );
@@ -448,7 +448,7 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
             dismissControl();
             const auto component = m_circuit.circuit.adjustments.at( adjustment ).component;
             m_liveControl = new LIVE_CONTROL_POPUP( m_frame,
-                m_circuit.locations.at( component ).reference.ToStdString(),
+                m_circuit.locations.at( component ).reference.ToStdString(wxConvUTF8),
                 m_circuit.circuit.adjustments, m_session.adjustments, component,
                 [this]( std::size_t index, double value ) { m_runner->SetAdjustment( index, value ); } );
             m_liveControl->Position( m_frame->GetCanvas()->ClientToScreen( aEvent.GetPosition() ), wxSize( 0, 16 ) );

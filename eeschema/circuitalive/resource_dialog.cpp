@@ -102,7 +102,7 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
                     copy.resources.clear();
                     for( const auto& row : rows )
                     {
-                        auto text = row.path->GetValue().ToStdString();
+                        auto text = row.path->GetValue().ToStdString(wxConvUTF8);
                         if( text.empty() )
                         {
                             if( row.resource.required )
