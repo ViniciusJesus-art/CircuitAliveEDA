@@ -72,9 +72,13 @@ subprocess.run(['makensis','-V2',str(script)],check=True)
 script.unlink()
 (installer.with_suffix(installer.suffix+'.sha256')).write_text(hashlib.file_digest(installer.open('rb'),'sha256').hexdigest()+'  '+installer.name+'\n')
 # Exercise the actual silent installer and the installed executable, not only the build tree.
-smoke=root/'installer-smoke'
+smoke=root/'installer smoke'
 subprocess.run([str(installer),'/S',f'/D={smoke}'],check=True,timeout=1200)
 subprocess.run([str(smoke/'bin/kicad-cli.exe'),'version'],check=True,timeout=60)
+python_env=dict(os.environ,PYTHONHOME=str(smoke),
+                PYTHONPATH=str(smoke/'lib'/f'python{sys.version_info.major}.{sys.version_info.minor}'/'site-packages'))
+subprocess.run([str(smoke/'bin/python.exe'),'-c','import wx, pcbnew; print("Installed Python/wx:", wx.version())'],
+               check=True,timeout=60,env=python_env)
 subprocess.run([sys.executable,str(root/'tools/circuitalive/release/prepare-runtime.py'),
                str(smoke/'bin'),str(smoke/'bin/ngspice')],check=True)
 subprocess.run([sys.executable,str(root/'tools/circuitalive/release/smoke-worker.py'),

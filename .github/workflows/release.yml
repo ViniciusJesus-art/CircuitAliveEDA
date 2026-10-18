@@ -17,6 +17,10 @@ jobs:
   windows:
     runs-on: windows-2022
     timeout-minutes: 240
+    env:
+      CCACHE_DIR: D:/a/_temp/circuitalive-ccache
+      CCACHE_MAXSIZE: 2G
+      RELEASE_VERSION: ${{ inputs.version || '10.0.7-alpha.1' }}
     defaults:
       run:
         shell: msys2 {0}
@@ -46,12 +50,14 @@ jobs:
           path: D:/a/_temp/circuitalive-ccache
           key: windows-ucrt64-${{ github.sha }}
           restore-keys: windows-ucrt64-
-      - name: Build, test and package
-        env:
-          CCACHE_DIR: D:/a/_temp/circuitalive-ccache
-          CCACHE_MAXSIZE: 2G
-          RELEASE_VERSION: ${{ inputs.version || '10.0.7-alpha.1' }}
-        run: bash tools/circuitalive/release/build-windows.sh "$RELEASE_VERSION"
+      - name: Build simulator
+        run: bash tools/circuitalive/release/build-windows.sh "$RELEASE_VERSION" configure
+      - name: Test simulator (177 cases)
+        run: bash tools/circuitalive/release/build-windows.sh "$RELEASE_VERSION" test
+      - name: Build applications
+        run: bash tools/circuitalive/release/build-windows.sh "$RELEASE_VERSION" build
+      - name: Package and verify installed runtime
+        run: bash tools/circuitalive/release/build-windows.sh "$RELEASE_VERSION" package
       - name: Preserve compiler cache on failures
         if: always()
         uses: actions/cache/save@v4

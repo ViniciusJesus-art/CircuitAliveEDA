@@ -1,7 +1,8 @@
-/* Portable ngspice 47 XSPICE ABI headers for the Windows memory code model.
- * KLU and CIDER layout switches are detected from the linked ngspice library. */
+/* MSYS2 ngspice 47 ABI: XSPICE and OSDI are enabled by its build recipe.
+ * KLU and CIDER layout switches are configured by CMake. */
 #pragma once
 #define XSPICE 1
+#define OSDI 1
 #define SHARED_MODULE 1
 #define STDC_HEADERS 1
 #define HAVE_LIMITS_H 1

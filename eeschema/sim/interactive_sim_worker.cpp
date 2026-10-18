@@ -76,6 +76,10 @@ public:
     ENGINE()
     {
         ngSpice_Init( &OnMessage, &OnStatus, &OnExit, &OnData, &OnInit, &OnBackground, this );
+        // The solver's preflight assumes every time point is retained. Our
+        // .save none streaming policy retains one solver point plus a bounded
+        // ring, whose limits are checked in Configure and Snapshot instead.
+        Command( "set no_mem_check" );
     }
 
     JSON Handle( const JSON& aRequest )
