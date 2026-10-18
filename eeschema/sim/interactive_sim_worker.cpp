@@ -10,6 +10,9 @@
 #include "platform_runtime.h"
 #ifdef _WIN32
 #include <windows.h>
+#ifdef ERROR
+#undef ERROR
+#endif
 #include <io.h>
 #define read _read
 #define dup _dup

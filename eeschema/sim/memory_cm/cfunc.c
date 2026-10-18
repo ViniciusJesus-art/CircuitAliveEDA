@@ -4,6 +4,9 @@ extern void cm_ca_memory(Mif_Private_t *);
 #include "../memory_backend.h"
 #include <string.h>
 static CA_MEMORY_BACKEND backend;
+#ifdef _WIN32
+__declspec(dllexport)
+#endif
 void CircuitAliveMemorySetBackend(const CA_MEMORY_BACKEND* b) { backend = *b; }
 typedef struct { uint64_t token; int powered; Digital_t output[32]; } MemoryState;
 void cm_ca_memory(Mif_Private_t *mif_private)

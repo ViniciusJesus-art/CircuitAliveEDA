@@ -10,7 +10,8 @@ if( CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 )
         target_link_libraries(circuitalive_sim_session PRIVATE psapi)
     endif()
 
-    add_library( circuitalive-memory MODULE memory_cm/ifspec.c memory_cm/cfunc.c memory_cm/module.c )
+    add_library( circuitalive-memory MODULE memory_cm/ifspec.c memory_cm/cfunc.c memory_cm/module.c
+        ${PROJECT_SOURCE_DIR}/thirdparty/ngspice-xspice/dstring.c )
     set_target_properties( circuitalive-memory PROPERTIES PREFIX "" SUFFIX ".cm" )
     set_target_properties( circuitalive-memory PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON )
     target_include_directories( circuitalive-memory SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/thirdparty/ngspice-xspice/include )

@@ -118,7 +118,7 @@ char * MIFgetMod(
     CKTcircuit *ckt,
     char      *name,
     INPmodel  **model,
-    INPtables *tab 
+    INPtables *tab
 	) {
 	return (coreitf->dllitf_MIFgetMod)(ckt,name,model,tab);
 }
@@ -128,7 +128,7 @@ IFvalue * MIFgetValue(
     char      **line,
     int       type,
     INPtables *tab,
-    char      **err 
+    char      **err
 	) {
 	return (coreitf->dllitf_MIFgetValue)(ckt,line,type,tab,err);
 }
@@ -138,7 +138,7 @@ int MIFsetup(
     SMPmatrix     *matrix,
     GENmodel      *inModel,
     CKTcircuit    *ckt,
-    int           *state 
+    int           *state
 	) {
 	return (coreitf->dllitf_MIFsetup)(matrix,inModel,ckt,state);
 }
@@ -152,7 +152,7 @@ int MIFunsetup(
 
 int MIFload(
     GENmodel      *inModel,
-    CKTcircuit    *ckt 
+    CKTcircuit    *ckt
 	) {
 	return (coreitf->dllitf_MIFload)(inModel,ckt);
 }
@@ -256,9 +256,9 @@ char *MIFcopy(char *c) {
 }
 
 
-void cm_climit_fcn(double in, double in_offset, double cntl_upper, 
-                   double cntl_lower, double lower_delta, 
-                   double upper_delta, double limit_range, 
+void cm_climit_fcn(double in, double in_offset, double cntl_upper,
+                   double cntl_lower, double lower_delta,
+                   double upper_delta, double limit_range,
                    double gain, int percent, double *out_final,
                    double *pout_pin_final, double *pout_pcntl_lower_final,
                    double *pout_pcntl_upper_final) {
@@ -278,7 +278,7 @@ void cm_smooth_corner(double x_input, double x_center, double y_center,
 }
 
 void cm_smooth_discontinuity(double x_input, double x_lower, double y_lower,
-                 double x_upper, double y_upper, 
+                 double x_upper, double y_upper,
                  double *y_output, double *dy_dx) {
 	(coreitf->dllitf_cm_smooth_discontinuity)(x_input,x_lower,y_lower,x_upper,y_upper,
 		                                      y_output,dy_dx);
