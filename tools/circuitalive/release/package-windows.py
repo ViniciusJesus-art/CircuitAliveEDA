@@ -71,9 +71,16 @@ SectionEnd
 subprocess.run(['makensis','-V2',str(script)],check=True)
 script.unlink()
 (installer.with_suffix(installer.suffix+'.sha256')).write_text(hashlib.file_digest(installer.open('rb'),'sha256').hexdigest()+'  '+installer.name+'\n')
+if os.environ.get('GITHUB_ACTIONS')=='true':
+ # The installer now owns these files; free space before installing another copy.
+ shutil.rmtree(stage)
+ for folder in ('symbols','footprints','3dmodels','template'):
+  path=prefix/'share/kicad'/folder
+  if path.exists():shutil.rmtree(path)
 # Exercise the actual silent installer and the installed executable, not only the build tree.
 smoke=root/'installer smoke'
-subprocess.run([str(installer),'/S',f'/D={smoke}'],check=True,timeout=1200)
+# NSIS requires /D to be last and unquoted, including paths containing spaces.
+subprocess.run(f'"{installer}" /S /D={smoke}',executable=str(installer),check=True,timeout=1200)
 subprocess.run([str(smoke/'bin/kicad-cli.exe'),'version'],check=True,timeout=60)
 python_env=dict(os.environ,PYTHONHOME=str(smoke),
                 PYTHONPATH=str(smoke/'lib'/f'python{sys.version_info.major}.{sys.version_info.minor}'/'site-packages'))
