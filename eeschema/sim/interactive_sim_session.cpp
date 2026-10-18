@@ -272,7 +272,7 @@ void INTERACTIVE_SIM_SESSION::Pause()
 void INTERACTIVE_SIM_SESSION::Stop()
 {
     std::lock_guard lock( m_impl->mutex );
-    if( m_impl->socket >= 0 )
+    if( m_impl->pid > 0 )
     {
         try
         {

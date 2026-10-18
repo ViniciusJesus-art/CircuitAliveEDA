@@ -49,7 +49,7 @@ struct INTERACTIVE_SIM_SESSION::IMPL
         startup.StartupInfo.dwFlags=STARTF_USESTDHANDLES;
         startup.StartupInfo.hStdInput=startup.StartupInfo.hStdOutput=child;startup.StartupInfo.hStdError=errors;
         startup.lpAttributeList=attributes;
-        const auto executable=std::filesystem::u8path(workerPath).wstring();
+        const auto executable=std::filesystem::path(std::u8string(workerPath.begin(),workerPath.end())).wstring();
         std::wstring command=L"\""+executable+L"\"";
         PROCESS_INFORMATION info{};
         if(!CreateProcessW(executable.c_str(),command.data(),nullptr,nullptr,TRUE,

@@ -86,7 +86,9 @@ fs::path MODEL_PROFILES::DefaultFile()
     if( const char* p = std::getenv( "CIRCUITALIVE_PROFILE_FILE" ); p && *p ) return fs::absolute( p );
     if( const char* p = std::getenv( "KICAD_CONFIG_HOME" ); p && *p ) return fs::path( p ) / "circuitalive/model-profiles.json";
     if( const char* p = std::getenv( "XDG_CONFIG_HOME" ); p && *p ) return fs::path( p ) / "circuitaliveeda/model-profiles.json";
-    if( const char* p = std::getenv( "APPDATA" ); p && *p ) return fs::u8path(p) / "CircuitAliveEDA/model-profiles.json";
+#ifdef _WIN32
+    if(const wchar_t* p=_wgetenv(L"APPDATA");p&&*p) return fs::path(p)/"CircuitAliveEDA/model-profiles.json";
+#endif
     if( const char* p = std::getenv( "HOME" ); p && *p ) return fs::path( p ) / ".config/circuitaliveeda/model-profiles.json";
     throw std::runtime_error( "Cannot locate simulation profiles directory" );
 }

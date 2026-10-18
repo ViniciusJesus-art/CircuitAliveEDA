@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-release_version=${1:-0.1.0-preview.1}
+release_version=${1:-10.0.7-alpha.1}
 release_stage=$(cygpath -m "$PWD/stage")
 cmake -S . -B build/windows -G Ninja \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE='-O2 -DNDEBUG' -DCMAKE_C_FLAGS_RELEASE='-O2 -DNDEBUG' \
@@ -9,7 +9,7 @@ cmake -S . -B build/windows -G Ninja \
     -DwxWidgets_CONFIG_EXECUTABLE="$MINGW_PREFIX/bin/wx-config-3.2" \
     -DOCC_INCLUDE_DIR="$MINGW_PREFIX/include/opencascade" \
     -DPYTHON_EXECUTABLE="$MINGW_PREFIX/bin/python.exe" -DPYTHON_ROOT_DIR="$MINGW_PREFIX" \
-    -DNGSPICE_ROOT_DIR="$MINGW_PREFIX" -DKICAD_VERSION_EXTRA=CircuitAliveEDA \
+    -DNGSPICE_ROOT_DIR="$MINGW_PREFIX" -DCA_NGSPICE_CIDER=ON -DKICAD_VERSION_EXTRA=CircuitAliveEDA \
     -DKICAD_CONFIG_DIR=circuitalive-eda -DKICAD_BUILD_I18N=ON \
     -DKICAD_BUILD_QA_TESTS=ON -DKICAD_SPICE_QA=ON -DKICAD_SCRIPTING_WXPYTHON=ON \
     -DKICAD_USE_SENTRY=OFF -DKICAD_UPDATE_CHECK=OFF -DUSE_CCACHE=ON
