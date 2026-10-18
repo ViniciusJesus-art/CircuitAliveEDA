@@ -7,6 +7,7 @@ param(
     [string]$ToolsRoot = $env:CA_WINDOWS_TOOLS
 )
 $ErrorActionPreference = 'Stop'
+$ErrorView = 'NormalView'
 Set-StrictMode -Version Latest
 if ($env:OS -ne 'Windows_NT') { throw 'This build requires native Windows and Visual Studio 2022.' }
 if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.]+)?$') { throw 'Invalid release version.' }
@@ -46,9 +47,8 @@ function Initialize-Tools {
     if ($actual -ne $lock.vcpkgCommit) { throw "Use a vcpkg clone pinned to $($lock.vcpkgCommit): $env:VCPKG_ROOT" }
     Invoke-Checked -Program "$env:VCPKG_ROOT/bootstrap-vcpkg.bat" -Arguments @('-disableMetrics')
     if (!(Test-Path $env:SWIG_EXECUTABLE)) {
-        $archive = Join-Path $ToolsRoot 'swigwin.zip'
-        Invoke-WebRequest "https://sourceforge.net/projects/swig/files/swigwin/swigwin-$($lock.swigVersion)/swigwin-$($lock.swigVersion).zip/download" -OutFile $archive
-        Expand-Archive $archive -DestinationPath $ToolsRoot -Force
+        & "$PSScriptRoot/prepare-swig.ps1" -ToolsRoot $ToolsRoot `
+            -Version $lock.swigVersion -Sha256 $lock.swigSha256
     }
     Invoke-Checked -Program $env:SWIG_EXECUTABLE -Arguments @('-version')
 }

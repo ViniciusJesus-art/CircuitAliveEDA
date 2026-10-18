@@ -1,4 +1,5 @@
 {
   "vcpkgCommit": "66c0373dc7fca549e5803087b9487edfe3aca0a1",
-  "swigVersion": "4.3.1"
+  "swigVersion": "4.3.1",
+  "swigSha256": "7ea5197c557af20b2f7780ffcfe803bbe0e2009f5846874112aea37e5f693417"
 }
