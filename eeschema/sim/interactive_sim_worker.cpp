@@ -318,8 +318,9 @@ private:
                 GetProcAddress(reinterpret_cast<HMODULE>(m_memoryModule),"CircuitAliveMemorySetBackend"));
             if(!bind) throw std::runtime_error("Invalid memory engine");
             auto backend=m_memory.Backend();bind(&backend);
-            auto modulePath=path;std::replace(modulePath.begin(),modulePath.end(),'\\','/');
-            Command("codemodel \"" + modulePath + "\"");
+            // ngspice resolves relative Windows modules beside the executable.
+            // This also avoids its ANSI loader interpreting the installation path.
+            Command("codemodel circuitalive-memory.cm");
 #else
             const int fd = open(path.c_str(),O_RDONLY|O_CLOEXEC);
             if(fd<0)throw std::runtime_error("Memory engine file is missing: "+path);

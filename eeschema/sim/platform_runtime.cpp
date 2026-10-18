@@ -24,7 +24,7 @@ std::filesystem::path ExecutablePath()
 }
 std::string PathUtf8(const std::filesystem::path& path)
 {
-    const auto value=path.u8string();return {value.begin(),value.end()};
+    const auto value=path.generic_u8string();return {value.begin(),value.end()};
 }
 std::uint64_t ProcessId()
 {

@@ -24,7 +24,7 @@ int WINAPI wWinMain(HINSTANCE,HINSTANCE,PWSTR,int)
         fs::create_directories(scripts);std::ofstream init(scripts/L"spinit");
         init << "* CircuitAliveEDA bundled runtime\nunset osdi_enabled\nset num_threads=2\n";
         for(const auto& entry:fs::directory_iterator(bin/L"ngspice"))
-            if(entry.path().extension()==L".cm")init<<"codemodel \""<<utf8(entry.path())<<"\"\n";
+            if(entry.path().extension()==L".cm")init<<"codemodel ngspice/"<<utf8(entry.path().filename())<<"\n";
         init.close();if(!init)return 2;
         SetEnvironmentVariableW(L"SPICE_SCRIPTS",scripts.c_str());
         SetEnvironmentVariableW(L"PYTHONHOME",root.c_str());

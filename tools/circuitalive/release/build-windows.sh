@@ -16,7 +16,7 @@ cmake -S . -B build/windows -G Ninja \
     -DKICAD_USE_SENTRY=OFF -DKICAD_UPDATE_CHECK=OFF -DUSE_CCACHE=ON
 cmake --build build/windows --parallel 2 --target qa_interactive_sim
 python tools/circuitalive/release/prepare-runtime.py build/windows/eeschema/sim "$MINGW_PREFIX/lib/ngspice"
-export SPICE_SCRIPTS="$PWD/build/windows/eeschema/sim/ngspice/scripts"
+export SPICE_SCRIPTS="$(cygpath -m "$PWD/build/windows/eeschema/sim/ngspice/scripts")"
 build/windows/qa/tests/spice/qa_interactive_sim.exe --report_level=short --log_level=error
 cmake --build build/windows --parallel 2
 cmake --install build/windows

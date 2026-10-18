@@ -2,6 +2,7 @@
 #define BOOST_TEST_MODULE CircuitAliveEDA_InteractiveSession
 #include <boost/test/unit_test.hpp>
 #include <interactive_sim_session.h>
+#include <platform_runtime.h>
 
 #include <cmath>
 #include <filesystem>
@@ -305,7 +306,9 @@ BOOST_AUTO_TEST_CASE( SessionsAreIsolatedAndChildrenAreReaped )
     }
     errno = 0;
     BOOST_CHECK(Reaped(firstPid));
+#ifndef _WIN32
     BOOST_CHECK_EQUAL( errno, ECHILD );
+#endif
 }
 
 BOOST_AUTO_TEST_CASE( WorkerFailureIsContained )
@@ -329,13 +332,24 @@ BOOST_AUTO_TEST_CASE( WorkerFailureIsContained )
 
 BOOST_AUTO_TEST_CASE( WorkerPathWithSpaces )
 {
-    char name[] = "/tmp/circuitalive worker-XXXXXX";
-    char* directory = mkdtemp( name );
-    BOOST_REQUIRE( directory != nullptr );
-    const auto link = std::filesystem::path( directory ) / "simulation worker";
+    const auto directory = std::filesystem::temp_directory_path()
+            / ("circuitalive worker " + std::to_string(ProcessId()));
+    BOOST_REQUIRE( std::filesystem::create_directory(directory) );
+#ifdef _WIN32
+    const auto link = directory / "simulation worker.exe";
+#else
+    const auto link = directory / "simulation worker";
+#endif
     try
     {
+#ifdef _WIN32
+        // Copying does not require the Windows symlink privilege.
+        std::filesystem::copy_file( CIRCUITALIVE_TEST_WORKER, link );
+        std::filesystem::copy( std::filesystem::path(CIRCUITALIVE_TEST_WORKER).parent_path()/"ngspice",
+                directory/"ngspice", std::filesystem::copy_options::recursive );
+#else
         std::filesystem::create_symlink( CIRCUITALIVE_TEST_WORKER, link );
+#endif
         INTERACTIVE_SIM_SESSION session( link.string() );
         session.Configure( RC, Config() );
         session.AdvanceTo( 0.0005 );
