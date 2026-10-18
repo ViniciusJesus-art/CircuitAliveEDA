@@ -54,7 +54,7 @@ public:
 
     wxString GetResetTooltip() const override
     {
-        return _( "Reset all hotkeys to the built-in KiCad defaults" );
+        return _( "Reset all hotkeys to the built-in CircuitAliveEDA defaults" );
     }
 
     wxSizer* GetBottomSizer() { return m_bottomSizer; }

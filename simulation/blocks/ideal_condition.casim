@@ -1,0 +1,69 @@
+{
+  "id": "ideal_condition",
+  "name": "CONDITION / comparator (ideal, no supply pins)",
+  "description": "IF A > B THEN Y = HIGH ELSE Y = LOW. No VCC/GND pins: all signal voltages use circuit ground as their reference. Output energy is provided by an ideal behavioral source; supply current and power limits are not modeled.",
+  "equations": [
+    "IF A > B THEN Y = HIGH ELSE Y = LOW.",
+    "Input loading: 1 teraohm to circuit ground. Output series resistance: rout."
+  ],
+  "family": "Ideal logic and conditions",
+  "pins": [
+    {
+      "id": "a",
+      "label": "Input A",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "b",
+      "label": "Input B",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "y",
+      "label": "Output Y",
+      "role": "output",
+      "default_pin": "3"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "high",
+      "label": "HIGH output level",
+      "default": "+5V",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "low",
+      "label": "LOW output level",
+      "default": "0V",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "rout",
+      "label": "Output resistance",
+      "default": "1",
+      "unit": "Ohm",
+      "min": 1e-06,
+      "max": 1000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Bresult_${id} result_${id} 0 V={(v(${pin:a}) > v(${pin:b})) ? ${param:high} : ${param:low}}",
+      "Rout_${id} result_${id} ${pin:y} ${param:rout}",
+      "Rinput_a_${id} ${pin:a} 0 1e12",
+      "Rinput_b_${id} ${pin:b} 0 1e12"
+    ]
+  },
+  "schema_version": 1,
+  "backend": "ngspice",
+  "license": "GPL-3.0-or-later",
+  "ignore_legacy_spice_fields": true,
+  "category": "Building blocks/Ideal primitives"
+}

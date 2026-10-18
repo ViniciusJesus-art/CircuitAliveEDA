@@ -98,7 +98,7 @@ PANEL_EESCHEMA_DISPLAY_OPTIONS_BASE::PANEL_EESCHEMA_DISPLAY_OPTIONS_BASE( wxWind
 	m_defaultFontLabel->Wrap( -1 );
 	bSizerDefaultFont->Add( m_defaultFontLabel, 0, wxRIGHT|wxLEFT|wxALIGN_CENTER_VERTICAL, 5 );
 
-	wxString m_defaultFontCtrlChoices[] = { _("KiCad Font") };
+	wxString m_defaultFontCtrlChoices[] = { _("CircuitAliveEDA Font") };
 	int m_defaultFontCtrlNChoices = sizeof( m_defaultFontCtrlChoices ) / sizeof( wxString );
 	m_defaultFontCtrl = new FONT_CHOICE( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, m_defaultFontCtrlNChoices, m_defaultFontCtrlChoices, 0 );
 	m_defaultFontCtrl->SetSelection( 0 );

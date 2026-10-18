@@ -1215,7 +1215,7 @@ TOOL_ACTION SCH_ACTIONS::importGraphics( TOOL_ACTION_ARGS()
 TOOL_ACTION SCH_ACTIONS::importNonKicadSchematic( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.importNonKicadSchematic" )
         .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Import Non-KiCad Schematic..." ) )
+        .FriendlyName( _( "Import Non-CircuitAliveEDA Schematic..." ) )
         .Tooltip( _( "Replace current schematic sheet with one imported from another application" ) )
         .Icon( BITMAPS::import_document ) );
 

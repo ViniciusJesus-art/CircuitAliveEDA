@@ -267,7 +267,7 @@ void FOOTPRINT_IMPORT_RECONCILER::writeAndRegisterCache(
 
     if( !pi )
     {
-        report( m_reporter, _( "Cannot reconcile imported footprints: no KiCad footprint writer." ),
+        report( m_reporter, _( "Cannot reconcile imported footprints: no CircuitAliveEDA footprint writer." ),
                 RPT_SEVERITY_ERROR );
         return;
     }

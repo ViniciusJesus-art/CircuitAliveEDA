@@ -1,4 +1,5 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
+#include "model_i18n.h"
 #include "resource_dialog.h"
 #include "circuit_snapshot.h"
 #include "simulation_model.h"
@@ -18,7 +19,7 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
                         wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER );
     dialog.OptOut( &dialog );
     auto* layout = new wxBoxSizer( wxVERTICAL );
-    layout->Add( new wxStaticText( &dialog, wxID_ANY, wxString::FromUTF8( component.reference + " — " + model.name ) ),
+    layout->Add( new wxStaticText( &dialog, wxID_ANY, wxString::FromUTF8(component.reference) + " — " + ModelText(model.name) ),
                  0, wxALL, 10 );
     layout->Add(
             new wxStaticText(
@@ -39,8 +40,7 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
                                                                     : RESOURCE_SELECTION{};
         auto* group = new wxBoxSizer( wxVERTICAL );
         group->Add( new wxStaticText( &dialog, wxID_ANY,
-                                      wxString::FromUTF8( resource.label +
-                                                          ( resource.required ? " (required)" : " (optional)" ) ) ),
+                                      ModelText( resource.label ) + ( resource.required ? _(" (required)") : _(" (optional)") ) ),
                     0, wxBOTTOM, 4 );
         auto* path = new wxTextCtrl( &dialog, wxID_ANY, wxString::FromUTF8( selected.path ) );
         auto* browse = new wxButton( &dialog, wxID_ANY, _( "Browse…" ) );
@@ -83,14 +83,10 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
     for( const auto& region : model.memories )
         layout->Add( new wxStaticText(
                              &dialog, wxID_ANY,
-                             wxString::FromUTF8( region.label + " — " +
-                                                 std::to_string( ( std::size_t( 1 ) << region.addressBits ) *
-                                                                 ( ( region.wordBits + 7 ) / 8 ) ) +
-                                                 " bytes, " +
-                                                 ( region.writable ? "RAM; unspecified bits start X"
-                                                                   : "read only; erased byte 0x" +
-                                                                             MemoryHex( { static_cast<std::uint8_t>(
-                                                                                     region.fill ) } ) ) ) ),
+                             ModelText( region.label ) + " — " + wxString::Format(_("%zu bytes, %s"),
+                                 (std::size_t(1) << region.addressBits) * ((region.wordBits + 7) / 8),
+                                 region.writable ? _("RAM; unspecified bits start X")
+                                     : _("read only; erased byte 0x") + wxString::FromUTF8(MemoryHex({static_cast<std::uint8_t>(region.fill)}))) ),
                      0, wxLEFT | wxRIGHT | wxBOTTOM, 10 );
     layout->Add( dialog.CreateSeparatedButtonSizer( wxOK | wxCANCEL ), 0, wxEXPAND | wxALL, 10 );
     dialog.SetSizerAndFit( layout );
@@ -106,7 +102,7 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
                     copy.resources.clear();
                     for( const auto& row : rows )
                     {
-                        auto text = row.path->GetValue().ToStdString();
+                        auto text = row.path->GetValue().ToStdString(wxConvUTF8);
                         if( text.empty() )
                         {
                             if( row.resource.required )
@@ -140,7 +136,7 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
                 }
                 catch( const std::exception& e )
                 {
-                    wxMessageBox( wxString::FromUTF8( e.what() ), _( "Component data files" ),
+                    wxMessageBox( DiagnosticText( e.what() ), _( "Component data files" ),
                                   wxOK | wxICON_INFORMATION, &dialog );
                 }
             },

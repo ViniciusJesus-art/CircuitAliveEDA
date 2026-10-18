@@ -261,7 +261,7 @@ std::optional<ApiResponseStatus> API_HANDLER_EDITOR::checkForBusy()
     {
         ApiResponseStatus e;
         e.set_status( ApiStatusCode::AS_BUSY );
-        e.set_error_message( "KiCad is busy and cannot respond to API requests right now" );
+        e.set_error_message( "CircuitAliveEDA is busy and cannot respond to API requests right now" );
         return e;
     }
 

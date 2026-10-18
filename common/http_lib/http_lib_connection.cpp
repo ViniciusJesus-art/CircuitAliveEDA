@@ -99,7 +99,7 @@ bool HTTP_LIB_CONNECTION::validateHttpLibraryEndpoints()
 
         if( res.length() == 0 )
         {
-            m_lastError += wxString::Format( _( "KiCad received an empty response!" ) + "\n" );
+            m_lastError += wxString::Format( _( "CircuitAliveEDA received an empty response!" ) + "\n" );
         }
         else
         {

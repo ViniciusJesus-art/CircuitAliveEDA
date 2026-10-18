@@ -756,7 +756,7 @@ bool PS_PLOTTER::StartPlot( const wxString& aPageNumber )
 
     // This is for 'hidden' text (search anchors for PDF)
     "/phantomshow { moveto\n"
-    "    /KicadFont findfont 0.000001 scalefont setfont\n"
+    "    /CircuitAliveEDAFont findfont 0.000001 scalefont setfont\n"
     "    show } bind def\n"
 
     // This is for regular postscript text
@@ -776,10 +776,10 @@ bool PS_PLOTTER::StartPlot( const wxString& aPageNumber )
     "  end } bind def\n"
 
     // Remap AdobeStandard fonts to Latin1
-    "/KicadFont /Helvetica reencodefont definefont pop\n"
-    "/KicadFont-Bold /Helvetica-Bold reencodefont definefont pop\n"
-    "/KicadFont-Oblique /Helvetica-Oblique reencodefont definefont pop\n"
-    "/KicadFont-BoldOblique /Helvetica-BoldOblique reencodefont definefont pop\n"
+    "/CircuitAliveEDAFont /Helvetica reencodefont definefont pop\n"
+    "/CircuitAliveEDAFont-Bold /Helvetica-Bold reencodefont definefont pop\n"
+    "/CircuitAliveEDAFont-Oblique /Helvetica-Oblique reencodefont definefont pop\n"
+    "/CircuitAliveEDAFont-BoldOblique /Helvetica-BoldOblique reencodefont definefont pop\n"
     "%%EndProlog\n";
 
     time_t time1970 = time( nullptr );

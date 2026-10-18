@@ -87,7 +87,7 @@ PCB_LAYER_ID DIALOG_MAP_LAYERS::GetSelectedLayerID()
     // There should only be one selected (or none) as the list is set with wxLC_SINGLE_SEL style
     wxASSERT_MSG( ( m_kicad_layers_list->GetNextItem( itemIndex, wxLIST_NEXT_ALL,
                                                       wxLIST_STATE_SELECTED ) ) == wxNOT_FOUND,
-                  wxT( "There are more than one KiCad layer selected (unexpected)" ) );
+                  wxT( "There are more than one CircuitAliveEDA layer selected (unexpected)" ) );
 
     for( int layer = 0; layer < PCB_LAYER_ID_COUNT; ++layer )
     {
@@ -266,7 +266,7 @@ DIALOG_MAP_LAYERS::DIALOG_MAP_LAYERS( wxWindow* aParent, const std::vector<INPUT
 
     wxListItem kicadLayersHeader;
     kicadLayersHeader.SetId( 0 );
-    kicadLayersHeader.SetText( _( "KiCad Layer" ) );
+    kicadLayersHeader.SetText( _( "CircuitAliveEDA Layer" ) );
     kicadLayersHeader.SetWidth( kicadMaxTextWidth + 5 );
     m_kicad_layers_list->InsertColumn( 0, kicadLayersHeader );
 

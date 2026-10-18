@@ -2044,8 +2044,8 @@ void ALTIUM_PCB::HelperParseDimensions6Linear( const ADIMENSION6& aElem )
         if( m_reporter )
         {
             m_reporter->Report( wxString::Format(
-                    _( "Dimension found on an Altium layer (%d) with no KiCad equivalent. "
-                           "It has been moved to KiCad layer Eco1_User." ), aElem.layer ),
+                    _( "Dimension found on an Altium layer (%d) with no CircuitAliveEDA equivalent. "
+                           "It has been moved to CircuitAliveEDA layer Eco1_User." ), aElem.layer ),
                         RPT_SEVERITY_INFO );
         }
 
@@ -2151,8 +2151,8 @@ void ALTIUM_PCB::HelperParseDimensions6Radial(const ADIMENSION6 &aElem)
         if( m_reporter )
         {
             m_reporter->Report( wxString::Format(
-                _( "Dimension found on an Altium layer (%d) with no KiCad equivalent. "
-                   "It has been moved to KiCad layer Eco1_User." ),
+                _( "Dimension found on an Altium layer (%d) with no CircuitAliveEDA equivalent. "
+                   "It has been moved to CircuitAliveEDA layer Eco1_User." ),
                 aElem.layer ), RPT_SEVERITY_INFO );
         }
 
@@ -2231,8 +2231,8 @@ void ALTIUM_PCB::HelperParseDimensions6Leader( const ADIMENSION6& aElem )
         if( m_reporter )
         {
             wxString msg;
-            msg.Printf( _( "Dimension found on an Altium layer (%d) with no KiCad equivalent. "
-                          "It has been moved to KiCad layer Eco1_User." ), aElem.layer );
+            msg.Printf( _( "Dimension found on an Altium layer (%d) with no CircuitAliveEDA equivalent. "
+                          "It has been moved to CircuitAliveEDA layer Eco1_User." ), aElem.layer );
             m_reporter->Report( msg, RPT_SEVERITY_ERROR );
         }
 
@@ -2330,8 +2330,8 @@ void ALTIUM_PCB::HelperParseDimensions6Datum( const ADIMENSION6& aElem )
         if( m_reporter )
         {
             wxString msg;
-            msg.Printf( _( "Dimension found on an Altium layer (%d) with no KiCad equivalent. "
-                           "It has been moved to KiCad layer Eco1_User." ), aElem.layer );
+            msg.Printf( _( "Dimension found on an Altium layer (%d) with no CircuitAliveEDA equivalent. "
+                           "It has been moved to CircuitAliveEDA layer Eco1_User." ), aElem.layer );
             m_reporter->Report( msg, RPT_SEVERITY_INFO );
         }
 
@@ -2361,8 +2361,8 @@ void ALTIUM_PCB::HelperParseDimensions6Center( const ADIMENSION6& aElem )
         if( m_reporter )
         {
             wxString msg;
-            msg.Printf( _( "Dimension found on an Altium layer (%d) with no KiCad equivalent. "
-                           "It has been moved to KiCad layer Eco1_User." ), aElem.layer );
+            msg.Printf( _( "Dimension found on an Altium layer (%d) with no CircuitAliveEDA equivalent. "
+                           "It has been moved to CircuitAliveEDA layer Eco1_User." ), aElem.layer );
             m_reporter->Report( msg, RPT_SEVERITY_INFO );
         }
 
@@ -3115,8 +3115,8 @@ void ALTIUM_PCB::ConvertShapeBasedRegions6ToBoardItem( const AREGION6& aElem, co
             if( m_reporter )
             {
                 wxString msg;
-                msg.Printf( _( "Dashed outline found on an Altium layer (%d) with no KiCad equivalent. "
-                               "It has been moved to KiCad layer Eco1_User." ), aElem.layer );
+                msg.Printf( _( "Dashed outline found on an Altium layer (%d) with no CircuitAliveEDA equivalent. "
+                               "It has been moved to CircuitAliveEDA layer Eco1_User." ), aElem.layer );
                 m_reporter->Report( msg, RPT_SEVERITY_ERROR );
             }
 
@@ -3233,7 +3233,7 @@ void ALTIUM_PCB::ConvertShapeBasedRegions6ToFootprintItem( FOOTPRINT*      aFoot
                     wxString msg;
                     msg.Printf( _( "Loading library '%s':\n"
                                  "Footprint %s contains a dashed outline on Altium layer (%d) with "
-                                 "no KiCad equivalent. It has been moved to KiCad layer Eco1_User." ),
+                                 "no CircuitAliveEDA equivalent. It has been moved to CircuitAliveEDA layer Eco1_User." ),
                               m_library,
                               m_footprintName,
                               aElem.layer );
@@ -3246,7 +3246,7 @@ void ALTIUM_PCB::ConvertShapeBasedRegions6ToFootprintItem( FOOTPRINT*      aFoot
                 {
                     wxString msg;
                     msg.Printf( _( "Footprint %s contains a dashed outline on Altium layer (%d) with "
-                                 "no KiCad equivalent. It has been moved to KiCad layer Eco1_User." ),
+                                 "no CircuitAliveEDA equivalent. It has been moved to CircuitAliveEDA layer Eco1_User." ),
                               aFootprint->GetReference(),
                               aElem.layer );
                     m_reporter->Report( msg, RPT_SEVERITY_ERROR );
@@ -4097,7 +4097,7 @@ void ALTIUM_PCB::ConvertPads6ToFootprintItemOnCopper( FOOTPRINT* aFootprint, con
                             wxString msg;
                             msg.Printf( _( "Loading library '%s':\n"
                                          "Footprint %s pad %s has a hole-rotation of %d degrees. "
-                                         "KiCad only supports 90 degree rotations." ),
+                                         "CircuitAliveEDA only supports 90 degree rotations." ),
                                       m_library,
                                       m_footprintName,
                                       aElem.name,
@@ -4111,7 +4111,7 @@ void ALTIUM_PCB::ConvertPads6ToFootprintItemOnCopper( FOOTPRINT* aFootprint, con
                         {
                             wxString msg;
                             msg.Printf( _( "Footprint %s pad %s has a hole-rotation of %d degrees. "
-                                         "KiCad only supports 90 degree rotations." ),
+                                         "CircuitAliveEDA only supports 90 degree rotations." ),
                                       aFootprint->GetReference(),
                                       aElem.name,
                                       KiROUND( slotRotation.AsDegrees() ) );
@@ -4338,8 +4338,8 @@ void ALTIUM_PCB::ConvertPads6ToBoardItemOnNonCopper( const APAD6& aElem )
         if( m_reporter )
         {
             wxString msg;
-            msg.Printf( _( "Non-copper pad %s found on an Altium layer (%d) with no KiCad "
-                         "equivalent. It has been moved to KiCad layer Eco1_User." ),
+            msg.Printf( _( "Non-copper pad %s found on an Altium layer (%d) with no CircuitAliveEDA "
+                         "equivalent. It has been moved to CircuitAliveEDA layer Eco1_User." ),
                       aElem.name, aElem.layer );
             m_reporter->Report( msg, RPT_SEVERITY_INFO );
         }
@@ -4368,7 +4368,7 @@ void ALTIUM_PCB::ConvertPads6ToFootprintItemOnNonCopper( FOOTPRINT* aFootprint, 
                 wxString msg;
                 msg.Printf( _( "Loading library '%s':\n"
                              "Footprint %s non-copper pad %s found on an Altium layer (%d) with no "
-                             "KiCad equivalent. It has been moved to KiCad layer Eco1_User." ),
+                             "CircuitAliveEDA equivalent. It has been moved to CircuitAliveEDA layer Eco1_User." ),
                           m_library,
                           m_footprintName,
                           aElem.name,
@@ -4382,7 +4382,7 @@ void ALTIUM_PCB::ConvertPads6ToFootprintItemOnNonCopper( FOOTPRINT* aFootprint, 
             {
                 wxString msg;
                 msg.Printf( _( "Footprint %s non-copper pad %s found on an Altium layer (%d) with no "
-                             "KiCad equivalent. It has been moved to KiCad layer Eco1_User." ),
+                             "CircuitAliveEDA equivalent. It has been moved to CircuitAliveEDA layer Eco1_User." ),
                           aFootprint->GetReference(),
                           aElem.name,
                           aElem.layer );

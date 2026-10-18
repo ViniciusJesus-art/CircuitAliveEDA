@@ -135,7 +135,7 @@ extern const char defaultDrawingSheet[] =
     "(tbtext \"A\" (name \"\") (pos 1 25 rtcorner) (font (size 1.3 1.3)) (justify center) (repeat 100) (incry 50))\n"
     "(tbtext \"Date: ${ISSUE_DATE}\" (name \"\") (pos 87 6.9))\n"
     "(line (name \"\") (start 110 5.5) (end 2 5.5))\n"
-    "(tbtext \"${KICAD_VERSION}\" (name \"\") (pos 109 4.1) (comment \"Kicad version\"))\n"
+    "(tbtext \"${KICAD_VERSION}\" (name \"\") (pos 109 4.1) (comment \"CircuitAliveEDA version\"))\n"
     "(line (name \"\") (start 110 8.5) (end 2 8.5))\n"
     "(tbtext \"Rev: ${REVISION}\" (name \"\") (pos 24 6.9) (font bold))\n"
     "(tbtext \"Size: ${PAPER}\" (name \"\") (pos 109 6.9) (comment \"Paper format name\"))\n"

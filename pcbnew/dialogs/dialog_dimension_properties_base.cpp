@@ -217,7 +217,7 @@ DIALOG_DIMENSION_PROPERTIES_BASE::DIALOG_DIMENSION_PROPERTIES_BASE( wxWindow* pa
 	m_fontLabel->Wrap( -1 );
 	gbSizerText->Add( m_fontLabel, wxGBPosition( 0, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL|wxBOTTOM|wxRIGHT, 5 );
 
-	wxString m_fontCtrlChoices[] = { _("KiCad Font") };
+	wxString m_fontCtrlChoices[] = { _("CircuitAliveEDA Font") };
 	int m_fontCtrlNChoices = sizeof( m_fontCtrlChoices ) / sizeof( wxString );
 	m_fontCtrl = new FONT_CHOICE( m_sizerText->GetStaticBox(), wxID_ANY, wxDefaultPosition, wxDefaultSize, m_fontCtrlNChoices, m_fontCtrlChoices, 0 );
 	m_fontCtrl->SetSelection( 0 );

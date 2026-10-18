@@ -562,10 +562,10 @@ void PATHS::EnsureUserPathsExist()
     if( !tmp.DirExists() )
     {
         wxString msg = wxString::Format(
-                _( "KiCad was unable to use '%s'.\n"
+                _( "CircuitAliveEDA was unable to use '%s'.\n"
                    "\n"
                    "1. Disable 'Controlled folder access' in Windows settings or Group Policy\n"
-                   "2. Make sure no other antivirus software interferes with KiCad\n"
+                   "2. Make sure no other antivirus software interferes with CircuitAliveEDA\n"
                    "3. Make sure you have correct permissions set up" ),
                 tmp.GetPath() );
 

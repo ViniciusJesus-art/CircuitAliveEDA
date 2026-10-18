@@ -258,13 +258,15 @@ bool STARTWIZARD_PROVIDER_LIBRARIES::MigrateBuiltInLibraries( LIBRARY_TABLE& aTa
 
     for( LIBRARY_TABLE_ROW& row : aTable.Rows() )
     {
-        if( std::regex_search( row.URI().ToStdString(), builtInPattern ) )
+        if( row.Type() != LIBRARY_TABLE_ROW::TABLE_TYPE_NAME
+            && std::regex_search( row.URI().ToStdString(), builtInPattern ) )
         {
             toRemove.insert( row.URI() );
             insertStock = true;
             wxLogTrace( traceLibraries, wxT( "Libraries migration: removing old stock row '%s'" ), row.URI() );
         }
-        else if( row.Type() == LIBRARY_TABLE_ROW::TABLE_TYPE_NAME && row.Nickname() == wxT( "KiCad" ) )
+        else if( row.Type() == LIBRARY_TABLE_ROW::TABLE_TYPE_NAME && ( row.Nickname() == wxT( "KiCad" )
+                     || row.Nickname() == wxT( "CircuitAliveEDA" ) ) )
         {
             haveChained = true;
 
@@ -285,7 +287,7 @@ bool STARTWIZARD_PROVIDER_LIBRARIES::MigrateBuiltInLibraries( LIBRARY_TABLE& aTa
                 wxLogTrace( traceLibraries,
                             wxT( "Libraries migration: migrated chained table URI from '%s' to '%s'" ),
                             row.URI(), aStockPath );
-                row.SetDescription( _( "KiCad Default Libraries" ) );
+                row.SetDescription( _( "CircuitAliveEDA Default Libraries" ) );
                 row.SetURI( aStockPath );
                 chainedRepointed = true;
             }
@@ -309,8 +311,8 @@ bool STARTWIZARD_PROVIDER_LIBRARIES::MigrateBuiltInLibraries( LIBRARY_TABLE& aTa
         wxLogTrace( traceLibraries, wxT( "Libraries migration: inserting chained default table" ) );
         LIBRARY_TABLE_ROW chained = aTable.MakeRow();
         chained.SetType( LIBRARY_TABLE_ROW::TABLE_TYPE_NAME );
-        chained.SetNickname( wxT( "KiCad" ) );
-        chained.SetDescription( _( "KiCad Default Libraries" ) );
+        chained.SetNickname( wxT( "CircuitAliveEDA" ) );
+        chained.SetDescription( _( "CircuitAliveEDA Default Libraries" ) );
         chained.SetURI( aStockPath );
         aTable.Rows().insert( aTable.Rows().begin(), chained );
     }

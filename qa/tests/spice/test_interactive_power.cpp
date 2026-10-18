@@ -22,7 +22,9 @@ BOOST_AUTO_TEST_CASE( PowerSymbolNamesParseSignedAndNativeDecimalVoltages )
     for( const auto& [name, expected] : std::vector<std::pair<std::string, double>>{
         { "+5V", 5 }, { "+24V", 24 }, { "-12V", -12 }, { "+3V3", 3.3 },
         { "+1V8", 1.8 }, { "+2.5V", 2.5 }, { "-3V3", -3.3 }, { "+5VA", 5 },
-        { "+5VD", 5 }, { "500mV", .5 }, { " +24 V ", 24 }, { "0V", 0 } } )
+        { "+5VD", 5 }, { "500mV", .5 }, { " +24 V ", 24 }, { "0V", 0 },
+        { "+5v", 5 }, { "5v", 5 }, { "-5v", -5 }, { "+5", 5 }, { "5", 5 }, { "-5", -5 },
+        { ".5", .5 }, { "-0.5", -.5 }, { "5e-1", .5 } } )
     {
         auto value = PowerSymbolVoltage( name ); BOOST_REQUIRE( value ); BOOST_CHECK_CLOSE( *value, expected, 1e-8 );
     }

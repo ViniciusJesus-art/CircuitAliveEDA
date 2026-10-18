@@ -101,7 +101,7 @@ void SCH_EDIT_FRAME::doReCreateMenuBar()
     submenuImport->SetTitle( _( "Import" ) );
     submenuImport->SetIcon( BITMAPS::import );
 
-    submenuImport->Add( SCH_ACTIONS::importNonKicadSchematic, ACTION_MENU::NORMAL, _( "Non-KiCad Schematic..." ) );
+    submenuImport->Add( SCH_ACTIONS::importNonKicadSchematic, ACTION_MENU::NORMAL, _( "Non-CircuitAliveEDA Schematic..." ) );
     submenuImport->Add( SCH_ACTIONS::importFPAssignments, ACTION_MENU::NORMAL, _( "Footprint Assignments..." ) );
     submenuImport->Add( SCH_ACTIONS::importGraphics, ACTION_MENU::NORMAL, _( "Graphics..." ) );
 

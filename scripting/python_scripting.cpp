@@ -185,7 +185,7 @@ except Exception as e:
 
         if( ( wxVI.GetMajor() != wxPy_major ) || ( wxVI.GetMinor() != wxPy_minor ) )
         {
-            wxString msg = wxT( "The wxPython library was compiled against wxWidgets %s but KiCad is "
+            wxString msg = wxT( "The wxPython library was compiled against wxWidgets %s but CircuitAliveEDA is "
                                 "using %s.  Python plugins will not be available." );
             wxLogError( wxString::Format( msg, version, wxVersion ) );
             available = false;

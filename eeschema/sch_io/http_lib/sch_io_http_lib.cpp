@@ -552,7 +552,7 @@ void SCH_IO_HTTP_LIB::ensureSettings( const wxString& aSettingsPath )
                 if( m_settings->getSupportedAPIVersion() != m_settings->m_Source.api_version )
                 {
                     THROW_IO_ERROR( wxString::Format( _( "HTTP library settings file %s uses API version %s, but "
-                                                         "KiCad requires version %s." ),
+                                                         "CircuitAliveEDA requires version %s." ),
                                                       aSettingsPath, m_settings->m_Source.api_version,
                                                       m_settings->getSupportedAPIVersion() ) );
                 }

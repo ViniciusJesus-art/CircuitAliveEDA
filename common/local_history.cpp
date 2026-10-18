@@ -899,7 +899,7 @@ bool LOCAL_HISTORY::commitInBackground( const wxString& aProjectPath, const wxSt
     }
 
     git_signature* rawSig = nullptr;
-    git_signature_now( &rawSig, "KiCad", "noreply@kicad.org" );
+    git_signature_now( &rawSig, "CircuitAliveEDA", "noreply@circuitaliveeda.local" );
     std::unique_ptr<git_signature, decltype( &git_signature_free )> sig( rawSig, &git_signature_free );
 
     git_commit* parent = nullptr;
@@ -985,7 +985,7 @@ bool LOCAL_HISTORY::Init( const wxString& aProjectPath )
             wxFFile f( ignoreFile.GetFullPath(), wxT( "w" ) );
             if( f.IsOpened() )
             {
-                f.Write( wxS( "# KiCad local history exclusions. Edit to add your own rules.\n"
+                f.Write( wxS( "# CircuitAliveEDA local history exclusions. Edit to add your own rules.\n"
                               "fp-info-cache\n"
                               "*-backups/\n" ) );
                 f.Close();
@@ -1000,12 +1000,12 @@ bool LOCAL_HISTORY::Init( const wxString& aProjectPath )
 
             if( f.IsOpened() )
             {
-                f.Write( wxS( "KiCad Local History Directory\n"
+                f.Write( wxS( "CircuitAliveEDA Local History Directory\n"
                               "=============================\n\n"
                               "This directory contains automatic snapshots of your project files.\n"
-                              "KiCad periodically saves copies of your work here, allowing you to\n"
+                              "CircuitAliveEDA periodically saves copies of your work here, allowing you to\n"
                               "recover from accidental changes or data loss.\n\n"
-                              "You can browse and restore previous versions through KiCad's\n"
+                              "You can browse and restore previous versions through CircuitAliveEDA's\n"
                               "File > Local History menu.\n\n"
                               "To disable this feature:\n"
                               "  Preferences > Common > Project Backup > Enable automatic backups\n\n"
@@ -1096,7 +1096,7 @@ static SNAPSHOT_COMMIT_RESULT commitSnapshotWithLock( git_repository* repo, git_
     std::unique_ptr<git_tree, decltype( &git_tree_free )> tree( rawTree, &git_tree_free );
 
     git_signature* rawSig = nullptr;
-    git_signature_now( &rawSig, "KiCad", "noreply@kicad.org" );
+    git_signature_now( &rawSig, "CircuitAliveEDA", "noreply@circuitaliveeda.local" );
     std::unique_ptr<git_signature, decltype( &git_signature_free )> sig( rawSig,
                                                                          &git_signature_free );
 
@@ -1477,7 +1477,7 @@ bool LOCAL_HISTORY::CommitDuplicateOfLastSave( const wxString& aProjectPath, con
     }
 
     git_signature* sigRaw = nullptr;
-    git_signature_now( &sigRaw, "KiCad", "noreply@kicad.org" );
+    git_signature_now( &sigRaw, "CircuitAliveEDA", "noreply@circuitaliveeda.local" );
     std::unique_ptr<git_signature, decltype( &git_signature_free )> sig( sigRaw, &git_signature_free );
 
     wxString msg = aMessage.IsEmpty() ? wxS("Discard unsaved ") + aFileType : aMessage;

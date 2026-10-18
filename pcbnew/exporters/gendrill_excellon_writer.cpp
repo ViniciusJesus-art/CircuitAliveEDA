@@ -563,7 +563,7 @@ void EXCELLON_WRITER::writeEXCELLONHeader( const DRILL_SPAN& aSpan, TYPE_FILE aH
     {
         // The next lines in EXCELLON files are comments:
         wxString msg;
-        msg << wxT( "KiCad " ) << GetBuildVersion();
+        msg << wxT( "CircuitAliveEDA " ) << GetBuildVersion();
 
         fmt::print( m_file, "; DRILL file {} date {}\n",
                             TO_UTF8( msg ), TO_UTF8( GetISO8601CurrentDateTime() ) );
@@ -606,7 +606,7 @@ void EXCELLON_WRITER::writeEXCELLONHeader( const DRILL_SPAN& aSpan, TYPE_FILE aH
         fmt::print( m_file, "{}", TO_UTF8( msg ) );
 
         // Add the application name that created the drill file
-        msg = wxT( "; #@! TF.GenerationSoftware,Kicad,Pcbnew," );
+        msg = wxT( "; #@! TF.GenerationSoftware,CircuitAliveEDA,Pcbnew," );
         msg << GetBuildVersion() << wxT( "\n" );
         fmt::print( m_file, "{}", TO_UTF8( msg ) );
 

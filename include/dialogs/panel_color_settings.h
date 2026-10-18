@@ -47,7 +47,7 @@ public:
 
     virtual wxString GetResetTooltip() const override
     {
-        return _( "Reset all colors in this theme to the KiCad defaults" );
+        return _( "Reset all colors in this theme to the CircuitAliveEDA defaults" );
     }
 
     bool Show( bool show ) override;

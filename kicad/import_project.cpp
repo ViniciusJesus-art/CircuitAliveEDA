@@ -91,7 +91,7 @@ void KICAD_MANAGER_FRAME::ImportNonKiCadProject( const wxString& aWindowTitle,
     {
         // Don't use wxFileDialog here.  On GTK builds, the default path is returned unless a
         // file is actually selected.
-        wxDirDialog prodlg( this, _( "KiCad Project Destination" ),
+        wxDirDialog prodlg( this, _( "CircuitAliveEDA Project Destination" ),
                             importProj.m_InputFile.GetPath(), wxDD_DEFAULT_STYLE );
 
         if( prodlg.ShowModal() == wxID_CANCEL )

@@ -43,7 +43,10 @@
       "features": [ "fts5", "fts4", "fts3", "rtree", "session" ]
     },
     "icu",
-    "ngspice",
+    {
+      "name": "ngspice",
+      "features": [ "codemodels" ]
+    },
     "wxpython-33",
     {
       "name": "libgit2",

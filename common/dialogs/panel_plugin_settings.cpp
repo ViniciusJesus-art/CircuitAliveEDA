@@ -118,7 +118,7 @@ void PANEL_PLUGIN_SETTINGS::updateApiStatusText()
         m_stApiStatus->SetLabel( wxEmptyString );
     }
 #else
-    m_stApiStatus->SetLabel( _( "This installation of KiCad does not have API support enabled." ) );
+    m_stApiStatus->SetLabel( _( "This installation of CircuitAliveEDA does not have API support enabled." ) );
 #endif
 }
 
@@ -127,7 +127,7 @@ void PANEL_PLUGIN_SETTINGS::validatePythonInterpreter()
 {
     if( !m_cbEnableApi->GetValue() )
     {
-        m_stPythonStatus->SetLabel( _( "KiCad API is not enabled; external Python plugins will "
+        m_stPythonStatus->SetLabel( _( "CircuitAliveEDA API is not enabled; external Python plugins will "
                                        "not be available" ) );
         return;
     }

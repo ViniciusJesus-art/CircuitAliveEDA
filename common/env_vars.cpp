@@ -132,7 +132,7 @@ static void initialiseEnvVarHelp( std::map<wxString, wxString>& aMap )
         _( "The base path of the locally installed symbol libraries." );
 
     aMap[ENV_VAR::GetVersionedEnvVarName( wxS( "TEMPLATE_DIR" ) )] =
-        _( "A directory containing project templates installed with KiCad." );
+        _( "A directory containing project templates installed with CircuitAliveEDA." );
 
     aMap[wxS( "KICAD_USER_TEMPLATE_DIR" )] =
         _( "Optional. Can be defined if you want to create your own project templates folder." );
@@ -141,16 +141,16 @@ static void initialiseEnvVarHelp( std::map<wxString, wxString>& aMap )
         _( "A directory containing 3rd party plugins, libraries and other downloadable content." );
 
     aMap[wxS( "KIPRJMOD" )] =
-        _( "Internally defined by KiCad (cannot be edited) and is set to the absolute path of the currently "
+        _( "Internally defined by CircuitAliveEDA (cannot be edited) and is set to the absolute path of the currently "
            "loaded project file.  This environment variable can be used to define files and paths relative "
            "to the currently loaded project.  For instance, ${KIPRJMOD}/libs/footprints.pretty can be "
            "defined as a folder containing a project specific footprint library named footprints.pretty." );
 
     aMap[ENV_VAR::GetVersionedEnvVarName( wxS( "SCRIPTING_DIR" ) )] =
-        _( "A directory containing system-wide scripts installed with KiCad." );
+        _( "A directory containing system-wide scripts installed with CircuitAliveEDA." );
 
     aMap[ENV_VAR::GetVersionedEnvVarName( wxS( "USER_SCRIPTING_DIR" ) )] =
-        _( "A directory containing user-specific scripts installed with KiCad." );
+        _( "A directory containing user-specific scripts installed with CircuitAliveEDA." );
 
     // Deprecated vars
 #define DEP( var ) wxString::Format( _( "Deprecated version of %s." ), var )

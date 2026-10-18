@@ -131,11 +131,13 @@ void DIALOG_MANAGE_REPOSITORIES::addRepository( const wxString& aUrl )
 
     if( m_pcm->FetchRepository( aUrl, repository, &reporter ) )
     {
-        wxString name = repository.name;
+        wxString repositoryName = aUrl == wxS( PCM_DEFAULT_REPOSITORY_URL )
+                                          ? wxS( "Community package repository" ) : repository.name;
+        wxString name = repositoryName;
         int      increment = 1;
 
         while( findRow( 0, name ) >= 0 )
-            name = wxString::Format( "%s (%d)", repository.name, increment++ );
+            name = wxString::Format( "%s (%d)", repositoryName, increment++ );
 
         m_grid->Freeze();
 

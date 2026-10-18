@@ -32,7 +32,7 @@ static EDITOR_SESSION_VIEW WaitFor( SESSION_RUNNER& runner, PREDICATE predicate 
     for( ;; )
     {
         const auto view = runner.View();
-        BOOST_REQUIRE_MESSAGE( view.state != EDITOR_SESSION_STATE::ERROR, view.error );
+        BOOST_REQUIRE_MESSAGE( view.state != EDITOR_SESSION_STATE::FAILED, view.error );
         if( predicate( view ) ) return view;
         BOOST_REQUIRE( std::chrono::steady_clock::now() < deadline );
         std::this_thread::sleep_for( 5ms );

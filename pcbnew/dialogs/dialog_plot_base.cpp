@@ -353,8 +353,8 @@ DIALOG_PLOT_BASE::DIALOG_PLOT_BASE( wxWindow* parent, wxWindowID id, const wxStr
 
 	gbSizer5->Add( m_DXF_plotUnits, wxGBPosition( 0, 3 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL, 5 );
 
-	m_DXF_plotTextStrokeFontOpt = new wxCheckBox( m_SizerDXF_options->GetStaticBox(), wxID_ANY, _("Use KiCad font to plot text"), wxDefaultPosition, wxDefaultSize, 0 );
-	m_DXF_plotTextStrokeFontOpt->SetToolTip( _("Check to use KiCad stroke font\nUncheck to plot single-line ASCII texts as editable text (using DXF font)") );
+	m_DXF_plotTextStrokeFontOpt = new wxCheckBox( m_SizerDXF_options->GetStaticBox(), wxID_ANY, _("Use CircuitAliveEDA font to plot text"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_DXF_plotTextStrokeFontOpt->SetToolTip( _("Check to use CircuitAliveEDA stroke font\nUncheck to plot single-line ASCII texts as editable text (using DXF font)") );
 
 	gbSizer5->Add( m_DXF_plotTextStrokeFontOpt, wxGBPosition( 1, 0 ), wxGBSpan( 1, 2 ), wxALIGN_CENTER_VERTICAL|wxRIGHT|wxLEFT, 5 );
 

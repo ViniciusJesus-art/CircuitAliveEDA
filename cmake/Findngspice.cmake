@@ -102,7 +102,7 @@ if( NOT NGSPICE_BUILD_VERSION )
     endif()
 endif()
 
-if( WIN32 AND MSYS )
+if( MINGW )
     # NGSPICE_LIBRARY points to libngspice.dll.a on Windows,
     # but the goal is to find out the DLL name.
     # Note: libngspice-0.dll or libngspice-1.dll must be in a executable path
@@ -136,6 +136,7 @@ elseif( WIN32 AND MSVC )
 
     find_path(NGSPICE_CM_DIR
         NAMES analog.cm digital.cm spice2poly.cm
+        PATHS ${NGSPICE_ROOT_DIR}
         PATH_SUFFIXES
             lib/ngspice
     )

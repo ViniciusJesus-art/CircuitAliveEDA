@@ -2005,7 +2005,7 @@ bool PDF_PLOTTER::EndPlot()
 
     fmt::print( m_outputFile,
                 "<<\n"
-                "/Producer (KiCad PDF)\n"
+                "/Producer (CircuitAliveEDA PDF)\n"
                 "/CreationDate ({})\n"
                 "/Creator {}\n"
                 "/Title {}\n"
@@ -2141,8 +2141,8 @@ void PDF_PLOTTER::Text( const VECTOR2I&        aPos,
             int render_mode = 3;    // invisible
 
             VECTOR2I pos( aPos );
-            const char *fontname = aItalic ? ( aBold ? "/KicadFontBI" : "/KicadFontI" )
-                                           : ( aBold ? "/KicadFontB"  : "/KicadFont"  );
+            const char *fontname = aItalic ? ( aBold ? "/CircuitAliveEDAFontBI" : "/CircuitAliveEDAFontI" )
+                                           : ( aBold ? "/CircuitAliveEDAFontB"  : "/CircuitAliveEDAFont"  );
 
             // Compute the copious transformation parameters of the Current Transform Matrix
             double ctm_a, ctm_b, ctm_c, ctm_d, ctm_e, ctm_f;

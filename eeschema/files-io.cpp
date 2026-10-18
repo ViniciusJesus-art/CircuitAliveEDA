@@ -264,8 +264,8 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
 
         if( schFileType == SCH_IO_MGR::SCH_FILE_T::SCH_FILE_UNKNOWN )
         {
-            msg.Printf( _( "'%s' is not a KiCad schematic file.\nUse File -> Import for "
-                           "non-KiCad schematic files." ),
+            msg.Printf( _( "'%s' is not a CircuitAliveEDA schematic file.\nUse File -> Import for "
+                           "non-CircuitAliveEDA schematic files." ),
                         fullFileName );
 
             progressReporter.Hide();
@@ -458,7 +458,7 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
                                 _( "An error was found when loading the schematic that has "
                                    "been automatically fixed.  Please save the schematic to "
                                    "repair the broken file or it may not be usable with other "
-                                   "versions of KiCad." ) );
+                                   "versions of CircuitAliveEDA." ) );
         }
 
         UpdateFileHistory( fullFileName );
@@ -665,7 +665,7 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
 
             m_infoBar->RemoveAllButtons();
             m_infoBar->AddCloseButton();
-            m_infoBar->ShowMessage( _( "This file was created by an older version of KiCad. "
+            m_infoBar->ShowMessage( _( "This file uses an older file format. "
                                        "It will be converted to the new format when saved." ),
                                     wxICON_WARNING, WX_INFOBAR::MESSAGE_TYPE::OUTDATED_SAVE );
 
@@ -691,7 +691,7 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
             {
                 m_infoBar->RemoveAllButtons();
                 m_infoBar->AddCloseButton();
-                m_infoBar->ShowMessage( _( "This file was created by an older version of KiCad. "
+                m_infoBar->ShowMessage( _( "This file uses an older file format. "
                                            "It will be converted to the new format when saved." ),
                                         wxICON_WARNING, WX_INFOBAR::MESSAGE_TYPE::OUTDATED_SAVE );
             }

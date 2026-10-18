@@ -2,19 +2,67 @@
 #define BOOST_TEST_MODULE CircuitAliveEDA_InteractiveSession
 #include <boost/test/unit_test.hpp>
 #include <interactive_sim_session.h>
+#include <interactive_sim_protocol.h>
+#include <platform_runtime.h>
 
 #include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#ifdef _WIN32
+#include <windows.h>
+#include <tlhelp32.h>
+#include <io.h>
+#else
 #include <signal.h>
 #include <sstream>
 #include <sys/wait.h>
+#endif
 #include <thread>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 using namespace CIRCUITALIVE;
 using namespace std::chrono_literals;
+
+BOOST_AUTO_TEST_CASE( FailedStateKeepsErrorWireName )
+{
+    BOOST_CHECK_EQUAL( PROTOCOL::StateName( SIM_SESSION_STATE::FAILED ), "error" );
+    BOOST_CHECK( PROTOCOL::ParseState( "error" ) == SIM_SESSION_STATE::FAILED );
+}
+
+static bool Reaped(int pid)
+{
+#ifdef _WIN32
+    HANDLE process=OpenProcess(SYNCHRONIZE,FALSE,static_cast<DWORD>(pid));
+    if(!process)return true;
+    const bool exited=WaitForSingleObject(process,0)==WAIT_OBJECT_0;CloseHandle(process);return exited;
+#else
+    return waitpid(pid,nullptr,WNOHANG)==-1;
+#endif
+}
+static void KillWorker(int pid)
+{
+#ifdef _WIN32
+    HANDLE process=OpenProcess(PROCESS_TERMINATE,FALSE,static_cast<DWORD>(pid));
+    BOOST_REQUIRE(process);TerminateProcess(process,1);CloseHandle(process);
+#else
+    kill(pid,SIGKILL);
+#endif
+}
+static void SuspendWorker(int pid)
+{
+#ifdef _WIN32
+    HANDLE snapshot=CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD,0);BOOST_REQUIRE(snapshot!=INVALID_HANDLE_VALUE);
+    THREADENTRY32 entry{};entry.dwSize=sizeof(entry);
+    if(Thread32First(snapshot,&entry))do{if(entry.th32OwnerProcessID==static_cast<DWORD>(pid))
+    {HANDLE thread=OpenThread(THREAD_SUSPEND_RESUME,FALSE,entry.th32ThreadID);if(thread){SuspendThread(thread);CloseHandle(thread);}}}while(Thread32Next(snapshot,&entry));
+    CloseHandle(snapshot);
+#else
+    kill(pid,SIGSTOP);
+#endif
+}
 
 static const std::string RC = "RC continuity test\nV1 in 0 1\nR1 in out 1k\n"
                               "C1 out 0 1u ic=0\n.end\n";
@@ -56,7 +104,7 @@ BOOST_AUTO_TEST_CASE( CapacitorPauseResumeAndReset )
     const int oldPid = session.WorkerPid();
     session.Stop();
     BOOST_CHECK_NE( session.WorkerPid(), oldPid );
-    BOOST_CHECK_EQUAL( waitpid( oldPid, nullptr, WNOHANG ), -1 );
+    BOOST_CHECK(Reaped(oldPid));
     auto stopped = session.Snapshot();
     BOOST_CHECK( stopped.state == SIM_SESSION_STATE::STOPPED );
     BOOST_CHECK_EQUAL( stopped.latest.time, 0 );
@@ -236,7 +284,7 @@ BOOST_AUTO_TEST_CASE( MissingSignalFailsAndStopAllowsRecovery )
     cfg.signals = { "nonexistent" };
     session.Configure( RC, cfg );
     BOOST_CHECK_THROW( session.AdvanceTo( 0.0005 ), std::runtime_error );
-    BOOST_CHECK( session.Snapshot().state == SIM_SESSION_STATE::ERROR );
+    BOOST_CHECK( session.Snapshot().state == SIM_SESSION_STATE::FAILED );
     session.Stop();
     session.Configure( RC, Config() );
     session.AdvanceTo( 0.0005 );
@@ -261,8 +309,10 @@ BOOST_AUTO_TEST_CASE( SessionsAreIsolatedAndChildrenAreReaped )
         first.Play(); // Destruction while running must stop/reap its process.
     }
     errno = 0;
-    BOOST_CHECK_EQUAL( waitpid( firstPid, nullptr, WNOHANG ), -1 );
+    BOOST_CHECK(Reaped(firstPid));
+#ifndef _WIN32
     BOOST_CHECK_EQUAL( errno, ECHILD );
+#endif
 }
 
 BOOST_AUTO_TEST_CASE( WorkerFailureIsContained )
@@ -274,10 +324,10 @@ BOOST_AUTO_TEST_CASE( WorkerFailureIsContained )
     session.AdvanceTo( 0.0005 );
     const auto before = session.Snapshot();
     int pid = session.WorkerPid();
-    kill( pid, SIGKILL );
+    KillWorker(pid);
     BOOST_CHECK_THROW( session.Snapshot(), std::runtime_error );
     BOOST_CHECK_EQUAL( session.WorkerPid(), -1 );
-    BOOST_CHECK_EQUAL( waitpid( pid, nullptr, WNOHANG ), -1 );
+    BOOST_CHECK(Reaped(pid));
     session.Stop();
     session.AdvanceTo( 0.0005 );
     BOOST_CHECK_GT( session.Snapshot().generation, before.generation );
@@ -286,13 +336,24 @@ BOOST_AUTO_TEST_CASE( WorkerFailureIsContained )
 
 BOOST_AUTO_TEST_CASE( WorkerPathWithSpaces )
 {
-    char name[] = "/tmp/circuitalive worker-XXXXXX";
-    char* directory = mkdtemp( name );
-    BOOST_REQUIRE( directory != nullptr );
-    const auto link = std::filesystem::path( directory ) / "simulation worker";
+    const auto directory = std::filesystem::temp_directory_path()
+            / ("circuitalive worker " + std::to_string(ProcessId()));
+    BOOST_REQUIRE( std::filesystem::create_directory(directory) );
+#ifdef _WIN32
+    const auto link = directory / "simulation worker.exe";
+#else
+    const auto link = directory / "simulation worker";
+#endif
     try
     {
+#ifdef _WIN32
+        // Copying does not require the Windows symlink privilege.
+        std::filesystem::copy_file( CIRCUITALIVE_TEST_WORKER, link );
+        std::filesystem::copy( std::filesystem::path(CIRCUITALIVE_TEST_WORKER).parent_path()/"ngspice",
+                directory/"ngspice", std::filesystem::copy_options::recursive );
+#else
         std::filesystem::create_symlink( CIRCUITALIVE_TEST_WORKER, link );
+#endif
         INTERACTIVE_SIM_SESSION session( link.string() );
         session.Configure( RC, Config() );
         session.AdvanceTo( 0.0005 );
@@ -308,6 +369,12 @@ BOOST_AUTO_TEST_CASE( WorkerPathWithSpaces )
 
 BOOST_AUTO_TEST_CASE( ClosedStandardInputDoesNotBreakWorkerTransport )
 {
+#ifdef _WIN32
+    const int saved=_dup(0);_close(0);
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);
+    session.Configure(RC,Config());session.AdvanceTo(.0005);
+    if(saved>=0){_dup2(saved,0);_close(saved);}
+#else
     pid_t child = fork();
     BOOST_REQUIRE( child >= 0 );
     if( child == 0 )
@@ -325,13 +392,14 @@ BOOST_AUTO_TEST_CASE( ClosedStandardInputDoesNotBreakWorkerTransport )
     int status;
     BOOST_REQUIRE_EQUAL( waitpid( child, &status, 0 ), child );
     BOOST_CHECK( WIFEXITED( status ) && WEXITSTATUS( status ) == 0 );
+#endif
 }
 
 BOOST_AUTO_TEST_CASE( WorkerTimeoutIsBounded )
 {
     INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER, 200ms );
     int pid = session.WorkerPid();
-    kill( pid, SIGSTOP );
+    SuspendWorker(pid);
     const auto before = std::chrono::steady_clock::now();
     BOOST_CHECK_THROW( session.Snapshot(), std::runtime_error );
     BOOST_CHECK( std::chrono::steady_clock::now() - before < 2s );

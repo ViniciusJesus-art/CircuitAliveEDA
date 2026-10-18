@@ -409,7 +409,7 @@ bool PGM_BASE::InitPgm( bool aHeadless, bool aSkipPyInit, bool aIsUnitTest )
     }
 
     // Init parameters for configuration
-    App().SetVendorName(  wxT( "KiCad" ) );
+    App().SetVendorName( wxT( "CircuitAliveEDA" ) );
     App().SetAppName( pgm_name );
 
 #if wxCHECK_VERSION( 3, 3, 1 ) && defined( __WXGTK__ ) && defined( KICAD_DESKTOP_APP_NAME )
@@ -680,7 +680,7 @@ bool PGM_BASE::SetLanguage( wxString& aErrMsg, bool first_time )
         m_locale = new wxLocale;
         m_locale->Init( wxLANGUAGE_DEFAULT );
 
-        aErrMsg = _( "The KiCad language file for this language is not installed." );
+        aErrMsg = _( "The CircuitAliveEDA language file for this language is not installed." );
         return false;
     }
 
@@ -721,7 +721,7 @@ bool PGM_BASE::SetDefaultLanguage( wxString& aErrMsg )
         m_locale = new wxLocale;
         m_locale->Init();
 
-        aErrMsg = _( "The KiCad language file for this language is not installed." );
+        aErrMsg = _( "The CircuitAliveEDA language file for this language is not installed." );
         return false;
     }
 

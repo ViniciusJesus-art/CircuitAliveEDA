@@ -1,3 +1,3 @@
 ### Documentation
 
-For the full documentation see [https://docs.kicad.org](https://go.kicad.org/docs/GetMajorMinorVersion/en/pcbnew/pcbnew.html#custom_design_rules).
+For the full documentation see [CircuitAliveEDA documentation](https://github.com/ViniciusJesus-art/CircuitAliveEDA/tree/main/docs/circuitalive).

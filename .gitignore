@@ -168,3 +168,8 @@ qa/data/**/*.spice
 
 # Gradle local caches and build locks.
 .gradle/
+
+# Local Windows install tree and installer validation output.
+/stage/
+/installer smoke/
+/dist/

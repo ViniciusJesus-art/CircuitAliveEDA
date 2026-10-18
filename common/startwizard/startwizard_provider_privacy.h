@@ -26,7 +26,7 @@
 
 struct STARTWIZARD_PROVIDER_PRIVACY_MODEL
 {
-    bool m_autoUpdateKiCad = true;
+    bool m_autoUpdateKiCad = false;
     bool m_autoUpdatePCM   = true;
     bool m_enableSentry    = false;
 };

@@ -858,7 +858,7 @@ void PCAD_PCB::ExtractLayerStackup( wxXmlDocument* aXmlDoc )
         }
 
         if( m_layersStackup.size() > 32 )
-            THROW_IO_ERROR( _( "KiCad only supports 32 signal layers." ) );
+            THROW_IO_ERROR( _( "CircuitAliveEDA only supports 32 signal layers." ) );
     }
 }
 

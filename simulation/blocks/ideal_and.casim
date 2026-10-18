@@ -1,0 +1,77 @@
+{
+  "id": "ideal_and",
+  "name": "AND (ideal, no supply pins)",
+  "description": "Y = A AND B (after comparing each input with threshold). No VCC/GND pins: all signal voltages use circuit ground as their reference. Output energy is provided by an ideal behavioral source; supply current and power limits are not modeled.",
+  "equations": [
+    "Y = A AND B (after comparing each input with threshold).",
+    "Input loading: 1 teraohm to circuit ground. Output series resistance: rout."
+  ],
+  "family": "Ideal logic and conditions",
+  "pins": [
+    {
+      "id": "a",
+      "label": "Input A",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "b",
+      "label": "Input B",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "y",
+      "label": "Output Y",
+      "role": "output",
+      "default_pin": "3"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "threshold",
+      "label": "Input threshold",
+      "default": "+2.5V",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "high",
+      "label": "HIGH output level",
+      "default": "+5V",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "low",
+      "label": "LOW output level",
+      "default": "0V",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "rout",
+      "label": "Output resistance",
+      "default": "1",
+      "unit": "Ohm",
+      "min": 1e-06,
+      "max": 1000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Bresult_${id} result_${id} 0 V={(v(${pin:a}) >= ${param:threshold} && v(${pin:b}) >= ${param:threshold}) ? ${param:high} : ${param:low}}",
+      "Rout_${id} result_${id} ${pin:y} ${param:rout}",
+      "Rinput_a_${id} ${pin:a} 0 1e12",
+      "Rinput_b_${id} ${pin:b} 0 1e12"
+    ]
+  },
+  "schema_version": 1,
+  "backend": "ngspice",
+  "license": "GPL-3.0-or-later",
+  "ignore_legacy_spice_fields": true,
+  "category": "Building blocks/Ideal primitives"
+}

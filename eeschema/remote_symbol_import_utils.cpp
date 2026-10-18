@@ -326,7 +326,7 @@ std::unique_ptr<LIB_SYMBOL> LoadRemoteSymbolFromPayload( const std::vector<uint8
 
     if( !plugin )
     {
-        aError = _( "Unable to access the KiCad symbol plugin." );
+        aError = _( "Unable to access the CircuitAliveEDA symbol plugin." );
         wxRemoveFile( tempFile.GetFullPath() );
         return nullptr;
     }

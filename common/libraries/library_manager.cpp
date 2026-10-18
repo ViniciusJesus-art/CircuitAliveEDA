@@ -547,8 +547,8 @@ bool LIBRARY_MANAGER::CreateGlobalTable( LIBRARY_TABLE_TYPE aType, bool aPopulat
     {
         LIBRARY_TABLE_ROW& chained = table.InsertRow();
         chained.SetType( LIBRARY_TABLE_ROW::TABLE_TYPE_NAME );
-        chained.SetNickname( wxT( "KiCad" ) );
-        chained.SetDescription( _( "KiCad Default Libraries" ) );
+        chained.SetNickname( wxT( "CircuitAliveEDA" ) );
+        chained.SetDescription( _( "CircuitAliveEDA Default Libraries" ) );
         chained.SetURI( StockTableReferenceURI( aType ) );
     }
 

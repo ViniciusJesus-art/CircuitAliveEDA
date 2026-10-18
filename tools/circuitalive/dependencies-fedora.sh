@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/env.sh"
 packages=(
-    gcc-c++ cmake ninja-build git pkgconf-pkg-config ccache
+    gcc-c++ cmake ninja-build git pkgconf-pkg-config ccache gettext
     wxGTK-devel wxBase-devel boost-devel cairo-devel pixman-devel
     glew-devel glm-devel freeglut-devel mesa-libGLU-devel gtk3-devel
     libcurl-devel libgit2-devel libsecret-devel libspnav-devel
@@ -17,17 +17,17 @@ case "${1:---system}" in
         exec sudo dnf install "${packages[@]}"
         ;;
     --local)
-        # This mode supplements an existing Fedora 44 KiCad installation. The
-        # normal system installation above is preferable on a new machine.
+        # Build headers and tools are extracted locally; component libraries
+        # have their own preparation command and never require system KiCad.
         mkdir -p "$CIRCUITALIVE_ROOT/.circuitalive/rpms"
         dnf --repo=fedora --repo=updates download --arch=x86_64 \
             --destdir="$CIRCUITALIVE_ROOT/.circuitalive/rpms" \
             wxGTK-devel wxBase-devel boost-devel libcurl-devel opencascade-devel \
             protobuf-devel protobuf-compiler nng-devel-1.9.0-5.fc44 \
-            libngspice-devel-47-1.fc44 ngspice-47-1.fc44 \
+            libngspice-devel-47-1.fc44 ngspice-47-1.fc44 ngspice-codemodel-47-1.fc44 \
             libgit2-devel-1.9.7-1.fc44 swig ccache libspnav-devel unixODBC-devel \
             libsecret-devel-0.21.7-10.fc44 poppler-devel poppler-glib-devel \
-            wayland-devel \
+            wayland-devel gettext gettext-libs \
             gnutls-devel nettle-devel libtasn1-devel p11-kit-devel libidn2-devel gmp-devel \
             xorg-x11-server-Xvfb gh
         exec python3 "$CIRCUITALIVE_ROOT/tools/circuitalive/prepare-local-deps.py"

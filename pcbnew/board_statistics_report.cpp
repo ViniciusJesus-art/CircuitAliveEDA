@@ -723,7 +723,7 @@ wxString FormatBoardStatisticsJson( const BOARD_STATISTICS_DATA& aData, BOARD* a
 
     nlohmann::ordered_json metadata;
     metadata["date"] = GetISO8601CurrentDateTime();
-    metadata["generator"] = "KiCad " + GetBuildVersion();
+    metadata["generator"] = "CircuitAliveEDA " + GetBuildVersion();
     metadata["project"] = aProjectName;
     metadata["board_name"] = aBoardName;
     root["metadata"] = metadata;

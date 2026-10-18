@@ -23,6 +23,7 @@
 #include <eda_base_frame.h>
 #include <kiface_base.h>
 #include <pgm_base.h>
+#include <circuitalive/branding.h>
 #include <wx/display.h>
 #include <wx/log.h>
 #include <wx/statline.h>
@@ -111,8 +112,8 @@ public:
 
         wxBoxSizer* helpSizer = new wxBoxSizer( wxHORIZONTAL );
         wxStaticText* helpLabel = new wxStaticText( this, -1, _( "For help, please visit " ) );
-        wxString docsUrl = wxString::Format( "https://go.kicad.org/docs/%s", GetMajorMinorVersion() );
-        wxHyperlinkCtrl* helpLink = new wxHyperlinkCtrl( this, -1, wxT( "docs.kicad.org" ), docsUrl );
+        wxString docsUrl = CIRCUITALIVE::DocumentationUrl();
+        wxHyperlinkCtrl* helpLink = new wxHyperlinkCtrl( this, -1, wxT( "CircuitAliveEDA Documentation" ), docsUrl );
         helpSizer->Add( helpLabel, 0, wxLEFT | wxTOP | wxBOTTOM | wxALIGN_CENTER_VERTICAL, 5 );
         helpSizer->Add( helpLink, 0, wxRIGHT | wxTOP | wxBOTTOM | wxALIGN_CENTER_VERTICAL, 5 );
         m_mainSizer->Add( helpSizer, 0, wxEXPAND, 5 );

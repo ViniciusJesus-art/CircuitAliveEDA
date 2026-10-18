@@ -74,7 +74,7 @@ if( WIN32 )
     # as curl.
     # There is no harm in defining this globally, at worst some additional
     # headers have to be included explicitly.
-    add_compile_definitions( WIN32_LEAN_AND_MEAN )
+    add_compile_definitions( WIN32_LEAN_AND_MEAN NOMINMAX )
 endif()
 
 if( APPLE )
@@ -133,8 +133,14 @@ option( KICAD_SCRIPTING_WXPYTHON
 mark_as_advanced( KICAD_SCRIPTING_WXPYTHON )
 
 option( KICAD_UPDATE_CHECK
-    "Build in update check"
-    ON )
+    "Build in update check (unavailable in CircuitAliveEDA)"
+    OFF )
+
+# The inherited updater uses the upstream release service, not CircuitAliveEDA releases.
+if( KICAD_UPDATE_CHECK )
+    message( STATUS "Disabling upstream application updates for CircuitAliveEDA" )
+    set( KICAD_UPDATE_CHECK OFF CACHE BOOL "Build in update check" FORCE )
+endif()
 
 cmake_dependent_option( KICAD_WAYLAND
     "Support Wayland features"
@@ -341,7 +347,7 @@ add_compile_definitions( $<$<CONFIG:Debug>:DEBUG> )
 # Add option to add user directories for linker, if any
 link_directories( ${LINK_DIRECTORIES_PATH} )
 
-set( KICAD_CONFIG_DIR "kicad" CACHE STRING "Location of user specific KiCad config files" )
+set( KICAD_CONFIG_DIR "circuitalive-eda" CACHE STRING "Location of user specific CircuitAliveEDA config files" )
 mark_as_advanced( KICAD_CONFIG_DIR )
 add_compile_definitions( KICAD_CONFIG_DIR=${KICAD_CONFIG_DIR} )
 
@@ -557,8 +563,6 @@ if( MSVC )
     add_compile_definitions( BOOST_UUID_FORCE_AUTO_LINK )
     # Disable MSVC's deprecation warnings
     add_compile_definitions( _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE _SCL_SECURE_NO_WARNINGS )
-    # Hide Windows's min() and max() macros
-    add_compile_definitions( NOMINMAX )
     # source and execution charset are UTF-8
     string( APPEND CMAKE_CXX_FLAGS " /utf-8" )
 
@@ -1242,6 +1246,9 @@ add_subdirectory( plugins )             # 3D plugins must be built before kicad
 add_subdirectory( cvpcb )               # must be after pcbnew
 add_subdirectory( kicad )               # should follow pcbnew, eeschema, api
 add_subdirectory( tools )
+if( WIN32 AND MSVC )
+    add_subdirectory( tools/circuitalive/release )
+endif()
 add_subdirectory( utils )
 
 if( KICAD_BUILD_QA_TESTS )

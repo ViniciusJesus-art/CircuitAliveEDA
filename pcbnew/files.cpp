@@ -162,7 +162,7 @@ bool AskLoadBoardFileName( PCB_EDIT_FRAME* aParent, wxString* aFileName, int aCt
 
     if( aCtl & KICTL_KICAD_ONLY )
     {
-        fileFiltersStr = _( "All KiCad Board Files" ) + AddFileExtListToFilter( allExtensions );
+        fileFiltersStr = _( "All CircuitAliveEDA Board Files" ) + AddFileExtListToFilter( allExtensions );
     }
     else
     {
@@ -190,7 +190,7 @@ bool AskLoadBoardFileName( PCB_EDIT_FRAME* aParent, wxString* aFileName, int aCt
 
     bool kicadFormat = ( aCtl & KICTL_KICAD_ONLY );
 
-    wxFileDialog dlg( aParent, kicadFormat ? _( "Open Board File" ) : _( "Import Non KiCad Board File" ),
+    wxFileDialog dlg( aParent, kicadFormat ? _( "Open Board File" ) : _( "Import Non CircuitAliveEDA Board File" ),
                       path, name, fileFiltersStr, wxFD_OPEN | wxFD_FILE_MUST_EXIST );
 
     FILEDLG_IMPORT_NON_KICAD importOptions( aParent->config()->m_System.show_import_issues );
@@ -465,7 +465,7 @@ int PCB_EDIT_FRAME::inferLegacyEdgeClearance( BOARD* aBoard, bool aShowUserMsg )
                             _( "If the zones on this board are refilled the Copper Edge "
                                "Clearance setting will be used (see Board Setup > Design "
                                "Rules > Constraints).\n This may result in different fills "
-                               "from previous KiCad versions which used the line thicknesses "
+                               "from previous file format versions which used the line thicknesses "
                                "of the board boundary on the Edge Cuts layer." ) );
     }
 
@@ -856,7 +856,7 @@ bool PCB_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
         {
             m_infoBar->RemoveAllButtons();
             m_infoBar->AddCloseButton();
-            m_infoBar->ShowMessage( _( "This file was created by an older version of KiCad. "
+            m_infoBar->ShowMessage( _( "This file uses an older file format. "
                                        "It will be converted to the new format when saved." ),
                                     wxICON_WARNING, WX_INFOBAR::MESSAGE_TYPE::OUTDATED_SAVE );
         }

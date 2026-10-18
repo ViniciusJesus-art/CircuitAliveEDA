@@ -124,7 +124,7 @@ int GERBVIEW_CONTROL::ExportToPcbnew( const TOOL_EVENT& aEvent )
     wxString fileDialogName( NAMELESS_PROJECT + wxT( "." ) + FILEEXT::KiCadPcbFileExtension );
     wxString     path = m_frame->GetMruPath();
 
-    wxFileDialog filedlg( m_frame, _( "Export as KiCad Board File" ), path, fileDialogName,
+    wxFileDialog filedlg( m_frame, _( "Export as CircuitAliveEDA Board File" ), path, fileDialogName,
                           FILEEXT::PcbFileWildcard(), wxFD_SAVE | wxFD_OVERWRITE_PROMPT );
 
     KIPLATFORM::UI::AllowNetworkFileSystems( &filedlg );

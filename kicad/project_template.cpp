@@ -479,7 +479,7 @@ wxFileName EnsureDefaultProjectTemplate( const wxString& aBaseDir )
             return wxFileName();
 
         info.Write( wxT( "<html><head><title>Default</title></head><body>"
-                         "<h3>Default KiCad project template.</h3></body></html>" ) );
+                         "<h3>Default CircuitAliveEDA project template.</h3></body></html>" ) );
         info.Close();
     }
 

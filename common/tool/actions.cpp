@@ -1388,7 +1388,7 @@ TOOL_ACTION ACTIONS::gettingStarted( TOOL_ACTION_ARGS()
         .Name( "common.SuiteControl.gettingStarted" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Getting Started" ) )
-        .Tooltip( _( "Open \"Getting Started in KiCad\" guide for beginners" ) )
+        .Tooltip( _( "Open \"Getting Started in CircuitAliveEDA\" guide for beginners" ) )
         .Icon( BITMAPS::help ) );
 
 TOOL_ACTION ACTIONS::help( TOOL_ACTION_ARGS()
@@ -1418,14 +1418,14 @@ TOOL_ACTION ACTIONS::getInvolved( TOOL_ACTION_ARGS()
         .Name( "common.SuiteControl.getInvolved" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Get Involved" ) )
-        .Tooltip( _( "Open \"Contribute to KiCad\" in a web browser" ) )
+        .Tooltip( _( "Open \"Contribute to CircuitAliveEDA\" in a web browser" ) )
         .Icon( BITMAPS::info ) );
 
 TOOL_ACTION ACTIONS::donate( TOOL_ACTION_ARGS()
         .Name( "common.SuiteControl.donate" )
         .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Donate" ) )
-        .Tooltip( _( "Open \"Donate to KiCad\" in a web browser" ) ) );
+        .FriendlyName( _( "Support Original Project..." ) )
+        .Tooltip( _( "Support the original project credited in About" ) ) );
 
 TOOL_ACTION ACTIONS::reportBug( TOOL_ACTION_ARGS()
         .Name( "common.SuiteControl.reportBug" )

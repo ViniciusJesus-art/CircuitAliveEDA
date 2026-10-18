@@ -273,8 +273,13 @@ void DIALOG_ABOUT::onCopyVersionInfo( wxCommandEvent& event )
 
 void DIALOG_ABOUT::onDonateClick( wxCommandEvent& event )
 {
-    if( TOOL_MANAGER* mgr = static_cast<EDA_BASE_FRAME*>( GetParent() )->GetToolManager() )
-        mgr->RunAction( "common.SuiteControl.donate" );
+    const wxString url = wxS( "https://go.kicad.org/app-donate" );
+
+    if( !wxLaunchDefaultBrowser( url ) )
+    {
+        wxMessageBox( wxString::Format( _( "To support KiCad, the upstream project, visit %s" ), url ),
+                      _( "Support KiCad" ), wxOK | wxICON_INFORMATION, this );
+    }
 }
 
 

@@ -1531,7 +1531,7 @@ ATEXT6::ATEXT6( ALTIUM_BINARY_PARSER& aReader, std::map<uint32_t, wxString>& aSt
         {
             uint8_t temp = aReader.Peek<uint8_t>();
             uint32_t temp32 = ii < 3 ? ALTIUM_PROPS_UTILS::ConvertToKicadUnit( aReader.Peek<uint32_t>() ) : 0;
-            wxLogTrace( traceAltiumImport, "3ATEXT6 %zu:\t Byte:%u, Kicad:%u\n", ii, temp, temp32 );
+            wxLogTrace( traceAltiumImport, "3ATEXT6 %zu:\t Byte:%u, CircuitAliveEDA:%u\n", ii, temp, temp32 );
             aReader.Skip( 1 );
         }
     }

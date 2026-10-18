@@ -60,8 +60,8 @@ PDF_STROKE_FONT_SUBSET::PDF_STROKE_FONT_SUBSET( const KIFONT::STROKE_FONT* aFont
                                                 double aStrokeWidthFactor, double aAspectRatio ) :
         m_font( aFont ),
         m_unitsPerEm( aUnitsPerEm ),
-        m_resourceName( fmt::format( "/KiCadStroke{}", aSubsetIndex ) ),
-        m_cmapName( fmt::format( "KiCadStrokeCMap{}", aSubsetIndex ) ),
+        m_resourceName( fmt::format( "/CircuitAliveEDAStroke{}", aSubsetIndex ) ),
+        m_cmapName( fmt::format( "CircuitAliveEDAStrokeCMap{}", aSubsetIndex ) ),
         m_widths( MAX_SIMPLE_FONT_CODES, 0.0 ),
         m_nextCode( 1 ),
         m_lastCode( 0 ),
@@ -340,7 +340,7 @@ std::string PDF_STROKE_FONT_SUBSET::BuildToUnicodeCMap() const
     fmt::format_to( std::back_inserter( buffer ), "/CIDInit /ProcSet findresource begin\n" );
     fmt::format_to( std::back_inserter( buffer ), "12 dict begin\n" );
     fmt::format_to( std::back_inserter( buffer ), "begincmap\n" );
-    fmt::format_to( std::back_inserter( buffer ), "/CIDSystemInfo << /Registry (KiCad) /Ordering (StrokeFont) /Supplement 0 >> def\n" );
+    fmt::format_to( std::back_inserter( buffer ), "/CIDSystemInfo << /Registry (CircuitAliveEDA) /Ordering (StrokeFont) /Supplement 0 >> def\n" );
     fmt::format_to( std::back_inserter( buffer ), "/CMapName /{} def\n", m_cmapName );
     fmt::format_to( std::back_inserter( buffer ), "/CMapType 2 def\n" );
     fmt::format_to( std::back_inserter( buffer ), "1 begincodespacerange\n" );

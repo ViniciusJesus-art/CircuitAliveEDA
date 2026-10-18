@@ -27,6 +27,7 @@
 #include <kicad_curl/kicad_curl_easy.h>
 
 #include <bitmaps.h>
+#include <circuitalive/branding.h>
 #include <build_version.h>
 #include <common.h>     // for SearchHelpFileFullPath
 #include <pgm_base.h>
@@ -51,9 +52,7 @@
 #include <reporter.h>
 #include <widgets/kistatusbar.h>
 
-#define URL_GET_INVOLVED wxS( "https://go.kicad.org/contribute/" )
-#define URL_DONATE wxS( "https://go.kicad.org/app-donate" )
-#define URL_DOCUMENTATION wxS( "https://go.kicad.org/docs/" )
+#define URL_GET_INVOLVED CIRCUITALIVE::ProjectUrl()
 
 
 /// URL to launch a new issue with pre-populated description
@@ -292,76 +291,20 @@ int COMMON_CONTROL::ShowProjectManager( const TOOL_EVENT& aEvent )
 
 int COMMON_CONTROL::ShowHelp( const TOOL_EVENT& aEvent )
 {
-    wxString helpFile;
-    wxString msg;
+    const wxString url = aEvent.IsAction( &ACTIONS::gettingStarted )
+                                 ? CIRCUITALIVE::ProjectUrl() + wxS( "#readme" )
+                                 : CIRCUITALIVE::DocumentationUrl();
 
-    // the URL of help files is "https://go.kicad.org/docs/<version>/<language>/<name>/"
-    const wxString baseUrl = URL_DOCUMENTATION + GetMajorMinorVersion() + wxT( "/" )
-                             + Pgm().GetLocale()->GetName().BeforeLast( '_' ) + wxT( "/" );
-
-    /* We have to get document for beginners,
-     * or the full specific doc
-     * if event id is wxID_INDEX, we want the document for beginners.
-     * else the specific doc file (its name is in Kiface().GetHelpFileName())
-     * The document for beginners is the same for all KiCad utilities
-     */
-    if( aEvent.IsAction( &ACTIONS::gettingStarted ) )
+    if( !wxLaunchDefaultBrowser( url ) )
     {
-        // List of possible names for Getting Started in KiCad
-        const wxChar* names[2] = {
-                wxT( "getting_started_in_kicad" ),
-                wxT( "Getting_Started_in_KiCad" )
-        };
-
-        // Search for "getting_started_in_kicad.html" or "getting_started_in_kicad.pdf"
-        // or "Getting_Started_in_KiCad.html" or "Getting_Started_in_KiCad.pdf"
-        for( auto& name : names )
-        {
-            helpFile = SearchHelpFileFullPath( name );
-
-            if( !helpFile.IsEmpty() )
-                break;
-        }
-
-        if( !helpFile )
-        {
-            msg = wxString::Format( _( "Help file '%s' or\n'%s' could not be found.\n"
-                                       "Do you want to access the KiCad online help?" ),
-                                    names[0], names[1] );
-            KICAD_MESSAGE_DIALOG dlg( nullptr, msg, _( "File Not Found" ),
-                                      wxYES_NO | wxNO_DEFAULT | wxCANCEL );
-
-            if( dlg.ShowModal() != wxID_YES )
-                return -1;
-
-            helpFile = baseUrl + names[0] + wxS( "/" );
-        }
-    }
-    else
-    {
-        wxString base_name = m_frame->help_name();
-
-        helpFile = SearchHelpFileFullPath( base_name );
-
-        if( !helpFile )
-        {
-            msg = wxString::Format( _( "Help file '%s' could not be found.\n"
-                                       "Do you want to access the KiCad online help?" ),
-                                    base_name );
-            KICAD_MESSAGE_DIALOG dlg( nullptr, msg, _( "File Not Found" ),
-                                      wxYES_NO | wxNO_DEFAULT | wxCANCEL );
-
-            if( dlg.ShowModal() != wxID_YES )
-                return -1;
-
-            helpFile = baseUrl + base_name + wxS( "/" );
-        }
+        wxString msg = wxString::Format( _( "Could not launch the default browser.\n"
+                                           "For CircuitAliveEDA documentation, visit %s" ), url );
+        wxMessageBox( msg, _( "CircuitAliveEDA Help" ), wxOK, m_frame );
+        return -1;
     }
 
-    GetAssociatedDocument( m_frame, helpFile, &m_frame->Prj() );
     return 0;
 }
-
 
 int COMMON_CONTROL::About( const TOOL_EVENT& aEvent )
 {
@@ -384,9 +327,9 @@ int COMMON_CONTROL::GetInvolved( const TOOL_EVENT& aEvent )
     {
         wxString msg;
         msg.Printf( _( "Could not launch the default browser.\n"
-                       "For information on how to help the KiCad project, visit %s" ),
+                       "For information on how to help the CircuitAliveEDA project, visit %s" ),
                     URL_GET_INVOLVED );
-        wxMessageBox( msg, _( "Get involved with KiCad" ), wxOK, m_frame );
+        wxMessageBox( msg, _( "Get involved with CircuitAliveEDA" ), wxOK, m_frame );
     }
 
     return 0;
@@ -395,18 +338,9 @@ int COMMON_CONTROL::GetInvolved( const TOOL_EVENT& aEvent )
 
 int COMMON_CONTROL::Donate( const TOOL_EVENT& aEvent )
 {
-    if( !wxLaunchDefaultBrowser( URL_DONATE ) )
-    {
-        wxString msg;
-        msg.Printf( _( "Could not launch the default browser.\n"
-                       "To donate to the KiCad project, visit %s" ),
-                    URL_DONATE );
-        wxMessageBox( msg, _( "Donate to KiCad" ), wxOK, m_frame );
-    }
-
-    return 0;
+    // Upstream support is presented with the attribution in About.
+    return About( aEvent );
 }
-
 
 int COMMON_CONTROL::ReportBug( const TOOL_EVENT& aEvent )
 {

@@ -1,7 +1,9 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
+#include "model_i18n.h"
 #include "editor_simulation.h"
 #include "schematic_adapter.h"
 #include "session_runner.h"
+#include "visual_signals.h"
 #include "simulation_overlay.h"
 #include "simulation_toolbar.h"
 #include "model_dialog.h"
@@ -22,6 +24,9 @@
 #include <project.h>
 #include <sch_draw_panel.h>
 #include <sch_edit_frame.h>
+#include <eeschema_settings.h>
+#include <pgm_base.h>
+#include <settings/settings_manager.h>
 #include <schematic.h>
 #include <tool/tool_action.h>
 #include <tool/action_manager.h>
@@ -44,6 +49,7 @@ public:
     void Install();
     void Shutdown();
     void Invalidate();
+    void ReloadPreferences();
     void Rebind()
     {
         Invalidate();
@@ -98,6 +104,7 @@ private:
     std::optional<PROBE_KIND> m_placing;
     SCHEMATIC_SNAPSHOT m_circuit;
     EDITOR_SESSION_VIEW m_session;
+    SIMULATION_PREFERENCES m_preferences;
     bool m_active = false;
     bool m_errorShown = false;
     bool m_probePanel = false, m_logicLevels = false, m_instrumentsVisible = false;
@@ -108,6 +115,7 @@ private:
     std::vector<bool> m_overlaySwitches;
     std::vector<double> m_overlayAdjustments;
     std::vector<LOGIC_LEVEL> m_overlayLevels;
+    std::vector<bool> m_overlayRapid;
     wxWeakRef<LIVE_CONTROL_POPUP> m_liveControl;
 };
 
@@ -116,7 +124,7 @@ void EDITOR_SIMULATION_TOOL::Install()
     if( m_installed )
         return;
     m_runner = std::make_unique<SESSION_RUNNER>( FindSessionWorker(
-            wxStandardPaths::Get().GetExecutablePath().ToStdString() ) );
+            wxStandardPaths::Get().GetExecutablePath().ToStdString(wxConvUTF8) ) );
     m_overlay = std::make_unique<SIMULATION_OVERLAY>();
     m_frame->Schematic().AddListener( this );
     m_installed = true;
@@ -131,7 +139,7 @@ void EDITOR_SIMULATION_TOOL::Install()
             auto* symbol=static_cast<SCH_SYMBOL*>(selected.Front());
             if(symbol->GetExcludedFromSim(&m_frame->GetCurrentSheet(),m_frame->Schematic().GetCurrentVariant()))return false;
             try{
-                auto component=ReadSymbolModelSettings(*symbol,m_frame->GetCurrentSheet(),m_frame->Schematic().GetCurrentVariant(),m_frame->Prj().GetProjectPath().ToStdString(),true);
+                auto component=ReadSymbolModelSettings(*symbol,m_frame->GetCurrentSheet(),m_frame->Schematic().GetCurrentVariant(),m_frame->Prj().GetProjectPath().ToStdString(wxConvUTF8),true);
                 return !MODEL_REPOSITORY(MODEL_REPOSITORY::DefaultDirectories(component.projectDirectory)).SelectModel(component).memories.empty();
             }catch(const std::exception&){return false;}
         } );
@@ -163,7 +171,19 @@ void EDITOR_SIMULATION_TOOL::Install()
     Bind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
     m_frame->GetCanvas()->Bind( wxEVT_LEFT_DOWN, &EDITOR_SIMULATION_TOOL::click, this );
     m_frame->Bind( wxEVT_CHAR_HOOK, &EDITOR_SIMULATION_TOOL::key, this );
-    m_timer.Start( 33 );
+    ReloadPreferences();
+}
+
+void EDITOR_SIMULATION_TOOL::ReloadPreferences()
+{
+    if( !m_installed ) return;
+    if( const auto* cfg = GetAppSettings<EESCHEMA_SETTINGS>( "eeschema" ) )
+        m_preferences = cfg->m_RealtimeSimulation;
+    m_preferences.Normalize();
+    m_runner->SetPreferences( m_preferences );
+    m_logicLevels = m_preferences.showDigitalIndicators;
+    m_timer.Start( m_preferences.FrameInterval().count() );
+    redraw();
 }
 
 void EDITOR_SIMULATION_TOOL::Shutdown()
@@ -237,7 +257,8 @@ int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
         {
             // Freeze a complete graph/model snapshot on this thread; the solver never reads it live.
             m_frame->RecalculateConnections( nullptr, NO_CLEANUP );
-            m_circuit = CaptureSchematic( m_frame->Schematic(), true );
+            m_circuit = CaptureSchematic( m_frame->Schematic(), true, m_preferences );
+            m_runner->SetSpeed( m_preferences.playbackSpeed );
             m_runner->Start( m_circuit.circuit );
             m_resultOpened = false;
             m_active = true;
@@ -245,8 +266,8 @@ int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
         }
         catch( const std::exception& e )
         {
-            setStatus( _( "Circuit needs attention" ) + " — " + wxString::FromUTF8( e.what() ).Left( 160 ) );
-            wxMessageBox( wxString::FromUTF8( e.what() ), _( "Interactive simulation" ),
+            setStatus( _( "Circuit needs attention" ) + " — " + DiagnosticText( e.what() ).Left( 160 ) );
+            wxMessageBox( DiagnosticText( e.what() ), _( "Interactive simulation" ),
                           wxOK | wxICON_INFORMATION, m_frame );
         }
     }
@@ -277,7 +298,12 @@ int EDITOR_SIMULATION_TOOL::ToggleProbes( const TOOL_EVENT& )
 
 int EDITOR_SIMULATION_TOOL::ToggleLogic( const TOOL_EVENT& )
 {
-    m_logicLevels = !m_logicLevels; redraw(); return 0;
+    m_logicLevels = !m_logicLevels;
+    m_preferences.showDigitalIndicators = m_logicLevels;
+    if( auto* cfg = GetAppSettings<EESCHEMA_SETTINGS>( "eeschema" ) )
+        cfg->m_RealtimeSimulation.showDigitalIndicators = m_logicLevels;
+    redraw();
+    return 0;
 }
 
 int EDITOR_SIMULATION_TOOL::Pause( const TOOL_EVENT& )
@@ -313,7 +339,7 @@ int EDITOR_SIMULATION_TOOL::Memory( const TOOL_EVENT& )
     {
         auto component =
                 ReadSymbolModelSettings( *symbol, m_frame->GetCurrentSheet(), m_frame->Schematic().GetCurrentVariant(),
-                                         m_frame->Prj().GetProjectPath().ToStdString() );
+                                         m_frame->Prj().GetProjectPath().ToStdString(wxConvUTF8) );
         std::vector<MEMORY_REGION_CONFIG> regions;
         std::vector<std::size_t> slots;
         if( m_active )
@@ -321,7 +347,7 @@ int EDITOR_SIMULATION_TOOL::Memory( const TOOL_EVENT& )
             for( const auto& region : m_circuit.circuit.memories )
             {
                 const auto& location = m_circuit.locations.at( region.component );
-                if( location.reference.ToStdString() == component.reference )
+                if( location.reference.ToStdString(wxConvUTF8) == component.reference )
                 {
                     slots.push_back( region.slot );
                     regions.push_back( m_circuit.circuit.config.memories.at( region.slot ) );
@@ -342,7 +368,7 @@ int EDITOR_SIMULATION_TOOL::Memory( const TOOL_EVENT& )
     }
     catch( const std::exception& e )
     {
-        wxMessageBox( wxString::FromUTF8( e.what() ), _( "Memory" ), wxOK | wxICON_INFORMATION, m_frame );
+        wxMessageBox( DiagnosticText( e.what() ), _( "Memory" ), wxOK | wxICON_INFORMATION, m_frame );
     }
     return 0;
 }
@@ -368,7 +394,7 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
             return 0;
         }
         auto component = ReadSymbolModelSettings( *symbol, m_frame->GetCurrentSheet(),
-            m_frame->Schematic().GetCurrentVariant(), m_frame->Prj().GetProjectPath().ToStdString(), true );
+            m_frame->Schematic().GetCurrentVariant(), m_frame->Prj().GetProjectPath().ToStdString(wxConvUTF8), true );
         bool excluded = symbol->GetExcludedFromSim( &m_frame->GetCurrentSheet(),
                                                    m_frame->Schematic().GetCurrentVariant() );
         if( EditSimulationModel( m_frame, component, excluded ) )
@@ -378,7 +404,7 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
                 for( auto* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
                 {
                     auto* unit = static_cast<SCH_SYMBOL*>( item );
-                    if( unit != symbol && ( !symbol->IsMultiUnit() || unit->GetRef( &sheet ).ToStdString() != component.reference
+                    if( unit != symbol && ( !symbol->IsMultiUnit() || unit->GetRef( &sheet ).ToStdString(wxConvUTF8) != component.reference
                         || unit->GetLibId() != symbol->GetLibId() ) ) continue;
                     commit.Modify( unit, sheet.LastScreen() );
                     unit->SetExcludedFromSim( excluded, &sheet, m_frame->Schematic().GetCurrentVariant() );
@@ -390,7 +416,7 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
     }
     catch( const std::exception& e )
     {
-        wxMessageBox( wxString::FromUTF8( e.what() ), _( "Simulation model" ), wxOK, m_frame );
+        wxMessageBox( DiagnosticText( e.what() ), _( "Simulation model" ), wxOK, m_frame );
     }
     return 0;
 }
@@ -407,7 +433,7 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
             m_instruments->ClearProbeName();
             setStatus( _( "Probe placed — click another wire or press Esc" ) );
         }
-        catch( const std::exception& e ) { setStatus( wxString::FromUTF8( e.what() ) ); }
+        catch( const std::exception& e ) { setStatus( DiagnosticText( e.what() ) ); }
         return;
     }
     if( m_active && ( m_session.state == EDITOR_SESSION_STATE::RUNNING
@@ -422,7 +448,7 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
             dismissControl();
             const auto component = m_circuit.circuit.adjustments.at( adjustment ).component;
             m_liveControl = new LIVE_CONTROL_POPUP( m_frame,
-                m_circuit.locations.at( component ).reference.ToStdString(),
+                m_circuit.locations.at( component ).reference.ToStdString(wxConvUTF8),
                 m_circuit.circuit.adjustments, m_session.adjustments, component,
                 [this]( std::size_t index, double value ) { m_runner->SetAdjustment( index, value ); } );
             m_liveControl->Position( m_frame->GetCanvas()->ClientToScreen( aEvent.GetPosition() ), wxSize( 0, 16 ) );
@@ -469,7 +495,7 @@ void EDITOR_SIMULATION_TOOL::redraw( bool force )
     if( !m_overlay )
         return;
     const bool visible = m_session.state != EDITOR_SESSION_STATE::STOPPED
-                         && m_session.state != EDITOR_SESSION_STATE::ERROR;
+                         && m_session.state != EDITOR_SESSION_STATE::FAILED;
     const auto sheet = m_frame->GetCurrentSheet().PathAsString();
     std::vector<int> brightness;
     for( std::size_t i = 0; visible && i < m_circuit.circuit.leds.size(); ++i )
@@ -479,11 +505,13 @@ void EDITOR_SIMULATION_TOOL::redraw( bool force )
         && m_logicLevels == m_overlayLogic && brightness == m_overlayBrightness
         && m_session.switches == m_overlaySwitches
         && m_session.adjustments == m_overlayAdjustments
-        && ( !m_logicLevels || m_session.logicLevels == m_overlayLevels ) ) return;
+        && ( !m_logicLevels || ( m_session.logicLevels == m_overlayLevels
+                                 && m_session.logicRapid == m_overlayRapid ) ) ) return;
     m_overlayCached = true; m_overlayVisible = visible; m_overlaySheet = sheet; m_overlayLogic = m_logicLevels;
     m_overlayBrightness = std::move( brightness ); m_overlaySwitches = m_session.switches;
     m_overlayAdjustments = m_session.adjustments;
     m_overlayLevels = m_logicLevels ? m_session.logicLevels : std::vector<LOGIC_LEVEL>{};
+    m_overlayRapid = m_logicLevels ? m_session.logicRapid : std::vector<bool>{};
     auto* view = m_frame->GetCanvas()->GetView();
     m_overlay->Render( m_circuit, m_session, m_frame->GetCurrentSheet().PathAsString(), m_logicLevels );
     if( !view->HasItem( m_overlay.get() ) )
@@ -503,10 +531,12 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     const auto oldTime = m_session.sample.latest.time;
     const auto oldEvents = m_session.sample.eventsApplied;
     const auto oldSpeed = m_session.speed;
+    const auto oldPreferences = m_session.preferences;
     m_session = m_runner->View();
     const auto state = m_session.state;
     if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, m_active );
-    if( m_active && !m_circuit.circuit.measurements.empty() && !m_resultOpened )
+    if( m_active && m_preferences.autoOpenInstruments
+        && !m_circuit.circuit.measurements.empty() && !m_resultOpened )
     { showInstruments( true ); m_resultOpened = true; }
     if( !m_active )
     {
@@ -514,7 +544,10 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
         return;
     }
     if( state == oldState && m_session.sample.latest.time == oldTime
-        && m_session.sample.eventsApplied == oldEvents && m_session.speed == oldSpeed ) { publishStatus(); return; }
+        && m_session.sample.eventsApplied == oldEvents && m_session.speed == oldSpeed
+        && m_session.preferences == oldPreferences ) { publishStatus(); return; }
+    // Refresh electrical visuals at the timer rate; only status text is throttled.
+    redraw( false );
     if( state == oldState && state == EDITOR_SESSION_STATE::RUNNING
         && now - m_lastHud < std::chrono::milliseconds( 100 ) ) return;
     m_lastHud = now;
@@ -523,18 +556,17 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     wxString status = wxString::Format( "%s — t = %.6f s   %.3g×", names[static_cast<int>( state )],
                                        m_session.sample.latest.time, m_session.speed );
     for( std::size_t i = 0; i < std::min<std::size_t>( 2, m_session.warnings.size() ); ++i )
-        status += "   " + wxString::FromUTF8( m_session.warnings[i] );
+        status += "   " + DiagnosticText( m_session.warnings[i] );
     if( m_session.warnings.size() > 2 ) status += wxString::Format( _( "   +%zu warnings" ), m_session.warnings.size() - 2 );
     if( !m_circuit.circuit.floatingIslands.empty() )
         status += wxString::Format( _( "   Floating: %zu" ), m_circuit.circuit.floatingIslands.size() );
-    if( state == EDITOR_SESSION_STATE::ERROR ) status += "   " + wxString::FromUTF8( m_session.error ).Left( 140 );
+    if( state == EDITOR_SESSION_STATE::FAILED ) status += "   " + DiagnosticText( m_session.error ).Left( 140 );
     setStatus( status );
     publishStatus();
-    redraw( false );
-    if( state == EDITOR_SESSION_STATE::ERROR && !m_errorShown )
+    if( state == EDITOR_SESSION_STATE::FAILED && !m_errorShown )
     {
         m_errorShown = true;
-        wxMessageBox( wxString::FromUTF8( m_session.error ), _( "Interactive simulation" ),
+        wxMessageBox( DiagnosticText( m_session.error ), _( "Interactive simulation" ),
                       wxOK | wxICON_ERROR, m_frame );
     }
 }
@@ -568,5 +600,12 @@ void RebindEditorSimulation( SCH_EDIT_FRAME* aFrame )
     if( aFrame->GetToolManager() )
         if( auto* tool = aFrame->GetToolManager()->GetTool<EDITOR_SIMULATION_TOOL>() )
             tool->Rebind();
+}
+
+void ReloadEditorSimulationPreferences( SCH_EDIT_FRAME* aFrame )
+{
+    if( aFrame->GetToolManager() )
+        if( auto* tool = aFrame->GetToolManager()->GetTool<EDITOR_SIMULATION_TOOL>() )
+            tool->ReloadPreferences();
 }
 }

@@ -59,7 +59,7 @@ public:
 
     const IO_BASE::IO_FILE_DESC GetLibraryDesc() const override
     {
-        return IO_BASE::IO_FILE_DESC( _HKI( "KiCad HTTP library files" ), { FILEEXT::HTTPLibraryFileExtension } );
+        return IO_BASE::IO_FILE_DESC( _HKI( "CircuitAliveEDA HTTP library files" ), { FILEEXT::HTTPLibraryFileExtension } );
     }
 
     int GetModifyHash() const override { return m_modifyHash; }

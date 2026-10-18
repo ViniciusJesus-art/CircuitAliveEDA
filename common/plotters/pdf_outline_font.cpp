@@ -373,7 +373,7 @@ std::string PDF_OUTLINE_FONT_SUBSET::BuildCIDToGIDStream() const
 
 std::string PDF_OUTLINE_FONT_SUBSET::makeResourceName( unsigned aSubsetIndex )
 {
-    return fmt::format( "/KiCadOutline{}", aSubsetIndex );
+    return fmt::format( "/CircuitAliveEDAOutline{}", aSubsetIndex );
 }
 
 std::string PDF_OUTLINE_FONT_SUBSET::sanitizeFontName( const wxString& aName )

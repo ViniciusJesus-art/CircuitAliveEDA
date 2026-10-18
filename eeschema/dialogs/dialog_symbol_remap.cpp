@@ -73,9 +73,9 @@ DIALOG_SYMBOL_REMAP::DIALOG_SYMBOL_REMAP( SCH_EDIT_FRAME* aParent ) :
     wxString text;
 
     text = _( "This schematic currently uses the project symbol library list look up method "
-              "for loading library symbols.  KiCad will attempt to map the existing symbols "
+              "for loading library symbols.  CircuitAliveEDA will attempt to map the existing symbols "
               "to use the new symbol library table.  Remapping will change some project files "
-              "and schematics may not be compatible with older versions of KiCad.  All files "
+              "and schematics may not be compatible with older versions of CircuitAliveEDA.  All files "
               "that are changed will be backed up to the \"rescue-backup\" folder in the project "
               "folder should you need to revert any changes.  If you choose to skip this step, "
               "you will be responsible for manually remapping the symbols." );

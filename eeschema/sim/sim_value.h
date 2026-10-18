@@ -156,7 +156,9 @@ namespace SIM_VALUE_GRAMMAR
     template <NOTATION Notation>
     struct garbageSuffix;
 
-    template <> struct garbageSuffix<NOTATION::SI> : seq<> {};
+    // Voltage fields also accept their displayed unit, with either case. Keep
+    // prefixes case-sensitive (milli versus mega) and reject arbitrary suffixes.
+    template <> struct garbageSuffix<NOTATION::SI> : opt<one<'V', 'v'>> {};
     template <> struct garbageSuffix<NOTATION::SPICE> : star<alpha> {};
 
 

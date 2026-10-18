@@ -27,6 +27,7 @@
 
 #include <mock_pgm_base.h>
 #include <richio.h>
+#include <circuitalive/branding.h>
 #include <io/kicad/kicad_io_utils.h>
 #include <qa_utils/env_var_utils.h>
 #include <qa_utils/file_utils.h>
@@ -621,7 +622,8 @@ static size_t countChainedKiCadRows( const LIBRARY_TABLE& aTable )
             []( const LIBRARY_TABLE_ROW& aRow )
             {
                 return aRow.Type() == LIBRARY_TABLE_ROW::TABLE_TYPE_NAME
-                       && aRow.Nickname() == wxS( "KiCad" );
+                       && ( aRow.Nickname() == wxS( "KiCad" )
+                            || aRow.Nickname() == wxS( "CircuitAliveEDA" ) );
             } );
 }
 
@@ -700,6 +702,28 @@ BOOST_AUTO_TEST_CASE( MigrateBuiltInLibraries_ChainedRowMigratedInPlace )
     auto migrated = table.Row( wxS( "KiCad" ) );
     BOOST_REQUIRE( migrated.has_value() );
     BOOST_CHECK_EQUAL( ( *migrated )->URI(), stockPath );
+}
+
+
+// Rebranding the library editor must not change the file format's native type token.
+BOOST_AUTO_TEST_CASE( BrandedLibraryTypeKeepsCompatibleStorage )
+{
+    LIBRARY_TABLE table( true, wxEmptyString, LIBRARY_TABLE_SCOPE::PROJECT );
+    table.SetType( LIBRARY_TABLE_TYPE::SYMBOL );
+    LIBRARY_TABLE_ROW& row = table.InsertRow();
+    row.SetNickname( wxS( "Parts" ) );
+    row.SetURI( wxS( "${KIPRJMOD}/Parts.kicad_sym" ) );
+    row.SetType( CIRCUITALIVE::LibraryTypeId( CIRCUITALIVE::ProductName() ) );
+
+    BOOST_CHECK_EQUAL( CIRCUITALIVE::LibraryTypeLabel( row.Type() ),
+                       CIRCUITALIVE::ProductName() );
+    BOOST_CHECK_EQUAL( row.Type(), wxS( "KiCad" ) );
+
+    STRING_FORMATTER formatter;
+    table.Format( &formatter );
+    LIBRARY_TABLE_PARSER parser;
+    BOOST_CHECK( parser.ParseBuffer( formatter.GetString() ).has_value() );
+    BOOST_CHECK_EQUAL( formatter.GetString().find( "CircuitAliveEDA" ), std::string::npos );
 }
 
 

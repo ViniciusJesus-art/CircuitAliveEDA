@@ -36,6 +36,9 @@ public:
             PANEL_STARTWIZARD_PRIVACY_BASE( aParent ),
             m_model( aModel )
     {
+#ifndef KICAD_UPDATE_CHECK
+        m_cbAutoUpdateKiCad->Hide();
+#endif
 #ifndef KICAD_USE_SENTRY
         m_sizerDataCollection->Show( false );
 #endif
@@ -43,7 +46,11 @@ public:
 
     bool TransferDataFromWindow() override
     {
+#ifdef KICAD_UPDATE_CHECK
         m_model->m_autoUpdateKiCad = m_cbAutoUpdateKiCad->GetValue();
+#else
+        m_model->m_autoUpdateKiCad = false;
+#endif
         m_model->m_autoUpdatePCM   = m_cbAutoUpdatePCM->GetValue();
 
 #ifdef KICAD_USE_SENTRY
@@ -115,7 +122,7 @@ void STARTWIZARD_PROVIDER_PRIVACY::ApplyDefaults()
     COMMON_SETTINGS* commonSettings = Pgm().GetCommonSettings();
     KICAD_SETTINGS* settings = Pgm().GetSettingsManager().GetAppSettings<KICAD_SETTINGS>( "kicad" );
 
-    settings->m_KiCadUpdateCheck = true;
+    settings->m_KiCadUpdateCheck = false;
     settings->m_PcmUpdateCheck   = true;
     APP_MONITOR::SENTRY::Instance()->SetSentryOptIn( false );
 

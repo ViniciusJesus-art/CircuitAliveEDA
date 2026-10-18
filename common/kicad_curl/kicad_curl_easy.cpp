@@ -175,7 +175,7 @@ KICAD_CURL_EASY::KICAD_CURL_EASY() :
         curl_easy_setopt( m_CURL, CURLOPT_VERBOSE, 1L );
     }
 
-    wxString application( wxS( "KiCad" ) );
+    wxString application( wxS( "CircuitAliveEDA" ) );
     wxString version( GetBuildVersion() );
     wxString platform = wxS( "(" ) + wxGetOsDescription() + wxS( ";" ) + GetPlatformGetBitnessName();
 
@@ -191,7 +191,7 @@ KICAD_CURL_EASY::KICAD_CURL_EASY() :
 
     platform << wxS( ")" );
 
-    wxString user_agent = wxS( "KiCad/" ) + version + wxS( " " ) + platform + wxS( " " ) + application;
+    wxString user_agent = wxS( "CircuitAliveEDA/" ) + version + wxS( " " ) + platform + wxS( " " ) + application;
 
     user_agent << wxS( "/" ) << GetBuildDate();
     setOption<const char*>( CURLOPT_USERAGENT, user_agent.ToStdString().c_str() );

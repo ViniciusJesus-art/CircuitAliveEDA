@@ -15,7 +15,7 @@ DIALOG_AUTOSAVE_RECOVERY_BASE::DIALOG_AUTOSAVE_RECOVERY_BASE( wxWindow* parent, 
 
 	bMainSizer = new wxBoxSizer( wxVERTICAL );
 
-	m_explanation = new wxStaticText( this, wxID_ANY, _("KiCad found auto-saved changes from a previous session. This usually means KiCad closed unexpectedly while you had unsaved work."), wxDefaultPosition, wxDefaultSize, 0 );
+	m_explanation = new wxStaticText( this, wxID_ANY, _("CircuitAliveEDA found auto-saved changes from a previous session. This usually means CircuitAliveEDA closed unexpectedly while you had unsaved work."), wxDefaultPosition, wxDefaultSize, 0 );
 	m_explanation->Wrap( 560 );
 	bMainSizer->Add( m_explanation, 0, wxALL|wxEXPAND, 10 );
 

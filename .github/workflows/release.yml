@@ -1,0 +1,62 @@
+name: Local Windows installer (MSVC)
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Installer version (artifact only, no GitHub release)
+        required: true
+        default: 10.0.7-alpha.1
+concurrency:
+  group: windows-msvc-${{ github.ref }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 360
+    env:
+      CA_WINDOWS_TOOLS: D:/ca-tools
+      RELEASE_VERSION: ${{ inputs.version || '10.0.7-alpha.1' }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore compiler-tracked vcpkg cache
+        uses: actions/cache@v4
+        with:
+          path: D:/ca-tools/binary-cache
+          key: windows-msvc-v143-${{ hashFiles('vcpkg*.json', 'tools/circuitalive/release/windows-toolchain.json', 'tools/circuitalive/release/triplets/*.cmake') }}
+      - name: Prepare Visual Studio, vcpkg and SWIG
+        run: ./tools/circuitalive/release/build-windows.ps1 -Phase setup
+      - name: Configure dependencies and applications
+        run: ./tools/circuitalive/release/build-windows.ps1 -Phase configure -Version $env:RELEASE_VERSION
+      - name: Validate affected sources and simulator, then build all applications
+        run: ./tools/circuitalive/release/build-windows.ps1 -Phase build
+      - name: Prepare component libraries and NSIS
+        run: |
+          choco install nsis --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          ./tools/circuitalive/release/prepare-windows-libraries.ps1
+      - name: Package and verify installed runtime
+        run: ./tools/circuitalive/release/build-windows.ps1 -Phase package -Version $env:RELEASE_VERSION
+      - name: Keep installer available for local download
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: |
+            dist/*-windows-x86_64-setup.exe
+            dist/*-windows-x86_64-setup.exe.sha256
+          if-no-files-found: error
+          compression-level: 0
+      - name: Keep validation logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msvc-diagnostics
+          path: |
+            build/windows-msvc/CMakeCache.txt
+            build/windows-msvc/CMakeFiles/CMakeConfigureLog.yaml
+            build/windows-msvc/Testing/Temporary/*.log
+          if-no-files-found: ignore

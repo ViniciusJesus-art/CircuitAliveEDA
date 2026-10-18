@@ -25,7 +25,7 @@
 
 std::map<JOB_EXPORT_SCH_NETLIST::FORMAT, wxString> jobNetlistNameLookup =
 {
-    { JOB_EXPORT_SCH_NETLIST::FORMAT::KICADSEXPR, wxT( "KiCad" ) },
+    { JOB_EXPORT_SCH_NETLIST::FORMAT::KICADSEXPR, wxT( "CircuitAliveEDA" ) },
     { JOB_EXPORT_SCH_NETLIST::FORMAT::KICADXML, wxT( "XML" ) },
     { JOB_EXPORT_SCH_NETLIST::FORMAT::ORCADPCB2, wxT( "OrcadPCB2" ) },
     { JOB_EXPORT_SCH_NETLIST::FORMAT::ALLEGRO, wxT( "Allegro" ) },

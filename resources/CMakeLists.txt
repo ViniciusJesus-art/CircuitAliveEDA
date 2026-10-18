@@ -18,6 +18,7 @@ elseif( UNIX )
             -DKICAD_PROVIDES_APP_ID=${KICAD_PROVIDES_APP_ID}
             -P ${KICAD_CMAKE_MODULE_PATH}/BuildSteps/WritePlatformMetadata_linux.cmake
         DEPENDS ${KICAD_CMAKE_MODULE_PATH}/BuildSteps/WritePlatformMetadata_linux.cmake
+                ${PROJECT_SOURCE_DIR}/resources/linux/metainfo/org.kicad.kicad.metainfo.xml.in
         COMMENT "Configuring Linux metainfo"
         )
 
@@ -117,6 +118,8 @@ elseif( UNIX )
             get_filename_component( _ICON_NAME ${_ICON} NAME_WE )
             get_filename_component( _ICON_EXT ${_ICON} EXT )
             if( _ICON_NAME STREQUAL "kicad" )
+                continue()
+            elseif( _ICON_NAME STREQUAL "circuitaliveeda" )
                 set( _RENAMED_ICON "${_ICON_PATH}/${KICAD_APP_NAME}${_ICON_EXT}" )
             else()
                 set( _RENAMED_ICON "${_ICON_PATH}/${KICAD_ICON_PREFIX}.${_ICON_NAME}${_ICON_EXT}" )
@@ -135,30 +138,29 @@ elseif( UNIX )
              )
 
     # Install MIME type files
-    install( DIRECTORY ${PROJECT_BINARY_DIR}/resources/linux/mime/
+    install( FILES
+             ${PROJECT_BINARY_DIR}/resources/linux/mime/${KICAD_MIME_FILE_PREFIX}-gerbers.xml
+             ${PROJECT_BINARY_DIR}/resources/linux/mime/${KICAD_MIME_FILE_PREFIX}-kicad.xml
              DESTINATION ${CMAKE_INSTALL_DATADIR}/mime/packages
              COMPONENT resources
-             FILES_MATCHING
-             PATTERN "*.xml"
-             PATTERN "*.in" EXCLUDE
              )
 
     # Install application launchers (.desktop files)
-    install( DIRECTORY ${PROJECT_BINARY_DIR}/resources/linux/launchers/
+    install( FILES
+             ${PROJECT_BINARY_DIR}/resources/linux/launchers/${KICAD_APP_NAME}.desktop
+             ${PROJECT_BINARY_DIR}/resources/linux/launchers/${KICAD_APP_PREFIX}.bitmap2component.desktop
+             ${PROJECT_BINARY_DIR}/resources/linux/launchers/${KICAD_APP_PREFIX}.eeschema.desktop
+             ${PROJECT_BINARY_DIR}/resources/linux/launchers/${KICAD_APP_PREFIX}.gerbview.desktop
+             ${PROJECT_BINARY_DIR}/resources/linux/launchers/${KICAD_APP_PREFIX}.pcbcalculator.desktop
+             ${PROJECT_BINARY_DIR}/resources/linux/launchers/${KICAD_APP_PREFIX}.pcbnew.desktop
              DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
              COMPONENT resources
-             FILES_MATCHING
-             PATTERN "*.desktop"
-             PATTERN "*.in" EXCLUDE
              )
 
     # Install appstream metadata (app store entry)
-    install( DIRECTORY ${PROJECT_BINARY_DIR}/resources/linux/metainfo/
+    install( FILES ${PROJECT_BINARY_DIR}/resources/linux/metainfo/${KICAD_APP_NAME}.metainfo.xml
              DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo
              COMPONENT resources
-             FILES_MATCHING
-             PATTERN "*metainfo.xml"
-             PATTERN "*.in" EXCLUDE
              )
 
     # Install bash completion

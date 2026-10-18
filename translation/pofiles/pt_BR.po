@@ -18,7 +18,7 @@ msgstr ""
 "Project-Id-Version: kicad\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-10-06 23:06+0300\n"
-"PO-Revision-Date: 2026-04-24 16:39+0000\n"
+"PO-Revision-Date: 2026-10-18 17:00+0000\n"
 "Last-Translator: Anonymous <noreply@weblate.org>\n"
 "Language-Team: Portuguese (Brazil) <https://hosted.weblate.org/projects/"
 "kicad/v10/pt_BR/>\n"
@@ -34618,7 +34618,7 @@ msgid "Linear resistance:"
 msgstr "Resistência linear:"
 
 #: pcb_calculator/calculator_panels/panel_cable_size_base.cpp:126
-#, c-format
+#, no-c-format
 msgid "Frequency for 100% skin depth:"
 msgstr "Frequência de 100% de profundidade da camada:"
 
@@ -40869,7 +40869,7 @@ msgid "Solder paste relative clearance:"
 msgstr "Isolamento relativo da pasta de solda:"
 
 #: pcbnew/dialogs/dialog_footprint_properties_fp_editor_base.cpp:385
-#, c-format
+#, no-c-format
 msgid ""
 "This is the local clearance ratio applied as a percentage of the pad width "
 "and height for this footprint.\n"
@@ -62142,14 +62142,6 @@ msgstr "Não foi possível abrir/criar o caminho '%s'."
 #~ msgstr "Comprimento desacoplado"
 
 #, fuzzy
-#~ msgid "Minimum"
-#~ msgstr "Largura mínima"
-
-#, fuzzy
-#~ msgid "Maximum"
-#~ msgstr "Largura máxima:"
-
-#, fuzzy
 #~ msgid "Preferred"
 #~ msgstr "Preferências"
 
@@ -62655,10 +62647,6 @@ msgstr "Não foi possível abrir/criar o caminho '%s'."
 
 #~ msgid "Add current board to design block"
 #~ msgstr "Adicionar a placa atual ao bloco de desenho"
-
-#, fuzzy
-#~ msgid "Browse…"
-#~ msgstr "Navegue"
 
 #~ msgid "A library table row nickname and path cells are empty."
 #~ msgstr ""
@@ -64663,18 +64651,6 @@ msgstr "Não foi possível abrir/criar o caminho '%s'."
 
 #~ msgid "Export HPGL Job Settings"
 #~ msgstr "Exportar configurações de tarefa HPGL"
-
-#~ msgid "A3"
-#~ msgstr "A3"
-
-#~ msgid "A2"
-#~ msgstr "A2"
-
-#~ msgid "A1"
-#~ msgstr "A1"
-
-#~ msgid "A0"
-#~ msgstr "A0"
 
 #~ msgid "D"
 #~ msgstr "D"
@@ -67306,9 +67282,6 @@ msgstr "Não foi possível abrir/criar o caminho '%s'."
 #~ msgid "Choose package file"
 #~ msgstr "Escolha o arquivo do pacote"
 
-#~ msgid "Open"
-#~ msgstr "Abrir"
-
 #~ msgid "Save As"
 #~ msgstr "Salve como"
 
@@ -69405,10 +69378,6 @@ msgstr "Não foi possível abrir/criar o caminho '%s'."
 #~ msgid "Drawing Properties"
 #~ msgstr "Propriedades dos desenhos"
 
-#, fuzzy
-#~ msgid "Off"
-#~ msgstr "Deslocamento"
-
 #, c-format
 #~ msgid "Unexpected file extension: '%s'."
 #~ msgstr "Há uma extensão inesperada do arquivo: '%s'."
@@ -70269,12 +70238,6 @@ msgstr "Não foi possível abrir/criar o caminho '%s'."
 
 #~ msgid "Show &Grid"
 #~ msgstr "Mostre a &grade"
-
-#~ msgid "Signals"
-#~ msgstr "Sinais"
-
-#~ msgid "Cursors"
-#~ msgstr "Cursores"
 
 #~ msgid "Reannotate:"
 #~ msgstr "Reanote:"
@@ -71374,9 +71337,6 @@ msgstr "Não foi possível abrir/criar o caminho '%s'."
 
 #~ msgid "BJT"
 #~ msgstr "BJT"
-
-#~ msgid "MOSFET"
-#~ msgstr "MOSFET"
 
 #~ msgid "JFET"
 #~ msgstr "JFET"
@@ -74938,12 +74898,6 @@ msgstr "Não foi possível abrir/criar o caminho '%s'."
 #~ msgid "Shows the copper thickness on copper layers (slower loading)"
 #~ msgstr ""
 #~ "Exibir a espessura do cobre nas camadas de cobre (carregamento lento)"
-
-#~ msgid "Zoom in"
-#~ msgstr "Ampliar"
-
-#~ msgid "Zoom out"
-#~ msgstr "Reduzir"
 
 #~ msgid "Redraw view"
 #~ msgstr "Redesenhar tela"
@@ -78801,3 +78755,5753 @@ msgstr "Não foi possível abrir/criar o caminho '%s'."
 
 #~ msgid "Use default netname"
 #~ msgstr "Utilizar nome de rede padrão"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "   +%zu warnings"
+msgstr "   +%zu avisos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "   Floating: %zu"
+msgstr "   Flutuantes: %zu"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid " (optional)"
+msgstr " (opcional)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid " (required)"
+msgstr " (obrigatório)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid " · gap "
+msgstr " · intervalo "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid " · outside visible range"
+msgstr " · fora da faixa visível"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid " · partial history"
+msgstr " · histórico parcial"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid " · physical 0 V · drag to move this signal"
+msgstr " · 0 V físico · arraste para mover este sinal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "%s — %s   Value: %s"
+msgstr "%s — %s   Valor: %s"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "%zu bytes, %s"
+msgstr "%zu bytes, %s"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "%zu models found"
+msgstr "%zu modelos encontrados"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "&Block"
+msgstr "&Bloco"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "&Model"
+msgstr "&Modelo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N4001 rectifier diode"
+msgstr "1N4001 diodo retificador"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N4002 rectifier diode"
+msgstr "1N4002 diodo retificador"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N4003 rectifier diode"
+msgstr "1N4003 diodo retificador"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N4004 rectifier diode"
+msgstr "1N4004 diodo retificador"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N4005 rectifier diode"
+msgstr "1N4005 diodo retificador"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N4006 rectifier diode"
+msgstr "1N4006 diodo retificador"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N4007 rectifier diode"
+msgstr "1N4007 diodo retificador"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N4148 switching diode"
+msgstr "1N4148 diodo de comutação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5400 3A rectifier diode"
+msgstr "1N5400 diodo retificador de 3 A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5401 3A rectifier diode"
+msgstr "1N5401 diodo retificador de 3 A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5402 3A rectifier diode"
+msgstr "1N5402 diodo retificador de 3 A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5403 3A rectifier diode"
+msgstr "1N5403 diodo retificador de 3 A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5404 3A rectifier diode"
+msgstr "1N5404 diodo retificador de 3 A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5405 3A rectifier diode"
+msgstr "1N5405 diodo retificador de 3 A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5406 3A rectifier diode"
+msgstr "1N5406 diodo retificador de 3 A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5407 3A rectifier diode"
+msgstr "1N5407 diodo retificador de 3 A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5408 3A rectifier diode"
+msgstr "1N5408 diodo retificador de 3 A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5817 Schottky diode"
+msgstr "1N5817 diodo Schottky"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5818 Schottky diode"
+msgstr "1N5818 diodo Schottky"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5819 Schottky diode"
+msgstr "1N5819 diodo Schottky"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5820 Schottky diode"
+msgstr "1N5820 diodo Schottky"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5821 Schottky diode"
+msgstr "1N5821 diodo Schottky"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "1N5822 Schottky diode"
+msgstr "1N5822 diodo Schottky"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "27C512-55 EPROM 64K x 8"
+msgstr "27C512-55 EPROM 64K x 8"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "2N3904 NPN transistor"
+msgstr "2N3904 transistor NPN"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "2N3906 PNP transistor"
+msgstr "2N3906 transistor PNP"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "2N7000 N-channel MOSFET"
+msgstr "2N7000 MOSFET de canal N"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "2N7002 N-channel MOSFET"
+msgstr "2N7002 MOSFET de canal N"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4001 NOR gates"
+msgstr "4001 portas NOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4002 NOR gates"
+msgstr "4002 portas NOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4011 NAND gates"
+msgstr "4011 portas NAND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4012 NAND gates"
+msgstr "4012 portas NAND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4013 dual D flip-flop"
+msgstr "4013 flip-flop D duplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4023 NAND gates"
+msgstr "4023 portas NAND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4025 NOR gates"
+msgstr "4025 portas NOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4069 INVERTER gates"
+msgstr "4069 portas inversoras"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4070 XOR gates"
+msgstr "4070 portas XOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4071 OR gates"
+msgstr "4071 portas OR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4072 OR gates"
+msgstr "4072 portas OR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4073 AND gates"
+msgstr "4073 portas AND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4075 OR gates"
+msgstr "4075 portas OR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4077 XNOR gates"
+msgstr "4077 portas XNOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "4081 AND gates"
+msgstr "4081 portas AND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "555"
+msgstr "555"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "555 assembled visually from divider, comparators, reset-priority latch, output and discharge blocks."
+msgstr "555 montado visualmente com blocos de divisor, comparadores, latch com prioridade de reset, saída e descarga."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "555 example"
+msgstr "Exemplo com 555"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "62256 SRAM 32K x 8"
+msgstr "62256 SRAM 32K x 8"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HC"
+msgstr "74HC"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HC00 quad NAND (powered, mixed-signal)"
+msgstr "74HC00 NAND quádruplo (alimentado, sinais mistos)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HC02 behavioral nor"
+msgstr "74HC02 NOR comportamental"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HC04 behavioral inverter"
+msgstr "74HC04 inversor comportamental"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HC125 quad three-state buffer"
+msgstr "74HC125 buffer de três estados quádruplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HC240 octal inverting tri-state buffer"
+msgstr "74HC240 buffer inversor de três estados óctuplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HC244 octal tri-state buffer"
+msgstr "74HC244 buffer de três estados óctuplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HC74 dual D flip-flop"
+msgstr "74HC74 flip-flop D duplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HC86 behavioral xor"
+msgstr "74HC86 XOR comportamental"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HCT"
+msgstr "74HCT"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HCT00 NAND gates"
+msgstr "74HCT00 portas NAND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HCT02 NOR gates"
+msgstr "74HCT02 portas NOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HCT04 INVERTER gates"
+msgstr "74HCT04 portas inversoras"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HCT240 octal inverting tri-state buffer"
+msgstr "74HCT240 buffer inversor de três estados óctuplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HCT244 octal tri-state buffer"
+msgstr "74HCT244 buffer de três estados óctuplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74HCT74 dual D flip-flop"
+msgstr "74HCT74 flip-flop D duplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS"
+msgstr "74LS"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS00 NAND gates"
+msgstr "74LS00 portas NAND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS02 NOR gates"
+msgstr "74LS02 portas NOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS04 INVERTER gates"
+msgstr "74LS04 portas inversoras"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS08 behavioral and"
+msgstr "74LS08 AND comportamental"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS10 NAND gates"
+msgstr "74LS10 portas NAND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS11 AND gates"
+msgstr "74LS11 portas AND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS125 quad tri-state buffer"
+msgstr "74LS125 buffer de três estados quádruplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS126 quad tri-state buffer"
+msgstr "74LS126 buffer de três estados quádruplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS20 NAND gates"
+msgstr "74LS20 portas NAND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS21 AND gates"
+msgstr "74LS21 portas AND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS240 octal inverting tri-state buffer"
+msgstr "74LS240 buffer inversor de três estados óctuplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS244 octal tri-state buffer"
+msgstr "74LS244 buffer de três estados óctuplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS27 NOR gates"
+msgstr "74LS27 portas NOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS30 NAND gates"
+msgstr "74LS30 portas NAND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS32 behavioral or"
+msgstr "74LS32 OR comportamental"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS74 dual D flip-flop"
+msgstr "74LS74 flip-flop D duplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "74LS86 XOR gates"
+msgstr "74LS86 portas XOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "7805 fixed regulator"
+msgstr "7805 regulador fixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "7806 fixed regulator"
+msgstr "7806 regulador fixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "7808 fixed regulator"
+msgstr "7808 regulador fixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "7809 fixed regulator"
+msgstr "7809 regulador fixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "7812 fixed regulator"
+msgstr "7812 regulador fixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "7815 fixed regulator"
+msgstr "7815 regulador fixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "7818 fixed regulator"
+msgstr "7818 regulador fixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "7824 fixed regulator"
+msgstr "7824 regulador fixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "? = unknown bits (X). Read-only snapshot; capture does not advance time."
+msgstr "? = bits desconhecidos (X). Captura somente para leitura; capturar não avança o tempo."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A resistive path between its two terminals. Resistance sets the current for a given voltage difference."
+msgstr "Um caminho resistivo entre os dois terminais. A resistência determina a corrente para uma dada diferença de tensão."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A simple one-way current condition. Forward conduction starts above the configured forward drop; reverse current is limited by the off resistance. Use Generic silicon diode for exponential conduction, breakdown, junction capacitance and transit time."
+msgstr "Uma condição simples de corrente em um único sentido. A condução direta começa acima da queda de tensão configurada; a corrente reversa é limitada pela resistência no estado desligado. Use Diodo de silício genérico para condução exponencial, ruptura, capacitância de junção e tempo de trânsito."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A0"
+msgstr "A0"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A1"
+msgstr "A1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A10"
+msgstr "A10"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A11"
+msgstr "A11"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A12"
+msgstr "A12"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A13"
+msgstr "A13"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A14"
+msgstr "A14"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A15"
+msgstr "A15"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A2"
+msgstr "A2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A3"
+msgstr "A3"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A8"
+msgstr "A8"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A9"
+msgstr "A9"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "AC sinusoidal voltage"
+msgstr "Tensão CA senoidal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "ADJ"
+msgstr "ADJ"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "AMS1117"
+msgstr "AMS1117"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "AMS1117 adjustable regulator"
+msgstr "AMS1117 regulador ajustável"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "AMS1117-1.5 1.5V regulator"
+msgstr "AMS1117-1.5 regulador de 1.5V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "AMS1117-1.8 1.8V regulator"
+msgstr "AMS1117-1.8 regulador de 1.8V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "AMS1117-2.5 2.5V regulator"
+msgstr "AMS1117-2.5 regulador de 2.5V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "AMS1117-2.85 2.85V regulator"
+msgstr "AMS1117-2.85 regulador de 2.85V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "AMS1117-3.3 3.3V regulator"
+msgstr "AMS1117-3.3 regulador de 3.3V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "AMS1117-5.0 5.0V regulator"
+msgstr "AMS1117-5.0 regulador de 5.0V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "AND (ideal, no supply pins)"
+msgstr "AND (ideal, sem pinos de alimentação)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Acquiring post-trigger"
+msgstr "Adquirindo após o disparo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Active-low /OE1"
+msgstr "/OE1 ativo em nível baixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Active-low /OE2"
+msgstr "/OE2 ativo em nível baixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Active-low /OE3"
+msgstr "/OE3 ativo em nível baixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Active-low /OE4"
+msgstr "/OE4 ativo em nível baixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Add a building block (Ctrl+B)"
+msgstr "Adicionar um bloco de construção (Ctrl+B)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Add block"
+msgstr "Adicionar bloco"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Add block...\tCtrl+B"
+msgstr "Adicionar bloco...\tCtrl+B"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Add parameter"
+msgstr "Adicionar parâmetro"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Adjust pin current"
+msgstr "Corrente do pino de ajuste"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Adjustable"
+msgstr "Ajustáveis"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "All models"
+msgstr "Todos os modelos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Amplitude / div"
+msgstr "Amplitude / div"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Amplitude A (V)"
+msgstr "Amplitude A (V)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Amplitude B (V)"
+msgstr "Amplitude B (V)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Analog"
+msgstr "Analógicos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Analog and mixed signal"
+msgstr "Analógicos e sinais mistos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Anode"
+msgstr "Ânodo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Anode (A)"
+msgstr "Ânodo (A)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Anode A"
+msgstr "Ânodo A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Anode current warning (not a current limiter)"
+msgstr "Aviso de corrente no ânodo (não limita a corrente)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Appearance only; current still comes from the circuit.\nZero diameter hides that circle. Stop and Play to apply changes to a running simulation."
+msgstr "Apenas aparência; a corrente continua sendo determinada pelo circuito.\nDiâmetro zero oculta o círculo correspondente. Use Parar e Iniciar para aplicar alterações à simulação em execução."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Applied on a new simulation. The instruments panel can change speed during playback without changing component timing."
+msgstr "Aplicada ao iniciar uma nova simulação. O painel de instrumentos permite alterar a velocidade durante a reprodução sem alterar a temporização dos componentes."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Approximate state response time"
+msgstr "Tempo aproximado de resposta do estado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Arrange blocks in rows"
+msgstr "Organizar blocos em linhas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Associate a model file, map physical pins and configure parameters"
+msgstr "Associar um arquivo de modelo, mapear pinos físicos e configurar parâmetros"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "At or above this frequency, keep the LED lit at the brightness of its on phase. The cutoff follows playback speed."
+msgstr "Nesta frequência ou acima dela, mantém o LED aceso com o brilho da fase ligada. O corte acompanha a velocidade de reprodução."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "At or above this frequency, show a purple dot with ~ for fast switching. The cutoff follows playback speed."
+msgstr "Nesta frequência ou acima dela, exibe um ponto roxo com ~ para indicar comutação rápida. O corte acompanha a velocidade de reprodução."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Auto · no edge"
+msgstr "Automático · sem borda"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Automatic (extension)"
+msgstr "Automático (extensão)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Automatic range"
+msgstr "Faixa automática"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Automatic: "
+msgstr "Automático: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Automatically open instruments when probes are present"
+msgstr "Abrir instrumentos automaticamente quando houver sondas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Average current rating warning (not a current limiter)"
+msgstr "Aviso de corrente média nominal (não limita a corrente)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BC327 PNP transistor"
+msgstr "BC327 transistor PNP"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BC337 NPN transistor"
+msgstr "BC337 transistor NPN"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BC547 NPN transistor"
+msgstr "BC547 transistor NPN"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BC548 NPN transistor"
+msgstr "BC548 transistor NPN"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BC557 PNP transistor"
+msgstr "BC557 transistor PNP"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BC558 PNP transistor"
+msgstr "BC558 transistor PNP"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BD139 NPN transistor"
+msgstr "BD139 transistor NPN"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BD140 PNP transistor"
+msgstr "BD140 transistor PNP"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BS170 N-channel MOSFET"
+msgstr "BS170 MOSFET de canal N"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BSS138 N-channel MOSFET"
+msgstr "BSS138 MOSFET de canal N"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BSS84 P-channel MOSFET"
+msgstr "BSS84 MOSFET de canal P"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BUFFER"
+msgstr "BUFFER"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BUFFER (ideal, no supply pins)"
+msgstr "BUFFER (ideal, sem pinos de alimentação)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BZV55C12 Zener diode"
+msgstr "BZV55C12 diodo Zener"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BZV55C5V1 Zener diode"
+msgstr "BZV55C5V1 diodo Zener"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Base"
+msgstr "Base"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Base spreading resistance"
+msgstr "Resistência de espalhamento da base"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Base-collector capacitance"
+msgstr "Capacitância base-coletor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Base-emitter capacitance"
+msgstr "Capacitância base-emissor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Bench test: set each input/supply (5V, 0V), an output load (load:10k), or leave it blank for an open terminal. This does not change the model."
+msgstr "Teste de bancada: defina cada entrada/alimentação (5V, 0V), uma carga de saída (load:10k) ou deixe em branco para um terminal desconectado. Isso não altera o modelo."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Bipolar"
+msgstr "Bipolares"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Block properties"
+msgstr "Propriedades do bloco"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Body diode reverse transit parameter"
+msgstr "Parâmetro de trânsito reverso do diodo de corpo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Bottom 1"
+msgstr "Inferior 1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Bottom 2"
+msgstr "Inferior 2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Breakdown voltage (configure for exact part)"
+msgstr "Tensão de ruptura (configure para o componente exato)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Brightness and warning currents control visualization and warnings; they do not limit current."
+msgstr "As correntes de brilho e de aviso controlam a visualização e os avisos; elas não limitam a corrente."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Browse…"
+msgstr "Procurar…"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Build a component from connected blocks.\n\nStart with Model > Start from existing model, or choose a component symbol and add blocks.\n\nSelect a block to read its operation and see all its connections highlighted. Double-click to change values or connections.\n\nDrag any wire segment to make room. Your routes are saved with the model.\n\nIdeal logic and condition blocks need no supply pins; their voltages are relative to circuit ground. Powered blocks model supply behavior."
+msgstr "Construa um componente a partir de blocos conectados.\n\nComece em Modelo > Começar com um modelo existente ou escolha um símbolo de componente e adicione blocos.\n\nSelecione um bloco para ler seu funcionamento e destacar todas as conexões. Clique duas vezes para alterar valores ou conexões.\n\nArraste qualquer segmento de fio para abrir espaço. Os caminhos dos fios são salvos com o modelo.\n\nBlocos ideais de lógica e condição dispensam pinos de alimentação; suas tensões são relativas ao terra do circuito. Blocos alimentados modelam o comportamento da alimentação."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Build behavior"
+msgstr "Construir comportamento"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Build simulation models, map symbol pins and configure behavior"
+msgstr "Criar modelos de simulação, mapear pinos de símbolos e configurar comportamentos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Building blocks"
+msgstr "Blocos de construção"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "CD4000"
+msgstr "CD4000"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "CONDITION / comparator (ideal, no supply pins)"
+msgstr "CONDIÇÃO / comparador (ideal, sem pinos de alimentação)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cancel connection"
+msgstr "Cancelar conexão"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot load chosen symbol"
+msgstr "Não foi possível carregar o símbolo escolhido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot prepare model test"
+msgstr "Não foi possível preparar o teste do modelo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Capacitance"
+msgstr "Capacitância"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Capacitors"
+msgstr "Capacitores"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Capture paused state"
+msgstr "Capturar estado pausado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cathode"
+msgstr "Cátodo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cathode (K)"
+msgstr "Cátodo (K)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cathode K"
+msgstr "Cátodo K"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Center (V)"
+msgstr "Centro (V)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Changes apply live. Esc or click outside closes."
+msgstr "As alterações são aplicadas em tempo real. Esc ou um clique fora fecha a janela."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Channel threshold (not the fully-on gate voltage)"
+msgstr "Limiar do canal (não é a tensão de condução plena da porta)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Channel transconductance factor"
+msgstr "Fator de transcondutância do canal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Charge Q = C × (V1 − V2)."
+msgstr "Carga Q = C × (V1 − V2)."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose a scale or type an SI value, for example 20 ms or 500 mV. Press Enter to apply."
+msgstr "Escolha uma escala ou digite um valor SI, por exemplo 20 ms ou 500 mV. Pressione Enter para aplicar."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose a symbol to import every physical pin, including all units. Port IDs identify the terminals inside this model."
+msgstr "Escolha um símbolo para importar todos os pinos físicos, incluindo todas as unidades. Os IDs das portas identificam os terminais dentro deste modelo."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose a tool, click a wire. Esc finishes placement."
+msgstr "Escolha uma ferramenta e clique em um fio. Esc encerra o posicionamento."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose component symbol..."
+msgstr "Escolher símbolo do componente..."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose model…"
+msgstr "Escolher modelo…"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose simulation model"
+msgstr "Escolher modelo de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose the component symbol before adding blocks"
+msgstr "Escolha o símbolo do componente antes de adicionar blocos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cin"
+msgstr "Cin"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Circle diameter (mm):"
+msgstr "Diâmetro do círculo (mm):"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Circuit changed — press Play to rebuild"
+msgstr "Circuito alterado — pressione Iniciar para reconstruir"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Circuit needs attention"
+msgstr "O circuito precisa de atenção"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "CircuitAlive model (*.casim)|*.casim"
+msgstr "Modelo CircuitAlive (*.casim)|*.casim"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "CircuitAlive model (*.casim)|*.casim|All files|*"
+msgstr "Modelo CircuitAlive (*.casim)|*.casim|Todos os arquivos|*"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "CircuitAlive snapshot (*.camem)|*.camem|Binary (*.bin)|*.bin|Intel HEX (*.hex)|*.hex"
+msgstr "Captura CircuitAlive (*.camem)|*.camem|Binário (*.bin)|*.bin|Intel HEX (*.hex)|*.hex"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cjo sets zero-bias junction capacitance; Tt sets stored-charge transit time. BV sets reverse breakdown."
+msgstr "Cjo define a capacitância da junção sem polarização; Tt define o tempo de trânsito da carga armazenada. BV define a ruptura reversa."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Click a wire to place the probe. Esc finishes placement."
+msgstr "Clique em um fio para posicionar a sonda. Esc encerra o posicionamento."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Click a wire to place the probe; Esc finishes placement"
+msgstr "Clique em um fio para posicionar a sonda; Esc encerra o posicionamento"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Closed resistance"
+msgstr "Resistência no estado fechado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Collector"
+msgstr "Coletor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Collector capacitance"
+msgstr "Capacitância do coletor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Collector current limit"
+msgstr "Limite de corrente do coletor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Collector current warning (not a current limiter)"
+msgstr "Aviso de corrente do coletor (não limita a corrente)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Collector current warning per channel"
+msgstr "Aviso de corrente do coletor por canal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Collector lead resistance"
+msgstr "Resistência do terminal do coletor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Collector on resistance"
+msgstr "Resistência do coletor em condução"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Collector saturation floor"
+msgstr "Tensão mínima de saturação do coletor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Collector saturation scale"
+msgstr "Escala de saturação do coletor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Compact nominal 25 C behavior; see docs/circuitalive/ANALOG_MODEL_CATALOG.md."
+msgstr "Comportamento compacto nominal a 25 °C; consulte docs/circuitalive/ANALOG_MODEL_CATALOG.md."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Comparator"
+msgstr "Comparador"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Comparators"
+msgstr "Comparadores"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Completed"
+msgstr "Concluído"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Component P: positive = absorbed, negative = delivered."
+msgstr "P do componente: positiva = absorvida, negativa = fornecida."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Component data files"
+msgstr "Arquivos de dados do componente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Component pins"
+msgstr "Pinos do componente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Component: "
+msgstr "Componente: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Component: choose a symbol to import its pins"
+msgstr "Componente: escolha um símbolo para importar seus pinos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Configurable behavioral approximation; see docs/circuitalive/COMPLEX_MODELS.md for fidelity and limits."
+msgstr "Aproximação comportamental configurável; consulte docs/circuitalive/COMPLEX_MODELS.md para fidelidade e limitações."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Configure simulation model"
+msgstr "Configurar modelo de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Configure the simulation that runs directly on the schematic. Component models and probe settings remain with the circuit."
+msgstr "Configure a simulação executada diretamente no esquema. Os modelos dos componentes e as configurações das sondas ficam salvos com o circuito."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Connect terminals"
+msgstr "Conectar terminais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Connect: click two terminals. Move: drag a block or a wire segment. Select a block to highlight its nets. Double-click to edit. Esc cancels a connection."
+msgstr "Conectar: clique em dois terminais. Mover: arraste um bloco ou segmento de fio. Selecione um bloco para destacar suas redes. Clique duas vezes para editar. Esc cancela uma conexão."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Connected to"
+msgstr "Conectado a"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Connections: choose a component pin, select an existing wire or type a new wire name. Blank leaves a terminal open."
+msgstr "Conexões: escolha um pino do componente, selecione um fio existente ou digite um novo nome de fio. Em branco deixa o terminal desconectado."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Constant current"
+msgstr "Corrente constante"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Copies the model, pin mapping, parameters and measurement choices into new symbols. Existing symbols keep their settings. $value follows each symbol's Value."
+msgstr "Copia o modelo, o mapeamento de pinos, os parâmetros e as opções de medição para novos símbolos. Símbolos existentes mantêm suas configurações. $value acompanha o Valor de cada símbolo."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Could not write the capture file."
+msgstr "Não foi possível gravar o arquivo de captura."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cout"
+msgstr "Cout"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Current (A)"
+msgstr "Corrente (A)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Current for full displayed brightness"
+msgstr "Corrente para brilho máximo exibido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Current warning (0 disables)"
+msgstr "Aviso de corrente (0 desativa)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Current warning threshold"
+msgstr "Limiar de aviso de corrente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cursors"
+msgstr "Cursores"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Custom 555 timer"
+msgstr "Temporizador 555 personalizado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "D0"
+msgstr "D0"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "D1"
+msgstr "D1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "D2"
+msgstr "D2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "D3"
+msgstr "D3"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "D4"
+msgstr "D4"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "D5"
+msgstr "D5"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "D6"
+msgstr "D6"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "D7"
+msgstr "D7"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "DC offset"
+msgstr "Deslocamento CC"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "DC voltage"
+msgstr "Tensão CC"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "DC voltage source"
+msgstr "Fonte de tensão CC"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "DFF"
+msgstr "DFF"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "DIODE (piecewise linear)"
+msgstr "DIODO (linear por trechos)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Data"
+msgstr "Dados"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Data files…"
+msgstr "Arquivos de dados…"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Differential input resistance"
+msgstr "Resistência diferencial de entrada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Digital"
+msgstr "Digitais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Digital indicator frequency cutoff:"
+msgstr "Frequência de corte dos indicadores digitais:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Diodes"
+msgstr "Diodos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Discharge r"
+msgstr "Resistência de descarga"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Discharge switch (active low)"
+msgstr "Chave de descarga (ativa em nível baixo)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Disconnect selected block"
+msgstr "Desconectar bloco selecionado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Display color — blue"
+msgstr "Cor de exibição — azul"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Display color — green"
+msgstr "Cor de exibição — verde"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Display color — red"
+msgstr "Cor de exibição — vermelho"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Display color, intensity, opacity and circle/halo diameters affect only the overlay; electrical current is unchanged. Diameters are in schematic millimeters. Zero diameter hides that circle."
+msgstr "Cor, intensidade, opacidade e diâmetros do círculo/halo afetam apenas a sobreposição visual; a corrente elétrica permanece inalterada. Os diâmetros são medidos em milímetros do esquema. Diâmetro zero oculta o círculo correspondente."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Display intensity"
+msgstr "Intensidade de exibição"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Display warnings for LEDs and components exceeding their configured current ratings."
+msgstr "Exibe avisos para LEDs e componentes que excedam os limites de corrente configurados."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Display warnings when a digital component's supply is outside its model's operating range."
+msgstr "Exibe avisos quando a alimentação de um componente digital estiver fora da faixa de operação do modelo."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Divider"
+msgstr "Divisor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Drag 0 V arrows to move signals; drag T to change trigger level. Wheel: time; Shift-wheel: amplitude."
+msgstr "Arraste as setas de 0 V para mover os sinais; arraste T para alterar o nível de disparo. Roda do mouse: tempo; Shift+roda: amplitude."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Drag lines; click A, Shift-click B.\nTimes are relative to T, or window start."
+msgstr "Arraste as linhas; clique para A, Shift+clique para B.\nOs tempos são relativos a T ou ao início da janela."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Drag trigger level"
+msgstr "Arrastar nível de disparo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Drain"
+msgstr "Dreno"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Drain current warning (not a current limiter)"
+msgstr "Aviso de corrente do dreno (não limita a corrente)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Drain series resistance"
+msgstr "Resistência em série do dreno"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Drain-source avalanche voltage"
+msgstr "Tensão de avalanche dreno-fonte"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Dropout"
+msgstr "Queda mínima de regulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Dual potentiometer"
+msgstr "Potenciômetro duplo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Duration:"
+msgstr "Duração:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Duty ≈"
+msgstr "Ciclo ativo ≈"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "EL817 phototransistor optocoupler"
+msgstr "EL817 optoacoplador com fototransistor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "ELSE: forward current is zero; reverse leakage is V(A,K) / Roff."
+msgstr "SENÃO: a corrente direta é zero; a fuga reversa é V(A,K) / Roff."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "EPROM"
+msgstr "EPROM"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "EPROM 64K x 8"
+msgstr "EPROM 64K x 8"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "EPROM contents"
+msgstr "Conteúdo da EPROM"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Early voltage"
+msgstr "Tensão Early"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Edge"
+msgstr "Borda"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Edit block"
+msgstr "Editar bloco"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Edit selected block (Ctrl+E)"
+msgstr "Editar bloco selecionado (Ctrl+E)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Edit selected block...\tCtrl+E"
+msgstr "Editar bloco selecionado...\tCtrl+E"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Edit these parameters to change the physical junction. For a simple IF/ELSE diode, choose DIODE (piecewise linear)."
+msgstr "Edite estes parâmetros para alterar a junção física. Para um diodo simples com condição SE/SENÃO, escolha DIODO (linear por trechos)."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Electrical parameters"
+msgstr "Parâmetros elétricos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Electromechanical"
+msgstr "Eletromecânicos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Emission coefficient"
+msgstr "Coeficiente de emissão"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Emitter"
+msgstr "Emissor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Emitter lead resistance"
+msgstr "Resistência do terminal do emissor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Enter a value between %g and %g for %s"
+msgstr "Insira um valor entre %g e %g para %s"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Envelope capture · measurements are estimates"
+msgstr "Captura por envoltória · medições estimadas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Exclude this component from simulation"
+msgstr "Excluir este componente da simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Excluded — no simulation model is required."
+msgstr "Excluído — nenhum modelo de simulação é necessário."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Expand / dock"
+msgstr "Expandir / acoplar"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Exponential damping"
+msgstr "Amortecimento exponencial"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Export capture CSV…"
+msgstr "Exportar captura CSV…"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Export memory snapshot"
+msgstr "Exportar captura de memória"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Export oscilloscope capture"
+msgstr "Exportar captura do osciloscópio"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Export…"
+msgstr "Exportar…"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Fall delay"
+msgstr "Atraso de descida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Fall time"
+msgstr "Tempo de descida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Falling ↓"
+msgstr "Descida ↓"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Family"
+msgstr "Família"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Files belong to this instance. Paths inside the project are saved relative to it.\nLoading a file initializes the next simulation; it does not overwrite a paused session."
+msgstr "Os arquivos pertencem a esta instância. Caminhos dentro do projeto são salvos de forma relativa a ele.\nCarregar um arquivo inicializa a próxima simulação; não sobrescreve uma sessão pausada."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "First transistor nominal gain"
+msgstr "Ganho nominal do primeiro transistor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Fit all signal amplitudes, center trigger level, and show about three periods when measurable."
+msgstr "Ajusta as amplitudes de todos os sinais, centraliza o nível de disparo e exibe cerca de três períodos quando mensuráveis."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Fit content\tCtrl+F"
+msgstr "Ajustar ao conteúdo\tCtrl+F"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Fit this signal"
+msgstr "Ajustar este sinal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Forget saved default"
+msgstr "Esquecer padrão salvo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Forward PN junction with series resistance; current is set by the connected circuit."
+msgstr "Junção PN direta com resistência em série; a corrente é determinada pelo circuito conectado."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Forward current gain (nominal)"
+msgstr "Ganho de corrente direta (nominal)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Forward drop"
+msgstr "Queda de tensão direta"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Forward junction: I ≈ Is × (exp(Vj / (N × thermal voltage)) − 1)."
+msgstr "Junção direta: I ≈ Is × (exp(Vj / (N × tensão térmica)) − 1)."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Forward transit time"
+msgstr "Tempo de trânsito direto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Forward voltage at reference current"
+msgstr "Tensão direta na corrente de referência"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Forward voltage is calibrated at reference_current. Reverse current does not light the LED."
+msgstr "A tensão direta é calibrada em reference_current. A corrente reversa não acende o LED."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Forward voltage is specified at the reference current and 27 C. Current is calculated by the circuit. The warning threshold does not limit current or simulate damage."
+msgstr "A tensão direta é especificada na corrente de referência e a 27 °C. A corrente é calculada pelo circuito. O limiar de aviso não limita a corrente nem simula danos."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Freeze this capture; the circuit simulation continues."
+msgstr "Congela esta captura; a simulação do circuito continua."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Frequency ≈"
+msgstr "Frequência ≈"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "From (+):"
+msgstr "De (+):"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "GND"
+msgstr "GND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Gain bandwidth product"
+msgstr "Produto ganho-largura de banda"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Gate"
+msgstr "Porta"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Gate trigger current (conservative 25C value)"
+msgstr "Corrente de disparo da porta (valor conservador a 25 °C)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Gate-drain capacitance at positive Vds"
+msgstr "Capacitância porta-dreno com Vds positivo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Gate-drain capacitance near reverse conduction"
+msgstr "Capacitância porta-dreno próxima da condução reversa"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Gate-source capacitance"
+msgstr "Capacitância porta-fonte"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "General purpose"
+msgstr "Uso geral"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Generic silicon diode"
+msgstr "Diodo de silício genérico"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Gnd"
+msgstr "Gnd"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Go to hex address"
+msgstr "Ir para endereço hexadecimal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "HIGH output level"
+msgstr "Nível ALTO de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Halo diameter (mm):"
+msgstr "Diâmetro do halo (mm):"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "High drop"
+msgstr "Queda de tensão em nível alto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "High input threshold / VCC"
+msgstr "Limiar alto de entrada / VCC"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "High pulse width"
+msgstr "Largura do pulso alto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "High voltage"
+msgstr "Tensão alta"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "High-current gain roll-off"
+msgstr "Redução do ganho em correntes altas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "High-to-low propagation delay"
+msgstr "Atraso de propagação de alto para baixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Higher rates follow visible transitions more closely and use more processing power. Aim above twice the frequency you want to see blinking."
+msgstr "Taxas maiores acompanham melhor as transições visíveis e usam mais processamento. Use um valor superior ao dobro da frequência que deseja ver piscar."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Hold"
+msgstr "Congelar"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Hold · capture frozen"
+msgstr "Congelado · captura congelada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Holding current"
+msgstr "Corrente de manutenção"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Holdoff (s)"
+msgstr "Intervalo entre disparos (s)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "How long to wait for a simulation response before reporting an error."
+msgstr "Quanto tempo aguardar por uma resposta da simulação antes de informar um erro."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Hysteresis (V)"
+msgstr "Histerese (V)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "I = (V1 − V2) / R."
+msgstr "I = (V1 − V2) / R."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "I = C × d(V1 − V2)/dt."
+msgstr "I = C × d(V1 − V2)/dt."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "I enters the (+) terminal. P is signed power for this port pair."
+msgstr "I entra pelo terminal (+). P é a potência com sinal para este par de portas."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "ID"
+msgstr "ID"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "IF A > B THEN Y = HIGH ELSE Y = LOW."
+msgstr "SE A > B ENTÃO Y = ALTO SENÃO Y = BAIXO."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "IF A > B THEN Y = HIGH ELSE Y = LOW. No VCC/GND pins: all signal voltages use circuit ground as their reference. Output energy is provided by an ideal behavioral source; supply current and power limits are not modeled."
+msgstr "SE A > B ENTÃO Y = ALTO SENÃO Y = BAIXO. Sem pinos VCC/GND: todas as tensões dos sinais usam o terra do circuito como referência. A energia de saída é fornecida por uma fonte comportamental ideal; a corrente de alimentação e os limites de potência não são modelados."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "IF V(A,K) > Vf: I = (V(A,K) - Vf) / Ron."
+msgstr "SE V(A,K) > Vf: I = (V(A,K) - Vf) / Ron."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "IN"
+msgstr "IN"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "INVERTER"
+msgstr "INVERSOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "INVERTER (ideal, no supply pins)"
+msgstr "INVERSOR (ideal, sem pinos de alimentação)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "IRF3205 N-channel MOSFET"
+msgstr "IRF3205 MOSFET de canal N"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "IRF540N N-channel MOSFET"
+msgstr "IRF540N MOSFET de canal N"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "IRF9540N P-channel MOSFET"
+msgstr "IRF9540N MOSFET de canal P"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "IRLZ44N N-channel MOSFET"
+msgstr "IRLZ44N MOSFET de canal N"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Ideal analog primitives"
+msgstr "Primitivas analógicas ideais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Ideal capacitor"
+msgstr "Capacitor ideal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Ideal inductor"
+msgstr "Indutor ideal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Ideal logic and conditions"
+msgstr "Lógica e condições ideais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Ideal primitives"
+msgstr "Primitivas ideais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Ideal resistor"
+msgstr "Resistor ideal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Imax"
+msgstr "Imax"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Inductance"
+msgstr "Indutância"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Inductors"
+msgstr "Indutores"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Initial contents — %zu bytes; loaded on the next Play"
+msgstr "Conteúdo inicial — %zu bytes; carregado ao iniciar novamente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Initial memory image"
+msgstr "Imagem inicial da memória"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Initial playback speed:"
+msgstr "Velocidade inicial de reprodução:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Initial voltage"
+msgstr "Tensão inicial"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input 1 +"
+msgstr "Entrada 1 +"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input 1 -"
+msgstr "Entrada 1 -"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input 2 +"
+msgstr "Entrada 2 +"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input 2 -"
+msgstr "Entrada 2 -"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input 3 +"
+msgstr "Entrada 3 +"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input 3 -"
+msgstr "Entrada 3 -"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input 4 +"
+msgstr "Entrada 4 +"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input 4 -"
+msgstr "Entrada 4 -"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input A"
+msgstr "Entrada A"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input B"
+msgstr "Entrada B"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input bias current; negative flows out"
+msgstr "Corrente de polarização de entrada; negativa sai do terminal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input capacitance"
+msgstr "Capacitância de entrada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input history: "
+msgstr "Histórico de entrada: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input loading: 1 teraohm to circuit ground. Output series resistance: rout."
+msgstr "Carga de entrada: 1 teraohm para o terra do circuito. Resistência em série na saída: rout."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input offset voltage"
+msgstr "Tensão de offset de entrada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Input threshold"
+msgstr "Limiar de entrada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Inspect or export the initial image or paused memory contents"
+msgstr "Inspecionar ou exportar a imagem inicial ou o conteúdo da memória pausada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Intensity (%):"
+msgstr "Intensidade (%):"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Interactive Pause"
+msgstr "Pausar simulação interativa"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Interactive Play"
+msgstr "Iniciar simulação interativa"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Interactive SPST switch"
+msgstr "Chave SPST interativa"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Interactive Stop"
+msgstr "Parar simulação interativa"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Interactive simulation"
+msgstr "Simulação interativa"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Interactive switches"
+msgstr "Chaves interativas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Internal gate resistance"
+msgstr "Resistência interna da porta"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Internal input B-E resistor"
+msgstr "Resistor B-E interno de entrada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Internal operations:"
+msgstr "Operações internas:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Internal output B-E resistor"
+msgstr "Resistor B-E interno de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invert display"
+msgstr "Inverter exibição"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Iq"
+msgstr "Iq"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Isolated mounting pin"
+msgstr "Pino de montagem isolado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Keep rapidly blinking LEDs lit"
+msgstr "Manter acesos os LEDs que piscam rapidamente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "L78L05_SO8 5V regulator"
+msgstr "L78L05_SO8 regulador de 5V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "L78L05_TO92 5V regulator"
+msgstr "L78L05_TO92 regulador de 5V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "L78L09_SO8 9V regulator"
+msgstr "L78L09_SO8 regulador de 9V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "L78L09_TO92 9V regulator"
+msgstr "L78L09_TO92 regulador de 9V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "L78L12_SO8 12V regulator"
+msgstr "L78L12_SO8 regulador de 12V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "L78L12_TO92 12V regulator"
+msgstr "L78L12_TO92 regulador de 12V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "L7905 5V regulator"
+msgstr "L7905 regulador de 5V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "L7912 12V regulator"
+msgstr "L7912 regulador de 12V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "L7915 15V regulator"
+msgstr "L7915 regulador de 15V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED (configurable diode)"
+msgstr "LED (diodo configurável)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED anode"
+msgstr "Ânodo do LED"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED appearance"
+msgstr "Aparência do LED"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED cathode"
+msgstr "Cátodo do LED"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED color:"
+msgstr "Cor do LED:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED current warning"
+msgstr "Aviso de corrente do LED"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED emission coefficient"
+msgstr "Coeficiente de emissão do LED"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED frequency cutoff:"
+msgstr "Frequência de corte dos LEDs:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED junction capacitance"
+msgstr "Capacitância de junção do LED"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED saturation current"
+msgstr "Corrente de saturação do LED"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LED series resistance"
+msgstr "Resistência em série do LED"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LEDs"
+msgstr "LEDs"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LEDs and digital indicators"
+msgstr "LEDs e indicadores digitais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM1117"
+msgstr "LM1117"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM1117DT-1.8 1.8V regulator"
+msgstr "LM1117DT-1.8 regulador de 1.8V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM1117DT-2.5 2.5V regulator"
+msgstr "LM1117DT-2.5 regulador de 2.5V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM1117DT-3.3 3.3V regulator"
+msgstr "LM1117DT-3.3 regulador de 3.3V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM1117DT-5.0 5.0V regulator"
+msgstr "LM1117DT-5.0 regulador de 5.0V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM1117DT-ADJ adjustable regulator"
+msgstr "LM1117DT-ADJ regulador ajustável"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM2901 open-collector comparator"
+msgstr "LM2901 comparador de coletor aberto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM2902 operational amplifier"
+msgstr "LM2902 amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM2903 open-collector comparator"
+msgstr "LM2903 comparador de coletor aberto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM2904 operational amplifier"
+msgstr "LM2904 amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM317 adjustable regulator"
+msgstr "LM317 regulador ajustável"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM317 adjustable regulator (TO3 pinout)"
+msgstr "LM317 regulador ajustável (pinagem TO3)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM324 operational amplifier"
+msgstr "LM324 amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM339 open-collector comparator"
+msgstr "LM339 comparador de coletor aberto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM358 operational amplifier"
+msgstr "LM358 amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM358_DFN operational amplifier"
+msgstr "LM358_DFN amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM393 open-collector comparator"
+msgstr "LM393 comparador de coletor aberto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM741 operational amplifier"
+msgstr "LM741 amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM78xx"
+msgstr "LM78xx"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LM79xx"
+msgstr "LM79xx"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LMV393 open-collector comparator"
+msgstr "LMV393 comparador de coletor aberto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LMx58 and LMx24"
+msgstr "LMx58 e LMx24"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LOW output level"
+msgstr "Nível BAIXO de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "LTV-817 phototransistor optocoupler"
+msgstr "LTV-817 optoacoplador com fototransistor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Level (V)"
+msgstr "Nível (V)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Library symbols"
+msgstr "Símbolos de biblioteca"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Linear potentiometer with live wiper adjustment. Click the symbol during simulation to adjust its position."
+msgstr "Potenciômetro linear com ajuste do cursor em tempo real. Clique no símbolo durante a simulação para ajustar sua posição."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Linear regulators"
+msgstr "Reguladores lineares"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Load address (hex): 0x"
+msgstr "Endereço de carga (hex): 0x"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Load file..."
+msgstr "Carregar arquivo..."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Load simulation model"
+msgstr "Carregar modelo de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Logic ICs"
+msgstr "CIs lógicos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Logic display high ratio"
+msgstr "Razão de nível alto na exibição lógica"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Logic display low ratio"
+msgstr "Razão de nível baixo na exibição lógica"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Low drop"
+msgstr "Queda de tensão em nível baixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Low input threshold / VCC"
+msgstr "Limiar baixo de entrada / VCC"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Low voltage"
+msgstr "Tensão baixa"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Low-current forward gain"
+msgstr "Ganho direto em correntes baixas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Low-to-high propagation delay"
+msgstr "Atraso de propagação de baixo para alto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Lower output headroom"
+msgstr "Margem inferior de tensão de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Lumped terminal capacitance"
+msgstr "Capacitância concentrada do terminal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "MCP6001-OT operational amplifier"
+msgstr "MCP6001-OT amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "MCP6001R operational amplifier"
+msgstr "MCP6001R amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "MCP6001U operational amplifier"
+msgstr "MCP6001U amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "MCP6002-xMC operational amplifier"
+msgstr "MCP6002-xMC amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "MCP6002-xMS operational amplifier"
+msgstr "MCP6002-xMS amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "MCP6004 operational amplifier"
+msgstr "MCP6004 amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "MCP600x"
+msgstr "MCP600x"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "MOSFET"
+msgstr "MOSFET"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Mark fast digital switching in purple (~)"
+msgstr "Indicar comutação digital rápida em roxo (~)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Max"
+msgstr "Máx."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Max step"
+msgstr "Passo máximo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Maximum"
+msgstr "Máximo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Maximum collector sink current per channel"
+msgstr "Corrente máxima absorvida pelo coletor por canal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Maximum input-reference difference"
+msgstr "Diferença máxima entre entrada e referência"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Maximum session duration:"
+msgstr "Duração máxima da sessão:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Maximum simulated time before completion. Very small model time steps may shorten this limit."
+msgstr "Tempo simulado máximo antes da conclusão. Passos de tempo muito pequenos dos modelos podem reduzir este limite."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Maximum supply difference"
+msgstr "Diferença máxima de alimentação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Maximum supply voltage"
+msgstr "Tensão máxima de alimentação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Maximum time step:"
+msgstr "Passo de tempo máximo:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Mean"
+msgstr "Média"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Measure I"
+msgstr "Medir I"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Measure P"
+msgstr "Medir P"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Measure V"
+msgstr "Medir V"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Measurement probes"
+msgstr "Sondas de medição"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Measurements"
+msgstr "Medições"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Memory"
+msgstr "Memória"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Memory data (*.bin;*.hex;*.ihex;*.camem)|*.bin;*.hex;*.ihex;*.camem|All files|*"
+msgstr "Dados de memória (*.bin;*.hex;*.ihex;*.camem)|*.bin;*.hex;*.ihex;*.camem|Todos os arquivos|*"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Memory export"
+msgstr "Exportação de memória"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Min"
+msgstr "Mín."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Minimum"
+msgstr "Mínimo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Minimum supply difference"
+msgstr "Diferença mínima de alimentação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Minimum supply voltage"
+msgstr "Tensão mínima de alimentação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Minus"
+msgstr "Menos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Model ID:"
+msgstr "ID do modelo:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Model default"
+msgstr "Padrão do modelo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Model port"
+msgstr "Porta do modelo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Model ports → physical symbol pins"
+msgstr "Portas do modelo → pinos físicos do símbolo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Modelo didático configurável; não é um macromodelo certificado pelo fabricante."
+msgstr "Modelo didático configurável; não é um macromodelo certificado pelo fabricante."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "N"
+msgstr "N"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "NAND"
+msgstr "NAND"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "NC"
+msgstr "NC"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "NE555 bipolar timer"
+msgstr "Temporizador bipolar NE555"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "NOR"
+msgstr "NOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "NULL"
+msgstr "NULL"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Native compact diode fitted to selected room-temperature datasheet points. See docs/circuitalive/MODEL_CATALOG.md."
+msgstr "Diodo compacto nativo ajustado a pontos selecionados da folha de dados à temperatura ambiente. Consulte docs/circuitalive/MODEL_CATALOG.md."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Negative (-)"
+msgstr "Negativo (-)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Negative supply / reference"
+msgstr "Alimentação negativa / referência"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "New\tCtrl+N"
+msgstr "Novo\tCtrl+N"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "New parameter"
+msgstr "Novo parâmetro"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "No capture to export."
+msgstr "Nenhuma captura para exportar."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "No model selected"
+msgstr "Nenhum modelo selecionado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Nominal current transfer ratio (1 = 100%)"
+msgstr "Razão nominal de transferência de corrente (1 = 100%)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Nominal dropout"
+msgstr "Queda mínima nominal de regulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Nominal propagation delay high to low"
+msgstr "Atraso nominal de propagação de alto para baixo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Nominal propagation delay low to high"
+msgstr "Atraso nominal de propagação de baixo para alto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Nominal response time"
+msgstr "Tempo nominal de resposta"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Not saved"
+msgstr "Não salvo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Nq"
+msgstr "Nq"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "OR (ideal, no supply pins)"
+msgstr "OR (ideal, sem pinos de alimentação)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "OUT"
+msgstr "OUT"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Off"
+msgstr "Desligado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Off / roll"
+msgstr "Desligado / contínuo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Off resistance"
+msgstr "Resistência no estado desligado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "On resistance"
+msgstr "Resistência no estado ligado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "On-state knee voltage"
+msgstr "Tensão de joelho em condução"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "On-state preview"
+msgstr "Prévia do LED aceso"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "On-state slope resistance"
+msgstr "Resistência incremental em condução"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Opacity (%):"
+msgstr "Opacidade (%):"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Open"
+msgstr "Aberto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Open resistance"
+msgstr "Resistência no estado aberto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Open simulation model"
+msgstr "Abrir modelo de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Open the measurements and oscilloscope panel when starting a circuit with probes."
+msgstr "Abre o painel de medições e osciloscópio ao iniciar um circuito com sondas."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Open-loop gain"
+msgstr "Ganho em malha aberta"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Open...\tCtrl+O"
+msgstr "Abrir...\tCtrl+O"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Operational amplifiers"
+msgstr "Amplificadores operacionais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Optical response time constant"
+msgstr "Constante de tempo da resposta óptica"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Optocouplers"
+msgstr "Optoacopladores"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Oscilloscope"
+msgstr "Osciloscópio"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Oscilloscope and warnings"
+msgstr "Osciloscópio e avisos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Oscilloscope history:"
+msgstr "Histórico do osciloscópio:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Out"
+msgstr "Saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output 1"
+msgstr "Saída 1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output 2"
+msgstr "Saída 2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output 3"
+msgstr "Saída 3"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output 4"
+msgstr "Saída 4"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output Y"
+msgstr "Saída Y"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output capacitance"
+msgstr "Capacitância de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output collector resistance"
+msgstr "Resistência do coletor de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output current limit"
+msgstr "Limite de corrente de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output current warning per channel"
+msgstr "Aviso de corrente de saída por canal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output emitter resistance"
+msgstr "Resistência do emissor de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output forward transit time"
+msgstr "Tempo de trânsito direto da saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output gain roll-off current"
+msgstr "Corrente de redução do ganho de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output resistance"
+msgstr "Resistência de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output resistance (nominal)"
+msgstr "Resistência de saída (nominal)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output reverse transit parameter"
+msgstr "Parâmetro de trânsito reverso da saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output sink current limit per channel"
+msgstr "Limite de corrente absorvida pela saída por canal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output source current limit per channel"
+msgstr "Limite de corrente fornecida pela saída por canal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output stage resistance"
+msgstr "Resistência do estágio de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output switch transition"
+msgstr "Transição da chave de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output transistor nominal gain"
+msgstr "Ganho nominal do transistor de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output transition time"
+msgstr "Tempo de transição da saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Output voltage magnitude"
+msgstr "Módulo da tensão de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Overlay circle diameter"
+msgstr "Diâmetro do círculo sobreposto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Overlay halo diameter"
+msgstr "Diâmetro do halo sobreposto"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Overlay opacity"
+msgstr "Opacidade da sobreposição"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Own native VDMOS approximation at selected datasheet operating points; see docs/circuitalive/MODEL_CATALOG.md."
+msgstr "Aproximação VDMOS nativa própria em pontos de operação selecionados da folha de dados; consulte docs/circuitalive/MODEL_CATALOG.md."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "PAD"
+msgstr "PAD"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "PC817 phototransistor optocoupler"
+msgstr "PC817 optoacoplador com fototransistor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "PN2222A / 2N2222 family NPN transistor"
+msgstr "PN2222A / família 2N2222 de transistores NPN"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Package quiescent current"
+msgstr "Corrente quiescente do encapsulamento"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Parameters — blank uses the model default; $value follows the symbol Value"
+msgstr "Parâmetros — em branco usa o padrão do modelo; $value acompanha o Valor do símbolo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Pass resistance"
+msgstr "Resistência de passagem"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Passive components"
+msgstr "Componentes passivos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Pause and preserve the circuit state"
+msgstr "Pausar e preservar o estado do circuito"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Paused"
+msgstr "Pausado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Paused snapshot — t = %.9g s; %zu bytes"
+msgstr "Captura pausada — t = %.9g s; %zu bytes"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Pausing and capturing memory…"
+msgstr "Pausando e capturando memória…"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Peak amplitude"
+msgstr "Amplitude de pico"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Period"
+msgstr "Período"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Period ≈"
+msgstr "Período ≈"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Phototransistor"
+msgstr "Fototransistor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Phototransistor collector"
+msgstr "Coletor do fototransistor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Phototransistor emitter"
+msgstr "Emissor do fototransistor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Physical pin"
+msgstr "Pino físico"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Pin logic levels"
+msgstr "Níveis lógicos dos pinos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Pk–pk"
+msgstr "Pico a pico"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Place a measurement probe on a wire"
+msgstr "Posicione uma sonda de medição em um fio"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Place simulation probe"
+msgstr "Posicionar sonda de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Playback and interaction"
+msgstr "Reprodução e interação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Plus"
+msgstr "Mais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Port ID"
+msgstr "ID da porta"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Positive"
+msgstr "Positivo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Positive (+)"
+msgstr "Positivo (+)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Positive moves the capture later; negative moves it earlier. Roll mode: negative browses older history."
+msgstr "Valores positivos deslocam a captura para depois; negativos, para antes. No modo contínuo, valores negativos percorrem o histórico anterior."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Positive supply"
+msgstr "Alimentação positiva"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Potentiometer"
+msgstr "Potenciômetro"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Potentiometers and trimmers"
+msgstr "Potenciômetros e trimpots"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Power (W)"
+msgstr "Potência (W)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Power recovery address holdoff"
+msgstr "Intervalo de retenção de endereço após restabelecer a alimentação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Preparing"
+msgstr "Preparando"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Pretrigger (%)"
+msgstr "Pré-disparo (%)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Probe name (blank uses the net label or A, B, C...)"
+msgstr "Nome da sonda (em branco usa o rótulo da rede ou A, B, C...)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Probe name (optional)"
+msgstr "Nome da sonda (opcional)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Probe placed — click another wire or press Esc"
+msgstr "Sonda posicionada — clique em outro fio ou pressione Esc"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Probe placement finished"
+msgstr "Posicionamento de sondas encerrado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Probe properties"
+msgstr "Propriedades da sonda"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Probes"
+msgstr "Sondas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Public parameters appear in Simulation model... on the schematic. Use @ID in a block's value to link it to a public parameter."
+msgstr "Os parâmetros públicos aparecem em Modelo de simulação... no esquema. Use @ID no valor de um bloco para vinculá-lo a um parâmetro público."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Pulse voltage / logic clock"
+msgstr "Tensão pulsada / clock lógico"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Push-pull output stage"
+msgstr "Estágio de saída push-pull"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Q"
+msgstr "Q"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Q0"
+msgstr "Q0"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Q1"
+msgstr "Q1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Q2"
+msgstr "Q2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Q3"
+msgstr "Q3"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Q4"
+msgstr "Q4"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Q5"
+msgstr "Q5"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Q6"
+msgstr "Q6"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Q7"
+msgstr "Q7"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Quiescent current"
+msgstr "Corrente quiescente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "RAM"
+msgstr "RAM"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "RAM; unspecified bits start X"
+msgstr "RAM; bits não especificados iniciam em X"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "RMS"
+msgstr "RMS"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Read delay"
+msgstr "Atraso de leitura"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Read-only 64 KiB image; 55 ns address access at nominal 25 C. BIN, Intel HEX or CAMEM. CE/OE high disables outputs; erased bytes are FF. Programming voltage is not simulated."
+msgstr "Imagem de 64 KiB somente para leitura; acesso por endereço de 55 ns a 25 °C nominais. BIN, Intel HEX ou CAMEM. CE/OE em nível alto desabilita as saídas; bytes apagados são FF. A tensão de programação não é simulada."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Readings"
+msgstr "Leituras"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Real-time Simulation"
+msgstr "Simulação em tempo real"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Rearm"
+msgstr "Rearmar"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Rectifier and switching"
+msgstr "Retificação e comutação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Reference current"
+msgstr "Corrente de referência"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Reference voltage"
+msgstr "Tensão de referência"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Reload file"
+msgstr "Recarregar arquivo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Remove selected block"
+msgstr "Remover bloco selecionado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Remove selected parameter"
+msgstr "Remover parâmetro selecionado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Removed on OK"
+msgstr "Removido ao confirmar"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Rename simulation probe"
+msgstr "Renomear sonda de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Requested retained samples per signal for new simulations. Circuit size also limits history to keep memory use bounded."
+msgstr "Número solicitado de amostras mantidas por sinal para novas simulações. O tamanho do circuito também limita o histórico para controlar o uso de memória."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Reset threshold"
+msgstr "Limiar de reset"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Resistance"
+msgstr "Resistência"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Resistors"
+msgstr "Resistores"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Response"
+msgstr "Resposta"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Reusable authoring block. Parameters and connections are embedded in the saved model."
+msgstr "Bloco reutilizável para criação de modelos. Os parâmetros e as conexões ficam incorporados no modelo salvo."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Reusable event-driven digital block."
+msgstr "Bloco digital reutilizável orientado a eventos."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Reverse branch series resistance"
+msgstr "Resistência em série do ramo reverso"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Reverse current warning (~400mW / Vz)"
+msgstr "Aviso de corrente reversa (~400mW / Vz)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Reverse transit / saturation storage parameter"
+msgstr "Parâmetro de trânsito reverso / armazenamento em saturação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Rise delay"
+msgstr "Atraso de subida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Rise time"
+msgstr "Tempo de subida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Rising ↑"
+msgstr "Subida ↑"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Role"
+msgstr "Função"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Roll · trigger off"
+msgstr "Contínuo · disparo desligado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Ron"
+msgstr "Ron"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Room-temperature compact approximation calibrated against datasheet operating points. See docs/circuitalive/DISCRETE_MODELS.md."
+msgstr "Aproximação compacta à temperatura ambiente calibrada com pontos de operação da folha de dados. Consulte docs/circuitalive/DISCRETE_MODELS.md."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Room-temperature mixed-signal functional approximation with finite output resistance and propagation delay. See docs/circuitalive/MODEL_CATALOG.md."
+msgstr "Aproximação funcional de sinais mistos à temperatura ambiente, com resistência de saída finita e atraso de propagação. Consulte docs/circuitalive/MODEL_CATALOG.md."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Rout"
+msgstr "Rout"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Route all wires automatically"
+msgstr "Rotear todos os fios automaticamente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Run bench test\tCtrl+R"
+msgstr "Executar teste de bancada\tCtrl+R"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Run test"
+msgstr "Executar teste"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Running"
+msgstr "Em execução"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "S"
+msgstr "S"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "SCR"
+msgstr "SCR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "SR LATCH"
+msgstr "LATCH SR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "SR latch with reset priority"
+msgstr "Latch SR com prioridade de reset"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "SRAM 32K x 8"
+msgstr "SRAM 32K x 8"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Samples"
+msgstr "Amostras"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Saturation current"
+msgstr "Corrente de saturação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Save\tCtrl+S"
+msgstr "Salvar\tCtrl+S"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Save as...\tCtrl+Shift+S"
+msgstr "Salvar como...\tCtrl+Shift+S"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Save changes to this simulation model?"
+msgstr "Salvar alterações neste modelo de simulação?"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Save simulation model"
+msgstr "Salvar modelo de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Saved: "
+msgstr "Salvo: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Schottky"
+msgstr "Schottky"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Search name, ID, family or library symbol…"
+msgstr "Pesquisar nome, ID, família ou símbolo de biblioteca…"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Select component data"
+msgstr "Selecionar dados do componente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Semiconductors"
+msgstr "Semicondutores"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Series path: V(A,K) = Vj + I × Rs."
+msgstr "Caminho em série: V(A,K) = Vj + I × Rs."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Series resistance"
+msgstr "Resistência em série"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Set"
+msgstr "Set"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Sets the initial SW_Push state when a new simulation starts."
+msgstr "Define o estado inicial de SW_Push ao iniciar uma nova simulação."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Show digital pin indicators"
+msgstr "Mostrar indicadores dos pinos digitais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Show logic supply warnings"
+msgstr "Mostrar avisos de alimentação lógica"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Show or hide probe tools; hiding returns to the cursor"
+msgstr "Mostrar ou ocultar ferramentas de sonda; ocultar retorna ao cursor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Show overcurrent warnings"
+msgstr "Mostrar avisos de sobrecorrente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Show pin levels: 1 red, 0 blue, Z gray, X yellow, ~ purple for fast switching; configure cutoffs in Real-time Simulation preferences"
+msgstr "Mostrar níveis dos pinos: 1 vermelho, 0 azul, Z cinza, X amarelo, ~ roxo para comutação rápida; configure os cortes nas preferências de Simulação em tempo real"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Show trace"
+msgstr "Mostrar traço"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Signals"
+msgstr "Sinais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Silicon PN junction. Current flows primarily from anode to cathode. Conduction rises exponentially rather than switching at a fixed voltage. Reverse breakdown, series resistance and charge storage are part of the same junction model."
+msgstr "Junção PN de silício. A corrente flui principalmente do ânodo para o cátodo. A condução aumenta exponencialmente, em vez de comutar em uma tensão fixa. Ruptura reversa, resistência em série e armazenamento de carga fazem parte do mesmo modelo de junção."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulated time advanced by Step at 1× speed. The selected playback speed scales this duration."
+msgstr "Tempo simulado avançado pelo botão Passo na velocidade 1×. A velocidade de reprodução selecionada multiplica esta duração."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation Model Editor — CircuitAliveEDA"
+msgstr "Editor de modelos de simulação — CircuitAliveEDA"
+
+
+#. CircuitAliveEDA manager launcher.
+msgid "Choose a component and build its simulation behavior"
+msgstr "Escolha um componente e construa seu comportamento na simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation model"
+msgstr "Modelo de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation model..."
+msgstr "Modelo de simulação..."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation response timeout:"
+msgstr "Tempo limite de resposta da simulação:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Single · capture complete"
+msgstr "Único · captura concluída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Single-step duration:"
+msgstr "Duração de cada passo:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Slew rate"
+msgstr "Taxa de variação da tensão"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Slow the simulation to see sequential logic. This changes the playback rate, not component timing."
+msgstr "Reduza a velocidade da simulação para observar a lógica sequencial. Isso altera a velocidade de reprodução, sem alterar a temporização dos componentes."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Solver step ≤ "
+msgstr "Passo do solucionador ≤ "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Solver — applied to new simulations"
+msgstr "Solucionador — aplicado a novas simulações"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Source series resistance"
+msgstr "Resistência em série da fonte"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Sources"
+msgstr "Fontes"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Sparse samples · zoom adds no detail"
+msgstr "Amostras esparsas · ampliar não acrescenta detalhes"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Speed"
+msgstr "Velocidade"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Start delay"
+msgstr "Atraso inicial"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Start from existing model..."
+msgstr "Começar com um modelo existente..."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Start or resume interactive simulation"
+msgstr "Iniciar ou retomar a simulação interativa"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Start push buttons released (open)"
+msgstr "Iniciar botões de pressão soltos (abertos)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "State"
+msgstr "Estado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Step"
+msgstr "Passo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Stimulus / load"
+msgstr "Estímulo / carga"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Stop and reset interactive simulation"
+msgstr "Parar e reiniciar a simulação interativa"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Stopped"
+msgstr "Parado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Stopped — t = 0 s"
+msgstr "Parado — t = 0 s"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Stores charge. Its current depends on how quickly the voltage between its terminals changes."
+msgstr "Armazena carga. Sua corrente depende da rapidez com que a tensão entre os terminais varia."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Stores magnetic energy. Its voltage depends on how quickly the current changes."
+msgstr "Armazena energia magnética. Sua tensão depende da rapidez com que a corrente varia."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Switches"
+msgstr "Chaves"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Symbol Value:"
+msgstr "Valor do símbolo:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "TIC106 sensitive-gate SCR"
+msgstr "TIC106 SCR de porta sensível"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "TIP122 NPN power Darlington"
+msgstr "TIP122 Darlington NPN de potência"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "TIP127 PNP power Darlington"
+msgstr "TIP127 Darlington PNP de potência"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "TIP41C NPN transistor"
+msgstr "TIP41C transistor NPN"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "TIP42C PNP transistor"
+msgstr "TIP42C transistor PNP"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "TL071 operational amplifier"
+msgstr "TL071 amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "TL072 operational amplifier"
+msgstr "TL072 amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "TL074 operational amplifier"
+msgstr "TL074 amplificador operacional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "TL07x"
+msgstr "TL07x"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "TLP291 phototransistor optocoupler"
+msgstr "TLP291 optoacoplador com fototransistor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Target visual update rate:"
+msgstr "Taxa desejada de atualização visual:"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Terminal"
+msgstr "Terminal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Terminal 1"
+msgstr "Terminal 1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Terminal 2"
+msgstr "Terminal 2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Test completed at t = %g s\n\n"
+msgstr "Teste concluído em t = %g s\n\n"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Test duration must be between 0 and 1 second"
+msgstr "A duração do teste deve estar entre 0 e 1 segundo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Test model"
+msgstr "Testar modelo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "The pin indicator toolbar button controls this same preference."
+msgstr "O botão de indicadores dos pinos na barra de ferramentas controla esta mesma preferência."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "The signal must return this far past the level before the next edge can trigger."
+msgstr "O sinal deve retornar esta distância além do nível antes que a próxima borda possa disparar."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "The test needs a non-ground terminal"
+msgstr "O teste precisa de um terminal diferente do terra"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "This instance is omitted before loading or validating its model. Existing model settings are kept. This does not change defaults for new symbols."
+msgstr "Esta instância é omitida antes de carregar ou validar o modelo. As configurações existentes do modelo são mantidas. Isso não altera os padrões para novos símbolos."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Thyristors"
+msgstr "Tiristores"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Time + amplitude"
+msgstr "Tempo + amplitude"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Time A (s)"
+msgstr "Tempo A (s)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Time B (s)"
+msgstr "Tempo B (s)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Time offset (s)"
+msgstr "Deslocamento de tempo (s)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Time/div"
+msgstr "Tempo/div"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Timers"
+msgstr "Temporizadores"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "To (−):"
+msgstr "Para (−):"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Top 1"
+msgstr "Superior 1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Top 2"
+msgstr "Superior 2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Total resistance"
+msgstr "Resistência total"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Transistors"
+msgstr "Transistores"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Transit time"
+msgstr "Tempo de trânsito"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Transition"
+msgstr "Transição"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Transport saturation current"
+msgstr "Corrente de saturação de transporte"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Trigger"
+msgstr "Disparo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Triggered"
+msgstr "Disparado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsaved model"
+msgstr "Modelo não salvo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Upper limit for solver time steps. Component models may require smaller steps for accuracy."
+msgstr "Limite superior dos passos de tempo do solucionador. Os modelos dos componentes podem exigir passos menores para garantir a precisão."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Upper output headroom"
+msgstr "Margem superior de tensão de saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Use these settings for new %s symbols"
+msgstr "Usar estas configurações para novos símbolos %s"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Use this model for new symbols of the selected component"
+msgstr "Usar este modelo para novos símbolos do componente selecionado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "V and scope use the circuit reference.\nA and W insert an ideal series sensor.\nCurrent: left → right or top → bottom.\nWire power: V(reference) × I.\n\nComponent V / I / P: Simulation model..."
+msgstr "V e osciloscópio usam a referência do circuito.\nA e W inserem um sensor ideal em série.\nCorrente: esquerda → direita ou cima → baixo.\nPotência no fio: V(referência) × I.\n\nV / I / P do componente: Modelo de simulação..."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "V-"
+msgstr "V-"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "V1 − V2 = L × dI/dt."
+msgstr "V1 − V2 = L × dI/dt."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "VCC"
+msgstr "VCC"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "VDD"
+msgstr "VDD"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "VI"
+msgstr "VI"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "VO"
+msgstr "VO"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "VSS"
+msgstr "VSS"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Values: enter an SI value (10k, 100n, 5V), or choose @parameter to expose it in the component's configuration."
+msgstr "Valores: insira um valor SI (10k, 100n, 5V) ou escolha @parameter para disponibilizá-lo na configuração do componente."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Vcc"
+msgstr "Vcc"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "View memory…"
+msgstr "Ver memória…"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Vih"
+msgstr "Vih"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Vil"
+msgstr "Vil"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Visible capture · time-weighted mean / RMS\nPeriod, frequency and duty: midpoint crossings."
+msgstr "Captura visível · média ponderada pelo tempo / RMS\nPeríodo, frequência e ciclo ativo: cruzamentos do ponto médio."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Visual, playback and warning changes apply when you click OK. Solver limits, history and initial switch state apply after Stop, then Play."
+msgstr "Alterações visuais, de reprodução e de avisos são aplicadas ao clicar em OK. Limites do solucionador, histórico e estado inicial das chaves são aplicados após Parar e Iniciar."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Vmax"
+msgstr "Vmax"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Vmin"
+msgstr "Vmin"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Voltage (V)"
+msgstr "Tensão (V)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Voltage and current"
+msgstr "Tensão e corrente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Voltage at the middle horizontal line, independently for each signal."
+msgstr "Tensão na linha horizontal central, independente para cada sinal."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Vout"
+msgstr "Vout"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Vref"
+msgstr "Vref"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Waiting for capture"
+msgstr "Aguardando captura"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Waiting for trigger"
+msgstr "Aguardando disparo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "When disabled, LEDs always display instantaneous current, including fast pulses."
+msgstr "Quando desativado, os LEDs sempre exibem a corrente instantânea, incluindo pulsos rápidos."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "When disabled, pin indicators always display their instantaneous logic state."
+msgstr "Quando desativado, os indicadores dos pinos sempre exibem o estado lógico instantâneo."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "While paused, advance %.3g ms × playback speed, preserving the circuit state."
+msgstr "Quando pausado, avance %.3g ms × velocidade de reprodução, preservando o estado do circuito."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "While paused, advance by the step duration configured in Real-time Simulation preferences."
+msgstr "Quando pausado, avance pela duração do passo configurada nas preferências de Simulação em tempo real."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Wiper 1"
+msgstr "Cursor 1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Wiper 2"
+msgstr "Cursor 2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Wiper position"
+msgstr "Posição do cursor"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Wiper position (0 = bottom, 1 = top)"
+msgstr "Posição do cursor (0 = inferior, 1 = superior)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "XNOR"
+msgstr "XNOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "XOR"
+msgstr "XOR"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y = A AND B (after comparing each input with threshold)."
+msgstr "Y = A AND B (após comparar cada entrada com o limiar)."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y = A AND B (after comparing each input with threshold). No VCC/GND pins: all signal voltages use circuit ground as their reference. Output energy is provided by an ideal behavioral source; supply current and power limits are not modeled."
+msgstr "Y = A AND B (após comparar cada entrada com o limiar). Sem pinos VCC/GND: todas as tensões dos sinais usam o terra do circuito como referência. A energia de saída é fornecida por uma fonte comportamental ideal; a corrente de alimentação e os limites de potência não são modelados."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y = A OR B (after comparing each input with threshold)."
+msgstr "Y = A OR B (após comparar cada entrada com o limiar)."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y = A OR B (after comparing each input with threshold). No VCC/GND pins: all signal voltages use circuit ground as their reference. Output energy is provided by an ideal behavioral source; supply current and power limits are not modeled."
+msgstr "Y = A OR B (após comparar cada entrada com o limiar). Sem pinos VCC/GND: todas as tensões dos sinais usam o terra do circuito como referência. A energia de saída é fornecida por uma fonte comportamental ideal; a corrente de alimentação e os limites de potência não são modelados."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y = HIGH when A < threshold; otherwise LOW."
+msgstr "Y = ALTO quando A < limiar; caso contrário, BAIXO."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y = HIGH when A < threshold; otherwise LOW. No VCC/GND pins: all signal voltages use circuit ground as their reference. Output energy is provided by an ideal behavioral source; supply current and power limits are not modeled."
+msgstr "Y = ALTO quando A < limiar; caso contrário, BAIXO. Sem pinos VCC/GND: todas as tensões dos sinais usam o terra do circuito como referência. A energia de saída é fornecida por uma fonte comportamental ideal; a corrente de alimentação e os limites de potência não são modelados."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y = HIGH when A >= threshold; otherwise LOW."
+msgstr "Y = ALTO quando A >= limiar; caso contrário, BAIXO."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y = HIGH when A >= threshold; otherwise LOW. No VCC/GND pins: all signal voltages use circuit ground as their reference. Output energy is provided by an ideal behavioral source; supply current and power limits are not modeled."
+msgstr "Y = ALTO quando A >= limiar; caso contrário, BAIXO. Sem pinos VCC/GND: todas as tensões dos sinais usam o terra do circuito como referência. A energia de saída é fornecida por uma fonte comportamental ideal; a corrente de alimentação e os limites de potência não são modelados."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y1"
+msgstr "Y1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y2"
+msgstr "Y2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y3"
+msgstr "Y3"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Y4"
+msgstr "Y4"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Zener"
+msgstr "Zener"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Zener calibration current"
+msgstr "Corrente de calibração Zener"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Zener voltage at test current"
+msgstr "Tensão Zener na corrente de teste"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Zero-bias base-emitter capacitance"
+msgstr "Capacitância base-emissor sem polarização"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Zero-bias body junction capacitance"
+msgstr "Capacitância da junção de corpo sem polarização"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Zero-bias collector-base capacitance"
+msgstr "Capacitância coletor-base sem polarização"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Zero-bias junction capacitance"
+msgstr "Capacitância de junção sem polarização"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Zoom in"
+msgstr "Ampliar"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Zoom out"
+msgstr "Reduzir"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "a1"
+msgstr "a1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "a2"
+msgstr "a2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "a3"
+msgstr "a3"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "a4"
+msgstr "a4"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "a5"
+msgstr "a5"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "a6"
+msgstr "a6"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "a7"
+msgstr "a7"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "a8"
+msgstr "a8"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "adj"
+msgstr "adj"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "bidirectional"
+msgstr "bidirecional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "clk1"
+msgstr "clk1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "clk2"
+msgstr "clk2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "clr1"
+msgstr "clr1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "clr2"
+msgstr "clr2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "ctrl"
+msgstr "ctrl"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "d1"
+msgstr "d1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "d2"
+msgstr "d2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "discharge"
+msgstr "descarga"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "gnd"
+msgstr "gnd"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i1_0"
+msgstr "i1_0"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i1_1"
+msgstr "i1_1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i1_2"
+msgstr "i1_2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i1_3"
+msgstr "i1_3"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i1_4"
+msgstr "i1_4"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i1_5"
+msgstr "i1_5"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i1_6"
+msgstr "i1_6"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i1_7"
+msgstr "i1_7"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i2_0"
+msgstr "i2_0"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i2_1"
+msgstr "i2_1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i2_2"
+msgstr "i2_2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i2_3"
+msgstr "i2_3"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i3_0"
+msgstr "i3_0"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i3_1"
+msgstr "i3_1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i3_2"
+msgstr "i3_2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i4_0"
+msgstr "i4_0"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i4_1"
+msgstr "i4_1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i5_0"
+msgstr "i5_0"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "i6_0"
+msgstr "i6_0"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "input"
+msgstr "entrada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "ms"
+msgstr "ms"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "nq1"
+msgstr "nq1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "nq2"
+msgstr "nq2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "oe1"
+msgstr "oe1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "oe10"
+msgstr "oe10"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "oe13"
+msgstr "oe13"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "oe19"
+msgstr "oe19"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "oe4"
+msgstr "oe4"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "out"
+msgstr "out"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "output"
+msgstr "saída"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "passive"
+msgstr "passivo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "power"
+msgstr "alimentação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "pre1"
+msgstr "pre1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "pre2"
+msgstr "pre2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "q1"
+msgstr "q1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "q2"
+msgstr "q2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "read only; erased byte 0x"
+msgstr "somente leitura; byte apagado 0x"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "reference"
+msgstr "referência"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "reset"
+msgstr "reset"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "samples"
+msgstr "amostras"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "thresh"
+msgstr "thresh"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "trig"
+msgstr "trig"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "vcc"
+msgstr "vcc"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "y1"
+msgstr "y1"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "y2"
+msgstr "y2"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "y3"
+msgstr "y3"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "y4"
+msgstr "y4"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "y5"
+msgstr "y5"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "y6"
+msgstr "y6"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "y7"
+msgstr "y7"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "y8"
+msgstr "y8"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "~{CS}"
+msgstr "~{CS}"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "~{OE}"
+msgstr "~{OE}"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "~{WE}"
+msgstr "~{WE}"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "µs"
+msgstr "µs"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "×"
+msgstr "×"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid " is outside its limits"
+msgstr " está fora dos limites"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid " range must fit the block parameter range"
+msgstr " deve ter uma faixa contida na faixa do parâmetro do bloco"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid " to a distinct physical symbol pin"
+msgstr " a um pino físico distinto do símbolo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid " · %zu points"
+msgstr " · %zu pontos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ". Select the symbol and use Simulation model..."
+msgstr ". Selecione o símbolo e use Modelo de simulação..."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": Missing or oversized model file"
+msgstr ": arquivo de modelo ausente ou muito grande"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": check electrical pin names for "
+msgstr ": verifique os nomes dos pinos elétricos de "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": current probe is bypassed by another wire or equal net labels"
+msgstr ": a sonda de corrente foi desviada por outro fio ou por rótulos de rede iguais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": physical pin count differs"
+msgstr ": a quantidade de pinos físicos é diferente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": power symbol has no resolved net"
+msgstr ": o símbolo de alimentação não tem uma rede resolvida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": repeated pin connected to different nets"
+msgstr ": pino repetido conectado a redes diferentes"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": units must share one simulation model and parameters"
+msgstr ": as unidades devem compartilhar o mesmo modelo de simulação e os mesmos parâmetros"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": unknown block parameter "
+msgstr ": parâmetro de bloco desconhecido "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": unknown block port "
+msgstr ": porta de bloco desconhecida "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": unknown component port "
+msgstr ": porta de componente desconhecida "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid ": unknown public parameter "
+msgstr ": parâmetro público desconhecido "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A V/I source reference and finite value are required"
+msgstr "É necessária uma referência de fonte V/I e um valor finito"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "A component deck with a title and .end is required"
+msgstr "É necessária uma netlist de componentes com título e .end"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Ambiguous physical pin for model port "
+msgstr "Pino físico ambíguo para a porta do modelo "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Annotate the schematic: reference missing or repeated"
+msgstr "Anote o esquema: referência ausente ou repetida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "BIN cannot represent unknown bits (X). Export a .camem snapshot to preserve them."
+msgstr "BIN não pode representar bits desconhecidos (X). Exporte uma captura .camem para preservá-los."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Behavioral model exceeds 2 Mibit of RAM"
+msgstr "O modelo comportamental excede 2 Mibit de RAM"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Behavioral model needs parameter: "
+msgstr "O modelo comportamental precisa do parâmetro: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Behavioral models generate their own logic interfaces"
+msgstr "Modelos comportamentais geram suas próprias interfaces lógicas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Behavioral output needs an output/bidirectional port"
+msgstr "A saída comportamental precisa de uma porta de saída ou bidirecional"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Behavioral supply ports must differ"
+msgstr "As portas de alimentação comportamental devem ser distintas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Brightness current must be positive"
+msgstr "A corrente de brilho deve ser positiva"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot advance a completed/failed session"
+msgstr "Não é possível avançar uma sessão concluída ou com falha"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot associate "
+msgstr "Não foi possível associar "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot create simulation socket"
+msgstr "Não foi possível criar o socket de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot duplicate simulation socket"
+msgstr "Não foi possível duplicar o socket de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot load memory engine: "
+msgstr "Não foi possível carregar o mecanismo de memória: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot locate simulation profiles directory"
+msgstr "Não foi possível localizar o diretório de perfis de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot lock simulation profiles file"
+msgstr "Não foi possível bloquear o arquivo de perfis de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot prepare simulation worker spawn"
+msgstr "Não foi possível preparar a criação do processo de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot read memory image: "
+msgstr "Não foi possível ler a imagem de memória: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot start simulation worker: "
+msgstr "Não foi possível iniciar o processo de simulação: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Cannot write to simulation worker: "
+msgstr "Não foi possível gravar no processo de simulação: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose BIN, Intel HEX or CircuitAlive memory snapshot format"
+msgstr "Escolha o formato BIN, Intel HEX ou captura de memória CircuitAlive"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose a file for "
+msgstr "Escolha um arquivo para "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose a longer wire section, away from the endpoints"
+msgstr "Escolha um trecho de fio mais longo, afastado das extremidades"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose a model before saving a symbol default"
+msgstr "Escolha um modelo antes de salvar um padrão de símbolo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Choose a simulation model file first"
+msgstr "Primeiro escolha um arquivo de modelo de simulação"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Circuit memory limit: 1 MiB and 128 regions"
+msgstr "Limite de memória do circuito: 1 MiB e 128 regiões"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Click on an electrical wire to place the probe"
+msgstr "Clique em um fio elétrico para posicionar a sonda"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Configure a circuit first"
+msgstr "Primeiro configure um circuito"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Conflicting ideal supply voltage: "
+msgstr "Tensão de alimentação ideal conflitante: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Conflicting power symbols on the same net: "
+msgstr "Símbolos de alimentação conflitantes na mesma rede: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Custom SPICE fields require an explicit model file"
+msgstr "Campos SPICE personalizados exigem um arquivo de modelo explícito"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Custom SPICE fields require an explicit model file: "
+msgstr "Campos SPICE personalizados exigem um arquivo de modelo explícito: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Duplicate signal"
+msgstr "Sinal duplicado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Each component pin needs a distinct port ID and physical number"
+msgstr "Cada pino do componente precisa de um ID de porta e um número físico distintos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Electrical groups must cover all model ports"
+msgstr "Os grupos elétricos devem abranger todas as portas do modelo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Empty electrical group"
+msgstr "Grupo elétrico vazio"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Empty pin-name alias"
+msgstr "Alias de nome de pino vazio"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Every physical symbol pin needs a model port (open wires are allowed)"
+msgstr "Cada pino físico do símbolo precisa de uma porta no modelo (fios desconectados são permitidos)"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Excessive memory events within one timestep"
+msgstr "Excesso de eventos de memória em um único passo de tempo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "External terminals are distinct. Add a resistor/link block between them."
+msgstr "Os terminais externos são distintos. Adicione um bloco de resistor ou ligação entre eles."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "File required: "
+msgstr "Arquivo obrigatório: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Frequency must be positive"
+msgstr "A frequência deve ser positiva"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Incompatible simulation worker"
+msgstr "Processo de simulação incompatível"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Intel HEX address exceeds component capacity"
+msgstr "O endereço Intel HEX excede a capacidade do componente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Intel HEX cannot represent partially unknown bytes. Export .camem instead."
+msgstr "Intel HEX não pode representar bytes parcialmente desconhecidos. Exporte em .camem."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Intel HEX checksum mismatch"
+msgstr "Soma de verificação Intel HEX incorreta"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Intel HEX end record is missing"
+msgstr "Registro de fim Intel HEX ausente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid LED appearance parameter: "
+msgstr "Parâmetro de aparência do LED inválido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid Sim.Params assignment"
+msgstr "Atribuição Sim.Params inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid behavioral block count"
+msgstr "Quantidade de blocos comportamentais inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid behavioral signal: "
+msgstr "Sinal comportamental inválido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid behavioral vector width"
+msgstr "Largura de vetor comportamental inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid control levels"
+msgstr "Níveis de controle inválidos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid gate input count"
+msgstr "Quantidade de entradas da porta lógica inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid hexadecimal load address"
+msgstr "Endereço hexadecimal de carga inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid initial logic state"
+msgstr "Estado lógico inicial inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid internal drive port"
+msgstr "Porta de acionamento interno inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid internal net: "
+msgstr "Rede interna inválida: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid legacy parameter mapping"
+msgstr "Mapeamento de parâmetros legados inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid live adjustment"
+msgstr "Ajuste em tempo real inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid logic driver value: "
+msgstr "Valor de acionamento lógico inválido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid logic driver: "
+msgstr "Acionamento lógico inválido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid logic supply ports"
+msgstr "Portas de alimentação lógica inválidas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid logic thresholds or supply range"
+msgstr "Limiares lógicos ou faixa de alimentação inválidos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid measurement ports"
+msgstr "Portas de medição inválidas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid memory capacity/fill"
+msgstr "Capacidade ou preenchimento de memória inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid memory engine"
+msgstr "Mecanismo de memória inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid memory hex digit"
+msgstr "Dígito hexadecimal de memória inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid memory hex size"
+msgstr "Tamanho hexadecimal de memória inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid memory image"
+msgstr "Imagem de memória inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid memory read range"
+msgstr "Faixa de leitura de memória inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid memory snapshot masks"
+msgstr "Máscaras de captura de memória inválidas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid memory version"
+msgstr "Versão de memória inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid model identity"
+msgstr "Identidade do modelo inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid model memory region"
+msgstr "Região de memória do modelo inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid model pin count"
+msgstr "Quantidade de pinos do modelo inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid model resource"
+msgstr "Recurso do modelo inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid numeric value: "
+msgstr "Valor numérico inválido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid or oversized netlist"
+msgstr "Netlist inválida ou muito grande"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid or repeated electrical-group port"
+msgstr "Porta de grupo elétrico inválida ou repetida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid or repeated model port"
+msgstr "Porta de modelo inválida ou repetida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid or repeated parameter: "
+msgstr "Parâmetro inválido ou repetido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid oscilloscope acquisition settings"
+msgstr "Configurações de aquisição do osciloscópio inválidas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid oscilloscope timebase"
+msgstr "Base de tempo do osciloscópio inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid parameter definition"
+msgstr "Definição de parâmetro inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid parameter range: "
+msgstr "Faixa de parâmetro inválida: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid part alias"
+msgstr "Alias de componente inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid pin-name mapping"
+msgstr "Mapeamento de nomes de pinos inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid probe pin mapping"
+msgstr "Mapeamento de pinos da sonda inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid resource format"
+msgstr "Formato de recurso inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid resources"
+msgstr "Recursos inválidos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid runtime memory configuration"
+msgstr "Configuração de memória em execução inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid signal activity monitor"
+msgstr "Monitor de atividade do sinal inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid signal token"
+msgstr "Identificador de sinal inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid simulation request timeout"
+msgstr "Tempo limite da solicitação de simulação inválido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid simulation timing, signals or history capacity"
+msgstr "Temporização, sinais ou capacidade do histórico da simulação inválidos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid voltage constraint"
+msgstr "Restrição de tensão inválida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Invalid/repeated block ID: "
+msgstr "ID de bloco inválido ou repetido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Live adjustment initial value is out of range"
+msgstr "O valor inicial do ajuste em tempo real está fora da faixa"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Logic supply out of range: "
+msgstr "Alimentação lógica fora da faixa: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Map model port "
+msgstr "Mapeie a porta do modelo "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Maximum time step must be positive"
+msgstr "O passo de tempo máximo deve ser positivo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Memory address out of bounds"
+msgstr "Endereço de memória fora dos limites"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Memory block shape/region mismatch: "
+msgstr "Formato ou região do bloco de memória incompatível: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Memory data width mismatch"
+msgstr "Largura dos dados de memória incompatível"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Memory engine file is missing: "
+msgstr "Arquivo do mecanismo de memória ausente: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Memory image address exceeds component capacity"
+msgstr "O endereço da imagem de memória excede a capacidade do componente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Memory page exceeds 4096 bytes"
+msgstr "A página de memória excede 4096 bytes"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Missing Sim.Params value"
+msgstr "Valor Sim.Params ausente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Missing behavioral output: "
+msgstr "Saída comportamental ausente: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Missing or oversized file: "
+msgstr "Arquivo ausente ou muito grande: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Missing or oversized memory image: "
+msgstr "Imagem de memória ausente ou muito grande: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Missing or oversized model: "
+msgstr "Modelo ausente ou muito grande: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Missing or oversized resource: "
+msgstr "Recurso ausente ou muito grande: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Model design supports up to 128 blocks"
+msgstr "A criação de modelos permite até 128 blocos"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Model has no SPICE instance or behavioral blocks"
+msgstr "O modelo não tem instância SPICE nem blocos comportamentais"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "No active memory for this component"
+msgstr "Nenhuma memória ativa para este componente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "No active simulation to pause"
+msgstr "Nenhuma simulação ativa para pausar"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "No simulation model associated with "
+msgstr "Nenhum modelo de simulação associado a "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Non-finite/complex data in transient analysis"
+msgstr "Dados não finitos ou complexos na análise transitória"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Overcurrent: "
+msgstr "Sobrecorrente: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Overlapping wires must be cleaned before placing a current probe"
+msgstr "Os fios sobrepostos devem ser corrigidos antes de posicionar uma sonda de corrente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Oversized model file"
+msgstr "Arquivo de modelo muito grande"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Parameter default outside limits: "
+msgstr "Valor padrão do parâmetro fora dos limites: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Part aliases require names for every model port"
+msgstr "Aliases de componentes exigem nomes para todas as portas do modelo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Pause the simulation before reading memory"
+msgstr "Pause a simulação antes de ler a memória"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Place current and power probes on a horizontal or vertical wire"
+msgstr "Posicione as sondas de corrente e potência em um fio horizontal ou vertical"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Place the probe away from junctions, labels and component pins"
+msgstr "Posicione a sonda afastada de junções, rótulos e pinos de componentes"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Power symbol voltage exceeds 1 MV: "
+msgstr "A tensão do símbolo de alimentação excede 1 MV: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "RAM limits: 16 address bits, 32 data bits, one select"
+msgstr "Limites de RAM: 16 bits de endereço, 32 bits de dados, uma seleção"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Repeated default physical pin"
+msgstr "Pino físico padrão repetido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Repeated or excessive Sim.Params assignments"
+msgstr "Atribuições Sim.Params repetidas ou excessivas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Repeated/invalid behavioral signal driver: "
+msgstr "Acionamento de sinal comportamental repetido ou inválido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Select the measurement's positive and negative model ports"
+msgstr "Selecione as portas positiva e negativa do modelo para a medição"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Select two distinct measurement ports"
+msgstr "Selecione duas portas de medição distintas"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Set a model ID, name and component pins"
+msgstr "Defina um ID de modelo, nome e pinos do componente"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Short circuit across ideal supply: "
+msgstr "Curto-circuito na alimentação ideal: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Short circuit across voltage-source terminals"
+msgstr "Curto-circuito entre os terminais da fonte de tensão"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Signal not found: "
+msgstr "Sinal não encontrado: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation produced no data"
+msgstr "A simulação não produziu dados"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation profiles file is too large"
+msgstr "O arquivo de perfis de simulação é muito grande"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation reply exceeds protocol limit"
+msgstr "A resposta da simulação excede o limite do protocolo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation request exceeds protocol limit"
+msgstr "A solicitação de simulação excede o limite do protocolo"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation time must advance monotonically"
+msgstr "O tempo da simulação deve avançar continuamente, sem retroceder"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation worker disconnected"
+msgstr "O processo de simulação foi desconectado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation worker exited without a reply"
+msgstr "O processo de simulação terminou sem responder"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation worker is unavailable"
+msgstr "O processo de simulação está indisponível"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation worker timed out"
+msgstr "O processo de simulação excedeu o tempo limite"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Simulation worker timed out or poll failed"
+msgstr "O processo de simulação excedeu o tempo limite ou a consulta falhou"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Source changes require a confirmed pause"
+msgstr "Alterações nas fontes exigem uma pausa confirmada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Stop the completed/failed session before restarting"
+msgstr "Pare a sessão concluída ou com falha antes de reiniciar"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Stop the session before changing the circuit"
+msgstr "Pare a sessão antes de alterar o circuito"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Target must be positive and within the configured horizon"
+msgstr "O destino deve ser positivo e estar dentro do horizonte configurado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "This component has no memory in the active simulation. Stop and restart "
+msgstr "Este componente não tem memória na simulação ativa. Pare e reinicie "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Too many memory regions"
+msgstr "Excesso de regiões de memória"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Too many signal activity monitors"
+msgstr "Excesso de monitores de atividade de sinal"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Too many wire bends"
+msgstr "Excesso de dobras nos fios"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Too many wire routes"
+msgstr "Excesso de caminhos de fios"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unclosed Sim.Params value"
+msgstr "Valor Sim.Params sem fechamento"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unclosed block placeholder"
+msgstr "Marcador de bloco sem fechamento"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unclosed model placeholder"
+msgstr "Marcador de modelo sem fechamento"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Undriven behavioral signal: "
+msgstr "Sinal comportamental sem acionamento: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unexpected data after .end"
+msgstr "Dados inesperados após .end"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown LED appearance parameter"
+msgstr "Parâmetro de aparência do LED desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown behavioral port: "
+msgstr "Porta comportamental desconhecida: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown block"
+msgstr "Bloco desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown block placeholder: "
+msgstr "Marcador de bloco desconhecido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown block terminal"
+msgstr "Terminal de bloco desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown driven port: "
+msgstr "Porta acionada desconhecida: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown external terminal"
+msgstr "Terminal externo desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown frequency parameter"
+msgstr "Parâmetro de frequência desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown indicator parameter"
+msgstr "Parâmetro de indicador desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown indicator type"
+msgstr "Tipo de indicador desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown legacy default parameter"
+msgstr "Parâmetro padrão legado desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown logic parameter: "
+msgstr "Parâmetro lógico desconhecido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown mapped model port: "
+msgstr "Porta mapeada do modelo desconhecida: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown maximum step parameter"
+msgstr "Parâmetro de passo máximo desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown model parameter: "
+msgstr "Parâmetro do modelo desconhecido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown model placeholder: "
+msgstr "Marcador de modelo desconhecido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown model resource: "
+msgstr "Recurso do modelo desconhecido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown pin role: "
+msgstr "Função de pino desconhecida: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown probe kind"
+msgstr "Tipo de sonda desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown probe kind: "
+msgstr "Tipo de sonda desconhecido: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown reference port"
+msgstr "Porta de referência desconhecida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown simulation operation"
+msgstr "Operação de simulação desconhecida"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unknown warning parameter"
+msgstr "Parâmetro de aviso desconhecido"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported Sim.Params parameter: "
+msgstr "Parâmetro Sim.Params não suportado: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported behavioral block version"
+msgstr "Versão de bloco comportamental não suportada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported behavioral block: "
+msgstr "Bloco comportamental não suportado: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported deck directive: "
+msgstr "Diretiva de netlist não suportada: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported file format for "
+msgstr "Formato de arquivo não suportado para "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported memory export format"
+msgstr "Formato de exportação de memória não suportado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported memory snapshot"
+msgstr "Captura de memória não suportada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported model design version"
+msgstr "Versão de criação de modelo não suportada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported numeric suffix: "
+msgstr "Sufixo numérico não suportado: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported or malformed Intel HEX record"
+msgstr "Registro Intel HEX não suportado ou malformado"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "Unsupported simulation profiles file: "
+msgstr "Arquivo de perfis de simulação não suportado: "
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "after changing its model."
+msgstr "após alterar o modelo."
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "ngspice could not load the circuit"
+msgstr "O ngspice não conseguiu carregar o circuito"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "ngspice did not acknowledge stopping"
+msgstr "O ngspice não confirmou a parada"
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "ngspice does not support single-point streaming storage ("
+msgstr "O ngspice não oferece armazenamento contínuo de ponto único ("
+
+
+#. CircuitAliveEDA interface and bundled simulation models.
+msgid "ngspice rejected: "
+msgstr "O ngspice rejeitou: "

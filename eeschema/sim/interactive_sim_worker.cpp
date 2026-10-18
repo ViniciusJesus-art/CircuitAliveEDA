@@ -7,7 +7,21 @@
 #include "interactive_sim_protocol.h"
 #include "runtime_memory.h"
 #include <filesystem>
+#include "platform_runtime.h"
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#define read _read
+#define dup _dup
+#define dup2 _dup2
+#define fdopen _fdopen
+#define STDIN_FILENO 0
+#define STDOUT_FILENO 1
+#define STDERR_FILENO 2
+#else
 #include <dlfcn.h>
+#include <unistd.h>
+#endif
 #include <fcntl.h>
 #include <ngspice/sharedspice.h>
 
@@ -26,7 +40,6 @@
 #include <set>
 #include <signal.h>
 #include <sstream>
-#include <unistd.h>
 
 namespace CIRCUITALIVE
 {
@@ -60,6 +73,10 @@ public:
     ENGINE()
     {
         ngSpice_Init( &OnMessage, &OnStatus, &OnExit, &OnData, &OnInit, &OnBackground, this );
+        // The solver's preflight assumes every time point is retained. Our
+        // .save none streaming policy retains one solver point plus a bounded
+        // ring, whose limits are checked in Configure and Snapshot instead.
+        Command( "set no_mem_check" );
     }
 
     JSON Handle( const JSON& aRequest )
@@ -134,6 +151,28 @@ private:
                 || cfg.signals.empty() || cfg.signals.size() > 256
                 || cfg.signals.size() * cfg.historyCapacity > 65536 )
             throw std::runtime_error( "Invalid simulation timing, signals or history capacity" );
+
+        if( aRequest.contains( "activity_monitors" ) )
+        {
+            if( aRequest.at( "activity_monitors" ).size() > 4096 )
+                throw std::runtime_error( "Too many signal activity monitors" );
+            for( const auto& item : aRequest.at( "activity_monitors" ) )
+            {
+                SIM_ACTIVITY_MONITOR monitor{ item.at( "signal" ), item.at( "reference" ),
+                    item.at( "supply" ), item.at( "low" ), item.at( "high" ),
+                    item.at( "default_supply" ), item.at( "min_supply" ), item.at( "max_supply" ) };
+                auto valid = [&]( std::size_t index )
+                    { return index == ACTIVITY_NO_SIGNAL || index < cfg.signals.size(); };
+                if( !valid( monitor.signal ) || !valid( monitor.reference )
+                    || !valid( monitor.supply ) || !std::isfinite( monitor.low )
+                    || !std::isfinite( monitor.high ) || monitor.low >= monitor.high
+                    || !std::isfinite( monitor.defaultSupply ) || monitor.defaultSupply <= 0
+                    || !std::isfinite( monitor.minSupply ) || monitor.minSupply <= 0
+                    || !std::isfinite( monitor.maxSupply ) || monitor.maxSupply < monitor.minSupply )
+                    throw std::runtime_error( "Invalid signal activity monitor" );
+                cfg.activityMonitors.push_back( monitor );
+            }
+        }
 
         std::vector<std::string> names;
         std::set<std::string> unique;
@@ -223,6 +262,7 @@ private:
         m_eventTime = 0;
         m_head = m_size = 0;
         m_indices.clear();
+        m_activity.assign( m_config.activityMonitors.size(), SIGNAL_ACTIVITY_TRACKER{} );
         m_error.clear();
         m_finished = true;
     }
@@ -252,7 +292,7 @@ private:
         if( m_error.empty() ) m_error = m_memory.Error();
         if( !m_error.empty() )
         {
-            m_state = SIM_SESSION_STATE::ERROR;
+            m_state = SIM_SESSION_STATE::FAILED;
             throw std::runtime_error( m_error );
         }
     }
@@ -270,24 +310,29 @@ private:
         m_memory.Reset( m_config.memories );
         if( !m_config.memories.empty() && !m_memoryModule )
         {
-            const auto path =
-                    ( std::filesystem::canonical( "/proc/self/exe" ).parent_path() / "circuitalive-memory.cm" )
-                            .string();
-            const int fd = open( path.c_str(), O_RDONLY | O_CLOEXEC );
-            if( fd < 0 )
-                throw std::runtime_error( "Memory engine file is missing: " + path );
-            const auto modulePath = "/proc/self/fd/" + std::to_string( fd );
-            m_memoryModule = dlopen( modulePath.c_str(), RTLD_NOW | RTLD_LOCAL );
-            if( !m_memoryModule )
-                throw std::runtime_error( std::string( "Cannot load memory engine: " ) + dlerror() );
-            auto bind = reinterpret_cast<void ( * )( const CA_MEMORY_BACKEND* )>(
-                    dlsym( m_memoryModule, "CircuitAliveMemorySetBackend" ) );
-            if( !bind )
-                throw std::runtime_error( "Invalid memory engine" );
-            auto backend = m_memory.Backend();
-            bind( &backend );
-            Command( "codemodel " + modulePath );
-            close( fd );
+            const auto file = ExecutablePath().parent_path() / "circuitalive-memory.cm";
+            const auto path = PathUtf8(file);
+#ifdef _WIN32
+            m_memoryModule = reinterpret_cast<void*>(LoadLibraryW(file.c_str()));
+            if(!m_memoryModule) throw std::runtime_error("Cannot load memory engine: " + path);
+            auto bind = reinterpret_cast<void (*)(const CA_MEMORY_BACKEND*)>(
+                GetProcAddress(reinterpret_cast<HMODULE>(m_memoryModule),"CircuitAliveMemorySetBackend"));
+            if(!bind) throw std::runtime_error("Invalid memory engine");
+            auto backend=m_memory.Backend();bind(&backend);
+            // ngspice resolves relative Windows modules beside the executable.
+            // This also avoids its ANSI loader interpreting the installation path.
+            Command("codemodel circuitalive-memory.cm");
+#else
+            const int fd = open(path.c_str(),O_RDONLY|O_CLOEXEC);
+            if(fd<0)throw std::runtime_error("Memory engine file is missing: "+path);
+            struct CLOSE_FD{int fd;~CLOSE_FD(){close(fd);}} closeFd{fd};
+            const auto modulePath="/proc/self/fd/"+std::to_string(fd);
+            m_memoryModule=dlopen(modulePath.c_str(),RTLD_NOW|RTLD_LOCAL);
+            if(!m_memoryModule)throw std::runtime_error(std::string("Cannot load memory engine: ")+dlerror());
+            auto bind=reinterpret_cast<void (*)(const CA_MEMORY_BACKEND*)>(dlsym(m_memoryModule,"CircuitAliveMemorySetBackend"));
+            if(!bind)throw std::runtime_error("Invalid memory engine");
+            auto backend=m_memory.Backend();bind(&backend);Command("codemodel "+modulePath);
+#endif
             CheckError();
         }
         std::istringstream stream( m_deck );
@@ -300,7 +345,7 @@ private:
         pointers.push_back( nullptr );
         if( ngSpice_Circ( pointers.data() ) != 0 )
         {
-            m_state = SIM_SESSION_STATE::ERROR;
+            m_state = SIM_SESSION_STATE::FAILED;
             throw std::runtime_error( "ngspice could not load the circuit" );
         }
         CheckError();
@@ -322,7 +367,7 @@ private:
         {
             std::lock_guard lock( m_mutex );
             m_finished = true;
-            m_state = SIM_SESSION_STATE::ERROR;
+            m_state = SIM_SESSION_STATE::FAILED;
             throw;
         }
     }
@@ -373,7 +418,7 @@ private:
         {
             std::lock_guard lock( m_mutex );
             if( failed || m_samples == 0 )
-                m_state = SIM_SESSION_STATE::ERROR;
+                m_state = SIM_SESSION_STATE::FAILED;
             else if( m_latest.time >= m_config.horizon * ( 1 - 1e-12 ) )
                 m_state = SIM_SESSION_STATE::COMPLETED;
             else
@@ -417,7 +462,7 @@ private:
         Wait();
         Refresh();
         CheckError();
-        if( m_state == SIM_SESSION_STATE::ERROR )
+        if( m_state == SIM_SESSION_STATE::FAILED )
             throw std::runtime_error( "Simulation produced no data" );
     }
 
@@ -466,10 +511,7 @@ private:
                 throw std::runtime_error( "ngspice does not support single-point streaming storage ("
                                           + std::to_string( retained ) + " retained)" );
         }
-        std::ifstream statm( "/proc/self/statm" );
-        std::uint64_t pages = 0, resident = 0;
-        statm >> pages >> resident;
-        resident *= static_cast<std::uint64_t>( sysconf( _SC_PAGESIZE ) );
+        const auto resident=ResidentMemoryBytes();
 
         std::lock_guard lock( m_mutex );
         JSON history = JSON::array();
@@ -484,6 +526,13 @@ private:
                         { "overwritten", m_overwritten }, { "events", m_events },
                         { "event_time", m_eventTime }, { "retained", retained },
                         { "resident_bytes", resident }, { "error", m_error } };
+        result["activity"] = JSON::array();
+        for( const auto& tracker : m_activity )
+        {
+            const auto activity = tracker.Activity();
+            result["activity"].push_back( { { "period", activity.period },
+                    { "last_transition", activity.lastTransition }, { "high_value", activity.highValue } } );
+        }
         if( aDrain )
             m_head = m_size = 0;
         return result;
@@ -567,6 +616,9 @@ private:
         catch( const std::exception& e ) { self.m_error=e.what(); return 0; }
         if( !self.m_memory.Error().empty() ) { self.m_error=self.m_memory.Error(); return 0; }
         ++self.m_samples;
+        for( std::size_t i = 0; i < self.m_activity.size(); ++i )
+            self.m_activity[i].Observe( self.m_config.activityMonitors[i], self.m_latest.time,
+                                       self.m_latest.values );
         const auto position = ( self.m_head + self.m_size ) % self.m_ring.size();
         self.m_ring[position] = self.m_latest;
         if( self.m_size == self.m_ring.size() )
@@ -594,6 +646,7 @@ private:
     SIM_SAMPLE              m_latest;
     std::vector<int>        m_indices;
     std::vector<SIM_SAMPLE> m_ring;
+    std::vector<SIGNAL_ACTIVITY_TRACKER> m_activity;
     std::size_t            m_head = 0, m_size = 0;
     std::uint64_t          m_samples = 0, m_overwritten = 0, m_events = 0, m_generation = 0;
     double                 m_eventTime = 0;
@@ -605,19 +658,38 @@ int main()
     using namespace CIRCUITALIVE;
     using namespace PROTOCOL;
     std::locale::global( std::locale::classic() );
+#ifdef _WIN32
+    _setmode(STDIN_FILENO,_O_BINARY);_setmode(STDOUT_FILENO,_O_BINARY);
+#else
     signal( SIGPIPE, SIG_IGN ); // Worker-local; never change the editor's signal handlers.
 
+    #endif
     // Keep accidental library/code-model stdout out of the protocol channel.
-    FILE* wire = fdopen( dup( STDOUT_FILENO ), "w" );
+    FILE* wire = fdopen( dup( STDOUT_FILENO ), "wb" );
     if( !wire || dup2( STDERR_FILENO, STDOUT_FILENO ) < 0 )
         return 2;
+
+    // A running editor may predate a repaired launcher environment. Discover the
+    // worker's adjacent runtime too, rather than depending on /usr/lib64/ngspice.
+    if( const char* scripts = std::getenv( "SPICE_SCRIPTS" ); !scripts || !*scripts )
+    {
+        std::error_code error;
+        const auto executable = ExecutablePath();
+
+        if( !error )
+        {
+            const auto directory = executable.parent_path() / "ngspice/scripts";
+            if( std::filesystem::is_regular_file( directory / "spinit", error ) )
+                SetRuntimeEnvironment( "SPICE_SCRIPTS", PathUtf8(directory) );
+        }
+    }
 
     ENGINE engine;
     std::string input;
     char chunk[8192];
     for( ;; )
     {
-        const ssize_t count = read( STDIN_FILENO, chunk, sizeof( chunk ) );
+        const auto count = read( STDIN_FILENO, chunk, sizeof( chunk ) );
         if( count < 0 && errno == EINTR )
             continue;
         if( count <= 0 )

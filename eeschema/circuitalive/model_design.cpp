@@ -1,10 +1,12 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
+#include <sim/platform_runtime.h>
 #include "model_design.h"
 #include "circuit_snapshot.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <functional>
 #include <iomanip>
 #include <set>
 #include <sstream>
@@ -40,6 +42,24 @@ std::string Expand( const std::string& text, const std::map<std::string, std::st
     return out;
 }
 }
+std::string ModelBehaviorSummary( const std::string& text )
+{
+    const auto j = JSON::parse( text ); const auto m = MODEL_REPOSITORY::LoadText( text );
+    std::string result = m.name + "\n\n" + m.description + "\n";
+    for( const auto& line : j.value( "equations", std::vector<std::string>{} ) ) result += "\n" + line + "\n";
+    if( j.contains( "behavioral" ) )
+    {
+        result += "\nInternal operations:\n";
+        for( const auto& b : j.at( "behavioral" ).at( "blocks" ) )
+        {
+            result += "  " + b.at( "type" ).get<std::string>();
+            for( const auto* key : { "inputs", "data", "clock", "s", "r", "reset", "out", "q", "nq" } )
+                if( b.contains( key ) ) result += "  " + std::string(key) + "=" + b.at(key).dump();
+            result += "\n";
+        }
+    }
+    return result;
+}
 MODEL_DESIGN MODEL_DESIGN::Open( const std::string& text )
 {
     auto model = MODEL_REPOSITORY::LoadText( text );
@@ -53,20 +73,111 @@ MODEL_DESIGN MODEL_DESIGN::Open( const std::string& text )
         const auto& a = json.at( "authoring" );
         if( a.at( "version" ) != 1 ) throw std::runtime_error( "Unsupported model design version" );
         d.baseJson = a.value( "base", "" );
+        d.coreBlock = a.value( "core_block", "" );
         d.libraryId = a.value( "symbol", d.libraryId );
         for( const auto& b : a.at( "blocks" ) )
             d.blocks.push_back( { b.at( "id" ), b.at( "model" ).dump(),
                 b.at( "connections" ).get<std::map<std::string, std::string>>(),
                 b.at( "values" ).get<std::map<std::string, std::string>>(), b.value( "x", 280 ), b.value( "y", 80 ) } );
+        for( const auto& r : a.value( "wire_routes", JSON::array() ) )
+        {
+            DESIGN_WIRE_ROUTE route{ r.at( "from_block" ), r.at( "from_port" ), r.at( "to_block" ), r.at( "to_port" ), {} };
+            if( r.at( "bends" ).size() > 256 ) throw std::runtime_error( "Too many wire bends" );
+            for( const auto& p : r.at( "bends" ) ) route.bends.push_back( { p.at( 0 ), p.at( 1 ) } );
+            d.wireRoutes.push_back( std::move( route ) );
+            if( d.wireRoutes.size() > 4096 ) throw std::runtime_error( "Too many wire routes" );
+        }
     }
     return d;
+}
+void MODEL_DESIGN::MakeCoreVisible()
+{
+    if( baseJson.empty() || !blocks.empty() ) return;
+    auto core = JSON::parse( baseJson );
+    const auto model = MODEL_REPOSITORY::LoadText( core.dump() );
+    core.erase( "authoring" );
+    DESIGN_BLOCK block; block.id = "Core"; block.modelJson = core.dump(); block.x = 400; block.y = 70;
+    for( const auto& p : model.pins ) block.connections[p.id] = "@" + p.id;
+    for( const auto& p : model.parameters ) block.values[p.id] = "@" + p.id;
+    // Compile the core once, in the block. Keep component-level observations on
+    // the parent and point them at the namespaced devices inside that block.
+    core.erase( "behavioral" );
+    core["spice"] = { { "instance", JSON::array() }, { "definitions", JSON::array() } };
+    if( !model.logicVcc.empty() )
+        core["logic"] = { { "vcc", model.logicVcc }, { "gnd", model.logicGround },
+            { "low_parameter", model.logicLow }, { "high_parameter", model.logicHigh },
+            { "min_supply_parameter", model.logicMinSupply }, { "max_supply_parameter", model.logicMaxSupply },
+            { "driver_enable", model.driverEnable }, { "driver_value", model.driverValue },
+            { "internal_drive", model.internalDrive } };
+    std::function<void( JSON& )> rename = [&]( JSON& item )
+    {
+        if( item.is_string() )
+        {
+            auto text = item.get<std::string>(); std::size_t pos = 0;
+            while( ( pos = text.find( "${id}", pos ) ) != std::string::npos )
+            { text.replace( pos, 5, "b_Core_${id}" ); pos += 12; }
+            item = text;
+        }
+        else if( item.is_structured() ) for( auto& child : item ) rename( child );
+    };
+    for( const auto* key : { "logic", "indicator", "control", "adjustments", "current_warning" } )
+        if( core.contains( key ) ) rename( core[key] );
+    baseJson = core.dump(); coreBlock = block.id;
+    // A native PN diode has a real series path followed by the nonlinear
+    // junction (including its voltage-dependent charge and breakdown). Expose
+    // that path without substituting a fixed-drop diode or losing its physics.
+    auto junction = JSON::parse( block.modelJson );
+    const auto nativeInstance = std::vector<std::string>{ "D${id} ${pin:a} ${pin:k} model_${id}" };
+    if( model.instance == nativeInstance && model.definitions.size() == 1
+        && model.definitions.front().find( "Rs=${param:series_resistance}" ) != std::string::npos )
+    {
+        auto definition = model.definitions.front();
+        const auto pos = definition.find( "Rs=${param:series_resistance}" );
+        definition.replace( pos, std::string("Rs=${param:series_resistance}").size(), "Rs=0" );
+        junction["spice"]["definitions"] = { definition };
+        junction["id"] = "pn_junction"; junction["name"] = "PN junction + stored charge";
+        if( junction["pins"].size()==2 && junction["pins"][0].at("id")=="k" )
+            std::swap( junction["pins"][0], junction["pins"][1] );
+        junction["description"] = "Nonlinear one-way conduction, reverse breakdown and voltage-dependent charge storage. The series resistance is the separate Rs block.";
+        junction["equations"] = { "Forward conduction: I = Is * (exp(Vj / (N * thermal voltage)) - 1).",
+            "Reverse breakdown is set by BV. Cjo sets junction capacitance; Tt sets transit charge." };
+        auto& params = junction["parameters"];
+        params.erase( std::remove_if( params.begin(), params.end(), []( const auto& p )
+            { return p.at("id") == "series_resistance"; } ), params.end() );
+        block.values.erase("series_resistance"); block.connections["a"]="junction";
+        block.modelJson=junction.dump(); block.x=800;
+        // A sensed behavioral resistance also represents an exact zero-ohm
+        // path; SPICE's plain R device replaces zero by its minimum resistance.
+        JSON resistance = { {"schema_version",1}, {"backend","ngspice"}, {"id","series_resistance"},
+            {"name","Series resistance"}, {"description","V(P,N) = I * R. A zero value is an ideal link."},
+            {"pins", {{{"id","p"},{"label","Input"},{"role","passive"},{"default_pin","1"}},
+                      {{"id","n"},{"label","Junction"},{"role","passive"},{"default_pin","2"}}}},
+            {"parameters", {{{"id","resistance"},{"label","Resistance"},{"default","0.5"},{"unit","Ohm"},{"min",0},{"max",1e6}}}},
+            {"spice", {{"instance", {"Vsense_${id} sensed_${id} ${pin:n} 0",
+                "Bres_${id} ${pin:p} sensed_${id} V={i(Vsense_${id})*${param:resistance}}"}}}} };
+        blocks.push_back( { "Rs", resistance.dump(), {{"p","@a"},{"n","junction"}},
+            {{"resistance","@series_resistance"}}, 400, 100 } );
+    }
+    blocks.push_back( std::move( block ) );
+}
+void MODEL_DESIGN::RemoveBlock( const std::string& blockId )
+{
+    blocks.erase( std::remove_if( blocks.begin(), blocks.end(), [&]( const auto& b ) { return b.id == blockId; } ), blocks.end() );
+    wireRoutes.erase( std::remove_if( wireRoutes.begin(), wireRoutes.end(), [&]( const auto& r )
+        { return r.fromBlock == blockId || r.toBlock == blockId; } ), wireRoutes.end() );
+    if( coreBlock == blockId )
+    {
+        auto base = JSON::parse( baseJson );
+        for( const auto* key : { "logic", "indicator", "control", "adjustments", "current_warning", "memories", "resources" } ) base.erase(key);
+        baseJson = base.dump(); coreBlock.clear();
+    }
 }
 std::vector<std::filesystem::path> MODEL_DESIGN::BlockDirectories()
 {
     std::vector<std::filesystem::path> dirs;
     if( const char* p = std::getenv( "CIRCUITALIVE_BLOCK_DIR" ); p && *p ) dirs.emplace_back( p );
     dirs.emplace_back( CIRCUITALIVE_BUNDLED_BLOCK_DIR );
-    std::error_code error; auto executable = std::filesystem::read_symlink( "/proc/self/exe", error );
+    std::error_code error; auto executable = ExecutablePath();
     if( !error ) dirs.push_back( executable.parent_path().parent_path() / "share/circuitalive/blocks" );
     return dirs;
 }
@@ -156,6 +267,8 @@ std::string MODEL_DESIGN::Export() const
         if( !Identifier( b.id ) || !blockIds.insert( b.id ).second ) throw std::runtime_error( "Invalid/repeated block ID: " + b.id );
         auto model = MODEL_REPOSITORY::LoadText( b.modelJson );
         std::map<std::string, std::string> t{ { "id", "b_" + b.id + "_${id}" } }, connections;
+        t["control:initial"] = "${control:initial}";
+        for( const auto& memory : model.memories ) t["memory:" + memory.id] = "${memory:" + memory.id + "}";
         for( const auto& pin : model.pins )
         {
             auto it = b.connections.find( pin.id ); const auto net = it == b.connections.end() ? "" : it->second;
@@ -200,6 +313,29 @@ std::string MODEL_DESIGN::Export() const
         for( const auto& [p, value] : b.values )
             if( !t.contains( "param:" + p ) ) throw std::runtime_error( b.id + ": unknown block parameter " + p );
         models.push_back( std::move( model ) ); tokens.push_back( std::move( t ) ); nets.push_back( std::move( connections ) );
+    }
+    // A visible LED core may override or rebind display values in its properties.
+    // Its component-level indicator must observe those exact block bindings.
+    if(j.contains("indicator")&&!coreBlock.empty())for(std::size_t i=0;i<blocks.size();++i)if(blocks[i].id==coreBlock)
+    {
+        auto bind=[&](JSON& target,const std::string& childId)
+        {
+            if(childId.empty())return;
+            const auto& token=tokens[i].at("param:"+childId);
+            if(token.starts_with("${param:"))target=token.substr(8,token.size()-9);
+            else
+            {
+                auto spec=*std::find_if(models[i].parameters.begin(),models[i].parameters.end(),[&](const auto& p){return p.id==childId;});
+                spec.id="b_"+blocks[i].id+"_"+childId;spec.label=blocks[i].id+": "+spec.label;spec.defaultValue=token;
+                if(!parameterIds.contains(spec.id))addParameter(spec);
+                else for(auto& p:j["parameters"])if(p.at("id")==spec.id)p["default"]=token;
+                target=spec.id;
+            }
+        };
+        bind(j["indicator"]["brightness_parameter"],models[i].brightnessParameter);
+        if(!models[i].ratingParameter.empty())bind(j["indicator"]["rating_parameter"],models[i].ratingParameter);
+        if(models[i].ledAppearance.Configurable())for(std::size_t n=0;n<LED_APPEARANCE_KEYS.size();++n)
+            bind(j["indicator"]["appearance"][LED_APPEARANCE_KEYS[n]],models[i].ledAppearance.ids[n]);
     }
     // Presence of an analog element is conservative, matching the editor's connectivity resolver.
     std::map<std::string, std::vector<std::string>> drivers, internalDrivers; std::set<std::string> analog;
@@ -293,6 +429,15 @@ std::string MODEL_DESIGN::Export() const
     for( const auto& b : blocks ) saved.push_back( { { "id", b.id }, { "model", JSON::parse( b.modelJson ) },
         { "connections", b.connections }, { "values", b.values }, { "x", b.x }, { "y", b.y } } );
     j["authoring"] = { { "version", 1 }, { "symbol", libraryId }, { "base", baseJson }, { "blocks", saved } };
+    j["authoring"]["core_block"] = coreBlock;
+    j["authoring"]["wire_routes"] = JSON::array();
+    for( const auto& r : wireRoutes )
+    {
+        JSON bends = JSON::array();
+        for( const auto& p : r.bends ) bends.push_back( { p.x, p.y } );
+        j["authoring"]["wire_routes"].push_back( { { "from_block", r.fromBlock }, { "from_port", r.fromPort },
+            { "to_block", r.toBlock }, { "to_port", r.toPort }, { "bends", bends } } );
+    }
     const auto compiled = MODEL_REPOSITORY::LoadText( j.dump() );
     bool anchor = false;
     for( const auto& p : pins )

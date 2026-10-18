@@ -2,7 +2,7 @@
 
 # CircuitAliveEDA
 
-<img src="./resources/bitmaps_png/icons/icon_kicad.png" alt="Logo da Chloe" width="160" />
+<img src="./resources/bitmaps_png/icons/icon_kicad.png" alt="Logo do CircuitAliveEDA" width="160" />
 
 
 **Ambiente de desenvolvimento eletrônico com simulação interativa integrada**
@@ -130,19 +130,6 @@ Esses são objetivos de longo prazo, e não funcionalidades necessariamente disp
 
 ---
 
-## Por que utilizar o KiCad?
-
-O [KiCad](https://www.kicad.org/) é um dos principais projetos de código aberto voltados ao desenvolvimento eletrônico.
-
-Ele oferece uma base sólida para a criação de esquemáticos, desenvolvimento de placas de circuito impresso, gerenciamento de bibliotecas, visualização 3D e geração de arquivos de fabricação.
-
-Desenvolver todas essas ferramentas do zero exigiria uma quantidade enorme de trabalho e acabaria desviando o foco do principal objetivo do CircuitAliveEDA: **a experiência de simulação eletrônica**.
-
-Por esse motivo, escolhi trabalhar a partir do código-fonte do KiCad, preservando seus recursos e desenvolvendo novas funcionalidades sobre sua estrutura.
-
-O CircuitAliveEDA é um projeto derivado e independente, não sendo uma versão oficial do KiCad nem possuindo vínculo oficial com sua equipe de desenvolvimento.
-
----
 
 ## Base técnica
 
@@ -197,7 +184,7 @@ Para iniciar:
 ./circuitalive
 ```
 
-As instruções completas estão disponíveis no [guia de compilação](docs/circuitalive/BUILD_FEDORA.md).
+As instruções completas estão disponíveis nos guias de compilação para [Fedora](docs/circuitalive/BUILD_FEDORA.md) e [Windows/MSVC](docs/circuitalive/BUILD_WINDOWS.md).
 
 O projeto permanece em desenvolvimento e pode apresentar funcionalidades incompletas ou comportamentos inesperados.
 

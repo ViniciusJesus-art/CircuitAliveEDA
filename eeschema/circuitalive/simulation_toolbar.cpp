@@ -32,7 +32,7 @@ TOOL_ACTION SIMULATION_ACTIONS::probes( TOOL_ACTION_ARGS().Name( "circuitalive.I
         .Tooltip( wxTRANSLATE( "Show or hide probe tools; hiding returns to the cursor" ) ).Icon( BITMAPS::sim_run ) );
 TOOL_ACTION SIMULATION_ACTIONS::logicLevels( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.logicLevels" )
         .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "Pin logic levels" ) )
-        .Tooltip( wxTRANSLATE( "Show pin levels: 1 red, 0 blue, Z gray, X yellow" ) ).Icon( BITMAPS::sim_run ) );
+        .Tooltip( wxTRANSLATE( "Show pin levels: 1 red, 0 blue, Z gray, X yellow, ~ purple for fast switching; configure cutoffs in Real-time Simulation preferences" ) ).Icon( BITMAPS::sim_run ) );
 
 void EnsureSimulationToolbar( SCH_EDIT_FRAME& aFrame )
 {

@@ -5,13 +5,13 @@
 #include <sim/runtime_memory.h>
 #include <filesystem>
 #include <fstream>
-#include <unistd.h>
+#include <sim/platform_runtime.h>
 using namespace CIRCUITALIVE;
 namespace
 {
 struct TEMP
 {
-    std::filesystem::path path = std::filesystem::temp_directory_path() / ( "ca-memory-" + std::to_string( getpid() ) );
+    std::filesystem::path path = std::filesystem::temp_directory_path() / ( "ca-memory-" + std::to_string( CIRCUITALIVE::ProcessId() ) );
     TEMP()
     {
         std::filesystem::create_directories( path );

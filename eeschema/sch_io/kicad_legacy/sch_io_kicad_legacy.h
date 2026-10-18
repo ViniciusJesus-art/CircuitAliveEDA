@@ -71,13 +71,13 @@ public:
 
     const IO_BASE::IO_FILE_DESC GetSchematicFileDesc() const override
     {
-        return IO_BASE::IO_FILE_DESC( _HKI( "KiCad legacy schematic files" ),
+        return IO_BASE::IO_FILE_DESC( _HKI( "CircuitAliveEDA legacy schematic files" ),
                                       { FILEEXT::LegacySchematicFileExtension } );
     }
 
     const IO_BASE::IO_FILE_DESC GetLibraryDesc() const override
     {
-        return IO_BASE::IO_FILE_DESC( _HKI( "KiCad legacy symbol library files" ),
+        return IO_BASE::IO_FILE_DESC( _HKI( "CircuitAliveEDA legacy symbol library files" ),
                                       { FILEEXT::LegacySymbolLibFileExtension } );
     }
 

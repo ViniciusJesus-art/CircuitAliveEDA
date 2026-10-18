@@ -123,7 +123,7 @@ bool NETLIST_EXPORTER_SPICE::DoWriteNetlist( const wxString& aSimCommand, unsign
 
 void NETLIST_EXPORTER_SPICE::WriteHead( OUTPUTFORMATTER& aFormatter, unsigned aNetlistOptions )
 {
-    aFormatter.Print( 0, ".title KiCad schematic\n" );
+    aFormatter.Print( 0, ".title CircuitAliveEDA schematic\n" );
 }
 
 

@@ -120,13 +120,15 @@ kicad_add_boost_test( qa_spice qa_spice )
 setup_qa_env( qa_spice )
 
 if( TARGET circuitalive_sim_session )
-    add_executable( qa_interactive_sim test_interactive_sim_session.cpp test_interactive_circuit.cpp
+    add_executable( qa_interactive_sim test_interactive_sim_session.cpp test_interactive_windows_headers.cpp test_interactive_circuit.cpp
         test_interactive_models.cpp test_interactive_measurements.cpp test_interactive_devices.cpp
         test_interactive_complex.cpp test_interactive_power.cpp test_model_design.cpp
         test_interactive_discretes.cpp test_scope_acquisition.cpp test_model_catalog.cpp
-        test_analog_model_catalog.cpp test_live_controls.cpp test_digital_pipeline.cpp test_memory_resources.cpp )
+        test_analog_model_catalog.cpp test_live_controls.cpp test_digital_pipeline.cpp test_memory_resources.cpp test_visual_signals.cpp )
     target_link_libraries( qa_interactive_sim PRIVATE
         circuitalive_interactive circuitalive_sim_session Boost::unit_test_framework )
+    target_include_directories( qa_interactive_sim SYSTEM PRIVATE
+        ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann_json )
     target_compile_definitions( qa_interactive_sim PRIVATE
         BOOST_TEST_DYN_LINK
         CIRCUITALIVE_TEST_WORKER="$<TARGET_FILE:circuitalive-sim-worker>"

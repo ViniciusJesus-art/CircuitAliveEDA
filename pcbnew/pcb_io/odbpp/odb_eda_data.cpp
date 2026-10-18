@@ -411,7 +411,7 @@ void EDA_DATA::PACKAGE::Write( std::ostream& ost ) const
 void EDA_DATA::Write( std::ostream& ost ) const
 {
     ost << "# " << wxDateTime::Now().FormatISOCombined() << std::endl;
-    ost << "HDR KiCad EDA " << TO_UTF8( GetBuildVersion() ) << std::endl;
+    ost << "HDR CircuitAliveEDA " << TO_UTF8( GetBuildVersion() ) << std::endl;
     ost << "UNITS=" << PCB_IO_ODBPP::m_unitsStr << std::endl;
     ost << "LYR";
 

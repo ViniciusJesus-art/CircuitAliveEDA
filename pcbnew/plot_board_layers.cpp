@@ -1328,7 +1328,7 @@ PLOTTER* StartPlotBoard( BOARD *aBoard, const PCB_PLOT_PARAMS *aPlotOpts, int aL
         break;
 
     case PLOT_FORMAT::HPGL:
-        wxLogError( _( "HPGL plotting is no longer supported as of KiCad 10.0" ) );
+        wxLogError( _( "HPGL plotting is no longer supported as of version 10.0" ) );
         return nullptr;
 
     case PLOT_FORMAT::GERBER:

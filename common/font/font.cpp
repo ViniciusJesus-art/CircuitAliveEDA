@@ -147,7 +147,8 @@ FONT* FONT::getDefaultFont()
 FONT* FONT::GetFont( const wxString& aFontName, bool aBold, bool aItalic,
                      const std::vector<wxString>* aEmbeddedFiles, bool aForDrawingSheet )
 {
-    if( aFontName.empty() || aFontName.StartsWith( KICAD_FONT_NAME ) )
+    if( aFontName.empty() || aFontName.StartsWith( KICAD_FONT_NAME )
+        || aFontName.StartsWith( wxS( "KiCad Font" ) ) )
         return getDefaultFont();
 
     std::tuple<wxString, bool, bool, bool> key = { aFontName, aBold, aItalic, aForDrawingSheet };
@@ -174,7 +175,8 @@ bool FONT::IsStroke( const wxString& aFontName )
 {
     // This would need a more complex implementation if we ever support more stroke fonts
     // than the KiCad Font.
-    return aFontName == _( "Default Font" ) || aFontName == KICAD_FONT_NAME;
+    return aFontName == _( "Default Font" ) || aFontName == KICAD_FONT_NAME
+           || aFontName == wxS( "KiCad Font" );
 }
 
 

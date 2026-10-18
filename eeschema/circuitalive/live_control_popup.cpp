@@ -1,4 +1,5 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
+#include "model_i18n.h"
 #include "live_control_popup.h"
 #include <wx/panel.h>
 #include <wx/sizer.h>
@@ -21,7 +22,7 @@ LIVE_CONTROL_POPUP::LIVE_CONTROL_POPUP( wxWindow* parent, const std::string& ref
     for( std::size_t i = 0; i < controls.size(); ++i )
     {
         const auto& c = controls[i]; if( c.component != component ) continue;
-        layout->Add( new wxStaticText( panel, wxID_ANY, wxString::FromUTF8( c.label ) ), 0, wxLEFT | wxRIGHT, 8 );
+        layout->Add( new wxStaticText( panel, wxID_ANY, ModelText( c.label ) ), 0, wxLEFT | wxRIGHT, 8 );
         auto* row = new wxBoxSizer( wxHORIZONTAL );
         const int steps = std::clamp( int( std::min( 10000., std::ceil( ( c.maximum - c.minimum ) / c.step ) ) ), 1, 10000 );
         const double initialValue = i < values.size() ? values[i] : c.initial;

@@ -31,7 +31,7 @@
     <translation type="gettext">kicad</translation>
 
     <keywords>
-        <keyword translate="no">KiCad</keyword>
+        <keyword translate="no">CircuitAliveEDA</keyword>
         <keyword>EDA</keyword>
         <keyword>PCB</keyword>
         <keyword>Schematic</keyword>
@@ -48,45 +48,25 @@
 
     <description>
         <p>
-        CircuitAliveEDA is an electronics design automation (EDA) application based on KiCad, with interactive schematic simulation. It features schematic capture, integrated circuit simulation, printed circuit board (PCB) layout, 3D rendering, and plotting/data export to numerous formats. The upstream KiCad project also includes a high-quality component library featuring thousands of symbols, footprints, and 3D models. The upstream suite has minimal system requirements and runs on Linux, Windows, and macOS.
+        CircuitAliveEDA is an electronics design automation (EDA) application with interactive schematic simulation, schematic capture, printed circuit board (PCB) layout, 3D rendering, and plotting and data export tools.
         </p>
     </description>
 
-    <screenshots>
-        <screenshot type="default">
-            <caption>KiCad Schematic Editor</caption>
-            <image width="1600" height="900">https://www.kicad.org/img/screenshots/appstream/eeschema_9.png</image>
-        </screenshot>
-
-        <screenshot>
-            <caption>KiCad PCB Layout Editor</caption>
-            <image width="1600" height="900">https://www.kicad.org/img/screenshots/appstream/pcbnew_9.png</image>
-        </screenshot>
-
-        <screenshot>
-            <caption>KiCad 3D Viewer</caption>
-            <image width="1600" height="900">https://www.kicad.org/img/screenshots/appstream/3dviewer_9.png</image>
-        </screenshot>
-    </screenshots>
 
     <url type="homepage">https://github.com/ViniciusJesus-art/CircuitAliveEDA</url>
     <url type="bugtracker">https://github.com/ViniciusJesus-art/CircuitAliveEDA/issues</url>
-    <url type="help">https://go.kicad.org/docs/9</url>
-    <url type="donation">https://go.kicad.org/donate</url>
-    <url type="translate">https://go.kicad.org/translate</url>
-    <url type="contribute">https://go.kicad.org/contribute</url>
+    <url type="help">https://github.com/ViniciusJesus-art/CircuitAliveEDA/tree/main/docs/circuitalive</url>
     <url type="vcs-browser">https://github.com/ViniciusJesus-art/CircuitAliveEDA</url>
 
-    <update_contact>devlist@kicad.org</update_contact>
 
-    <developer_name>The KiCad Developers</developer_name>
+    <developer_name>CircuitAliveEDA contributors</developer_name>
 
 
     <!-- This is actually a valid tag, but the utilities don't think so -->
     <content_rating type="oars-1.1">
         <!-- We allow opt-in diagnostic information -->
         <content_attribute id="social-info">moderate</content_attribute>
-        <!-- We have a donation link in the application -->
+        <!-- The About dialog offers support for the upstream project. -->
         <content_attribute id="money-purchasing">mild</content_attribute>
     </content_rating>
 

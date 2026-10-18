@@ -448,7 +448,7 @@ void SETTINGS_MANAGER::loadAllColorSettings()
         colors_dir.Traverse( loader );
 
     // A user theme file can carry the same display name as a built-in theme (for example a
-    // user.json left over from an older version still named "KiCad Default"), which makes two
+    // user.json left over from an older version still named "CircuitAliveEDA Default"), which makes two
     // identically-named entries appear in every theme selector. Built-ins own their names, so
     // disambiguate any colliding user theme by appending its filename.
     std::set<wxString> builtinNames;

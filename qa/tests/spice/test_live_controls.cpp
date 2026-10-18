@@ -36,7 +36,7 @@ template<typename P> EDITOR_SESSION_VIEW Await( SESSION_RUNNER& runner, P predic
     const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
     for(;;)
     {
-        const auto view=runner.View();BOOST_REQUIRE_MESSAGE(view.state!=EDITOR_SESSION_STATE::ERROR,view.error);
+        const auto view=runner.View();BOOST_REQUIRE_MESSAGE(view.state!=EDITOR_SESSION_STATE::FAILED,view.error);
         if(predicate(view))return view;
         BOOST_REQUIRE(std::chrono::steady_clock::now()<deadline);
         std::this_thread::sleep_for(std::chrono::milliseconds(5));

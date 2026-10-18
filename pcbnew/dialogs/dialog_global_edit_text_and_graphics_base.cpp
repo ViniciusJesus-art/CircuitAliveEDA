@@ -190,7 +190,7 @@ DIALOG_GLOBAL_EDIT_TEXT_AND_GRAPHICS_BASE::DIALOG_GLOBAL_EDIT_TEXT_AND_GRAPHICS_
 	m_fontLabel->Wrap( -1 );
 	fgSizer1->Add( m_fontLabel, 0, wxTOP|wxRIGHT|wxLEFT|wxALIGN_CENTER_VERTICAL, 5 );
 
-	wxString m_fontCtrlChoices[] = { _("KiCad Font") };
+	wxString m_fontCtrlChoices[] = { _("CircuitAliveEDA Font") };
 	int m_fontCtrlNChoices = sizeof( m_fontCtrlChoices ) / sizeof( wxString );
 	m_fontCtrl = new FONT_CHOICE( m_specifiedValues, wxID_ANY, wxDefaultPosition, wxDefaultSize, m_fontCtrlNChoices, m_fontCtrlChoices, 0 );
 	m_fontCtrl->SetSelection( 0 );

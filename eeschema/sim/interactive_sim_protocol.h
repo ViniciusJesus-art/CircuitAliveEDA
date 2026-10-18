@@ -19,7 +19,7 @@ inline const char* StateName( SIM_SESSION_STATE aState )
     case SIM_SESSION_STATE::RUNNING: return "running";
     case SIM_SESSION_STATE::PAUSED: return "paused";
     case SIM_SESSION_STATE::COMPLETED: return "completed";
-    case SIM_SESSION_STATE::ERROR: return "error";
+    case SIM_SESSION_STATE::FAILED: return "error";
     }
     throw std::runtime_error( "Invalid simulation state" );
 }
@@ -28,7 +28,7 @@ inline SIM_SESSION_STATE ParseState( const std::string& aState )
 {
     for( auto state : { SIM_SESSION_STATE::STOPPED, SIM_SESSION_STATE::RUNNING,
                        SIM_SESSION_STATE::PAUSED, SIM_SESSION_STATE::COMPLETED,
-                       SIM_SESSION_STATE::ERROR } )
+                       SIM_SESSION_STATE::FAILED } )
     {
         if( aState == StateName( state ) )
             return state;

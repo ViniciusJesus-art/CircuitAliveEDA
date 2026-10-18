@@ -33,7 +33,7 @@ DIALOG_IMPORTED_LAYERS_BASE::DIALOG_IMPORTED_LAYERS_BASE( wxWindow* parent, wxWi
 	m_lblImportedLayers->Wrap( -1 );
 	fgSizer1->Add( m_lblImportedLayers, 0, wxALL, 5 );
 
-	m_lblKicadLayers = new wxStaticText( sbSizer1->GetStaticBox(), wxID_ANY, _("KiCad Layers"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_lblKicadLayers = new wxStaticText( sbSizer1->GetStaticBox(), wxID_ANY, _("CircuitAliveEDA Layers"), wxDefaultPosition, wxDefaultSize, 0 );
 	m_lblKicadLayers->Wrap( -1 );
 	fgSizer1->Add( m_lblKicadLayers, 0, wxALL, 5 );
 
@@ -92,12 +92,12 @@ DIALOG_IMPORTED_LAYERS_BASE::DIALOG_IMPORTED_LAYERS_BASE( wxWindow* parent, wxWi
 	bSizerBottom = new wxBoxSizer( wxHORIZONTAL );
 
 	m_button_automatch = new wxButton( this, wxID_ANY, _("Auto-Match Layers"), wxDefaultPosition, wxDefaultSize, 0 );
-	m_button_automatch->SetToolTip( _("Automatically match any unmatched layers to their KiCad equivalent.") );
+	m_button_automatch->SetToolTip( _("Automatically match any unmatched layers to their CircuitAliveEDA equivalent.") );
 
 	bSizerBottom->Add( m_button_automatch, 0, wxALL, 5 );
 
-	m_cbKeepKiCadLayerNames = new wxCheckBox( this, wxID_ANY, _("Keep KiCad layer names"), wxDefaultPosition, wxDefaultSize, 0 );
-	m_cbKeepKiCadLayerNames->SetToolTip( _("If checked, layers will keep their standard KiCad names instead of being renamed to the imported layer names.") );
+	m_cbKeepKiCadLayerNames = new wxCheckBox( this, wxID_ANY, _("Keep CircuitAliveEDA layer names"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_cbKeepKiCadLayerNames->SetToolTip( _("If checked, layers will keep their standard CircuitAliveEDA names instead of being renamed to the imported layer names.") );
 
 	bSizerBottom->Add( m_cbKeepKiCadLayerNames, 0, wxALL|wxALIGN_CENTER_VERTICAL, 5 );
 

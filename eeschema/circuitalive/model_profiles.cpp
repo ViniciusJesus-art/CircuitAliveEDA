@@ -4,9 +4,14 @@
 #include <cstdlib>
 #include <fstream>
 #include <stdexcept>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <sys/file.h>
 #include <fcntl.h>
 #include <unistd.h>
+#endif
+#include <sim/platform_runtime.h>
 namespace CIRCUITALIVE
 {
 namespace fs = std::filesystem;
@@ -30,25 +35,48 @@ public:
     explicit LOCK( const fs::path& file )
     {
         fs::create_directories( file.parent_path() );
+#ifdef _WIN32
+        const auto name=fs::path(file.wstring()+L".lock");
+        m_handle=CreateFileW(name.c_str(),GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,
+                             nullptr,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
+        OVERLAPPED lock{};
+        if(m_handle==INVALID_HANDLE_VALUE||!LockFileEx(m_handle,LOCKFILE_EXCLUSIVE_LOCK,0,MAXDWORD,MAXDWORD,&lock))
+        {
+            if(m_handle!=INVALID_HANDLE_VALUE)CloseHandle(m_handle);
+            throw std::runtime_error("Cannot lock simulation profiles file");
+        }
+#else
         m_fd = open( ( file.string() + ".lock" ).c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0600 );
         if( m_fd < 0 || flock( m_fd, LOCK_EX ) != 0 )
         {
             if( m_fd >= 0 ) close( m_fd );
             throw std::runtime_error( "Cannot lock simulation profiles file" );
         }
+#endif
     }
-    ~LOCK() { flock( m_fd, LOCK_UN ); close( m_fd ); }
+    ~LOCK()
+    {
+#ifdef _WIN32
+        OVERLAPPED lock{};UnlockFileEx(m_handle,0,MAXDWORD,MAXDWORD,&lock);CloseHandle(m_handle);
+#else
+        flock(m_fd,LOCK_UN);close(m_fd);
+#endif
+    }
 private:
+#ifdef _WIN32
+    HANDLE m_handle=INVALID_HANDLE_VALUE;
+#else
     int m_fd;
+#endif
 };
 void Write( const fs::path& file, const JSON& j )
 {
-    const auto temporary = file.string() + ".tmp." + std::to_string( getpid() );
+    const auto temporary = file.string() + ".tmp." + std::to_string( ProcessId() );
     try
     {
         std::ofstream out( temporary ); out.exceptions( std::ios::failbit | std::ios::badbit );
         out << j.dump( 2 ) << '\n'; out.close();
-        fs::rename( temporary, file );
+        ReplaceFile( temporary, file );
     }
     catch( ... ) { std::error_code error; fs::remove( temporary, error ); throw; }
 }
@@ -58,6 +86,9 @@ fs::path MODEL_PROFILES::DefaultFile()
     if( const char* p = std::getenv( "CIRCUITALIVE_PROFILE_FILE" ); p && *p ) return fs::absolute( p );
     if( const char* p = std::getenv( "KICAD_CONFIG_HOME" ); p && *p ) return fs::path( p ) / "circuitalive/model-profiles.json";
     if( const char* p = std::getenv( "XDG_CONFIG_HOME" ); p && *p ) return fs::path( p ) / "circuitaliveeda/model-profiles.json";
+#ifdef _WIN32
+    if(const wchar_t* p=_wgetenv(L"APPDATA");p&&*p) return fs::path(p)/"CircuitAliveEDA/model-profiles.json";
+#endif
     if( const char* p = std::getenv( "HOME" ); p && *p ) return fs::path( p ) / ".config/circuitaliveeda/model-profiles.json";
     throw std::runtime_error( "Cannot locate simulation profiles directory" );
 }

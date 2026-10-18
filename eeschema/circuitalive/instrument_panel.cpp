@@ -9,6 +9,8 @@
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 #include <wx/tglbtn.h>
+#include <wx/tooltip.h>
+#include <algorithm>
 
 namespace CIRCUITALIVE
 {
@@ -22,11 +24,14 @@ INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_
     for( const char* label : { "1×", "0.1×", "0.01×", "0.001×" } ) m_speed->Append( wxString::FromUTF8( label ) );
     m_speed->SetSelection( 0 );
     m_speed->SetToolTip( _( "Slow the simulation to see sequential logic. This changes the playback rate, not component timing." ) );
-    m_speed->Bind( wxEVT_COMBOBOX, [speed]( wxCommandEvent& event )
-    { const double rates[] = { 1, .1, .01, .001 }; speed( rates[event.GetSelection()] ); } );
+    m_speed->Bind( wxEVT_COMBOBOX, [this, speed]( wxCommandEvent& event )
+    {
+        const auto index = event.GetSelection();
+        if( index >= 0 && index < int( m_speedRates.size() ) ) speed( m_speedRates[index] );
+    } );
     time->Add( m_speed, 1, wxRIGHT, 8 );
     m_step = new wxButton( this, wxID_ANY, _( "Step" ) );
-    m_step->SetToolTip( _( "While paused, advance one slice (20 ms × selected speed), preserving the circuit state." ) );
+    m_step->SetToolTip( _( "While paused, advance by the step duration configured in Real-time Simulation preferences." ) );
     m_step->Bind( wxEVT_BUTTON, [step]( wxCommandEvent& ) { step(); } );
     m_step->Disable(); time->Add( m_step );
     layout->Add( time, 0, wxEXPAND | wxALL, 6 );
@@ -78,9 +83,19 @@ void INSTRUMENT_PANEL::SetPlacement( std::optional<PROBE_KIND> kind )
 void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const EDITOR_SESSION_VIEW& session, bool active )
 {
     m_step->Enable( active && session.state == EDITOR_SESSION_STATE::PAUSED );
-    const double rates[] = { 1, .1, .01, .001 };
-    for( int i = 0; i < 4; ++i )
-        if( session.speed == rates[i] && m_speed->GetSelection() != i ) m_speed->SetSelection( i );
+    auto rate = std::find( m_speedRates.begin(), m_speedRates.end(), session.speed );
+    int speedIndex = rate - m_speedRates.begin();
+    if( rate == m_speedRates.end() )
+    {
+        speedIndex = 4;
+        const auto label = wxString::Format( "%.4g×", session.speed );
+        if( m_speedRates.size() == 4 ) { m_speedRates.push_back( session.speed ); m_speed->Append( label ); }
+        else { m_speedRates[4] = session.speed; m_speed->SetString( 4, label ); }
+    }
+    if( m_speed->GetSelection() != speedIndex ) m_speed->SetSelection( speedIndex );
+    const auto stepTip = wxString::Format( _( "While paused, advance %.3g ms × playback speed, preserving the circuit state." ),
+                                          session.preferences.stepMs );
+    if( !m_step->GetToolTip() || m_step->GetToolTip()->GetTip() != stepTip ) m_step->SetToolTip( stepTip );
     bool values = false, scope = false;
     for( const auto& channel : snapshot.circuit.measurements )
         if( channel.scope ) scope = true; else values = true;
@@ -136,7 +151,7 @@ void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const 
                 m_values->SetItem( row, 1, wxString::FromUTF8( QuantityUnit( channel.quantity ) ) ); m_rows.push_back( channel.name );
             }
             if( m_values->GetItemText( row ) != wxString::FromUTF8( channel.name ) ) m_values->SetItem( row, 0, wxString::FromUTF8( channel.name ) );
-            const auto value = i < session.measurements.size() && session.state != EDITOR_SESSION_STATE::ERROR
+            const auto value = i < session.measurements.size() && session.state != EDITOR_SESSION_STATE::FAILED
                     ? FormatMeasurement( session.measurements[i], channel.quantity ) : "—";
             if( m_values->GetItemText( row, 2 ) != wxString::FromUTF8( value ) ) m_values->SetItem( row, 2, wxString::FromUTF8( value ) );
             ++row;

@@ -5,6 +5,8 @@
 #include "measurements.h"
 #include "logic_signals.h"
 #include "power_rails.h"
+#include "simulation_preferences.h"
+#include "led_appearance.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -37,6 +39,7 @@ struct CIRCUIT_INDICATOR
     double brightnessCurrent = 0.01;
     double ratedCurrent = 0.02;
     std::string reference = {};
+    LED_APPEARANCE appearance = {};
 };
 
 struct CIRCUIT_SWITCH
@@ -45,6 +48,7 @@ struct CIRCUIT_SWITCH
     std::string controlSource;
     double on = 5;
     double off = 0;
+    bool initiallyClosed = true;
 };
 
 struct CIRCUIT_ADJUSTMENT
@@ -76,7 +80,8 @@ struct CIRCUIT_SNAPSHOT
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents,
                                      const std::vector<CIRCUIT_PROBE>& aProbes = {},
                                      bool aPinIndicators = false,
-                                     const std::vector<POWER_SYMBOL>& aPowerSymbols = {} );
+                                     const std::vector<POWER_SYMBOL>& aPowerSymbols = {},
+                                     const SIMULATION_PREFERENCES& aPreferences = {} );
 double ParseComponentValue( const std::string& aValue );
 double LedBrightness( double aForwardCurrent, double aBrightnessCurrent = 0.01 );
 }

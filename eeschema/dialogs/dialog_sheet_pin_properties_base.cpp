@@ -82,7 +82,7 @@ DIALOG_SHEET_PIN_PROPERTIES_BASE::DIALOG_SHEET_PIN_PROPERTIES_BASE( wxWindow* pa
 	m_fontLabel->Wrap( -1 );
 	gbSizer1->Add( m_fontLabel, wxGBPosition( 0, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL|wxLEFT|wxRIGHT, 5 );
 
-	wxString m_fontCtrlChoices[] = { _("Default Font"), _("KiCad Font") };
+	wxString m_fontCtrlChoices[] = { _("Default Font"), _("CircuitAliveEDA Font") };
 	int m_fontCtrlNChoices = sizeof( m_fontCtrlChoices ) / sizeof( wxString );
 	m_fontCtrl = new FONT_CHOICE( formatting->GetStaticBox(), wxID_ANY, wxDefaultPosition, wxDefaultSize, m_fontCtrlNChoices, m_fontCtrlChoices, 0 );
 	m_fontCtrl->SetSelection( 0 );

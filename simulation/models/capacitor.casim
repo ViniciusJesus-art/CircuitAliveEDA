@@ -3,7 +3,7 @@
   "backend": "ngspice",
   "id": "capacitor",
   "name": "Ideal capacitor",
-  "description": "",
+  "description": "Stores charge. Its current depends on how quickly the voltage between its terminals changes.",
   "license": "GPL-3.0-or-later",
   "pins": [
     {
@@ -70,5 +70,9 @@
       "c": "capacitance"
     },
     "only_if_value_invalid": true
-  }
+  },
+  "equations": [
+    "I = C × d(V1 − V2)/dt.",
+    "Charge Q = C × (V1 − V2)."
+  ]
 }

@@ -58,7 +58,7 @@ bool defaultHttpHandler( const REMOTE_PROVIDER_HTTP_REQUEST& aRequest, REMOTE_PR
                          wxString& aError )
 {
     KICAD_CURL_EASY curl;
-    curl.SetUserAgent( "KiCad-RemoteProvider/1.0" );
+    curl.SetUserAgent( "CircuitAliveEDA-RemoteProvider/1.0" );
     curl.SetFollowRedirects( true );
     curl.SetConnectTimeout( 10 );
 

@@ -64,7 +64,7 @@ ID_FINDPREVIOUS = 1
 ID_SHOWTOOLS = 1
 ID_HIDEFOLDINGMARGIN = 1
 
-INTRO = "KiCad - Python Shell"
+INTRO = "CircuitAliveEDA - Python Shell"
 
 class KiCadPyFrame():
 
@@ -74,7 +74,7 @@ class KiCadPyFrame():
         self.parent = parent
         self.parent.CreateStatusBar()
         self.parent.SetStatusText('Frame')
-        self.shellName='KiCad Python Editor'
+        self.shellName='CircuitAliveEDA Python Editor'
         self.__createMenus()
 
         self.iconized = False
@@ -717,7 +717,7 @@ class KiCadPyFrame():
             config.WriteInt('Window/PosY', py)
 
 class KiCadEditorFrame(KiCadPyFrame):
-    def __init__(self, parent=None, id=-1, title='KiCad Python'):
+    def __init__(self, parent=None, id=-1, title='CircuitAliveEDA Python'):
 
         """Create EditorFrame instance."""
         KiCadPyFrame.__init__(self, parent)

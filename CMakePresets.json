@@ -1,6 +1,10 @@
 {
   "version": 3,
-  "cmakeMinimumRequired": { "major": 3, "minor": 22, "patch": 0 },
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 22,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "circuitalive-fedora",
@@ -21,6 +25,7 @@
         "KICAD_VERSION_EXTRA": "CircuitAliveEDA",
         "KICAD_CONFIG_DIR": "circuitalive-eda",
         "KICAD_BUILD_QA_TESTS": true,
+        "KICAD_BUILD_I18N": true,
         "KICAD_SPICE_QA": true,
         "KICAD_SCRIPTING_WXPYTHON": true,
         "KICAD_IPC_API": true,
@@ -42,6 +47,59 @@
         "SWIG_EXECUTABLE": "${sourceDir}/.circuitalive/deps/usr/bin/swig",
         "Protobuf_PROTOC_EXECUTABLE": "${sourceDir}/.circuitalive/deps/usr/bin/protoc"
       }
+    },
+    {
+      "name": "circuitalive-windows-msvc",
+      "displayName": "CircuitAliveEDA — Windows x64 MSVC v143",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-msvc",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/stage/windows-msvc",
+        "DEFAULT_INSTALL_PATH": "${sourceDir}/stage/windows-msvc",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "CMAKE_JOB_POOLS": "link=1",
+        "CMAKE_JOB_POOL_LINK": "link",
+        "VCPKG_TARGET_TRIPLET": "x64-windows",
+        "VCPKG_HOST_TRIPLET": "x64-windows",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/tools/circuitalive/release/triplets",
+        "VCPKG_MANIFEST_MODE": true,
+        "SWIG_EXECUTABLE": "$env{SWIG_EXECUTABLE}",
+        "PYTHON_EXECUTABLE": "${sourceDir}/build/windows-msvc/vcpkg_installed/x64-windows/tools/python3/python.exe",
+        "KICAD_VERSION_EXTRA": "CircuitAliveEDA",
+        "KICAD_CONFIG_DIR": "circuitalive-eda",
+        "KICAD_BUILD_QA_TESTS": true,
+        "KICAD_SPICE_QA": true,
+        "KICAD_BUILD_I18N": true,
+        "KICAD_SCRIPTING_WXPYTHON": true,
+        "KICAD_IPC_API": true,
+        "KICAD_USE_OCC": true,
+        "KICAD_WIN32_DPI_AWARE": true,
+        "KICAD_USE_SENTRY": false,
+        "KICAD_UPDATE_CHECK": false,
+        "KICAD_INSTALL_DEMOS": true,
+        "USE_CCACHE": false,
+        "NGSPICE_ROOT_DIR": "${sourceDir}/build/windows-msvc/vcpkg_installed/x64-windows"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "circuitalive-windows-msvc",
+      "configurePreset": "circuitalive-windows-msvc",
+      "jobs": 2
     }
   ]
 }

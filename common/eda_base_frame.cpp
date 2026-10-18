@@ -87,6 +87,7 @@
 
 #include <functional>
 #include <kiface_ids.h>
+#include <circuitalive_preferences_id.h>
 
 #ifdef KICAD_IPC_API
 #include <api/api_server.h>
@@ -911,7 +912,6 @@ void EDA_BASE_FRAME::AddStandardHelpMenu( wxMenuBar* aMenuBar )
     helpMenu->Add( ACTIONS::gettingStarted );
     helpMenu->Add( ACTIONS::listHotKeys );
     helpMenu->Add( ACTIONS::getInvolved );
-    helpMenu->Add( ACTIONS::donate );
     helpMenu->Add( ACTIONS::reportBug );
 
     helpMenu->AppendSeparator();
@@ -1661,6 +1661,9 @@ void EDA_BASE_FRAME::ShowPreferences( wxString aStartPage, wxString aStartParent
                 book->AddLazySubPage( LAZY_CTOR( PANEL_SCH_FIELD_NAME_TEMPLATES ), _( "Field Name Templates" ) );
                 book->AddLazySubPage( LAZY_CTOR( PANEL_SCH_DATA_SOURCES ), _( "Data Sources" ) );
                 book->AddLazySubPage( LAZY_CTOR( PANEL_SCH_SIMULATOR ), _( "Simulator" ) );
+#ifdef __linux__
+                book->AddLazySubPage( LAZY_CTOR( CIRCUITALIVE::PANEL_REALTIME_SIMULATION ), _( "Real-time Simulation" ) );
+#endif
             }
         }
         catch( ... )

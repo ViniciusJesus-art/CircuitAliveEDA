@@ -317,7 +317,11 @@ SPICEdev cm_ca_memory_info = {
     .DEVsenPrint = NULL,
     .DEVsenTrunc = NULL,
     .DEVdisto = NULL,
+#ifdef CA_NGSPICE_HAS_NOISE
     .DEVnoise = MIFnoise,
+#else
+    .DEVnoise = NULL,
+#endif
     .DEVsoaCheck = NULL,
     .DEVinstSize = &val_sizeofMIFinstance,
     .DEVmodSize = &val_sizeofMIFmodel,

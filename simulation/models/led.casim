@@ -67,6 +67,62 @@
       "unit": "A",
       "min": 1e-06,
       "max": 1
+    },
+    {
+      "id": "color_red",
+      "label": "Display color — red",
+      "default": "255",
+      "unit": "",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "color_green",
+      "label": "Display color — green",
+      "default": "66",
+      "unit": "",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "color_blue",
+      "label": "Display color — blue",
+      "default": "5",
+      "unit": "",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "display_intensity",
+      "label": "Display intensity",
+      "default": "100",
+      "unit": "%",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "circle_diameter",
+      "label": "Overlay circle diameter",
+      "default": "3.4",
+      "unit": "mm",
+      "min": 0,
+      "max": 50
+    },
+    {
+      "id": "halo_diameter",
+      "label": "Overlay halo diameter",
+      "default": "4.6",
+      "unit": "mm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "display_opacity",
+      "label": "Overlay opacity",
+      "default": "80",
+      "unit": "%",
+      "min": 0,
+      "max": 100
     }
   ],
   "spice": {
@@ -95,12 +151,27 @@
     "type": "led",
     "signal": "@d${id}[id]",
     "brightness_parameter": "brightness_current",
-    "rating_parameter": "rated_current"
+    "rating_parameter": "rated_current",
+    "appearance": {
+      "red_parameter": "color_red",
+      "green_parameter": "color_green",
+      "blue_parameter": "color_blue",
+      "intensity_parameter": "display_intensity",
+      "diameter_parameter": "circle_diameter",
+      "halo_diameter_parameter": "halo_diameter",
+      "opacity_parameter": "display_opacity"
+    }
   },
   "measurement_ports": {
     "positive": "a",
     "negative": "k"
   },
   "category": "Semiconductors/LEDs",
-  "family": "LEDs"
+  "family": "LEDs",
+  "equations": [
+    "Forward PN junction with series resistance; current is set by the connected circuit.",
+    "Forward voltage is calibrated at reference_current. Reverse current does not light the LED.",
+    "Brightness and warning currents control visualization and warnings; they do not limit current.",
+    "Display color, intensity, opacity and circle/halo diameters affect only the overlay; electrical current is unchanged. Diameters are in schematic millimeters. Zero diameter hides that circle."
+  ]
 }

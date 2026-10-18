@@ -43,7 +43,7 @@ COLOR_SETTINGS::COLOR_SETTINGS( const wxString& aFilename, bool aAbsolutePath ) 
         SetLocation( SETTINGS_LOC::NONE );
 
     m_params.emplace_back( new PARAM<wxString>( "meta.name", &m_displayName,
-                                                wxS( "KiCad Default" ) ) );
+                                                wxS( "CircuitAliveEDA Default" ) ) );
 
     m_params.emplace_back( new PARAM<bool>( "schematic.override_item_colors",
                                             &m_overrideSchItemColors, false ) );
@@ -443,12 +443,12 @@ void COLOR_SETTINGS::SetColor( int aLayer, const COLOR4D& aColor )
 std::vector<COLOR_SETTINGS*> COLOR_SETTINGS::CreateBuiltinColorSettings()
 {
     COLOR_SETTINGS* defaultTheme = new COLOR_SETTINGS( COLOR_BUILTIN_DEFAULT );
-    defaultTheme->SetName( _( "KiCad Default" ) );
+    defaultTheme->SetName( _( "CircuitAliveEDA Default" ) );
     defaultTheme->m_writeFile = false;
     defaultTheme->Load();   // We can just get the colors out of the param defaults for this one
 
     COLOR_SETTINGS* classicTheme = new COLOR_SETTINGS( COLOR_BUILTIN_CLASSIC );
-    classicTheme->SetName( _( "KiCad Classic" ) );
+    classicTheme->SetName( _( "CircuitAliveEDA Classic" ) );
     classicTheme->m_writeFile = false;
 
     for( PARAM_BASE* param : classicTheme->m_params )

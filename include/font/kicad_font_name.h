@@ -22,6 +22,6 @@
 
 // The "official" name of the building Kicad stroke font (always existing)
 // This is also a keyword, that cannot be translated
-#define KICAD_FONT_NAME wxT( "KiCad Font" )
+#define KICAD_FONT_NAME wxT( "CircuitAliveEDA Font" )
 
 #endif //KICAD_FONT_NAME_H

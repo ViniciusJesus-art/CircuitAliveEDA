@@ -162,7 +162,7 @@ bool DESIGN_BLOCK_IO_MGR::ConvertLibrary( std::map<std::string, UTF8>* aOldFileP
 
 const DESIGN_BLOCK_IO::IO_FILE_DESC DESIGN_BLOCK_IO::GetLibraryDesc() const
 {
-    return IO_BASE::IO_FILE_DESC( _HKI( "KiCad Design Block folders" ), {},
+    return IO_BASE::IO_FILE_DESC( _HKI( "CircuitAliveEDA Design Block folders" ), {},
                                   { FILEEXT::KiCadDesignBlockLibPathExtension }, false );
 }
 

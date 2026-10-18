@@ -300,7 +300,7 @@ void NOTIFICATIONS_MANAGER::Load()
     if( wxGetEnv( wxT( "KICAD_TEST_NOTI" ), nullptr ) )
     {
         CreateOrUpdate( wxS( "test" ), wxS( "Test Notification" ), wxS( "Test please ignore" ),
-                        wxS( "https://kicad.org" ) );
+                        wxS( "https://github.com/ViniciusJesus-art/CircuitAliveEDA" ) );
     }
 }
 

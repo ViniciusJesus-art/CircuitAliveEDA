@@ -38,6 +38,7 @@
 #include <confirm.h>
 #include <bitmaps.h>
 #include <lib_table_grid_data_model.h>
+#include <circuitalive/branding.h>
 #include <wildcards_and_files_ext.h>
 #include <env_paths.h>
 #include <functional>
@@ -109,7 +110,7 @@ public:
             SCH_IO_MGR::SCH_FILE_T pluginType = SCH_IO_MGR::GuessPluginTypeFromLibPath( uri );
 
             if( pluginType != SCH_IO_MGR::SCH_FILE_UNKNOWN )
-                SetValue( aRow, COL_TYPE, SCH_IO_MGR::ShowType( pluginType ) );
+                SetValue( aRow, COL_TYPE, CIRCUITALIVE::LibraryTypeLabel( SCH_IO_MGR::ShowType( pluginType ) ) );
         }
     }
 
@@ -345,14 +346,14 @@ PANEL_SYM_LIB_TABLE::PANEL_SYM_LIB_TABLE( DIALOG_EDIT_LIBRARY_TABLES* aParent, P
     {
         if( type == SCH_IO_MGR::SCH_NESTED_TABLE )
         {
-            m_pluginChoices.Add( SCH_IO_MGR::ShowType( type ) );
+            m_pluginChoices.Add( CIRCUITALIVE::LibraryTypeLabel( SCH_IO_MGR::ShowType( type ) ) );
             continue;
         }
 
         IO_RELEASER<SCH_IO> pi( SCH_IO_MGR::FindPlugin( type ) );
 
         if( pi )
-            m_pluginChoices.Add( SCH_IO_MGR::ShowType( type ) );
+            m_pluginChoices.Add( CIRCUITALIVE::LibraryTypeLabel( SCH_IO_MGR::ShowType( type ) ) );
     }
 
     std::optional<LIBRARY_TABLE*> table = Pgm().GetLibraryManager().Table( LIBRARY_TABLE_TYPE::SYMBOL,
@@ -410,7 +411,7 @@ PANEL_SYM_LIB_TABLE::PANEL_SYM_LIB_TABLE( DIALOG_EDIT_LIBRARY_TABLES* aParent, P
 
     for( auto& [type, desc] : m_supportedSymFiles )
     {
-        wxString entryStr = SCH_IO_MGR::ShowType( type );
+        wxString entryStr = CIRCUITALIVE::LibraryTypeLabel( SCH_IO_MGR::ShowType( type ) );
 
         if( !desc.m_FileExtensions.empty() )
             entryStr << wxString::Format( wxS( " (%s)" ), joinExtensions( desc.m_FileExtensions ) );
@@ -422,7 +423,7 @@ PANEL_SYM_LIB_TABLE::PANEL_SYM_LIB_TABLE( DIALOG_EDIT_LIBRARY_TABLES* aParent, P
         // Add folder-based entry right after KiCad file-based entry
         if( type == SCH_IO_MGR::SCH_KICAD )
         {
-            wxString folderEntry = SCH_IO_MGR::ShowType( SCH_IO_MGR::SCH_KICAD );
+            wxString folderEntry = CIRCUITALIVE::LibraryTypeLabel( SCH_IO_MGR::ShowType( SCH_IO_MGR::SCH_KICAD ) );
             folderEntry << wxString::Format( wxS( " (%s)" ), _( "folder with .kicad_sym files" ) );
             browseMenu->Append( ID_PANEL_SYM_LIB_KICAD_FOLDER, folderEntry );
             browseMenu->Bind( wxEVT_COMMAND_MENU_SELECTED, &PANEL_SYM_LIB_TABLE::browseLibrariesHandler, this,
@@ -561,7 +562,7 @@ void PANEL_SYM_LIB_TABLE::browseLibrariesHandler( wxCommandEvent& event )
     else
         lastDir = &m_lastProjectLibDir;
 
-    wxString       title = wxString::Format( _( "Select %s Library" ), SCH_IO_MGR::ShowType( fileType ) );
+    wxString       title = wxString::Format( _( "Select %s Library" ), CIRCUITALIVE::LibraryTypeLabel( SCH_IO_MGR::ShowType( fileType ) ) );
     wxWindow*      topLevelParent = wxGetTopLevelParent( this );
     wxArrayString  files;
 
@@ -631,7 +632,7 @@ void PANEL_SYM_LIB_TABLE::browseLibrariesHandler( wxCommandEvent& event )
             int last_row = cur_grid()->GetNumberRows() - 1;
 
             cur_grid()->SetCellValue( last_row, COL_NICKNAME, nickname );
-            cur_grid()->SetCellValue( last_row, COL_TYPE, SCH_IO_MGR::ShowType( fileType ) );
+            cur_grid()->SetCellValue( last_row, COL_TYPE, CIRCUITALIVE::LibraryTypeLabel( SCH_IO_MGR::ShowType( fileType ) ) );
 
             // try to use path normalized to an environmental variable or project path
             wxString path = NormalizePath( filePath, &envVars, m_project->GetProjectPath() );
@@ -791,9 +792,9 @@ void PANEL_SYM_LIB_TABLE::onConvertLegacyLibraries( wxCommandEvent& event )
         selectedRows.push_back( cur_grid()->GetGridCursorRow() );
 
     wxArrayInt legacyRows;
-    wxString   databaseType = SCH_IO_MGR::ShowType( SCH_IO_MGR::SCH_DATABASE );
-    wxString   httpType = SCH_IO_MGR::ShowType( SCH_IO_MGR::SCH_HTTP );
-    wxString   kicadType = SCH_IO_MGR::ShowType( SCH_IO_MGR::SCH_KICAD );
+    wxString   databaseType = CIRCUITALIVE::LibraryTypeLabel( SCH_IO_MGR::ShowType( SCH_IO_MGR::SCH_DATABASE ) );
+    wxString   httpType = CIRCUITALIVE::LibraryTypeLabel( SCH_IO_MGR::ShowType( SCH_IO_MGR::SCH_HTTP ) );
+    wxString   kicadType = CIRCUITALIVE::LibraryTypeLabel( SCH_IO_MGR::ShowType( SCH_IO_MGR::SCH_KICAD ) );
     wxString   nestedTableType = LIBRARY_TABLE_ROW::TABLE_TYPE_NAME;
     wxString   msg;
 
@@ -811,19 +812,19 @@ void PANEL_SYM_LIB_TABLE::onConvertLegacyLibraries( wxCommandEvent& event )
 
     if( legacyRows.size() <= 0 )
     {
-        wxMessageBox( _( "Select one or more rows containing libraries to save as current KiCad format." ) );
+        wxMessageBox( _( "Select one or more rows containing libraries to save as current CircuitAliveEDA format." ) );
         return;
     }
     else
     {
         if( legacyRows.size() == 1 )
         {
-            msg.Printf( _( "Save '%s' as current KiCad format (*.kicad_sym) and replace legacy entry in table?" ),
+            msg.Printf( _( "Save '%s' as current CircuitAliveEDA format (*.kicad_sym) and replace legacy entry in table?" ),
                         cur_grid()->GetCellValue( legacyRows[0], COL_NICKNAME ) );
         }
         else
         {
-            msg.Printf( _( "Save %d libraries as current KiCad format (*.kicad_sym) and replace legacy entries "
+            msg.Printf( _( "Save %d libraries as current CircuitAliveEDA format (*.kicad_sym) and replace legacy entries "
                            "in table?" ),
                         (int) legacyRows.size() );
         }

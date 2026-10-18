@@ -93,7 +93,7 @@
             <property name="gripper">0</property>
             <property name="hidden">0</property>
             <property name="id">wxID_ANY</property>
-            <property name="label">KiCad API</property>
+            <property name="label">CircuitAliveEDA API</property>
             <property name="markup">0</property>
             <property name="max_size"></property>
             <property name="maximize_button">0</property>
@@ -223,7 +223,7 @@
                 <property name="gripper">0</property>
                 <property name="hidden">0</property>
                 <property name="id">wxID_ANY</property>
-                <property name="label">When the KiCad API is enabled, plugins and other software running on this computer can connect to KiCad.</property>
+                <property name="label">When the CircuitAliveEDA API is enabled, plugins and other software running on this computer can connect to CircuitAliveEDA.</property>
                 <property name="markup">0</property>
                 <property name="max_size"></property>
                 <property name="maximize_button">0</property>
@@ -286,7 +286,7 @@
                 <property name="gripper">0</property>
                 <property name="hidden">0</property>
                 <property name="id">wxID_ANY</property>
-                <property name="label">Enable KiCad API</property>
+                <property name="label">Enable CircuitAliveEDA API</property>
                 <property name="max_size"></property>
                 <property name="maximize_button">0</property>
                 <property name="maximum_size"></property>
@@ -307,7 +307,7 @@
                 <property name="style"></property>
                 <property name="subclass">; ; forward_declare</property>
                 <property name="toolbar_pane">0</property>
-                <property name="tooltip">Enable the KiCad API.  Doing so will allow third-party software running on your computer to access KiCad.</property>
+                <property name="tooltip">Enable the CircuitAliveEDA API.  Doing so will allow third-party software running on your computer to access CircuitAliveEDA.</property>
                 <property name="validator_data_type"></property>
                 <property name="validator_style">wxFILTER_NONE</property>
                 <property name="validator_type">wxDefaultValidator</property>

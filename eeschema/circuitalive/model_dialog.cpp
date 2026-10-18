@@ -1,8 +1,10 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
+#include "model_i18n.h"
 #include "model_dialog.h"
 #include "resource_dialog.h"
 #include "simulation_model.h"
 #include "model_profiles.h"
+#include "panel_led_appearance.h"
 #include <dialog_shim.h>
 #include <wx/button.h>
 #include "choice_controls.h"
@@ -14,6 +16,7 @@
 #include <wx/msgdlg.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
+#include <wx/notebook.h>
 #include <optional>
 
 namespace CIRCUITALIVE
@@ -31,7 +34,7 @@ public:
         OptOut( this );
         SetInitialFocus( nullptr );
         auto* layout = new wxBoxSizer( wxVERTICAL );
-        layout->Add( new wxStaticText( this, wxID_ANY, wxString::Format( "%s — %s   Value: %s",
+        layout->Add( new wxStaticText( this, wxID_ANY, wxString::Format( _("%s — %s   Value: %s"),
             wxString::FromUTF8( component.reference ), wxString::FromUTF8( component.libraryId ),
             wxString::FromUTF8( component.value ) ) ), 0, wxALL, 10 );
         m_exclude = new wxCheckBox( this, wxID_ANY, _( "Exclude this component from simulation" ) );
@@ -65,14 +68,19 @@ public:
         layout->Add( m_pins, 1, wxEXPAND | wxALL, 10 );
         layout->Add( new wxStaticText( this, wxID_ANY, _( "Parameters — blank uses the model default; $value follows the symbol Value" ) ),
                      0, wxLEFT | wxRIGHT, 10 );
-        m_parameters = new wxGrid( this, wxID_ANY );
+        m_parameterPages=new wxNotebook(this,wxID_ANY);
+        auto* electrical=new wxPanel(m_parameterPages);auto* parameterLayout=new wxBoxSizer(wxVERTICAL);
+        m_parameters = new wxGrid( electrical, wxID_ANY );
         m_parameters->SetMinSize( wxSize( 200, 180 ) );
         m_parameters->CreateGrid( 0, 4 );
         m_parameters->SetColLabelValue( 0, _( "Parameter" ) );
         m_parameters->SetColLabelValue( 1, _( "Value" ) );
         m_parameters->SetColLabelValue( 2, _( "Unit" ) );
         m_parameters->SetColLabelValue( 3, _( "Model default" ) );
-        layout->Add( m_parameters, 2, wxEXPAND | wxALL, 10 );
+        parameterLayout->Add(m_parameters,1,wxEXPAND);electrical->SetSizer(parameterLayout);
+        m_parameterPages->AddPage(electrical,_("Electrical parameters"));
+        m_appearance=new PANEL_LED_APPEARANCE(m_parameterPages);m_appearance->Hide();
+        layout->Add( m_parameterPages, 2, wxEXPAND | wxALL, 10 );
         auto* measurements = new wxBoxSizer( wxVERTICAL );
         auto* checks = new wxBoxSizer( wxHORIZONTAL );
         m_voltage = new wxCheckBox( this, wxID_ANY, _( "Measure V" ) );
@@ -115,7 +123,7 @@ public:
         m_selected = selected;
         if( !excluded ) { selectExternalFile(); load( true ); }
         else m_details->SetLabel( _( "Excluded — no simulation model is required." ) );
-        m_editingControls = { m_choice, chooseModel, automatic, browse, reload, m_files, m_pins, m_parameters,
+        m_editingControls = { m_choice, chooseModel, automatic, browse, reload, m_files, m_pins, m_parameterPages,
             m_voltage, m_current, m_power, m_positive, m_negative, m_remember, forget };
         enableModelControls();
         m_exclude->Bind( wxEVT_CHECKBOX, [this]( wxCommandEvent& )
@@ -141,7 +149,7 @@ public:
             if( picker.ShowModal() != wxID_OK ) return;
             try
             {
-                m_selected = addModel( MODEL_REPOSITORY::Load( picker.GetPath().ToStdString() ) );
+                m_selected = addModel( MODEL_REPOSITORY::Load( picker.GetPath().ToStdString(wxConvUTF8) ) );
                 load( false );
             }
             catch( const std::exception& e ) { showError( e.what() ); }
@@ -219,7 +227,7 @@ private:
         m_models.push_back( std::move( model ) );
         return static_cast<int>( m_models.size() );
     }
-    void showError( const std::string& text ) { wxMessageBox( wxString::FromUTF8( text ), _( "Simulation model" ), wxOK | wxICON_INFORMATION, this ); }
+    void showError( const std::string& text ) { wxMessageBox( DiagnosticText( text ), _( "Simulation model" ), wxOK | wxICON_INFORMATION, this ); }
     void load( bool preserve )
     {
         if( !preserve ) { m_component.modelPins.clear(); m_component.modelParameters.clear(); m_component.resources.clear(); }
@@ -252,10 +260,10 @@ private:
                             ? relative.string() : m_model->file.string();
                 }
             }
-            m_choice->ChangeValue( ( m_selected == 0 ? _( "Automatic: " ) : wxString() ) + wxString::FromUTF8( m_model->name ) );
-            m_details->SetLabel( wxString::FromUTF8( m_model->file.string() + "\n" + m_model->description ) );
+            m_choice->ChangeValue( ( m_selected == 0 ? _( "Automatic: " ) : wxString() ) + ModelText( m_model->name ) );
+            m_details->SetLabel( wxString::FromUTF8( m_model->file.string() ) + "\n" + ModelText( m_model->description ) );
         }
-        catch( const std::exception& e ) { m_choice->ChangeValue( _( "No model selected" ) ); m_details->SetLabel( wxString::FromUTF8( e.what() ) ); }
+        catch( const std::exception& e ) { m_choice->ChangeValue( _( "No model selected" ) ); m_details->SetLabel( DiagnosticText( e.what() ) ); }
         if( m_pins->GetNumberRows() ) m_pins->DeleteRows( 0, m_pins->GetNumberRows() );
         if( m_parameters->GetNumberRows() ) m_parameters->DeleteRows( 0, m_parameters->GetNumberRows() );
         m_positive->Clear(); m_negative->Clear();
@@ -274,14 +282,14 @@ private:
             for( const auto& pin : m_model->pins )
             {
                 const int row = m_pins->GetNumberRows(); m_pins->AppendRows();
-                m_pins->SetCellValue( row, 0, wxString::FromUTF8( pin.label + " [" + pin.id + "]" ) );
-                m_pins->SetCellValue( row, 1, wxString::FromUTF8( pin.role ) );
+                m_pins->SetCellValue( row, 0, ModelText( pin.label ) + " [" + wxString::FromUTF8(pin.id) + "]" );
+                m_pins->SetCellValue( row, 1, ModelText( pin.role ) );
                 auto it = m_component.modelPins.find( pin.id );
                 m_pins->SetCellValue( row, 2, wxString::FromUTF8( it == m_component.modelPins.end() ? pin.defaultPin : it->second ) );
                 m_pins->SetReadOnly( row, 0 ); m_pins->SetReadOnly( row, 1 );
                 m_pins->SetCellEditor( row, 2, new CLICK_CHOICE_EDITOR( physical, false ) );
-                m_positive->Append( wxString::FromUTF8( pin.label + " [" + pin.id + "]" ) );
-                m_negative->Append( wxString::FromUTF8( pin.label + " [" + pin.id + "]" ) );
+                m_positive->Append( ModelText( pin.label ) + " [" + wxString::FromUTF8(pin.id) + "]" );
+                m_negative->Append( ModelText( pin.label ) + " [" + wxString::FromUTF8(pin.id) + "]" );
             }
             auto choose = [&]( CLICK_CHOICE* choice, const std::string& selected, const std::string& fallback, int defaultIndex )
             {
@@ -297,7 +305,7 @@ private:
             for( const auto& parameter : m_model->parameters )
             {
                 const int row = m_parameters->GetNumberRows(); m_parameters->AppendRows();
-                m_parameters->SetCellValue( row, 0, wxString::FromUTF8( parameter.label ) );
+                m_parameters->SetCellValue( row, 0, ModelText( parameter.label ) );
                 auto it = m_component.modelParameters.find( parameter.id );
                 auto value = it == m_component.modelParameters.end() ? std::string() : it->second;
                 if( value.empty() && inherited.contains( parameter.id ) && inherited.at( parameter.id ) != parameter.defaultValue )
@@ -315,6 +323,24 @@ private:
         m_parameters->SetColSize( 0, 350 );
         m_parameters->SetColSize( 1, 130 );
         m_parameters->SetColSize( 3, 130 );
+        if(m_model&&m_model->ledAppearance.Configurable())
+        {
+            m_appearance->Configure(*m_model,[this](const std::string& id)
+            {
+                for(std::size_t r=0;r<m_model->parameters.size();++r)if(m_model->parameters[r].id==id)
+                {
+                    const auto& p=m_model->parameters[r];const auto raw=m_parameters->GetCellValue(r,1).ToStdString(wxConvUTF8);
+                    try{return ParseComponentValue(raw.empty()?p.defaultValue:raw);}catch(const std::exception&){return ParseComponentValue(p.defaultValue);}
+                }
+                throw std::runtime_error("Unknown LED appearance parameter");
+            },[this](const std::string& id,const std::string& value)
+            {for(std::size_t r=0;r<m_model->parameters.size();++r)if(m_model->parameters[r].id==id)m_parameters->SetCellValue(r,1,wxString::FromUTF8(value));});
+            for(std::size_t r=0;r<m_model->parameters.size();++r)
+                if(std::find(m_model->ledAppearance.ids.begin(),m_model->ledAppearance.ids.end(),m_model->parameters[r].id)!=m_model->ledAppearance.ids.end())m_parameters->HideRow(r);
+            if(m_parameterPages->GetPageCount()==1)
+            {m_appearance->Show();m_parameterPages->AddPage(m_appearance,_("LED appearance"));}
+        }
+        else if(m_parameterPages->GetPageCount()>1){m_parameterPages->RemovePage(1);m_appearance->Hide();}
         m_files->Show(m_model && !m_model->resources.empty());
         m_details->Wrap( 830 ); Layout();
     }
@@ -337,9 +363,9 @@ private:
             selected.negative = m_model->pins.at( m_negative->GetSelection() ).id;
         }
         for( std::size_t i = 0; i < m_model->pins.size(); ++i )
-            m_component.modelPins[m_model->pins[i].id] = m_pins->GetCellValue( i, 2 ).ToStdString();
+            m_component.modelPins[m_model->pins[i].id] = m_pins->GetCellValue( i, 2 ).ToStdString(wxConvUTF8);
         for( std::size_t i = 0; i < m_model->parameters.size(); ++i )
-            if( auto value = m_parameters->GetCellValue( i, 1 ).ToStdString(); !value.empty() )
+            if( auto value = m_parameters->GetCellValue( i, 1 ).ToStdString(wxConvUTF8); !value.empty() )
                 m_component.modelParameters[m_model->parameters[i].id] = value;
     }
     CIRCUIT_COMPONENT m_component;
@@ -352,6 +378,8 @@ private:
     wxStaticText* m_details;
     wxGrid* m_pins;
     wxGrid* m_parameters;
+    wxNotebook* m_parameterPages;
+    PANEL_LED_APPEARANCE* m_appearance;
     wxCheckBox *m_voltage, *m_current, *m_power;
     CLICK_CHOICE *m_positive, *m_negative;
     wxCheckBox* m_remember;
