@@ -186,8 +186,9 @@ consultas e futuras atualizações deliberadas; não acompanhe automaticamente o
 HEAD da branch `10.0`. Use a tag registrada em [BASELINE.json](BASELINE.json).
 
 O histórico Git do upstream é mantido, junto com os commits de configuração
-reaplicados na base estável. A branch local `circuitalive/main` preserva o estado
-anterior à migração para consulta. O fork público anterior é conservado como
+reaplicados na base estável. O histórico anterior de `circuitalive/main` e o
+trabalho Windows foram consolidados em `main`; os estados anteriores continuam
+acessíveis pelo histórico Git. O fork público anterior é conservado como
 arquivo, com o nome `CircuitAliveEDA-upstream-fork`; novos commits do projeto
 são enviados somente ao `origin` privado.
 O workflow `lockdown.yml` do espelho oficial foi removido: ele fechava e
