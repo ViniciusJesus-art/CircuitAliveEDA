@@ -61,6 +61,11 @@ else:
       directory=Path('/usr/share')/base/package
       if directory.exists():shutil.copytree(directory,app/'share'/base/package,dirs_exist_ok=True,ignore=ignore)
     (app/'DEPENDENCIES.txt').write_text(subprocess.check_output(['rpm','-q','--qf','%{NAME} %{VERSION}-%{RELEASE} source=%{SOURCERPM}\n',*sorted(packages)],text=True))
+# The upstream APPDIR integration expects usr/bin and the Debian plugin layout.
+for alias,target in ((app/'usr/bin',app/'bin'),(app/'usr/share',app/'share'),
+                     (app/'usr/lib64',app/'lib64'),(app/'usr/lib/x86_64-linux-gnu',app/'lib64')):
+    alias.parent.mkdir(parents=True,exist_ok=True)
+    if not alias.exists():alias.symlink_to(os.path.relpath(target,alias.parent),target_is_directory=True)
 native_python=app/'lib64'/python_version
 combined_python=app/'lib'/python_version
 if native_python.is_dir() and not native_python.is_symlink():
@@ -78,6 +83,8 @@ bundle_root="$(cd -- "$(dirname -- "$bundle_file")" && pwd -P)"
 export LD_LIBRARY_PATH="$bundle_root/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export PYTHONHOME="$bundle_root"
 export PYTHONPATH="$bundle_root/lib/'''+python_version+'''/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+export APPDIR="$bundle_root"
+export KICAD_STOCK_DATA_HOME="$bundle_root/share/kicad"
 export KICAD10_SYMBOL_DIR="$bundle_root/share/kicad/symbols"
 export KICAD10_FOOTPRINT_DIR="$bundle_root/share/kicad/footprints"
 export KICAD10_3DMODEL_DIR="$bundle_root/share/kicad/3dmodels"
@@ -126,13 +133,13 @@ if not rpm_alias.exists():rpm_alias.symlink_to(work,target_is_directory=True)
 if rpm_alias.resolve()!=work.resolve():raise SystemExit('RPM build alias is occupied')
 rpmdir=rpm_alias/'rpmbuild'
 for directory in ('BUILD','BUILDROOT','RPMS','SOURCES','SPECS','SRPMS'):(rpmdir/directory).mkdir(parents=True,exist_ok=True)
-spec=rpmdir/'SPECS/circuitaliveeda.spec';numeric=args.version.split('-')[0]
+spec=rpmdir/'SPECS/circuitaliveeda.spec';numeric=args.version.split('-')[0];alpha=args.version.split('-alpha.')[1]
 spec.write_text(f'''%global debug_package %{{nil}}
 %global __os_install_post %{{nil}}
 %global _binary_payload w9T2.zstdio
 Name: circuitaliveeda
 Version: {numeric}
-Release: 0.alpha.1.fc44
+Release: 0.alpha.{alpha}.fc44
 Summary: CircuitAliveEDA with interactive circuit simulation
 License: GPL-3.0-or-later AND BSD-3-Clause AND LGPL-2.1-or-later
 URL: https://github.com/ViniciusJesus-art/CircuitAliveEDA
