@@ -29,6 +29,8 @@ jobs:
         with:
           path: D:/ca-tools/binary-cache
           key: windows-msvc-v143-${{ hashFiles('vcpkg*.json', 'tools/circuitalive/release/windows-toolchain.json', 'tools/circuitalive/release/triplets/*.cmake') }}
+      - name: Check toolchain initialization against Developer PowerShell overrides
+        run: ./qa/tests/cli/test_windows_toolchain.ps1
       - name: Prepare Visual Studio, vcpkg and SWIG
         run: ./tools/circuitalive/release/build-windows.ps1 -Phase setup
       - name: Configure dependencies and applications

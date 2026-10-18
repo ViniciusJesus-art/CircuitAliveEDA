@@ -15,11 +15,6 @@ $root = (Resolve-Path "$PSScriptRoot/../../..").Path
 Set-Location $root
 if (!$ToolsRoot) { $ToolsRoot = Join-Path $env:LOCALAPPDATA 'CircuitAliveEDA/tools' }
 $lock = Get-Content "$PSScriptRoot/windows-toolchain.json" -Raw | ConvertFrom-Json
-$env:VCPKG_ROOT = Join-Path $ToolsRoot 'vcpkg'
-$env:SWIG_EXECUTABLE = Join-Path $ToolsRoot "swigwin-$($lock.swigVersion)/swig.exe"
-$env:VCPKG_DEFAULT_BINARY_CACHE = Join-Path $ToolsRoot 'binary-cache'
-# Compiler-tracked local cache only: no MinGW or untracked feed packages.
-$env:VCPKG_BINARY_SOURCES = 'clear;default'
 $build = Join-Path $root 'build/windows-msvc'
 $prefix = Join-Path $build 'vcpkg_installed/x64-windows'
 $python = Join-Path $prefix 'tools/python3/python.exe'
@@ -80,6 +75,14 @@ function Validate-Project {
 }
 
 Import-Msvc
+# Developer PowerShell replaces VCPKG_ROOT with Visual Studio's bundled copy.
+# Apply our pinned toolchain paths after importing it, for every build phase.
+$env:VCPKG_ROOT = Join-Path $ToolsRoot 'vcpkg'
+$env:SWIG_EXECUTABLE = Join-Path $ToolsRoot "swigwin-$($lock.swigVersion)/swig.exe"
+$env:VCPKG_DEFAULT_BINARY_CACHE = Join-Path $ToolsRoot 'binary-cache'
+# Compiler-tracked local cache only: no MinGW or untracked feed packages.
+$env:VCPKG_BINARY_SOURCES = 'clear;default'
+Write-Host "Using project vcpkg: $env:VCPKG_ROOT"
 if ($Phase -in @('all', 'setup')) { Initialize-Tools }
 if ($Phase -in @('all', 'configure')) { Configure-Project }
 if ($Phase -in @('all', 'validate', 'build')) { Validate-Project }
