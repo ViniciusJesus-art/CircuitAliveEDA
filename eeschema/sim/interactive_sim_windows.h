@@ -36,18 +36,22 @@ struct INTERACTIVE_SIM_SESSION::IMPL
         HANDLE errors=CreateFileW(L"NUL",GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,&security,OPEN_EXISTING,0,nullptr);
         struct CHILD_HANDLES{HANDLE first,second;~CHILD_HANDLES(){CloseHandle(first);if(second!=INVALID_HANDLE_VALUE)CloseHandle(second);}} handles{child,errors};
         if(errors==INVALID_HANDLE_VALUE)throw std::runtime_error("Cannot prepare simulation worker spawn");
+        HANDLE output=INVALID_HANDLE_VALUE;
+        if(!DuplicateHandle(GetCurrentProcess(),child,GetCurrentProcess(),&output,0,TRUE,DUPLICATE_SAME_ACCESS))
+            throw std::runtime_error("Cannot prepare simulation worker spawn");
+        CHILD_HANDLES outputHandle{output,INVALID_HANDLE_VALUE};
         // Restrict inheritance to protocol and stderr handles, even in a multithreaded GUI.
         SIZE_T bytes=0;InitializeProcThreadAttributeList(nullptr,1,0,&bytes);
         std::vector<unsigned char> storage(bytes);
         auto* attributes=reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
         if(!InitializeProcThreadAttributeList(attributes,1,0,&bytes))throw std::runtime_error("Cannot prepare simulation worker spawn");
         struct ATTRIBUTE_CLEANUP{LPPROC_THREAD_ATTRIBUTE_LIST value;~ATTRIBUTE_CLEANUP(){DeleteProcThreadAttributeList(value);}} cleanup{attributes};
-        HANDLE inherited[]={child,errors};
+        HANDLE inherited[]={child,output,errors};
         if(!UpdateProcThreadAttribute(attributes,0,PROC_THREAD_ATTRIBUTE_HANDLE_LIST,inherited,sizeof(inherited),nullptr,nullptr))
             throw std::runtime_error("Cannot prepare simulation worker spawn");
         STARTUPINFOEXW startup{};startup.StartupInfo.cb=sizeof(startup);
         startup.StartupInfo.dwFlags=STARTF_USESTDHANDLES;
-        startup.StartupInfo.hStdInput=startup.StartupInfo.hStdOutput=child;startup.StartupInfo.hStdError=errors;
+        startup.StartupInfo.hStdInput=child;startup.StartupInfo.hStdOutput=output;startup.StartupInfo.hStdError=errors;
         startup.lpAttributeList=attributes;
         const auto executable=std::filesystem::path(std::u8string(workerPath.begin(),workerPath.end())).wstring();
         std::wstring command=L"\""+executable+L"\"";

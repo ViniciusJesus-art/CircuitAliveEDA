@@ -31,6 +31,13 @@
 include( ${KICAD_CMAKE_MODULE_PATH}/CreateGitVersionHeader.cmake )
 create_git_version_header( ${SRC_PATH} )
 
+if(CIRCUITALIVE_RELEASE_VERSION)
+    if(NOT CIRCUITALIVE_RELEASE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+-alpha\\.[0-9]+$")
+        message(FATAL_ERROR "Invalid CircuitAliveEDA alpha release version")
+    endif()
+    set(KICAD_VERSION "${CIRCUITALIVE_RELEASE_VERSION}")
+endif()
+
 # $KICAD_VERSION is set in KiCadVersion.cmake or by git (if it is available).
 set( KICAD_VERSION_FULL "${KICAD_VERSION}" )
 
