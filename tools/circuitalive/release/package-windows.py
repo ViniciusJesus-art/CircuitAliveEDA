@@ -75,3 +75,8 @@ script.unlink()
 smoke=root/'installer-smoke'
 subprocess.run([str(installer),'/S',f'/D={smoke}'],check=True,timeout=1200)
 subprocess.run([str(smoke/'bin/kicad-cli.exe'),'version'],check=True,timeout=60)
+subprocess.run([sys.executable,str(root/'tools/circuitalive/release/prepare-runtime.py'),
+               str(smoke/'bin'),str(smoke/'bin/ngspice')],check=True)
+subprocess.run([sys.executable,str(root/'tools/circuitalive/release/smoke-worker.py'),
+               str(smoke/'bin/circuitalive-sim-worker.exe'),'--scripts',str(smoke/'bin/ngspice/scripts')],
+               check=True,timeout=150)

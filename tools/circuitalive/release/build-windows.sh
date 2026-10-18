@@ -18,6 +18,8 @@ cmake --build build/windows --parallel 2 --target qa_interactive_sim
 python tools/circuitalive/release/prepare-runtime.py build/windows/eeschema/sim "$MINGW_PREFIX/lib/ngspice"
 export SPICE_SCRIPTS="$(cygpath -m "$PWD/build/windows/eeschema/sim/ngspice/scripts")"
 build/windows/qa/tests/spice/qa_interactive_sim.exe --report_level=short --log_level=error
+# The complete interactive regression has passed; build the shipping applications.
+cmake -S . -B build/windows -DKICAD_BUILD_QA_TESTS=OFF
 cmake --build build/windows --parallel 2
 cmake --install build/windows
 python tools/circuitalive/release/package-windows.py stage "$MINGW_PREFIX" "$release_version"

@@ -95,7 +95,7 @@ export SPICE_SCRIPTS="${XDG_CACHE_HOME:-$HOME/.cache}/circuitaliveeda/ngspice"
 mkdir -p "$SPICE_SCRIPTS"
 {
  printf '* CircuitAliveEDA bundled runtime\\nunset osdi_enabled\\nset num_threads=2\\n'
- for model in "$bundle_root"/bin/ngspice/*.cm; do printf 'codemodel "%s"\\n' "$model"; done
+ for model in "$bundle_root"/bin/ngspice/*.cm; do printf "codemodel '%s'\\n" "$model"; done
 } > "$SPICE_SCRIPTS/spinit"
 app=kicad
 case "${1:-}" in
@@ -123,11 +123,20 @@ Terminal=false
 EOF
 printf 'CircuitAliveEDA installed in %s\\n' "$destination"
 ''');install.chmod(0o755)
+# Strip only packaged ELF copies; retain dynamic exports used by plugins/Python.
+for binary in app.rglob('*'):
+    if binary.is_file() and not binary.is_symlink():
+        with binary.open('rb') as stream:is_elf=stream.read(4)==b'\x7fELF'
+        if is_elf and os.access(binary,os.W_OK):subprocess.run(['strip','--strip-unneeded',str(binary)],check=True)
 # Smoke-test relocated compiled binaries with the same launcher shipped to users.
 smoke_env=dict(os.environ)
 for name in ('LD_LIBRARY_PATH','PYTHONPATH','PYTHONHOME','KICAD_RUN_FROM_BUILD_DIR'):smoke_env.pop(name,None)
 smoke_env.update(XDG_CACHE_HOME=str(work/'smoke/cache'),XDG_DATA_HOME=str(work/'smoke/data'),KICAD_CONFIG_HOME=str(work/'smoke/config'),KICAD_CACHE_HOME=str(work/'smoke/cache'),KICAD_DOCUMENTS_HOME=str(work/'smoke/documents'),PATH='/usr/bin:/bin')
 subprocess.run([str(launcher),'cli','version'],check=True,timeout=60,env=smoke_env)
+smoke_env['LD_LIBRARY_PATH']=str(app/'lib64')
+subprocess.run([sys.executable,str(root/'tools/circuitalive/release/smoke-worker.py'),
+               str(app/'bin/circuitalive-sim-worker'),'--scripts',str(work/'smoke/cache/circuitaliveeda/ngspice')],
+               check=True,timeout=150,env=smoke_env)
 rpm_alias=Path('/tmp')/('circuitalive-rpm-'+str(os.getuid())+'-'+hashlib.sha256(str(work).encode()).hexdigest()[:12])
 if not rpm_alias.exists():rpm_alias.symlink_to(work,target_is_directory=True)
 if rpm_alias.resolve()!=work.resolve():raise SystemExit('RPM build alias is occupied')
