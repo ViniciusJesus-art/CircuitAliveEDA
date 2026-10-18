@@ -7,23 +7,31 @@
 
 #include <cerrno>
 #include <cstring>
-#include <fcntl.h>
 #include <mutex>
+#include <thread>
+#ifdef _WIN32
+#include <windows.h>
+#include <atomic>
+#include <filesystem>
+#else
+#include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
 #include <spawn.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
-#include <thread>
 #include <unistd.h>
-
 extern char** environ;
+#endif
 
 namespace CIRCUITALIVE
 {
 using namespace PROTOCOL;
 using CLOCK = std::chrono::steady_clock;
 
+#ifdef _WIN32
+#include "interactive_sim_windows.h"
+#else
 struct INTERACTIVE_SIM_SESSION::IMPL
 {
     mutable std::mutex        mutex;
@@ -212,6 +220,8 @@ struct INTERACTIVE_SIM_SESSION::IMPL
     }
 };
 
+#endif
+
 INTERACTIVE_SIM_SESSION::INTERACTIVE_SIM_SESSION(
         const std::string& aWorkerExecutable, std::chrono::milliseconds aTimeout ) :
         m_impl( std::make_unique<IMPL>( aTimeout ) )
@@ -233,6 +243,13 @@ void INTERACTIVE_SIM_SESSION::Configure( const std::string& aNetlist,
                       { "step", aConfig.step }, { "horizon", aConfig.horizon },
                       { "max_step", aConfig.maxStep }, { "uic", aConfig.useInitialConditions },
                       { "capacity", aConfig.historyCapacity }, { "signals", aConfig.signals } };
+    request["activity_monitors"] = JSON::array();
+    for( const auto& monitor : aConfig.activityMonitors )
+        request["activity_monitors"].push_back( {
+                { "signal", monitor.signal }, { "reference", monitor.reference },
+                { "supply", monitor.supply }, { "low", monitor.low }, { "high", monitor.high },
+                { "default_supply", monitor.defaultSupply }, { "min_supply", monitor.minSupply },
+                { "max_supply", monitor.maxSupply } } );
     request["memories"]=JSON::array();
     for(const auto& region:aConfig.memories)request["memories"].push_back({{"id",region.id},{"label",region.label},
         {"word_bits",region.wordBits},{"writable",region.writable},{"data",MemoryHex(region.initial.data)},{"known",MemoryHex(region.initial.known)}});
@@ -319,6 +336,10 @@ SIM_SESSION_SNAPSHOT INTERACTIVE_SIM_SESSION::Snapshot( bool aDrainHistory )
     result.engineRetainedPoints = response.at( "retained" );
     result.residentBytes = response.at( "resident_bytes" );
     result.error = response.at( "error" );
+    if( response.contains( "activity" ) )
+        for( const auto& activity : response.at( "activity" ) )
+            result.activity.push_back( { activity.at( "period" ), activity.at( "last_transition" ),
+                                         activity.at( "high_value" ) } );
 
     for( const auto& sample : response.at( "history" ) )
         result.history.push_back( { sample.at( "time" ), sample.at( "values" ).get<std::vector<double>>() } );

@@ -5,14 +5,14 @@
 #include <circuitalive/model_profiles.h>
 #include <filesystem>
 #include <fstream>
-#include <unistd.h>
+#include <sim/platform_runtime.h>
 
 using namespace CIRCUITALIVE;
 namespace fs = std::filesystem;
 
 struct MODEL_FILES
 {
-    fs::path directory = fs::temp_directory_path() / ( "circuitalive-models-" + std::to_string( getpid() ) );
+    fs::path directory = fs::temp_directory_path() / ( "circuitalive-models-" + std::to_string( CIRCUITALIVE::ProcessId() ) );
     MODEL_FILES() { fs::create_directories( directory ); }
     ~MODEL_FILES() { std::error_code error; fs::remove_all( directory, error ); }
     fs::path Write( const std::string& name, const std::string& text )
@@ -255,6 +255,52 @@ BOOST_AUTO_TEST_CASE( LedParametersArePerInstanceAndCurrentIsCalculatedByTheCirc
     BOOST_CHECK_LE( session.Snapshot().latest.values.at( 1 ), 0 );
 }
 
+BOOST_AUTO_TEST_CASE( LedAppearanceIsPerInstanceAndDoesNotChangeTheElectricalCircuit )
+{
+    std::vector<CIRCUIT_COMPONENT> parts={
+        {"V1","Simulation_SPICE:VDC","5",{{"1","supply"},{"2","0"}}},
+        {"R1","Device:R","470",{{"1","supply"},{"2","anode"}}},
+        {"D1","Device:LED","LED",{{"1","0"},{"2","anode"}}},
+        {"R2","Device:R","470",{{"1","supply"},{"2","anode2"}}},
+        {"D2","Device:LED","LED",{{"1","0"},{"2","anode2"}}}};
+    const auto original=BuildCircuitSnapshot(parts);
+    parts[2].modelParameters={{"color_red","0"},{"color_green","255"},{"color_blue","40"},
+        {"display_intensity","25"},{"circle_diameter","7"},{"halo_diameter","10"},{"display_opacity","60"}};
+    const auto changed=BuildCircuitSnapshot(parts);BOOST_CHECK_EQUAL(original.netlist,changed.netlist);
+    const auto& appearance=changed.leds[0].appearance;
+    BOOST_CHECK_EQUAL(appearance.red,0);BOOST_CHECK_EQUAL(appearance.green,1);
+    BOOST_CHECK_CLOSE(appearance.blue,40./255,1e-9);BOOST_CHECK_EQUAL(appearance.intensity,.25);
+    BOOST_CHECK_EQUAL(appearance.diameterMm,7);BOOST_CHECK_EQUAL(appearance.haloDiameterMm,10);
+    BOOST_CHECK_EQUAL(appearance.opacity,.6);BOOST_CHECK_EQUAL(changed.leds[1].appearance.red,1);
+    BOOST_CHECK_EQUAL(changed.leds[1].appearance.diameterMm,3.4);
+    auto display=LedDisplay(1,appearance);BOOST_CHECK_EQUAL(display.level,.25);BOOST_CHECK_EQUAL(display.red,0);
+    BOOST_CHECK_GT(display.green,display.blue);BOOST_CHECK_GT(display.haloOpacity,0);
+    display=LedDisplay(0,appearance);BOOST_CHECK_EQUAL(display.level,0);BOOST_CHECK_EQUAL(display.haloOpacity,0);
+    auto invisible=appearance;invisible.opacity=0;display=LedDisplay(1,invisible);
+    BOOST_CHECK_EQUAL(display.fillOpacity,0);BOOST_CHECK_EQUAL(display.strokeOpacity,0);BOOST_CHECK_EQUAL(display.haloOpacity,0);
+    invisible=appearance;invisible.intensity=0;BOOST_CHECK_EQUAL(LedDisplay(1,invisible).level,0);
+    MODEL_REPOSITORY repository;
+    for(const auto& [id,value]:std::vector<std::pair<std::string,std::string>>{
+        {"color_red","256"},{"color_green","-1"},{"display_intensity","101"},
+        {"circle_diameter","-1"},{"halo_diameter","101"},{"display_opacity","101"}})
+    {
+        auto bad=parts[2];bad.modelParameters[id]=value;BOOST_CHECK_THROW(repository.Resolve(bad),std::runtime_error);
+    }
+}
+BOOST_AUTO_TEST_CASE( LegacyLedModelsRetainDefaultAppearanceWithoutNewMetadata )
+{
+    const auto model=MODEL_REPOSITORY::LoadText(R"MODEL({
+      "schema_version":1,"backend":"ngspice","id":"legacy_led","name":"Legacy LED",
+      "pins":[{"id":"a","label":"Anode","role":"passive","default_pin":"1"},{"id":"k","label":"Cathode","role":"passive","default_pin":"2"}],
+      "parameters":[{"id":"brightness","label":"Brightness current","default":"10m","min":0.000001,"max":1}],
+      "spice":{"instance":["D${id} ${pin:a} ${pin:k} d${id}"],"definitions":[".model d${id} D"]},
+      "indicator":{"type":"led","signal":"@d${id}[id]","brightness_parameter":"brightness"}
+    })MODEL");
+    BOOST_CHECK(!model.ledAppearance.Configurable());
+    const auto appearance=ResolveLedAppearance(model.ledAppearance,{});
+    BOOST_CHECK_EQUAL(appearance.diameterMm,3.4);BOOST_CHECK_EQUAL(appearance.haloDiameterMm,4.6);
+    BOOST_CHECK_EQUAL(appearance.intensity,1);BOOST_CHECK_EQUAL(appearance.opacity,.8);
+}
 BOOST_AUTO_TEST_CASE( LedForwardVoltageIsCalibratedAtItsConfiguredReferenceCurrent )
 {
     for( const auto& value : { "1.2", "2.194", "3.2", "3.6", "4", "6" } )

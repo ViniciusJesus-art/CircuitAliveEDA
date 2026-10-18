@@ -9,5 +9,5 @@ Exec=bitmap2component %f
 StartupWMClass=bitmap2component
 Name=CircuitAliveEDA Image Converter
 GenericName=Bitmap to Component Converter
-Comment=Create a component from a bitmap for use with KiCad
+Comment=Create a component from a bitmap for use with CircuitAliveEDA
 X-AppStream-Ignore=true

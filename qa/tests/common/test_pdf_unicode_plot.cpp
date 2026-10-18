@@ -88,8 +88,8 @@ BOOST_AUTO_TEST_CASE( PlotMultilingualAllStylesMappings )
     std::string buffer; BOOST_REQUIRE( ReadPdfWithDecompressedStreams( pdfPath, buffer ) );
     BOOST_CHECK( buffer.rfind( "%PDF", 0 ) == 0 );
 
-    // Count how many distinct KiCadStrokeCMap names present; expect at least 4 (one per style).
-    int cmapCount = CountOccurrences( buffer, "/CMapName /KiCadStrokeCMap" );
+    // Count how many distinct CircuitAliveEDAStrokeCMap names present; expect at least 4 (one per style).
+    int cmapCount = CountOccurrences( buffer, "/CMapName /CircuitAliveEDAStrokeCMap" );
 
     BOOST_CHECK_MESSAGE( cmapCount >= 4, "Expected at least 4 CMaps (got " << cmapCount << ")" );
 
@@ -439,7 +439,7 @@ BOOST_AUTO_TEST_CASE( PlotOutlineFontEmbedding )
                          "BaseFont should reference Noto Sans subset" );
     BOOST_CHECK_MESSAGE( buffer.find( "00E9" ) != std::string::npos,
                          "ToUnicode map should include Latin character with accent" );
-    BOOST_CHECK_MESSAGE( buffer.find( "/KiCadOutline" ) != std::string::npos,
+    BOOST_CHECK_MESSAGE( buffer.find( "/CircuitAliveEDAOutline" ) != std::string::npos,
                          "Outline font resource entry missing" );
 
     // Optional: rasterize PDF to image (requires poppler 'pdftoppm').

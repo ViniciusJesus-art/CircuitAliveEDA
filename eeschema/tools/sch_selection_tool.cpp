@@ -3515,7 +3515,7 @@ void SCH_SELECTION_TOOL::ZoomFitCrossProbeBBox( const BOX2I& aBBox )
         ratio = kicadRatio;
         compRatioBent = 1.0; // Reset so we don't modify the "KiCad" ratio
         wxLogTrace( "CROSS_PROBE_SCALE",
-                    "Part TOO WIDE for screen.  Using normal KiCad zoom ratio: %1.5f", ratio );
+                    "Part TOO WIDE for screen.  Using normal CircuitAliveEDA zoom ratio: %1.5f", ratio );
     }
 
     // Now that "compRatioBent" holds our final scaling factor we apply it to the original

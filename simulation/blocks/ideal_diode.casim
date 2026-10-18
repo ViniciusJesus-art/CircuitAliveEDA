@@ -1,0 +1,60 @@
+{
+  "id": "ideal_diode",
+  "name": "DIODE (piecewise linear)",
+  "family": "Ideal analog primitives",
+  "description": "A simple one-way current condition. Forward conduction starts above the configured forward drop; reverse current is limited by the off resistance. Use Generic silicon diode for exponential conduction, breakdown, junction capacitance and transit time.",
+  "equations": [
+    "IF V(A,K) > Vf: I = (V(A,K) - Vf) / Ron.",
+    "ELSE: forward current is zero; reverse leakage is V(A,K) / Roff."
+  ],
+  "pins": [
+    {
+      "id": "a",
+      "label": "Anode A",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "k",
+      "label": "Cathode K",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "forward_voltage",
+      "label": "Forward drop",
+      "default": "0.7V",
+      "unit": "V",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "ron",
+      "label": "On resistance",
+      "default": "0.5",
+      "unit": "Ohm",
+      "min": 1e-06,
+      "max": 1000000000.0
+    },
+    {
+      "id": "roff",
+      "label": "Off resistance",
+      "default": "1e12",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Bdiode_${id} ${pin:a} ${pin:k} I={max(v(${pin:a},${pin:k})-${param:forward_voltage},0)/${param:ron}+min(v(${pin:a},${pin:k}),0)/${param:roff}}"
+    ]
+  },
+  "schema_version": 1,
+  "backend": "ngspice",
+  "license": "GPL-3.0-or-later",
+  "ignore_legacy_spice_fields": true,
+  "category": "Building blocks/Ideal primitives"
+}

@@ -95,7 +95,7 @@ TOOL_ACTION GERBVIEW_ACTIONS::exportToPcbnew( TOOL_ACTION_ARGS()
         .Name( "gerbview.Control.exportToPcbnew" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Export to PCB Editor..." ) )
-        .Tooltip( _( "Export data as a KiCad PCB file" ) )
+        .Tooltip( _( "Export data as a CircuitAliveEDA PCB file" ) )
         .Icon( BITMAPS::export_to_pcbnew ) );
 
 TOOL_ACTION GERBVIEW_ACTIONS::clearLayer( TOOL_ACTION_ARGS()

@@ -13,17 +13,51 @@
 #include <circuitalive/probe_placement.h>
 #include <circuitalive/model_profiles.h>
 #include <circuitalive/simulation_model.h>
+#include <circuitalive/visual_signals.h>
+#include <eeschema_settings.h>
 #include <filesystem>
 #include <fstream>
 #include <cmath>
 #include <algorithm>
 #include <cstdlib>
-#include <unistd.h>
+#include <sim/platform_runtime.h>
 #include <connection_graph.h>
 #include <sch_pin.h>
 #include <base_units.h>
 
 using namespace CIRCUITALIVE;
+
+BOOST_AUTO_TEST_CASE( RealtimeSimulationPreferencesPersistAndOlderSettingsKeepDefaults )
+{
+    struct DIRECTORY
+    {
+        std::filesystem::path path = std::filesystem::temp_directory_path()
+                / ( "ca-simulation-preferences-" + std::to_string( CIRCUITALIVE::ProcessId() ) );
+        DIRECTORY() { std::filesystem::create_directories( path ); }
+        ~DIRECTORY() { std::error_code e; std::filesystem::remove_all( path, e ); }
+    } temporary;
+    EESCHEMA_SETTINGS original;
+    original.Load();
+    original.m_RealtimeSimulation.ledCutoffHz = 45;
+    original.m_RealtimeSimulation.digitalCutoffHz = 90;
+    original.m_RealtimeSimulation.refreshRateHz = 80;
+    original.m_RealtimeSimulation.playbackSpeed = .25;
+    original.m_RealtimeSimulation.stepMs = 5;
+    original.m_RealtimeSimulation.maxTimeStepUs = 10;
+    original.m_RealtimeSimulation.scopeHistorySamples = 16384;
+    original.m_RealtimeSimulation.pushButtonsReleased = false;
+    original.m_RealtimeSimulation.warnOvercurrent = false;
+    original.m_RealtimeSimulation.showDigitalIndicators = true;
+    BOOST_REQUIRE( original.SaveToFile( wxString::FromUTF8( temporary.path.string() ), true ) );
+    EESCHEMA_SETTINGS restored;
+    BOOST_REQUIRE( restored.LoadFromFile( wxString::FromUTF8( temporary.path.string() ) ) );
+    BOOST_CHECK( restored.m_RealtimeSimulation == original.m_RealtimeSimulation );
+    // An existing configuration without the new section must remain usable.
+    std::ofstream( temporary.path / "eeschema.json", std::ios::trunc ) << "{\"meta\":{\"version\":3}}";
+    EESCHEMA_SETTINGS old;
+    BOOST_REQUIRE( old.LoadFromFile( wxString::FromUTF8( temporary.path.string() ) ) );
+    BOOST_CHECK( old.m_RealtimeSimulation == SIMULATION_PREFERENCES{} );
+}
 
 BOOST_FIXTURE_TEST_CASE( StandardLibraryPowerDiscreteDemoResolvesModelsAndRetainsScrState,
                          KI_TEST::SCHEMATIC_TEST_FIXTURE )
@@ -392,11 +426,11 @@ BOOST_FIXTURE_TEST_CASE( PlacementAdapterCopiesUserProfileIntoNativeSymbolFields
     struct PROFILE_ENV
     {
         std::string old = std::getenv( "CIRCUITALIVE_PROFILE_FILE" ) ? std::getenv( "CIRCUITALIVE_PROFILE_FILE" ) : "";
-        std::filesystem::path file = std::filesystem::temp_directory_path() / ( "ca-native-profile-" + std::to_string( getpid() ) + ".json" );
-        PROFILE_ENV() { setenv( "CIRCUITALIVE_PROFILE_FILE", file.c_str(), 1 ); }
+        std::filesystem::path file = std::filesystem::temp_directory_path() / ( "ca-native-profile-" + std::to_string( CIRCUITALIVE::ProcessId() ) + ".json" );
+        PROFILE_ENV() { SetRuntimeEnvironment( "CIRCUITALIVE_PROFILE_FILE", PathUtf8(file) ); }
         ~PROFILE_ENV()
         {
-            if( old.empty() ) unsetenv( "CIRCUITALIVE_PROFILE_FILE" ); else setenv( "CIRCUITALIVE_PROFILE_FILE", old.c_str(), 1 );
+            if( old.empty() ) UnsetRuntimeEnvironment( "CIRCUITALIVE_PROFILE_FILE" ); else SetRuntimeEnvironment( "CIRCUITALIVE_PROFILE_FILE", old );
             std::error_code error; std::filesystem::remove( file, error ); std::filesystem::remove( file.string() + ".lock", error );
         }
     } environment;
@@ -527,6 +561,49 @@ BOOST_FIXTURE_TEST_CASE( AuditUserClockPipeline, KI_TEST::SCHEMATIC_TEST_FIXTURE
     CheckNativePipeline( std::move( snapshot ), "U3" );
 }
 
+BOOST_FIXTURE_TEST_CASE( AuditUserClockVisuals, KI_TEST::SCHEMATIC_TEST_FIXTURE, *boost::unit_test::disabled() )
+{
+    const char* path = std::getenv( "CIRCUITALIVE_PIPELINE_SCHEMATIC" );
+    BOOST_REQUIRE( path );
+    LoadSchematic( wxFileName( wxString::FromUTF8( path ) ) );
+    auto circuit = CaptureSchematic( *m_schematic, true ).circuit;
+    ConfigureVisualSignals( circuit );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    EDITOR_SESSION_VIEW view;
+    view.state = EDITOR_SESSION_STATE::RUNNING;
+    unsigned clocks = 0, leds = 0;
+    for( const double time : { .15, .18, .21, .24 } )
+    {
+        session.AdvanceTo( time );
+        view.sample = session.Snapshot( true );
+        UpdateVisualSignals( circuit, view, 1 );
+        for( std::size_t i = 0; i < circuit.logicPins.size(); ++i )
+            if( circuit.logicPins[i].reference == "U1" && circuit.logicPins[i].pin == "3" )
+            {
+                ++clocks;
+                const auto period = view.sample.activity[circuit.leds.size() + i].period;
+                BOOST_REQUIRE_GT( period, 0 );
+                const double frequency = 1 / period;
+                BOOST_CHECK_EQUAL( view.logicRapid.at( i ), frequency >= view.preferences.digitalCutoffHz );
+                BOOST_TEST_MESSAGE( "U1.3 clock: " << frequency << " Hz" );
+            }
+        for( std::size_t i = 0; i < circuit.leds.size(); ++i )
+            if( circuit.leds[i].reference == "D2" )
+            {
+                ++leds;
+                const auto period = view.sample.activity[i].period;
+                BOOST_REQUIRE_GT( period, 0 );
+                if( 1 / period >= view.preferences.ledCutoffHz )
+                    BOOST_CHECK_GT( view.ledCurrents.at( i ), .001 );
+                else
+                    BOOST_CHECK_EQUAL( view.ledCurrents.at( i ), view.sample.latest.values.at( circuit.leds[i].signal ) );
+            }
+    }
+    BOOST_CHECK_EQUAL( clocks, 4u );
+    BOOST_CHECK_EQUAL( leds, 4u );
+}
+
 BOOST_FIXTURE_TEST_CASE( NativeTitlesAndTextBoxesAreAnnotationsDuringInteractiveSimulation,
                          KI_TEST::SCHEMATIC_TEST_FIXTURE )
 {
@@ -572,7 +649,7 @@ BOOST_FIXTURE_TEST_CASE( NativeExcludedInstanceBypassesBrokenModelAndPersistsWit
     struct TEMP_PROJECT
     {
         std::filesystem::path path = std::filesystem::temp_directory_path()
-                / ( "ca-exclusion-" + std::to_string( getpid() ) );
+                / ( "ca-exclusion-" + std::to_string( CIRCUITALIVE::ProcessId() ) );
         TEMP_PROJECT() { std::filesystem::create_directories( path ); }
         ~TEMP_PROJECT() { std::error_code ec; std::filesystem::remove_all( path, ec ); }
     } temporary;

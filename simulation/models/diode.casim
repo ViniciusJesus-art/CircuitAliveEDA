@@ -3,7 +3,7 @@
   "backend": "ngspice",
   "id": "diode",
   "name": "Generic silicon diode",
-  "description": "Modelo didático configurável; não é um macromodelo certificado pelo fabricante.",
+  "description": "Silicon PN junction. Current flows primarily from anode to cathode. Conduction rises exponentially rather than switching at a fixed voltage. Reverse breakdown, series resistance and charge storage are part of the same junction model.",
   "license": "GPL-3.0-or-later",
   "pins": [
     {
@@ -93,5 +93,11 @@
     "negative": "k"
   },
   "category": "Semiconductors/Diodes",
-  "family": "Rectifier and switching"
+  "family": "Rectifier and switching",
+  "equations": [
+    "Forward junction: I ≈ Is × (exp(Vj / (N × thermal voltage)) − 1).",
+    "Series path: V(A,K) = Vj + I × Rs.",
+    "Cjo sets zero-bias junction capacitance; Tt sets stored-charge transit time. BV sets reverse breakdown.",
+    "Edit these parameters to change the physical junction. For a simple IF/ELSE diode, choose DIODE (piecewise linear)."
+  ]
 }

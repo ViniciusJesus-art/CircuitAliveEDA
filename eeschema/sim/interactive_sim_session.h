@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include "memory_image.h"
+#include "signal_activity.h"
 
 namespace CIRCUITALIVE
 {
@@ -28,6 +29,7 @@ struct SIM_SESSION_CONFIG
     std::size_t              historyCapacity = 256;
     std::vector<std::string> signals;
     std::vector<MEMORY_REGION_CONFIG> memories;
+    std::vector<SIM_ACTIVITY_MONITOR> activityMonitors;
 };
 
 struct SIM_SAMPLE
@@ -42,6 +44,7 @@ struct SIM_SESSION_SNAPSHOT
     std::uint64_t            generation = 0;
     SIM_SAMPLE               latest;
     std::vector<SIM_SAMPLE>   history;
+    std::vector<SIM_SIGNAL_ACTIVITY> activity;
     std::uint64_t            samplesReceived = 0;
     std::uint64_t            samplesOverwritten = 0;
     std::uint64_t            eventsApplied = 0;

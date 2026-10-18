@@ -39,7 +39,7 @@
   ],
   "spice": {
     "instance": [
-      "Vcontrol${id} control${id} 0 5",
+      "Vcontrol${id} control${id} 0 ${control:initial}",
       "S${id} ${pin:p} ${pin:n} control${id} 0 m${id}"
     ],
     "definitions": [
@@ -59,7 +59,8 @@
   "control": {
     "source": "Vcontrol${id}",
     "on": 5,
-    "off": 0
+    "off": 0,
+    "initially_open_symbols": ["SW_Push"]
   },
   "measurement_ports": {
     "positive": "p",

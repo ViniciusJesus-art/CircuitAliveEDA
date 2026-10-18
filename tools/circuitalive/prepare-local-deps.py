@@ -39,11 +39,11 @@ alias = f'/tmp/circuitalive-{os.getuid()}-{key}'
 names = {
     'wxGTK-devel', 'wxBase-devel', 'boost-devel', 'libcurl-devel',
     'opencascade-devel', 'protobuf-devel', 'protobuf-compiler', 'nng-devel',
-    'libngspice-devel', 'ngspice', 'libgit2-devel', 'swig', 'ccache',
+    'libngspice-devel', 'ngspice', 'ngspice-codemodel', 'libgit2-devel', 'swig', 'ccache',
     'xorg-x11-server-Xvfb', 'gh', 'libspnav-devel', 'unixODBC-devel',
     'libsecret-devel', 'poppler-devel', 'poppler-glib-devel', 'wayland-devel',
     'gnutls-devel', 'nettle-devel', 'libtasn1-devel', 'p11-kit-devel',
-    'libidn2-devel', 'gmp-devel',
+    'libidn2-devel', 'gmp-devel', 'gettext', 'gettext-libs',
 }
 prefix.mkdir(parents=True, exist_ok=True)
 selected = []
@@ -92,6 +92,16 @@ for pc in prefix.rglob('*.pc'):
     # Make repeated invocations safe for files from previously extracted RPMs.
     content = content.replace(f'{alias}/.circuitalive/deps/usr', '/usr')
     pc.write_text(content.replace('/usr', f'{alias}/.circuitalive/deps/usr'))
+
+# Fedora's init script contains absolute system paths. Keep local code models
+# paired with the local shared library, including mixed analog/digital devices.
+spinit = prefix / 'usr/lib64/ngspice/scripts/spinit'
+if spinit.is_file():
+    content = spinit.read_text()
+    local_models = f'{alias}/.circuitalive/deps/usr/lib64/ngspice/'
+    content = content.replace(local_models, '/usr/lib64/ngspice/')
+    content = content.replace('/usr/lib64/ngspice/', local_models)
+    spinit.write_text(content)
 
 manifest = root / '.circuitalive/dependencies.sha256'
 manifest.write_text(''.join(

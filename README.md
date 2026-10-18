@@ -2,7 +2,7 @@
 
 # CircuitAliveEDA
 
-<img src="./resources/bitmaps_png/icons/icon_kicad.png" alt="Logo da Chloe" width="160" />
+<img src="./resources/bitmaps_png/icons/icon_kicad.png" alt="Logo do CircuitAliveEDA" width="160" />
 
 
 **Ambiente de desenvolvimento eletrônico com simulação interativa integrada**

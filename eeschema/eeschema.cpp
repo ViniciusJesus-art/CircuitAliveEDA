@@ -46,6 +46,10 @@
 #include <kiway.h>
 #include <project_sch.h>
 #include <circuitalive/model_author_api.h>
+#include <circuitalive_preferences_id.h>
+#ifdef __linux__
+#include <circuitalive/panel_simulation_preferences.h>
+#endif
 #include <richio.h>
 #include <settings/settings_manager.h>
 #include <symbol_editor_settings.h>
@@ -379,6 +383,10 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
 
         case PANEL_SCH_SIMULATOR:
             return new PANEL_SIMULATOR_PREFERENCES( aParent );
+#ifdef __linux__
+        case CIRCUITALIVE::PANEL_REALTIME_SIMULATION:
+            return new CIRCUITALIVE::PANEL_SIMULATION_PREFERENCES( aParent );
+#endif
 
         default:
             return nullptr;

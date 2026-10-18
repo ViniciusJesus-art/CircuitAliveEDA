@@ -31,7 +31,7 @@ const int kicadSchemaVersion = 0;
 
 const nlohmann::json PCM_DEFAULT_REPOSITORIES = nlohmann::json::array( {
     nlohmann::json( {
-        { "name", "KiCad official repository" },
+        { "name", "Community package repository" },
         { "url", PCM_DEFAULT_REPOSITORY_URL },
     } )
 } );
@@ -50,7 +50,7 @@ KICAD_SETTINGS::KICAD_SETTINGS() :
 
     m_params.emplace_back( new PARAM<wxString>( "system.last_update_check_time", &m_lastUpdateCheckTime, "" ) );
     m_params.emplace_back( new PARAM<wxString>( "system.last_received_update", &m_lastReceivedUpdate, "" ) );
-    m_params.emplace_back( new PARAM<bool>( "system.check_for_kicad_updates", &m_KiCadUpdateCheck, true ) );
+    m_params.emplace_back( new PARAM<bool>( "system.check_for_kicad_updates", &m_KiCadUpdateCheck, false ) );
 
     m_params.emplace_back( new PARAM<wxPoint>( "template.window.pos", &m_TemplateWindowPos, wxDefaultPosition ) );
     m_params.emplace_back( new PARAM<wxSize>( "template.window.size", &m_TemplateWindowSize, wxDefaultSize ) );
@@ -87,9 +87,16 @@ KICAD_SETTINGS::KICAD_SETTINGS() :
                     if( entry.empty() || !entry.is_object() )
                         continue;
 
-                    m_PcmRepositories.emplace_back(
-                            std::make_pair( wxString( entry["name"].get<std::string>() ),
-                                            wxString( entry["url"].get<std::string>() ) ) );
+                    wxString name( entry["name"].get<std::string>() );
+                    wxString url( entry["url"].get<std::string>() );
+
+                    if( url == wxS( PCM_DEFAULT_REPOSITORY_URL )
+                        && name == wxS( "KiCad official repository" ) )
+                    {
+                        name = wxS( "Community package repository" );
+                    }
+
+                    m_PcmRepositories.emplace_back( name, url );
                 }
             },
             PCM_DEFAULT_REPOSITORIES ) );

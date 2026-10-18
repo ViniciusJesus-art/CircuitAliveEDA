@@ -121,7 +121,7 @@ void KICAD_MANAGER_FRAME::doReCreateMenuBar()
 
     //Import Sub-menu
     ACTION_MENU* importMenu = new ACTION_MENU( false, controlTool );
-    importMenu->SetTitle( _( "Import Non-KiCad Project..." ) );
+    importMenu->SetTitle( _( "Import Non-CircuitAliveEDA Project..." ) );
     importMenu->SetIcon( BITMAPS::import_project );
 
     importMenu->Add( _( "Altium Project..." ),

@@ -11,20 +11,20 @@ MODEL_DESIGN MakeTimer555Design( const std::map<std::string, std::string>& t )
                     std::map<std::string, std::string> values, int x, int y )
     { d.blocks.push_back( { id, t.at( type ), std::move( pins ), std::move( values ), x, y } ); };
     add( "Rtop", "resistor", { { "p", "@vcc" }, { "n", "@ctrl" } }, { { "resistance", "@divider" } }, 280, 65 );
-    add( "Rmid", "resistor", { { "p", "@ctrl" }, { "n", "half" } }, { { "resistance", "@divider" } }, 280, 215 );
-    add( "Rbot", "resistor", { { "p", "half" }, { "n", "@gnd" } }, { { "resistance", "@divider" } }, 280, 365 );
+    add( "Rmid", "resistor", { { "p", "@ctrl" }, { "n", "half" } }, { { "resistance", "@divider" } }, 280, 245 );
+    add( "Rbot", "resistor", { { "p", "half" }, { "n", "@gnd" } }, { { "resistance", "@divider" } }, 280, 425 );
     const std::map<std::string, std::string> comparatorValues{ { "vmin", "@vmin" }, { "vmax", "@vmax" } };
-    add( "Trigger", "comparator", { { "plus", "half" }, { "minus", "@trig" }, { "out", "set" }, { "vcc", "@vcc" }, { "gnd", "@gnd" } }, comparatorValues, 570, 65 );
-    add( "Threshold", "comparator", { { "plus", "@thresh" }, { "minus", "@ctrl" }, { "out", "threshold" }, { "vcc", "@vcc" }, { "gnd", "@gnd" } }, comparatorValues, 570, 320 );
-    add( "ResetRef", "dc_voltage", { { "p", "reset_ref" }, { "n", "@gnd" } }, { { "voltage", "@reset_threshold" } }, 280, 560 );
-    add( "Reset", "comparator", { { "plus", "reset_ref" }, { "minus", "@reset" }, { "out", "clear" }, { "vcc", "@vcc" }, { "gnd", "@gnd" } }, comparatorValues, 570, 575 );
+    add( "Trigger", "comparator", { { "plus", "half" }, { "minus", "@trig" }, { "out", "set" }, { "vcc", "@vcc" }, { "gnd", "@gnd" } }, comparatorValues, 600, 65 );
+    add( "Threshold", "comparator", { { "plus", "@thresh" }, { "minus", "@ctrl" }, { "out", "threshold" }, { "vcc", "@vcc" }, { "gnd", "@gnd" } }, comparatorValues, 600, 340 );
+    add( "ResetRef", "dc_voltage", { { "p", "reset_ref" }, { "n", "@gnd" } }, { { "voltage", "@reset_threshold" } }, 280, 640 );
+    add( "Reset", "comparator", { { "plus", "reset_ref" }, { "minus", "@reset" }, { "out", "clear" }, { "vcc", "@vcc" }, { "gnd", "@gnd" } }, comparatorValues, 600, 615 );
     add( "Latch", "sr_reset_priority", { { "s", "set" }, { "r", "threshold" }, { "reset", "clear" }, { "q", "state" }, { "vcc", "@vcc" }, { "gnd", "@gnd" } },
-        { { "delay", "@delay" }, { "transition", "@transition" }, { "vmin", "@vmin" }, { "vmax", "@vmax" } }, 860, 210 );
+        { { "delay", "@delay" }, { "transition", "@transition" }, { "vmin", "@vmin" }, { "vmax", "@vmax" } }, 920, 230 );
     add( "Output", "pushpull", { { "state", "state" }, { "out", "@out" }, { "vcc", "@vcc" }, { "gnd", "@gnd" } },
-        { { "rout", "@rout" }, { "imax", "@imax" }, { "high_drop", "@high_drop" }, { "low_drop", "@low_drop" }, { "cout", "@cout" }, { "vmin", "@vmin" }, { "vmax", "@vmax" } }, 1150, 110 );
+        { { "rout", "@rout" }, { "imax", "@imax" }, { "high_drop", "@high_drop" }, { "low_drop", "@low_drop" }, { "cout", "@cout" }, { "vmin", "@vmin" }, { "vmax", "@vmax" } }, 1240, 110 );
     add( "Discharge", "discharge", { { "state", "state" }, { "out", "@discharge" }, { "vcc", "@vcc" }, { "gnd", "@gnd" } },
-        { { "ron", "@discharge_r" }, { "vmin", "@vmin" }, { "vmax", "@vmax" } }, 1150, 400 );
-    add( "Consumption", "constant_current", { { "p", "@vcc" }, { "n", "@gnd" } }, { { "current", "@iq" } }, 860, 600 );
+        { { "ron", "@discharge_r" }, { "vmin", "@vmin" }, { "vmax", "@vmax" } }, 1240, 420 );
+    add( "Consumption", "constant_current", { { "p", "@vcc" }, { "n", "@gnd" } }, { { "current", "@iq" } }, 920, 640 );
     return d;
 }
 }

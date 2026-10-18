@@ -38,6 +38,25 @@
 #include <settings/settings_manager.h>
 #include <sim/spice_circuit_model.h>
 #include <sim/spice_simulator.h>
+#include <sim/sim_value.h>
+
+BOOST_AUTO_TEST_CASE( VoltageValuesAcceptAnOptionalSignAndVoltageUnit )
+{
+    for( const auto* text : { "+5V", "+5v", "+5", "5", "5V", "5v" } )
+    {
+        BOOST_CHECK( SIM_VALUE_GRAMMAR::IsValid( text ) );
+        BOOST_CHECK_EQUAL( SIM_VALUE::ToDouble( text ), 5 );
+    }
+    for( const auto* text : { "-5V", "-5v", "-5" } )
+    {
+        BOOST_CHECK( SIM_VALUE_GRAMMAR::IsValid( text ) );
+        BOOST_CHECK_EQUAL( SIM_VALUE::ToDouble( text ), -5 );
+    }
+    BOOST_CHECK_CLOSE( SIM_VALUE::ToDouble( "+500mV" ), .5, 1e-9 );
+    BOOST_CHECK_CLOSE( SIM_VALUE::ToDouble( "5MV" ), 5e6, 1e-9 );
+    for( const auto* text : { "+-5V", "--5", "5Vgarbage", "5vv" } )
+        BOOST_CHECK( !SIM_VALUE_GRAMMAR::IsValid( text ) );
+}
 
 class TEST_NGSPICE_HELPERS
 {

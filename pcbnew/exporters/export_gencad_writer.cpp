@@ -886,7 +886,7 @@ bool GENCAD_EXPORTER::createHeaderInfoData()
     fmt::print( m_file, "GENCAD 1.4\n" );
 
     // Please note: GenCAD syntax requires quoted strings if they can contain spaces
-    fmt::print( m_file, "USER \"KiCad {}\"\n", GetBuildVersion() );
+    fmt::print( m_file, "USER \"CircuitAliveEDA {}\"\n", GetBuildVersion() );
 
     fmt::print( m_file, "DRAWING \"{}\"\n", m_board->GetFileName() );
 

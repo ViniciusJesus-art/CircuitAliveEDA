@@ -124,7 +124,7 @@ if( TARGET circuitalive_sim_session )
         test_interactive_models.cpp test_interactive_measurements.cpp test_interactive_devices.cpp
         test_interactive_complex.cpp test_interactive_power.cpp test_model_design.cpp
         test_interactive_discretes.cpp test_scope_acquisition.cpp test_model_catalog.cpp
-        test_analog_model_catalog.cpp test_live_controls.cpp test_digital_pipeline.cpp test_memory_resources.cpp )
+        test_analog_model_catalog.cpp test_live_controls.cpp test_digital_pipeline.cpp test_memory_resources.cpp test_visual_signals.cpp )
     target_link_libraries( qa_interactive_sim PRIVATE
         circuitalive_interactive circuitalive_sim_session Boost::unit_test_framework )
     target_compile_definitions( qa_interactive_sim PRIVATE

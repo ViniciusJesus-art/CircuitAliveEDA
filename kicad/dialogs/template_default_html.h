@@ -144,7 +144,7 @@ inline wxString GetWelcomeHtml( bool aDarkMode )
         "<head>"
         "<meta charset=\"UTF-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-        "<title>KiCad Project Template Selector</title>"
+        "<title>CircuitAliveEDA Project Template Selector</title>"
         "<style>" )
         + GetCommonStyles() +
         wxString(
@@ -283,7 +283,7 @@ inline wxString GetTemplateInfoHtml( const wxString& aTemplateName, bool aDarkMo
         "<head>"
         "<meta charset=\"UTF-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-        "<title>" ) + aTemplateName + wxString( " - KiCad Template</title>"
+        "<title>" ) + aTemplateName + wxString( " - CircuitAliveEDA Template</title>"
         "<style>" )
         + GetCommonStyles() +
         wxString(
@@ -451,7 +451,7 @@ inline wxString GetNoTemplatesHtml( bool aDarkMode )
         "<head>"
         "<meta charset=\"UTF-8\">"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-        "<title>No Templates - KiCad</title>"
+        "<title>No Templates - CircuitAliveEDA</title>"
         "<style>" )
         + GetCommonStyles() +
         wxString(

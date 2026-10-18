@@ -79,7 +79,7 @@ bool PANEL_PL_EDITOR_COLOR_SETTINGS::TransferDataFromWindow()
 
 void PANEL_PL_EDITOR_COLOR_SETTINGS::ResetPanel()
 {
-    m_themes->SetStringSelection( _( "KiCad Default" ) );
+    m_themes->SetStringSelection( _( "CircuitAliveEDA Default" ) );
 }
 
 

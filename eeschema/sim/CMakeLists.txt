@@ -1,14 +1,18 @@
-# CircuitAliveEDA stage-1 prototype. Process transport currently targets Linux.
-if( CMAKE_SYSTEM_NAME STREQUAL "Linux" )
+# Isolated solver process on Linux and Windows.
+if( CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 )
     find_package( Threads REQUIRED )
-    add_library( circuitalive_sim_session STATIC interactive_sim_session.cpp memory_image.cpp runtime_memory.cpp )
+    add_library( circuitalive_sim_session STATIC interactive_sim_session.cpp memory_image.cpp runtime_memory.cpp platform_runtime.cpp )
     target_include_directories( circuitalive_sim_session PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} )
     target_include_directories( circuitalive_sim_session SYSTEM PRIVATE
         ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann_json )
     target_link_libraries( circuitalive_sim_session PRIVATE Threads::Threads )
+    if(WIN32)
+        target_link_libraries(circuitalive_sim_session PRIVATE psapi)
+    endif()
 
     add_library( circuitalive-memory MODULE memory_cm/ifspec.c memory_cm/cfunc.c memory_cm/module.c )
     set_target_properties( circuitalive-memory PROPERTIES PREFIX "" SUFFIX ".cm" )
+    set_target_properties( circuitalive-memory PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON )
     target_include_directories( circuitalive-memory SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/thirdparty/ngspice-xspice/include )
     include( CheckLibraryExists )
     check_library_exists( "${NGSPICE_LIBRARY}" MIFbindCSC "" CA_NGSPICE_KLU )

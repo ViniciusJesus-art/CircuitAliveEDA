@@ -151,7 +151,7 @@ void GERBER_JOBFILE_WRITER::addJSONHeader()
         {
             "GenerationSoftware",
             {
-                { "Vendor", "KiCad" },
+                { "Vendor", "CircuitAliveEDA" },
                 { "Application", "Pcbnew" },
                 { "Version", GetBuildVersion() }
             }

@@ -457,7 +457,7 @@ void API_PLUGIN_MANAGER::InvokeAction( const wxString& aIdentifier, std::shared_
         if( Pgm().GetCommonSettings()->m_Api.python_interpreter == FindKicadFile( "pythonw.exe" )
             || wxGetEnv( wxT( "KICAD_RUN_FROM_BUILD_DIR" ), nullptr ) )
         {
-            wxLogTrace( traceApi, "Configured Python is the KiCad one; erasing path overrides..." );
+            wxLogTrace( traceApi, "Configured Python is the CircuitAliveEDA one; erasing path overrides..." );
             env.env.erase( "PYTHONHOME" );
             env.env.erase( "PYTHONPATH" );
         }
@@ -750,7 +750,7 @@ void API_PLUGIN_MANAGER::processNextJob( wxCommandEvent& aEvent )
         if( Pgm().GetCommonSettings()->m_Api.python_interpreter == FindKicadFile( "pythonw.exe" )
             || wxGetEnv( wxT( "KICAD_RUN_FROM_BUILD_DIR" ), nullptr ) )
         {
-            wxLogTrace( traceApi, "Configured Python is the KiCad one; erasing path overrides..." );
+            wxLogTrace( traceApi, "Configured Python is the CircuitAliveEDA one; erasing path overrides..." );
             env.env.erase( "PYTHONHOME" );
             env.env.erase( "PYTHONPATH" );
         }
@@ -841,7 +841,7 @@ void API_PLUGIN_MANAGER::processNextJob( wxCommandEvent& aEvent )
                 || wxGetEnv( wxT( "KICAD_RUN_FROM_BUILD_DIR" ), nullptr ) )
             {
                 wxLogTrace( traceApi,
-                            "Configured Python is the KiCad one; erasing path overrides..." );
+                            "Configured Python is the CircuitAliveEDA one; erasing path overrides..." );
                 env.env.erase( "PYTHONHOME" );
                 env.env.erase( "PYTHONPATH" );
             }

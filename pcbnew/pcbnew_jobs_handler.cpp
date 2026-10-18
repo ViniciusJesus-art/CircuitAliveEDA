@@ -284,7 +284,7 @@ PCBNEW_JOBS_HANDLER::PCBNEW_JOBS_HANDLER( KIWAY* aKiway ) :
     Register( "hpgl",
               [&]( JOB* aJob )
               {
-                  m_reporter->Report( _( "Plotting to HPGL is no longer supported as of KiCad 10.0.\n" ),
+                  m_reporter->Report( _( "Plotting to HPGL is no longer supported as of version 10.0.\n" ),
                                       RPT_SEVERITY_ERROR );
                   return CLI::EXIT_CODES::ERR_ARGS;
               },
@@ -296,7 +296,7 @@ PCBNEW_JOBS_HANDLER::PCBNEW_JOBS_HANDLER( KIWAY* aKiway ) :
                   wxCHECK( editFrame, false );
 
                   DisplayErrorMessage( editFrame,
-                                       _( "Plotting to HPGL is no longer supported as of KiCad 10.0." ) );
+                                       _( "Plotting to HPGL is no longer supported as of version 10.0." ) );
                   return false;
               } );
     Register( "drill",
@@ -2072,7 +2072,7 @@ int PCBNEW_JOBS_HANDLER::JobExportFpUpgrade( JOB* aJob )
     }
     else if( fileType != PCB_IO_MGR::KICAD_SEXP )
     {
-        m_reporter->Report( _( "Output path must be specified to convert legacy and non-KiCad libraries\n" ),
+        m_reporter->Report( _( "Output path must be specified to convert legacy and non-CircuitAliveEDA libraries\n" ),
                             RPT_SEVERITY_ERROR );
 
         return CLI::EXIT_CODES::ERR_INVALID_OUTPUT_CONFLICT;

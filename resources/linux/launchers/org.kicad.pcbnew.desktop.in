@@ -10,5 +10,5 @@ StartupWMClass=pcbnew
 MimeType=application/x-kicad-pcb;
 Name=CircuitAliveEDA PCB Editor (Standalone)
 GenericName=PCB layout editor
-Comment=Standalone circuit board editor for KiCad boards
+Comment=Standalone circuit board editor for CircuitAliveEDA boards
 X-AppStream-Ignore=true

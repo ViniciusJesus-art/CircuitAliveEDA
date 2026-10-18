@@ -54,7 +54,7 @@ class KiCadPyShell(KiCadEditorNotebookFrame):
                     default_startup = open(self.startup_file, 'w')
                     # provide the content for the default startup file.
                     default_startup.write(
-                        "### DEFAULT STARTUP FILE FOR KiCad Python Shell\n" +
+                        "### DEFAULT STARTUP FILE FOR CircuitAliveEDA Python Shell\n" +
                         "# Enter any Python code you would like to execute when" +
                         " the PCBNEW python shell first runs.\n" +
                         "\n" +
@@ -81,9 +81,9 @@ class KiCadPyShell(KiCadEditorNotebookFrame):
         intro = 'Py %s' % version.VERSION
 
         intro += """\n\nDeprecation Notice:\n
-This SWIG-based Python interface to the PCB editor is deprecated and will be removed 
-in a future version of KiCad.  Please plan to move to the new IPC API and/or make 
-use of the kicad-cli tool for your KiCad automation needs.\n\n"""
+This SWIG-based Python interface to the PCB editor is deprecated and will be removed
+in a future version of CircuitAliveEDA.  Please plan to move to the new IPC API and/or make
+use of the kicad-cli tool for your CircuitAliveEDA automation needs.\n\n"""
 
         import types
         import builtins
@@ -141,9 +141,9 @@ use of the kicad-cli tool for your KiCad automation needs.\n\n"""
 
     def OnAbout(self, event):
         """Display an About window."""
-        title = 'About : KiCad - Python Shell'
-        text = "Enhanced Python Shell for KiCad\n\n" + \
-               "KiCad Revision: %s\n" % pcbnew.FullVersion() + \
+        title = 'About : CircuitAliveEDA - Python Shell'
+        text = "Enhanced Python Shell for CircuitAliveEDA\n\n" + \
+               "CircuitAliveEDA Revision: %s\n" % pcbnew.FullVersion() + \
                "Platform: %s\n" % sys.platform + \
                "Python Version: %s\n" % sys.version.split()[0] + \
                "wxPython Version: %s\n" % wx.VERSION_STRING + \

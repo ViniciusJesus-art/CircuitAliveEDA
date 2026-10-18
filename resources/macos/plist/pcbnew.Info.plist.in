@@ -13,7 +13,7 @@
                     <string>brd</string>
                 </array>
 
-            <key>CFBundleTypeName</key>         <string>KiCad PCB document</string>
+            <key>CFBundleTypeName</key>         <string>CircuitAliveEDA PCB document</string>
             <key>LSHandlerRank</key>            <string>Owner</string>
         </dict>
         <dict>
@@ -23,7 +23,7 @@
                     <string>kicad_mod</string>
                 </array>
             <key>CFBundleTypeIconFile</key>     <string>fpedit_doc.icns</string>
-            <key>CFBundleTypeName</key>         <string>KiCad footprint</string>
+            <key>CFBundleTypeName</key>         <string>CircuitAliveEDA footprint</string>
             <key>LSHandlerRank</key>            <string>None</string>
         </dict>
         <dict>
@@ -32,7 +32,7 @@
                 <array>
                     <string>kicad_dru</string>
                 </array>
-            <key>CFBundleTypeName</key>         <string>KiCad custom design rules</string>
+            <key>CFBundleTypeName</key>         <string>CircuitAliveEDA custom design rules</string>
             <key>LSHandlerRank</key>            <string>None</string>
         </dict>
     </array>
@@ -40,7 +40,7 @@
     <key>CFBundleExecutable</key>               <string>pcbnew</string>
     <key>CFBundleGetInfoString</key>            <string></string>
     <key>CFBundleIconFile</key>                 <string>pcbnew.icns</string>
-    <key>CFBundleIdentifier</key>               <string>org.kicad.pcbnew</string>
+    <key>CFBundleIdentifier</key>               <string>org.circuitaliveeda.pcbnew</string>
     <key>CFBundleInfoDictionaryVersion</key>    <string>6.0</string>
     <key>CFBundleLongVersionString</key>        <string>@KICAD_VERSION_FULL@</string>
     <key>CFBundleName</key>                     <string>PCB Editor</string>

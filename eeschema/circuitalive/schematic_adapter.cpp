@@ -134,7 +134,8 @@ void ApplySavedSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& sheet,
     if( MODEL_PROFILES().Apply( component ) ) WriteSymbolModelSettings( symbol, component );
 }
 
-SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators )
+SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
+                                     const SIMULATION_PREFERENCES& aPreferences )
 {
     SCHEMATIC_SNAPSHOT result;
     std::vector<CIRCUIT_COMPONENT> components;
@@ -226,7 +227,7 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators 
                 result.pins.push_back( { index, pin->GetShownNumber().ToStdString(), sheet.PathAsString(), pin->GetPosition() } );
         }
     }
-    result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators, powerSymbols );
+    result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators, powerSymbols, aPreferences );
     return result;
 }
 }

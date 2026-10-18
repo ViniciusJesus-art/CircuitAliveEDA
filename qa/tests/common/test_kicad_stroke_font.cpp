@@ -82,4 +82,17 @@ BOOST_AUTO_TEST_CASE( TabCheck )
 }
 
 
+// Old projects/preferences must keep selecting the same built-in stroke font.
+BOOST_AUTO_TEST_CASE( LegacyFontNameCompatibility )
+{
+    KIFONT::FONT* legacy = KIFONT::FONT::GetFont( wxS( "KiCad Font" ) );
+    KIFONT::FONT* current = KIFONT::FONT::GetFont( wxS( "CircuitAliveEDA Font" ) );
+    BOOST_REQUIRE( legacy );
+    BOOST_CHECK_EQUAL( legacy, current );
+    BOOST_CHECK( legacy->IsStroke() );
+    BOOST_CHECK( KIFONT::FONT::IsStroke( wxS( "KiCad Font" ) ) );
+    BOOST_CHECK( KIFONT::FONT::IsStroke( wxS( "CircuitAliveEDA Font" ) ) );
+}
+
+
 BOOST_AUTO_TEST_SUITE_END()

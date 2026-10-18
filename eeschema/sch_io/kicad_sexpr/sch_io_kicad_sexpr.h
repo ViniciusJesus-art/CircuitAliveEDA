@@ -73,13 +73,13 @@ public:
 
     const IO_BASE::IO_FILE_DESC GetSchematicFileDesc() const override
     {
-        return IO_BASE::IO_FILE_DESC( _HKI( "KiCad s-expression schematic files" ),
+        return IO_BASE::IO_FILE_DESC( _HKI( "CircuitAliveEDA s-expression schematic files" ),
                                       { FILEEXT::KiCadSchematicFileExtension } );
     }
 
     const IO_BASE::IO_FILE_DESC GetLibraryDesc() const override
     {
-        return IO_BASE::IO_FILE_DESC( _HKI( "KiCad symbol library files" ),
+        return IO_BASE::IO_FILE_DESC( _HKI( "CircuitAliveEDA symbol library files" ),
                                       { FILEEXT::KiCadSymbolLibFileExtension } );
     }
 

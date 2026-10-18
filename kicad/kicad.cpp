@@ -365,7 +365,7 @@ bool PGM_KICAD::OnPgmInit()
             if( tmp.GetExt() != FILEEXT::ProjectFileExtension && tmp.GetExt() != FILEEXT::LegacyProjectFileExtension )
             {
                 DisplayErrorMessage( nullptr, wxString::Format( _( "File '%s'\n"
-                                                                   "does not appear to be a KiCad project file." ),
+                                                                   "does not appear to be a CircuitAliveEDA project file." ),
                                                                 tmp.GetFullPath() ) );
             }
             else

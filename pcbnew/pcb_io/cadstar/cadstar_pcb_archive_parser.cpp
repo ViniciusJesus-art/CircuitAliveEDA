@@ -89,7 +89,7 @@ void CADSTAR_PCB_ARCHIVE_PARSER::Parse( bool aLibrary )
                 else
                 {
                     THROW_IO_ERROR( wxT( "The selected file is an unknown CADSTAR format so "
-                                         "cannot be imported into KiCad." ) );
+                                         "cannot be imported into CircuitAliveEDA." ) );
                 }
             }
         }

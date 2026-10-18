@@ -190,8 +190,43 @@ EESCHEMA_SETTINGS::EESCHEMA_SETTINGS() :
         m_FindReplaceExtra(),
         m_ERCDialog(),
         m_Simulator(),
+        m_RealtimeSimulation(),
         m_RescueNeverShow( false )
 {
+    const CIRCUITALIVE::SIMULATION_PREFERENCES defaults;
+    m_params.emplace_back( new PARAM<double>( "circuitalive.simulation.led_cutoff_hz",
+            &m_RealtimeSimulation.ledCutoffHz, defaults.ledCutoffHz, 1.0, 1000.0 ) );
+    m_params.emplace_back( new PARAM<double>( "circuitalive.simulation.digital_cutoff_hz",
+            &m_RealtimeSimulation.digitalCutoffHz, defaults.digitalCutoffHz, 1.0, 1000.0 ) );
+    m_params.emplace_back( new PARAM<bool>( "circuitalive.simulation.hold_fast_leds",
+            &m_RealtimeSimulation.holdFastLeds, defaults.holdFastLeds ) );
+    m_params.emplace_back( new PARAM<bool>( "circuitalive.simulation.mark_fast_digital",
+            &m_RealtimeSimulation.markFastDigital, defaults.markFastDigital ) );
+    m_params.emplace_back( new PARAM<bool>( "circuitalive.simulation.show_digital_indicators",
+            &m_RealtimeSimulation.showDigitalIndicators, defaults.showDigitalIndicators ) );
+    m_params.emplace_back( new PARAM<int>( "circuitalive.simulation.refresh_rate_hz",
+            &m_RealtimeSimulation.refreshRateHz, defaults.refreshRateHz, 10, 240 ) );
+    m_params.emplace_back( new PARAM<double>( "circuitalive.simulation.playback_speed",
+            &m_RealtimeSimulation.playbackSpeed, defaults.playbackSpeed, .0001, 100.0 ) );
+    m_params.emplace_back( new PARAM<double>( "circuitalive.simulation.step_ms",
+            &m_RealtimeSimulation.stepMs, defaults.stepMs, .001, 1000.0 ) );
+    m_params.emplace_back( new PARAM<double>( "circuitalive.simulation.max_time_step_us",
+            &m_RealtimeSimulation.maxTimeStepUs, defaults.maxTimeStepUs, .001, 10000.0 ) );
+    m_params.emplace_back( new PARAM<double>( "circuitalive.simulation.duration_seconds",
+            &m_RealtimeSimulation.durationSeconds, defaults.durationSeconds, 1.0, 86400.0 ) );
+    m_params.emplace_back( new PARAM<double>( "circuitalive.simulation.worker_timeout_seconds",
+            &m_RealtimeSimulation.workerTimeoutSeconds, defaults.workerTimeoutSeconds, .1, 60.0 ) );
+    m_params.emplace_back( new PARAM<bool>( "circuitalive.simulation.push_buttons_released",
+            &m_RealtimeSimulation.pushButtonsReleased, defaults.pushButtonsReleased ) );
+    m_params.emplace_back( new PARAM<bool>( "circuitalive.simulation.auto_open_instruments",
+            &m_RealtimeSimulation.autoOpenInstruments, defaults.autoOpenInstruments ) );
+    m_params.emplace_back( new PARAM<bool>( "circuitalive.simulation.warn_overcurrent",
+            &m_RealtimeSimulation.warnOvercurrent, defaults.warnOvercurrent ) );
+    m_params.emplace_back( new PARAM<bool>( "circuitalive.simulation.warn_supply",
+            &m_RealtimeSimulation.warnSupply, defaults.warnSupply ) );
+    m_params.emplace_back( new PARAM<int>( "circuitalive.simulation.scope_history_samples",
+            &m_RealtimeSimulation.scopeHistorySamples, defaults.scopeHistorySamples, 256, 65536 ) );
+
     m_params.emplace_back( new PARAM<bool>( "appearance.footprint_preview",
             &m_Appearance.footprint_preview, true ) );
 
@@ -199,7 +234,7 @@ EESCHEMA_SETTINGS::EESCHEMA_SETTINGS() :
             &m_Appearance.print_sheet_reference, true ) );
 
     m_params.emplace_back( new PARAM<wxString>( "appearance.default_font",
-            &m_Appearance.default_font, "KiCad Font" ) );
+            &m_Appearance.default_font, "CircuitAliveEDA Font" ) );
 
     m_params.emplace_back( new PARAM<bool>( "appearance.show_hidden_pins",
             &m_Appearance.show_hidden_pins, false ) );

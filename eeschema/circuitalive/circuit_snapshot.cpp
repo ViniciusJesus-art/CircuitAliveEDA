@@ -17,6 +17,14 @@ double ParseComponentValue( const std::string& aValue )
     std::string value = aValue;
     value.erase( std::remove_if( value.begin(), value.end(),
                                []( unsigned char c ) { return c == ' ' || c == '\t'; } ), value.end() );
+    // Floating-point from_chars accepts '-', but not '+'. Accept one explicit
+    // positive sign in every component/model editor, without accepting '+-5'.
+    if( value.starts_with( "+" ) )
+    {
+        value.erase( 0, 1 );
+        if( value.empty() || value[0] == '+' || value[0] == '-' )
+            throw std::runtime_error( "Invalid numeric value: " + aValue );
+    }
     // KiCad values also use the multiplier as a decimal marker: 4R7, 4k7, 2u2.
     const auto marker = value.find_first_not_of( "+-0123456789" );
     if( marker != std::string::npos && std::string( "RrKkMmGgUuNnPp" ).find( value[marker] ) != std::string::npos
@@ -38,7 +46,7 @@ double ParseComponentValue( const std::string& aValue )
     // The netlist receives the parsed number, never the original text.
     const std::map<std::string, double> scales = {
         { "", 1 }, { "R", 1 }, { "r", 1 }, { "Ohm", 1 }, { "ohm", 1 }, { "Ω", 1 },
-        { "V", 1 }, { "F", 1 }, { "H", 1 }, { "deg", 1 }, { "A", 1 }, { "s", 1 }, { "Hz", 1 },
+        { "V", 1 }, { "v", 1 }, { "F", 1 }, { "H", 1 }, { "deg", 1 }, { "A", 1 }, { "s", 1 }, { "Hz", 1 },
         { "f", 1e-15 }, { "p", 1e-12 }, { "n", 1e-9 },
         { "u", 1e-6 }, { "U", 1e-6 }, { "µ", 1e-6 }, { "μ", 1e-6 }, { "m", 1e-3 }, { "M", 1e6 },
         { "k", 1e3 }, { "K", 1e3 }, { "Meg", 1e6 }, { "meg", 1e6 }, { "G", 1e9 }, { "g", 1e9 }
@@ -47,11 +55,14 @@ double ParseComponentValue( const std::string& aValue )
     auto scale = scales.find( suffix );
     if( scale == scales.end() )
     {
-        for( const std::string unit : { "Ohm", "ohm", "Ω", "F", "H", "deg", "V", "A", "s", "Hz" } )
+        for( const std::string unit : { "Ohm", "ohm", "Ω", "F", "H", "deg", "V", "v", "A", "s", "Hz" } )
         {
             if( suffix.ends_with( unit ) )
             {
                 scale = scales.find( suffix.substr( 0, suffix.size() - unit.size() ) );
+                // A unit may follow a multiplier, never another unit (5vv,
+                // 10Vdeg). All nonempty multipliers have a scale other than 1.
+                if( scale != scales.end() && !scale->first.empty() && scale->second == 1 ) scale = scales.end();
                 break;
             }
         }
@@ -69,11 +80,14 @@ double LedBrightness( double aForwardCurrent, double aBrightnessCurrent )
 
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents,
                                      const std::vector<CIRCUIT_PROBE>& aProbes, bool aPinIndicators,
-                                     const std::vector<POWER_SYMBOL>& aPowerSymbols )
+                                     const std::vector<POWER_SYMBOL>& aPowerSymbols,
+                                     const SIMULATION_PREFERENCES& aPreferences )
 {
     CIRCUIT_SNAPSHOT result;
-    result.config.step = result.config.maxStep = 1e-4;
-    result.config.horizon = 3600; // Finite internal horizon: completion is explicit in the UI.
+    auto preferences = aPreferences;
+    preferences.Normalize();
+    result.config.step = result.config.maxStep = preferences.maxTimeStepUs * 1e-6;
+    result.config.horizon = std::min( preferences.durationSeconds, result.config.maxStep * 9e7 );
     result.config.historyCapacity = 256;
     std::string projectDirectory;
     for( const auto& component : aComponents )
@@ -86,6 +100,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         try
         {
             auto model = repository.Resolve( component );
+            if( !preferences.pushButtonsReleased ) model.controlInitiallyClosed = true;
             const auto componentIndex = models.size();
             for( auto region : InitialModelMemories( component, model.model ) )
             {
@@ -263,12 +278,14 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             {
                 result.leds.push_back( { i, result.config.signals.size(),
                     model.parameters.at( model.model.brightnessParameter ),
-                    model.model.ratingParameter.empty() ? 0 : model.parameters.at( model.model.ratingParameter ), c.reference } );
+                    model.model.ratingParameter.empty() ? 0 : model.parameters.at( model.model.ratingParameter ), c.reference,
+                    ResolveLedAppearance(model.model.ledAppearance,model.parameters) } );
                 result.config.signals.push_back( expand( model.model.indicatorSignal ) );
             }
             if( !model.model.controlSource.empty() )
                 result.switches.push_back( { i, expand( model.model.controlSource ),
-                                            model.model.controlOn, model.model.controlOff } );
+                                            model.model.controlOn, model.model.controlOff,
+                                            model.controlInitiallyClosed } );
             for( const auto& control : model.model.adjustments )
             {
                 const double initial = model.parameters.at( control.parameter );

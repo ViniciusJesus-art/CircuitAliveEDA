@@ -9,6 +9,6 @@ StartupWMClass=eeschema
 MimeType=application/x-kicad-schematic;
 Name=CircuitAliveEDA Schematic Editor (Standalone)
 GenericName=Schematic Capture Tool
-Comment=Standalone schematic editor for KiCad schematics
+Comment=Standalone schematic editor for CircuitAliveEDA schematics
 Keywords=eeschema
 X-AppStream-Ignore=true

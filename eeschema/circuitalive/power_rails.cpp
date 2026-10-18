@@ -21,15 +21,15 @@ std::optional<double> PowerSymbolVoltage( const std::string& value )
     // such as +5VA/+5VD while preserving their native net names.
     static const std::regex decimalMarker( R"(^([+-]?)([0-9]+)[Vv]([0-9]+)([A-Za-z_][A-Za-z0-9_]*)?$)" );
     static const std::regex volts( R"(^([+-]?)([0-9]+(?:\.[0-9]+)?)([fpnumkKMGg]?)[Vv]([A-Za-z_][A-Za-z0-9_]*)?$)" );
+    static const std::regex bare( R"(^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$)" );
     std::smatch match;
     std::string number;
     if( std::regex_match( text, match, decimalMarker ) )
         number = match[1].str() + match[2].str() + "." + match[3].str();
     else if( std::regex_match( text, match, volts ) )
         number = match[1].str() + match[2].str() + match[3].str();
+    else if( std::regex_match( text, bare ) ) number = text;
     else return {};
-    // std::from_chars accepts a leading minus, but not a leading plus.
-    if( number.starts_with( "+" ) ) number.erase( 0, 1 );
     const double voltage = ParseComponentValue( number );
     if( std::abs( voltage ) > 1e6 ) throw std::runtime_error( "Power symbol voltage exceeds 1 MV: " + value );
     return voltage;

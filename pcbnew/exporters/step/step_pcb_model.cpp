@@ -3073,7 +3073,7 @@ bool STEP_PCB_MODEL::WriteIGES( const wxString& aFileName )
     writer.SetNameMode( true );
     IGESData_GlobalSection header = writer.Model()->GlobalSection();
     header.SetFileName( new TCollection_HAsciiString( fn.GetFullName().ToAscii() ) );
-    header.SetSendName( new TCollection_HAsciiString( "KiCad electronic assembly" ) );
+    header.SetSendName( new TCollection_HAsciiString( "CircuitAliveEDA electronic assembly" ) );
     header.SetAuthorName( new TCollection_HAsciiString( Interface_Static::CVal( "write.iges.header.author" ) ) );
     header.SetCompanyName( new TCollection_HAsciiString( Interface_Static::CVal( "write.iges.header.company" ) ) );
     writer.Model()->SetGlobalSection( header );
@@ -3172,9 +3172,9 @@ bool STEP_PCB_MODEL::WriteSTEP( const wxString& aFileName, bool aOptimize, bool 
 
     // TODO: how to control and ensure consistency with IGES?
     hdr.SetAuthorValue( 1, new TCollection_HAsciiString( "Pcbnew" ) );
-    hdr.SetOrganizationValue( 1, new TCollection_HAsciiString( "Kicad" ) );
-    hdr.SetOriginatingSystem( new TCollection_HAsciiString( "KiCad to STEP converter" ) );
-    hdr.SetDescriptionValue( 1, new TCollection_HAsciiString( "KiCad electronic assembly" ) );
+    hdr.SetOrganizationValue( 1, new TCollection_HAsciiString( "CircuitAliveEDA" ) );
+    hdr.SetOriginatingSystem( new TCollection_HAsciiString( "CircuitAliveEDA to STEP converter" ) );
+    hdr.SetDescriptionValue( 1, new TCollection_HAsciiString( "CircuitAliveEDA electronic assembly" ) );
 
     bool success = true;
 
@@ -3329,7 +3329,7 @@ bool STEP_PCB_MODEL::WriteXAO( const wxString& aFileName )
 
     // Based on Gmsh code
     file << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
-    file << "<XAO version=\"1.0\" author=\"KiCad\">" << std::endl;
+    file << "<XAO version=\"1.0\" author=\"CircuitAliveEDA\">" << std::endl;
     file << "  <geometry name=\"" << fn.GetName() << "\">" << std::endl;
     file << "    <shape format=\"BREP\"><![CDATA[";
 #if OCC_VERSION_HEX < 0x070600
@@ -3981,7 +3981,7 @@ bool STEP_PCB_MODEL::WriteGLTF( const wxString& aFileName )
     metadata.Add( TCollection_AsciiString( "source_pcb_file" ),
                   TCollection_ExtendedString( fn.GetFullName().wc_str() ) );
     metadata.Add( TCollection_AsciiString( "generator" ),
-                  TCollection_AsciiString( wxString::Format( wxS( "KiCad %s" ), GetSemanticVersion() ).ToAscii() ) );
+                  TCollection_AsciiString( wxString::Format( wxS( "CircuitAliveEDA %s" ), GetSemanticVersion() ).ToAscii() ) );
     metadata.Add( TCollection_AsciiString( "generated_at" ),
                   TCollection_AsciiString( GetISO8601CurrentDateTime().ToAscii() ) );
 
@@ -4062,7 +4062,7 @@ bool STEP_PCB_MODEL::WritePLY( const wxString& aFileName )
     metadata.Add( TCollection_AsciiString( "source_pcb_file" ),
                   TCollection_ExtendedString( fn.GetFullName().wc_str() ) );
     metadata.Add( TCollection_AsciiString( "generator" ),
-                  TCollection_AsciiString( wxString::Format( wxS( "KiCad %s" ),
+                  TCollection_AsciiString( wxString::Format( wxS( "CircuitAliveEDA %s" ),
                                                              GetSemanticVersion() ).ToAscii() ) );
     metadata.Add( TCollection_AsciiString( "generated_at" ),
                   TCollection_AsciiString( GetISO8601CurrentDateTime().ToAscii() ) );

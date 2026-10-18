@@ -18,6 +18,7 @@
  */
 
 #include <lib_table_grid_data_model.h>
+#include <circuitalive/branding.h>
 #include <string_utils.h>
 #include <libraries/library_manager.h>
 #include <widgets/grid_button.h>
@@ -42,7 +43,10 @@ LIB_TABLE_GRID_DATA_MODEL::LIB_TABLE_GRID_DATA_MODEL( DIALOG_SHIM* aDialog, WX_G
                                                        } ) );
 
     m_typesEditor = new wxGridCellAttr;
-    m_typesEditor->SetEditor( new wxGridCellChoiceEditor( aPluginChoices ) );
+    wxArrayString displayChoices;
+    for( const wxString& type : aPluginChoices )
+        displayChoices.Add( CIRCUITALIVE::LibraryTypeLabel( type ) );
+    m_typesEditor->SetEditor( new wxGridCellChoiceEditor( displayChoices ) );
 
     m_boolAttr = new wxGridCellAttr;
     m_boolAttr->SetRenderer( new wxGridCellBoolRenderer() );
@@ -109,7 +113,7 @@ wxString LIB_TABLE_GRID_DATA_MODEL::GetValue( int aRow, int aCol )
     {
     case COL_NICKNAME: return UnescapeString( r.Nickname() );
     case COL_URI:      return r.URI();
-    case COL_TYPE:     return r.Type();
+    case COL_TYPE:     return CIRCUITALIVE::LibraryTypeLabel( r.Type() );
     case COL_OPTIONS:  return r.Options();
     case COL_DESCR:    return r.Description();
     case COL_ENABLED:  return r.Disabled() ? wxT( "0" ) : wxT( "1" );
@@ -249,7 +253,7 @@ void LIB_TABLE_GRID_DATA_MODEL::SetValue( int aRow, int aCol, const wxString& aV
     {
     case COL_NICKNAME: lrow.SetNickname( EscapeString( aValue, CTX_LIBID ) );  break;
     case COL_URI:      lrow.SetURI( aValue );                                  break;
-    case COL_TYPE:     lrow.SetType( aValue );                                 break;
+    case COL_TYPE:     lrow.SetType( CIRCUITALIVE::LibraryTypeId( aValue ) );                                 break;
     case COL_OPTIONS:  lrow.SetOptions( aValue );                              break;
     case COL_DESCR:    lrow.SetDescription( aValue );                          break;
     case COL_ENABLED:  lrow.SetDisabled( aValue == wxT( "0" ) );               break;

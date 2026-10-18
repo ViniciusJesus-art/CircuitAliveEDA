@@ -48,6 +48,7 @@
 #include <lib_table_notebook_panel.h>
 #include <confirm.h>
 #include <lib_table_grid_data_model.h>
+#include <circuitalive/branding.h>
 #include <kiplatform/ui.h>
 #include <wildcards_and_files_ext.h>
 #include <pgm_base.h>
@@ -99,7 +100,7 @@ public:
             PCB_IO_MGR::PCB_FILE_T pluginType = PCB_IO_MGR::GuessPluginTypeFromLibPath( uri );
 
             if( pluginType != PCB_IO_MGR::FILE_TYPE_NONE )
-                SetValue( aRow, COL_TYPE, PCB_IO_MGR::ShowType( pluginType ) );
+                SetValue( aRow, COL_TYPE, CIRCUITALIVE::LibraryTypeLabel( PCB_IO_MGR::ShowType( pluginType ) ) );
         }
     }
 
@@ -332,7 +333,7 @@ PANEL_FP_LIB_TABLE::PANEL_FP_LIB_TABLE( DIALOG_EDIT_LIBRARY_TABLES* aParent, PRO
     populatePluginList();
 
     for( auto& [fileType, desc] : m_supportedFpFiles )
-        m_pluginChoices.Add( PCB_IO_MGR::ShowType( fileType ) );
+        m_pluginChoices.Add( CIRCUITALIVE::LibraryTypeLabel( PCB_IO_MGR::ShowType( fileType ) ) );
 
     std::optional<LIBRARY_TABLE*> table = Pgm().GetLibraryManager().Table( LIBRARY_TABLE_TYPE::FOOTPRINT,
                                                                            LIBRARY_TABLE_SCOPE::GLOBAL );
@@ -375,7 +376,7 @@ PANEL_FP_LIB_TABLE::PANEL_FP_LIB_TABLE( DIALOG_EDIT_LIBRARY_TABLES* aParent, PRO
 
     for( auto& [type, desc] : m_supportedFpFiles )
     {
-        wxString entryStr = PCB_IO_MGR::ShowType( type );
+        wxString entryStr = CIRCUITALIVE::LibraryTypeLabel( PCB_IO_MGR::ShowType( type ) );
         wxString midPart;
 
         if( desc.m_IsFile && !desc.m_FileExtensions.empty() )
@@ -525,7 +526,7 @@ void PANEL_FP_LIB_TABLE::onMigrateLibraries( wxCommandEvent& event )
         selectedRows.push_back( cur_grid()->GetGridCursorRow() );
 
     wxArrayInt rowsToMigrate;
-    wxString   kicadType = PCB_IO_MGR::ShowType( PCB_IO_MGR::KICAD_SEXP );
+    wxString   kicadType = CIRCUITALIVE::LibraryTypeLabel( PCB_IO_MGR::ShowType( PCB_IO_MGR::KICAD_SEXP ) );
     wxString   nestedTableType = LIBRARY_TABLE_ROW::TABLE_TYPE_NAME;
     wxString   msg;
     DIALOG_HTML_REPORTER errorReporter( this );
@@ -541,19 +542,19 @@ void PANEL_FP_LIB_TABLE::onMigrateLibraries( wxCommandEvent& event )
 
     if( rowsToMigrate.size() <= 0 )
     {
-        wxMessageBox( _( "Select one or more rows containing libraries to save as current KiCad format." ) );
+        wxMessageBox( _( "Select one or more rows containing libraries to save as current CircuitAliveEDA format." ) );
         return;
     }
     else
     {
         if( rowsToMigrate.size() == 1 )
         {
-            msg.Printf( _( "Save '%s' as current KiCad format and replace entry in table?" ),
+            msg.Printf( _( "Save '%s' as current CircuitAliveEDA format and replace entry in table?" ),
                         cur_grid()->GetCellValue( rowsToMigrate[0], COL_NICKNAME ) );
         }
         else
         {
-            msg.Printf( _( "Save %d libraries as current KiCad format and replace entries in table?" ),
+            msg.Printf( _( "Save %d libraries as current CircuitAliveEDA format and replace entries in table?" ),
                         (int) rowsToMigrate.size() );
         }
 
@@ -651,7 +652,7 @@ void PANEL_FP_LIB_TABLE::browseLibrariesHandler( wxCommandEvent& event )
     if( fileType == PCB_IO_MGR::NESTED_TABLE )
         title = _( "Select Library Table" );
     else
-        title = wxString::Format( _( "Select %s Library" ), PCB_IO_MGR::ShowType( fileType ) );
+        title = wxString::Format( _( "Select %s Library" ), CIRCUITALIVE::LibraryTypeLabel( PCB_IO_MGR::ShowType( fileType ) ) );
 
     if( m_notebook->GetSelection() == 0 )
         lastDir = cfg ? &cfg->m_LastFootprintLibDir : &dummy;
@@ -729,7 +730,7 @@ void PANEL_FP_LIB_TABLE::browseLibrariesHandler( wxCommandEvent& event )
             int last_row = cur_grid()->GetNumberRows() - 1;
 
             cur_grid()->SetCellValue( last_row, COL_NICKNAME, nickname );
-            cur_grid()->SetCellValue( last_row, COL_TYPE, PCB_IO_MGR::ShowType( fileType ) );
+            cur_grid()->SetCellValue( last_row, COL_TYPE, CIRCUITALIVE::LibraryTypeLabel( PCB_IO_MGR::ShowType( fileType ) ) );
 
             // try to use path normalized to an environmental variable or project path
             wxString path = NormalizePath( filePath, &envVars, m_project->GetProjectPath() );

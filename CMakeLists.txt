@@ -133,8 +133,14 @@ option( KICAD_SCRIPTING_WXPYTHON
 mark_as_advanced( KICAD_SCRIPTING_WXPYTHON )
 
 option( KICAD_UPDATE_CHECK
-    "Build in update check"
-    ON )
+    "Build in update check (unavailable in CircuitAliveEDA)"
+    OFF )
+
+# The inherited updater uses the upstream release service, not CircuitAliveEDA releases.
+if( KICAD_UPDATE_CHECK )
+    message( STATUS "Disabling upstream application updates for CircuitAliveEDA" )
+    set( KICAD_UPDATE_CHECK OFF CACHE BOOL "Build in update check" FORCE )
+endif()
 
 cmake_dependent_option( KICAD_WAYLAND
     "Support Wayland features"
@@ -341,7 +347,7 @@ add_compile_definitions( $<$<CONFIG:Debug>:DEBUG> )
 # Add option to add user directories for linker, if any
 link_directories( ${LINK_DIRECTORIES_PATH} )
 
-set( KICAD_CONFIG_DIR "kicad" CACHE STRING "Location of user specific KiCad config files" )
+set( KICAD_CONFIG_DIR "circuitalive-eda" CACHE STRING "Location of user specific CircuitAliveEDA config files" )
 mark_as_advanced( KICAD_CONFIG_DIR )
 add_compile_definitions( KICAD_CONFIG_DIR=${KICAD_CONFIG_DIR} )
 

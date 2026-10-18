@@ -1,11 +1,11 @@
 [Desktop Entry]
 Version=1.0
 Terminal=false
-Icon=circuitaliveeda
+Icon=@KICAD_DESKTOP_FILE_ICON_KICAD@
 Type=Application
 Categories=Science;Electronics;
 Exec=kicad %f
-StartupWMClass=kicad
+StartupWMClass=org.circuitaliveeda.CircuitAliveEDA
 Keywords=Projectmanager;
 MimeType=application/x-kicad-project;
 Name=CircuitAliveEDA

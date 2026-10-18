@@ -25,7 +25,15 @@ if [[ -d "$CIRCUITALIVE_WORK/.circuitalive/deps/usr" ]]; then
     CIRCUITALIVE_DEPS="$CIRCUITALIVE_WORK/.circuitalive/deps/usr"
     export PATH="$CIRCUITALIVE_DEPS/bin:$PATH"
     export LD_LIBRARY_PATH="$CIRCUITALIVE_DEPS/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    if [[ -z "${SPICE_SCRIPTS:-}" && -f "$CIRCUITALIVE_DEPS/lib64/ngspice/scripts/spinit" ]]; then
+        export SPICE_SCRIPTS="$CIRCUITALIVE_DEPS/lib64/ngspice/scripts"
+    fi
     export PKG_CONFIG_PATH="$CIRCUITALIVE_DEPS/lib64/pkgconfig:$CIRCUITALIVE_DEPS/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+    CIRCUITALIVE_PYTHON_VERSION="$(python3 -c 'import sys; print(f"python{sys.version_info.major}.{sys.version_info.minor}")')"
+    CIRCUITALIVE_PYTHON_SITE="$CIRCUITALIVE_DEPS/lib64/$CIRCUITALIVE_PYTHON_VERSION/site-packages"
+    if [[ -d "$CIRCUITALIVE_PYTHON_SITE/wx" ]]; then
+        export PYTHONPATH="$CIRCUITALIVE_PYTHON_SITE${PYTHONPATH:+:$PYTHONPATH}"
+    fi
     if [[ -d "$CIRCUITALIVE_DEPS/share/swig/4.4.1" ]]; then
         export SWIG_LIB="$CIRCUITALIVE_DEPS/share/swig/4.4.1"
     fi

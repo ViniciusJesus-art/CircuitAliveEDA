@@ -202,7 +202,7 @@ DIALOG_TABLECELL_PROPERTIES_BASE::DIALOG_TABLECELL_PROPERTIES_BASE( wxWindow* pa
     m_fontLabel->Wrap( -1 );
     gbFontSizer->Add( m_fontLabel, wxGBPosition( 1, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL | wxLEFT, 1 );
 
-    wxString m_fontCtrlChoices[] = { _( "Default Font" ), _( "KiCad Font" ) };
+    wxString m_fontCtrlChoices[] = { _( "Default Font" ), _( "CircuitAliveEDA Font" ) };
     int      m_fontCtrlNChoices = sizeof( m_fontCtrlChoices ) / sizeof( wxString );
     m_fontCtrl = new FONT_CHOICE( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, m_fontCtrlNChoices,
                                   m_fontCtrlChoices, 0 );

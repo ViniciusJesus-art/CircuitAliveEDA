@@ -1,3 +1,6 @@
+#ifdef _WIN32
+#include "config_windows.h"
+#else
 /* src/include/ngspice/config.h.  Generated from config.h.in by configure.  */
 /* src/include/ngspice/config.h.in.  Generated from configure.ac by autoheader.  */
 
@@ -593,3 +596,5 @@
 
 /* Define as `fork' if `vfork' does not work. */
 /* #undef vfork */
+
+#endif

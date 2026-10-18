@@ -1,4 +1,5 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
+#include "model_i18n.h"
 #include "model_browser.h"
 #include "model_catalog_index.h"
 #include <dialog_shim.h>
@@ -43,7 +44,7 @@ public:
     BROWSER( wxWindow* parent, const std::vector<SIMULATION_MODEL>& models, int selected ) :
         DIALOG_SHIM( parent, wxID_ANY, _( "Choose simulation model" ), wxDefaultPosition,
             wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER ),
-        m_models( models ), m_index( models ), m_timer( this )
+        m_models( models ), m_index( ModelsForDisplay( models ) ), m_timer( this )
     {
         OptOut( this ); SetInitialFocus( nullptr );
         auto* box = new wxBoxSizer( wxVERTICAL );
@@ -129,7 +130,7 @@ private:
         if( const auto index = selection() )
         {
             const auto& model = m_models.at( *index );
-            text += "\n" + W( model.description ) + "\n" + W( model.file.string() );
+            text += "\n" + ModelText( model.description ) + "\n" + W( model.file.string() );
         }
         m_details->SetLabel( text ); m_details->Wrap( GetClientSize().x - FromDIP( 30 ) );
     }

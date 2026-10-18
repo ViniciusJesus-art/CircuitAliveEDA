@@ -34,6 +34,7 @@
  *  icon_kicad_xpm;   // Icon of the application
  */
 #include <bitmaps.h>
+#include <circuitalive/branding.h>
 #include <build_version.h>
 #include <common.h>
 #include <kiplatform/app.h>
@@ -61,7 +62,7 @@ static void buildKicadAboutBanner( EDA_BASE_FRAME* aParent, ABOUT_APP_INFO& aInf
     aInfo.SetAppIcon( aParent->GetIcon() );
 
     /* Set title */
-    aInfo.SetAppName( Pgm().App().GetAppName() );
+    aInfo.SetAppName( CIRCUITALIVE::ProductName() );
 
     /* KiCad build version */
     wxString version;
@@ -134,7 +135,7 @@ static void buildKicadAboutBanner( EDA_BASE_FRAME* aParent, ABOUT_APP_INFO& aInf
                 << HtmlHyperlink( wxS( "http://www.kicad.org" ) )
                 << wxT( "</li>" );
     description << wxT( "<li>" )
-                << _( "Developer website - " )
+                << _( "Upstream KiCad developer website - " )
                 << HtmlHyperlink( wxS( "https://go.kicad.org/dev" ) )
                 << wxT( "</li>" );
 

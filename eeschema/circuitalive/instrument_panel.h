@@ -33,6 +33,7 @@ private:
     wxTextCtrl* m_name;
     wxStaticText* m_help;
     CLICK_CHOICE* m_speed;
+    std::vector<double> m_speedRates = { 1, .1, .01, .001 };
     wxButton* m_step;
     std::vector<wxToggleButton*> m_buttons;
     wxPanel *m_measurePage = nullptr, *m_scopePage = nullptr;

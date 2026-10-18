@@ -106,8 +106,8 @@ if( APPLE )
         MACOSX_PACKAGE_LOCATION Resources
         )
     set( MACOSX_BUNDLE_ICON_FILE kicad.icns )
-    set( MACOSX_BUNDLE_GUI_IDENTIFIER org.kicad.kicad )
-    set( MACOSX_BUNDLE_NAME kicad )
+    set( MACOSX_BUNDLE_GUI_IDENTIFIER org.circuitaliveeda.CircuitAliveEDA )
+    set( MACOSX_BUNDLE_NAME CircuitAliveEDA )
 endif()
 
 add_executable( kicad WIN32 MACOSX_BUNDLE
@@ -152,6 +152,7 @@ endif()
 if( APPLE )
     set_target_properties( kicad PROPERTIES
         MACOSX_BUNDLE_INFO_PLIST ${PROJECT_BINARY_DIR}/kicad/Info.plist
+        MACOSX_BUNDLE_BUNDLE_NAME CircuitAliveEDA
         )
     target_link_libraries( kicad
         nlohmann_json

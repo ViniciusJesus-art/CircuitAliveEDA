@@ -845,7 +845,7 @@ bool FABMASTER::assignLayers()
 
     for( const auto& [layer_name, fabmaster_layer] : layers )
     {
-        wxLogTrace( traceFabmaster, wxT( "Layer %s -> KiCad layer %d" ), layer_name,
+        wxLogTrace( traceFabmaster, wxT( "Layer %s -> CircuitAliveEDA layer %d" ), layer_name,
                     fabmaster_layer.layerid );
     }
 

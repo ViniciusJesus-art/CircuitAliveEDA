@@ -232,7 +232,7 @@ std::string PLACE_FILE_EXPORTER::GenPositionData()
         buffer += line;
 
         wxString Title = GetBuildVersion();
-        snprintf( line, sizeof(line), "### Printed by KiCad version %s\n", TO_UTF8( Title ) );
+        snprintf( line, sizeof(line), "### Printed by CircuitAliveEDA version %s\n", TO_UTF8( Title ) );
         buffer += line;
 
         buffer +=  unit_text;
@@ -311,7 +311,7 @@ std::string PLACE_FILE_EXPORTER::GenReportData()
     buffer += fmt::format( "## Footprint report - date {}\n", TO_UTF8( GetISO8601CurrentDateTime() ) );
 
     wxString Title = GetBuildVersion();
-    buffer += fmt::format( "## Printed by KiCad version {}\n", TO_UTF8( Title ) );
+    buffer += fmt::format( "## Printed by CircuitAliveEDA version {}\n", TO_UTF8( Title ) );
 
     buffer += unit_text;
 

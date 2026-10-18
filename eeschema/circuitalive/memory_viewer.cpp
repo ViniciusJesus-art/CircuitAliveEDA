@@ -1,4 +1,5 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
+#include "model_i18n.h"
 #include "memory_viewer.h"
 #include "session_runner.h"
 #include "choice_controls.h"
@@ -72,14 +73,14 @@ void ShowMemoryViewer( wxWindow* parent, const std::string& reference, const std
 {
     if( regions.empty() )
         return;
-    DIALOG_SHIM dialog( parent, wxID_ANY, wxString::FromUTF8( reference + " — Memory" ), wxDefaultPosition,
+    DIALOG_SHIM dialog( parent, wxID_ANY, wxString::FromUTF8(reference) + " — " + _("Memory"), wxDefaultPosition,
                         wxSize( 1000, 660 ), wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER );
     dialog.OptOut( &dialog );
     auto* layout = new wxBoxSizer( wxVERTICAL );
     auto* row = new wxBoxSizer( wxHORIZONTAL );
     auto* choice = new CLICK_CHOICE( &dialog, wxID_ANY );
     for( const auto& r : regions )
-        choice->Append( wxString::FromUTF8( r.label ) );
+        choice->Append( ModelText( r.label ) );
     choice->SetSelection( 0 );
     auto* refresh = new wxButton( &dialog, wxID_ANY, _( "Capture paused state" ) );
     refresh->Enable( runner != nullptr );
@@ -156,7 +157,7 @@ void ShowMemoryViewer( wxWindow* parent, const std::string& reference, const std
                      sequence = view.memorySequence;
                      if( !view.memoryError.empty() )
                      {
-                         info->SetLabel( wxString::FromUTF8( view.memoryError ) );
+                         info->SetLabel( DiagnosticText( view.memoryError ) );
                          return;
                      }
                      const auto index = std::size_t( choice->GetSelection() );
@@ -202,7 +203,7 @@ void ShowMemoryViewer( wxWindow* parent, const std::string& reference, const std
                 }
                 catch( const std::exception& e )
                 {
-                    wxMessageBox( wxString::FromUTF8( e.what() ), _( "Memory export" ), wxOK | wxICON_INFORMATION,
+                    wxMessageBox( DiagnosticText( e.what() ), _( "Memory export" ), wxOK | wxICON_INFORMATION,
                                   &dialog );
                 }
             } );

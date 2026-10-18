@@ -93,7 +93,7 @@ CLI::PCB_EXPORT_GERBER_COMMAND::PCB_EXPORT_GERBER_COMMAND( const std::string& aN
             .metavar( "PRECISION" );
 
     m_argParser.add_argument( ARG_NO_PROTEL_EXTENSION )
-            .help( UTF8STDSTR( _( "Use KiCad Gerber file extension" ) ) )
+            .help( UTF8STDSTR( _( "Use CircuitAliveEDA Gerber file extension" ) ) )
             .flag();
 
     m_argParser.add_argument( ARG_CHECK_ZONES )

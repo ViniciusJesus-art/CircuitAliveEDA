@@ -13,7 +13,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
-#include <unistd.h>
+#include <sim/platform_runtime.h>
 
 namespace CIRCUITALIVE
 {
@@ -113,7 +113,7 @@ std::vector<fs::path> MODEL_REPOSITORY::DefaultDirectories( const std::string& a
     if( const char* directory = std::getenv( "CIRCUITALIVE_MODEL_DIR" ); directory && *directory )
         paths.emplace_back( directory );
     std::error_code error;
-    auto executable = fs::read_symlink( "/proc/self/exe", error );
+    auto executable = ExecutablePath();
     if( !error ) paths.push_back( executable.parent_path().parent_path() / "share/circuitalive/models" );
     paths.emplace_back( CIRCUITALIVE_BUNDLED_MODEL_DIR );
     std::vector<fs::path> unique;
@@ -273,12 +273,24 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
             if( !parameters.contains( m.brightnessParameter )
                 || ( !m.ratingParameter.empty() && !parameters.contains( m.ratingParameter ) ) )
                 throw std::runtime_error( "Unknown indicator parameter" );
+            if(i.contains("appearance"))
+            {
+                for(std::size_t n=0;n<LED_APPEARANCE_KEYS.size();++n)
+                {
+                    const auto id=i.at("appearance").at(LED_APPEARANCE_KEYS[n]).get<std::string>();
+                    const auto spec=std::find_if(m.parameters.begin(),m.parameters.end(),[&](const auto& parameter){return parameter.id==id;});
+                    if(spec==m.parameters.end() || spec->minimum<0 || spec->maximum>LED_APPEARANCE_LIMITS[n])
+                        throw std::runtime_error("Invalid LED appearance parameter: "+id);
+                    m.ledAppearance.ids[n]=id;
+                }
+            }
         }
         if( j.contains( "control" ) )
         {
             const auto& c = j.at( "control" );
             m.controlSource = c.at( "source" );
             m.controlOn = c.value( "on", 5.0 ); m.controlOff = c.value( "off", 0.0 );
+            m.controlInitiallyOpenSymbols = c.value( "initially_open_symbols", std::vector<std::string>{} );
             if( !std::isfinite( m.controlOn ) || !std::isfinite( m.controlOff ) )
                 throw std::runtime_error( "Invalid control levels" );
         }
@@ -441,6 +453,9 @@ RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
 {
     RESOLVED_MODEL r;
     r.model = SelectModel( c );
+    const auto symbol = c.libraryId.substr( c.libraryId.find( ':' ) + 1 );
+    for( const auto& identity : r.model.controlInitiallyOpenSymbols )
+        if( identity == c.libraryId || identity == symbol ) r.controlInitiallyClosed = false;
     for( std::size_t i = 0; i < r.model.memories.size(); ++i )
         r.memorySlots[r.model.memories[i].id] = i;
     for( const auto& [id, selection] : c.resources )
@@ -568,6 +583,14 @@ std::string ExpandModelTemplate( const std::string& text, const RESOLVED_MODEL& 
             std::ostringstream number;
             number.imbue( std::locale::classic() );
             number << std::setprecision( 17 ) << model.parameters.at( token.substr( 6 ) );
+            result += number.str();
+        }
+        else if( token == "control:initial" )
+        {
+            std::ostringstream number;
+            number.imbue( std::locale::classic() );
+            number << std::setprecision( 17 )
+                   << ( model.controlInitiallyClosed ? model.model.controlOn : model.model.controlOff );
             result += number.str();
         }
         else if( token.starts_with( "memory:" ) ) result += std::to_string(model.memorySlots.at(token.substr(7)));

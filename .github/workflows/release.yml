@@ -1,0 +1,57 @@
+name: Compiled releases
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Installer version
+        required: true
+        default: 0.1.0-preview.1
+  push:
+    branches: ['release/windows-linux']
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 240
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          cache: true
+          install: >-
+            git patch
+            mingw-w64-ucrt-x86_64-kicad
+            mingw-w64-ucrt-x86_64-boost
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-ccache
+            mingw-w64-ucrt-x86_64-swig
+            mingw-w64-ucrt-x86_64-wxwidgets3.2-msw
+            mingw-w64-ucrt-x86_64-gettext-tools
+            mingw-w64-ucrt-x86_64-nsis
+      - uses: actions/cache@v4
+        with:
+          path: D:/a/_temp/circuitalive-ccache
+          key: windows-ucrt64-${{ github.sha }}
+          restore-keys: windows-ucrt64-
+      - name: Build, test and package
+        env:
+          CCACHE_DIR: D:/a/_temp/circuitalive-ccache
+          CCACHE_MAXSIZE: 2G
+          RELEASE_VERSION: ${{ inputs.version || '0.1.0-preview.1' }}
+        run: bash tools/circuitalive/release/build-windows.sh "$RELEASE_VERSION"
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0

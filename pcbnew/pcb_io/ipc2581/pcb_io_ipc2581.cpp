@@ -1491,7 +1491,7 @@ wxXmlNode* PCB_IO_IPC2581::generateHistorySection()
     wxXmlNode* historyNode = appendNode( m_xml_root, "HistoryRecord" );
     addAttribute( historyNode,  "number", "1" );
     addAttribute( historyNode,  "origination", wxDateTime::Now().FormatISOCombined() );
-    addAttribute( historyNode,  "software", "KiCad EDA" );
+    addAttribute( historyNode,  "software", "CircuitAliveEDA" );
     addAttribute( historyNode,  "lastChange", wxDateTime::Now().FormatISOCombined() );
 
     wxXmlNode* fileRevisionNode = appendNode( historyNode, "FileRevision" );
@@ -1500,9 +1500,9 @@ wxXmlNode* PCB_IO_IPC2581::generateHistorySection()
     addAttribute( fileRevisionNode,  "label", "NO LABEL" );
 
     wxXmlNode* softwarePackageNode = appendNode( fileRevisionNode, "SoftwarePackage" );
-    addAttribute( softwarePackageNode,  "name", "KiCad" );
+    addAttribute( softwarePackageNode,  "name", "CircuitAliveEDA" );
     addAttribute( softwarePackageNode,  "revision", GetMajorMinorPatchVersion() );
-    addAttribute( softwarePackageNode,  "vendor", "KiCad EDA" );
+    addAttribute( softwarePackageNode,  "vendor", "CircuitAliveEDA" );
 
     wxXmlNode* certificationNode = appendNode( softwarePackageNode, "Certification" );
     addAttribute( certificationNode,  "certificationStatus", "SELFTEST" );
@@ -4042,7 +4042,7 @@ wxXmlNode* PCB_IO_IPC2581::generateAvlSection()
 
     wxXmlNode* header = appendNode( avl, "AvlHeader" );
     addAttribute( header,  "title", "BOM" );
-    addAttribute( header,  "source", "KiCad" );
+    addAttribute( header,  "source", "CircuitAliveEDA" );
     addAttribute( header,  "author", "OWNER" );
     addAttribute( header,  "datetime", wxDateTime::Now().FormatISOCombined() );
     addAttribute( header,  "version", "1" );

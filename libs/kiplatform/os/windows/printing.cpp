@@ -290,7 +290,7 @@ public:
             m_taskRequestedToken = m_rtPM.PrintTaskRequested(
                     [this]( winrt::Windows::Foundation::IInspectable const& sender, winrt::Windows::Graphics::Printing::PrintTaskRequestedEventArgs const& e )
                     {
-                        auto task = e.Request().CreatePrintTask( L"KiCad PDF Print",
+                        auto task = e.Request().CreatePrintTask( L"CircuitAliveEDA PDF Print",
                                 [this]( winrt::Windows::Graphics::Printing::PrintTaskSourceRequestedArgs const& sourceRequestedArgs )
                                 {
                                     // Supply document source for preview

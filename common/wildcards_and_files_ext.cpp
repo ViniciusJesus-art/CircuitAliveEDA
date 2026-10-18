@@ -239,48 +239,48 @@ wxString FILEEXT::AllFilesWildcard()
 
 wxString FILEEXT::KiCadSymbolLibFileWildcard()
 {
-    return _( "KiCad symbol library files" )
+    return _( "CircuitAliveEDA symbol library files" )
             + AddFileExtListToFilter( { KiCadSymbolLibFileExtension } );
 }
 
 
 wxString FILEEXT::ProjectFileWildcard()
 {
-    return _( "KiCad project files" ) + AddFileExtListToFilter( { ProjectFileExtension } );
+    return _( "CircuitAliveEDA project files" ) + AddFileExtListToFilter( { ProjectFileExtension } );
 }
 
 
 wxString FILEEXT::LegacyProjectFileWildcard()
 {
-    return _( "KiCad legacy project files" )
+    return _( "CircuitAliveEDA legacy project files" )
             + AddFileExtListToFilter( { LegacyProjectFileExtension } );
 }
 
 
 wxString FILEEXT::AllProjectFilesWildcard()
 {
-    return _( "All KiCad project files" )
+    return _( "All CircuitAliveEDA project files" )
             + AddFileExtListToFilter( { ProjectFileExtension, LegacyProjectFileExtension } );
 }
 
 
 wxString FILEEXT::AllSchematicFilesWildcard()
 {
-    return _( "All KiCad schematic files" )
+    return _( "All CircuitAliveEDA schematic files" )
             + AddFileExtListToFilter( { KiCadSchematicFileExtension, LegacySchematicFileExtension } );
 }
 
 
 wxString FILEEXT::LegacySchematicFileWildcard()
 {
-    return _( "KiCad legacy schematic files" )
+    return _( "CircuitAliveEDA legacy schematic files" )
             + AddFileExtListToFilter( { LegacySchematicFileExtension } );
 }
 
 
 wxString FILEEXT::KiCadSchematicFileWildcard()
 {
-    return _( "KiCad s-expression schematic files" )
+    return _( "CircuitAliveEDA s-expression schematic files" )
             + AddFileExtListToFilter( { KiCadSchematicFileExtension } );
 }
 
@@ -324,7 +324,7 @@ wxString FILEEXT::OrCadPcb2NetlistFileWildcard()
 
 wxString FILEEXT::NetlistFileWildcard()
 {
-    return _( "KiCad netlist files" ) + AddFileExtListToFilter( { "net" } );
+    return _( "CircuitAliveEDA netlist files" ) + AddFileExtListToFilter( { "net" } );
 }
 
 
@@ -355,34 +355,34 @@ wxString FILEEXT::EasyEdaProFileWildcard()
 
 wxString FILEEXT::PcbFileWildcard()
 {
-    return _( "KiCad printed circuit board files" )
+    return _( "CircuitAliveEDA printed circuit board files" )
            + AddFileExtListToFilter( { KiCadPcbFileExtension } );
 }
 
 
 wxString FILEEXT::KiCadFootprintLibFileWildcard()
 {
-    return _( "KiCad footprint files" ) + AddFileExtListToFilter( { KiCadFootprintFileExtension } );
+    return _( "CircuitAliveEDA footprint files" ) + AddFileExtListToFilter( { KiCadFootprintFileExtension } );
 }
 
 
 wxString FILEEXT::KiCadFootprintLibPathWildcard()
 {
-    return _( "KiCad footprint library paths" )
+    return _( "CircuitAliveEDA footprint library paths" )
             + AddFileExtListToFilter( { KiCadFootprintLibPathExtension } );
 }
 
 
 wxString FILEEXT::KiCadDesignBlockPathWildcard()
 {
-    return _( "KiCad design block path" )
+    return _( "CircuitAliveEDA design block path" )
            + AddFileExtListToFilter( { KiCadDesignBlockPathExtension } );
 }
 
 
 wxString FILEEXT::KiCadDesignBlockLibPathWildcard()
 {
-    return _( "KiCad design block library paths" )
+    return _( "CircuitAliveEDA design block library paths" )
            + AddFileExtListToFilter( { KiCadDesignBlockLibPathExtension } );
 }
 
@@ -397,7 +397,7 @@ wxString FILEEXT::DrawingSheetFileWildcard()
 // Wildcard for cvpcb symbol to footprint link file
 wxString FILEEXT::FootprintAssignmentFileWildcard()
 {
-    return _( "KiCad symbol footprint link files" )
+    return _( "CircuitAliveEDA symbol footprint link files" )
             + AddFileExtListToFilter( { FootprintAssignmentFileExtension } );
 }
 
@@ -596,5 +596,5 @@ wxString FILEEXT::HotkeyFileWildcard()
 
 wxString FILEEXT::JobsetFileWildcard()
 {
-    return _( "KiCad jobset files" ) + AddFileExtListToFilter( { KiCadJobSetFileExtension } );
+    return _( "CircuitAliveEDA jobset files" ) + AddFileExtListToFilter( { KiCadJobSetFileExtension } );
 }

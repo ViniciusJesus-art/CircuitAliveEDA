@@ -93,7 +93,7 @@
                         <property name="gripper">0</property>
                         <property name="hidden">0</property>
                         <property name="id">wxID_ANY</property>
-                        <property name="label">This schematic has one or more buses with more than one label.&#x0A;This was allowed in previous KiCad versions but is no longer permitted.</property>
+                        <property name="label">This schematic has one or more buses with more than one label.&#x0A;This was allowed in previous file format versions but is no longer permitted.</property>
                         <property name="markup">0</property>
                         <property name="max_size"></property>
                         <property name="maximize_button">0</property>

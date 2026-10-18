@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <sim/memory_image.h>
+#include "led_appearance.h"
 
 namespace CIRCUITALIVE
 {
@@ -69,8 +70,10 @@ struct SIMULATION_MODEL
     std::vector<std::vector<std::string>> electricalGroups;
     std::string referencePin;
     std::string indicatorSignal, brightnessParameter, ratingParameter;
+    LED_APPEARANCE_PARAMETERS ledAppearance;
     std::string controlSource;
     double controlOn = 5, controlOff = 0;
+    std::vector<std::string> controlInitiallyOpenSymbols;
     std::vector<MODEL_ADJUSTMENT> adjustments;
     std::vector<MODEL_RESOURCE> resources;
     std::vector<MODEL_MEMORY> memories;
@@ -91,6 +94,7 @@ struct SIMULATION_MODEL
 struct RESOLVED_MODEL
 {
     SIMULATION_MODEL model;
+    bool controlInitiallyClosed = true;
     std::map<std::string, std::string> pins; // Model port -> schematic physical pin.
     std::map<std::string, std::string> parameterText;
     std::map<std::string, double> parameters;

@@ -423,7 +423,7 @@ void SCOPE_PANEL::present()
     }
     const auto& h = history(); const double span = h.empty() ? 0 : h.back().time - h.front().time;
     wxString info = _( "Solver step ≤ " ) + utf8( ScopeFormat( m_maxStep, "s" ) ) + _( " · gap " ) + utf8( ScopeFormat( m_frameGap, "s" ) );
-    info += "\n" + _( "Input history: " ) + utf8( ScopeFormat( span, "s" ) ) + wxString::Format( " · %zu points", h.size() );
+    info += "\n" + _( "Input history: " ) + utf8( ScopeFormat( span, "s" ) ) + wxString::Format( _(" · %zu points"), h.size() );
     if( frame.decimated ) info += "\n" + _( "Envelope capture · measurements are estimates" );
     else if( m_frameGap > m_preferences.timebase.perDivision / 2 ) info += "\n" + _( "Sparse samples · zoom adds no detail" );
     if( m_info->GetLabel() != info ) m_info->SetLabel( info );

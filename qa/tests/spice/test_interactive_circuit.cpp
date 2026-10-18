@@ -51,6 +51,13 @@ BOOST_AUTO_TEST_CASE( InteractiveValuesAndDisplayResponse )
     BOOST_CHECK_CLOSE( ParseComponentValue( "4k7" ), 4700, 1e-9 );
     BOOST_CHECK_CLOSE( ParseComponentValue( "2u2F" ), 2.2e-6, 1e-9 );
     BOOST_CHECK_CLOSE( ParseComponentValue( "R47" ), 0.47, 1e-9 );
+    for( const auto* value : { "+5V", "+5v", "+5", "5", "5V", "5v", " + 5 v " } )
+        BOOST_CHECK_EQUAL( ParseComponentValue( value ), 5 );
+    for( const auto* value : { "-5V", "-5v", "-5" } ) BOOST_CHECK_EQUAL( ParseComponentValue( value ), -5 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "+500mv" ), .5, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "+4k7" ), 4700, 1e-9 );
+    for( const auto* value : { "+-5V", "++5", "--5", "5vv", "+", "5Vgarbage" } )
+        BOOST_CHECK_THROW( ParseComponentValue( value ), std::runtime_error );
     BOOST_CHECK_THROW( ParseComponentValue( "1\nVhack a 0 9" ), std::runtime_error );
     BOOST_CHECK_THROW( ParseComponentValue( "NaN" ), std::runtime_error );
     BOOST_CHECK_THROW( ParseComponentValue( "1e999" ), std::runtime_error );
@@ -338,6 +345,56 @@ BOOST_AUTO_TEST_CASE( EditorRunnerCancellationAndFiniteCompletion )
     runner.Resume();
     std::this_thread::sleep_for( 40ms );
     BOOST_CHECK( runner.View().state == EDITOR_SESSION_STATE::COMPLETED );
+}
+
+BOOST_AUTO_TEST_CASE( PushSwitchStartsOpenInTheSolverAndEditorAndResetsOnReplay )
+{
+    auto parts = Components();
+    parts[1].libraryId = "Switch:SW_Push";
+    parts[1].value = "SW_Push";
+    // Existing schematics explicitly associate this shared model as well.
+    parts[1].modelFile = "builtin:switch";
+    const auto circuit = BuildCircuitSnapshot( parts );
+    BOOST_REQUIRE_EQUAL( circuit.switches.size(), 1u );
+    BOOST_CHECK( !circuit.switches[0].initiallyClosed );
+    BOOST_CHECK_NE( circuit.netlist.find( "Vcontrolca2 controlca2 0 0" ), std::string::npos );
+    SESSION_RUNNER runner( CIRCUITALIVE_TEST_WORKER );
+    runner.Start( circuit );
+    auto off = Await( runner, []( const auto& v ) { return v.sample.latest.time > .05; } );
+    BOOST_CHECK( !off.switches.at( 0 ) );
+    BOOST_CHECK_LT( off.ledCurrents.at( 0 ), 1e-6 );
+    runner.ToggleSwitch( 0 );
+    auto on = Await( runner, [&]( const auto& v ) { return v.sample.latest.time > off.sample.latest.time + .2; } );
+    BOOST_CHECK( on.switches.at( 0 ) );
+    BOOST_CHECK_GT( on.ledCurrents.at( 0 ), .003 );
+    runner.Pause();
+    Await( runner, []( const auto& v ) { return v.state == EDITOR_SESSION_STATE::PAUSED; } );
+    runner.ToggleSwitch( 0 );
+    BOOST_CHECK( !Await( runner, []( const auto& v ) { return !v.switches.at( 0 ); } ).switches[0] );
+    runner.Stop();
+    runner.Start( circuit );
+    auto replay = Await( runner, []( const auto& v ) { return v.state == EDITOR_SESSION_STATE::RUNNING; } );
+    BOOST_CHECK( !replay.switches.at( 0 ) );
+    BOOST_CHECK_EQUAL( replay.sample.eventsApplied, 0u );
+}
+
+BOOST_AUTO_TEST_CASE( SimulationPreferencesControlSolverLimitsAndInitialPushState )
+{
+    auto parts = Components();
+    parts[1].libraryId = "Switch:SW_Push";
+    parts[1].modelFile = "builtin:switch";
+    SIMULATION_PREFERENCES preferences;
+    preferences.maxTimeStepUs = 25;
+    preferences.durationSeconds = 12;
+    preferences.pushButtonsReleased = false;
+    const auto circuit = BuildCircuitSnapshot( parts, {}, false, {}, preferences );
+    BOOST_CHECK_CLOSE( circuit.config.maxStep, 25e-6, 1e-8 );
+    BOOST_CHECK_EQUAL( circuit.config.horizon, 12 );
+    BOOST_CHECK( circuit.switches.at( 0 ).initiallyClosed );
+    BOOST_CHECK_NE( circuit.netlist.find( "Vcontrolca2 controlca2 0 5" ), std::string::npos );
+    preferences.maxTimeStepUs = .001; // Tiny steps must also respect the solver's bounded horizon.
+    const auto tiny = BuildCircuitSnapshot( parts, {}, false, {}, preferences );
+    BOOST_CHECK_LE( tiny.config.horizon / tiny.config.maxStep, 1e8 );
 }
 
 BOOST_AUTO_TEST_CASE( EditorRunnerSurfacesWorkerFailure )

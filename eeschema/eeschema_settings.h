@@ -30,6 +30,7 @@
 #include <remote_provider_settings.h>
 #include <settings/app_settings.h>
 #include <sim/sim_preferences.h>
+#include <circuitalive/simulation_preferences.h>
 
 using KIGFX::COLOR4D;
 
@@ -352,6 +353,7 @@ public:
     DIALOG_CHANGE_SYMBOLS     m_ChangeSymbols;
 
     SIMULATOR                 m_Simulator;
+    CIRCUITALIVE::SIMULATION_PREFERENCES m_RealtimeSimulation;
 
     bool                      m_RescueNeverShow;
 

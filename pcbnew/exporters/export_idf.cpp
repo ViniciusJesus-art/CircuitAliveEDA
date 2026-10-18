@@ -636,7 +636,7 @@ bool PCB_EDIT_FRAME::Export_IDF3( BOARD* aPcb, const wxString& aFullFileName,
     idfBoard.SetLibraryVersion( 0 );
 
     std::ostringstream ostr;
-    ostr << "KiCad " << TO_UTF8( GetBuildVersion() );
+    ostr << "CircuitAliveEDA " << TO_UTF8( GetBuildVersion() );
     idfBoard.SetIDFSource( ostr.str() );
 
     try

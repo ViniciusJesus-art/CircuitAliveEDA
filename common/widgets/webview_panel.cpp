@@ -86,7 +86,7 @@ WEBVIEW_PANEL::WEBVIEW_PANEL( wxWindow* aParent, wxWindowID aId, const wxPoint& 
     browser->RegisterHandler( wxSharedPtr<wxWebViewHandler>( new wxWebViewArchiveHandler( "wxfs" ) ) );
     browser->RegisterHandler( wxSharedPtr<wxWebViewHandler>( new wxWebViewFSHandler( "memory" ) ) );
 #endif
-    browser->SetUserAgent( wxString::Format( "KiCad/%s WebView/%s", GetMajorMinorPatchVersion(), wxGetOsDescription() ) );
+    browser->SetUserAgent( wxString::Format( "CircuitAliveEDA/%s WebView/%s", GetMajorMinorPatchVersion(), wxGetOsDescription() ) );
     browser->Create( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize );
     sizer->Add( browser, 1, wxEXPAND );
     SetSizer( sizer );

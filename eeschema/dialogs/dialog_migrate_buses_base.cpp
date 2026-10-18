@@ -16,7 +16,7 @@ DIALOG_MIGRATE_BUSES_BASE::DIALOG_MIGRATE_BUSES_BASE( wxWindow* parent, wxWindow
 	wxBoxSizer* main_sizer;
 	main_sizer = new wxBoxSizer( wxVERTICAL );
 
-	m_staticText5 = new wxStaticText( this, wxID_ANY, _("This schematic has one or more buses with more than one label.\nThis was allowed in previous KiCad versions but is no longer permitted."), wxDefaultPosition, wxDefaultSize, 0 );
+	m_staticText5 = new wxStaticText( this, wxID_ANY, _("This schematic has one or more buses with more than one label.\nThis was allowed in previous file format versions but is no longer permitted."), wxDefaultPosition, wxDefaultSize, 0 );
 	m_staticText5->Wrap( 480 );
 	main_sizer->Add( m_staticText5, 0, wxEXPAND|wxTOP|wxRIGHT|wxLEFT, 10 );
 

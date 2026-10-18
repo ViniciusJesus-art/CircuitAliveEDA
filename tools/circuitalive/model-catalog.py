@@ -9,6 +9,7 @@ import argparse
 from collections import Counter
 import csv
 import json
+import os
 from pathlib import Path
 
 from symbol_library import library_symbols, symbol_pins
@@ -123,7 +124,9 @@ def write_report(prefix, summary, rows):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--symbols', type=Path, default=Path('/usr/share/kicad/symbols'))
+    parser.add_argument('--symbols', type=Path, default=Path(os.environ.get(
+        'KICAD10_SYMBOL_DIR', os.environ.get('CIRCUITALIVE_LIBRARY_DIR',
+        str(ROOT / '.circuitalive/libraries/usr/share/kicad')) + '/symbols')))
     parser.add_argument('--models', type=Path, nargs='+', default=[ROOT / 'simulation/models'],
                         help='Model directories, in precedence order')
     parser.add_argument('--output', type=Path, default=ROOT / '.circuitalive/reports/model-catalog')

@@ -34,6 +34,7 @@
 #include <string_utils.h>
 #include <dialogs/html_message_box.h>
 #include <build_version.h>
+#include <circuitalive/branding.h>
 
 
 HTML_MESSAGE_BOX::HTML_MESSAGE_BOX( wxWindow* aParent, const wxString& aTitle,
@@ -185,7 +186,7 @@ void HTML_MESSAGE_BOX::OnHTMLLinkClicked( wxHtmlLinkEvent& event )
 
     if( href.StartsWith( wxS( "https://go.kicad.org/docs" ) ) )
     {
-        href.Replace( wxS( "GetMajorMinorVersion" ), GetMajorMinorVersion() );
+        href = CIRCUITALIVE::DocumentationUrl();
     }
 
     wxURI uri( href );

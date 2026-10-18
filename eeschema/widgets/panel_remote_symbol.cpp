@@ -501,7 +501,7 @@ void PANEL_REMOTE_SYMBOL::beginSessionHandshake()
     m_messageIdCounter = 0;
 
     nlohmann::json params = nlohmann::json::object();
-    params["client_name"] = "KiCad";
+    params["client_name"] = "CircuitAliveEDA";
     params["client_version"] = GetSemanticVersion().ToStdString();
     params["supported_versions"] = { REMOTE_SYMBOL_SESSION_VERSION };
     sendRpcNotification( wxS( "NEW_SESSION" ), std::move( params ) );
@@ -786,7 +786,7 @@ void PANEL_REMOTE_SYMBOL::handleRpcMessage( const nlohmann::json& aMessage )
     if( command == wxS( "NEW_SESSION" ) )
     {
         nlohmann::json reply = nlohmann::json::object();
-        reply["client_name"] = "KiCad";
+        reply["client_name"] = "CircuitAliveEDA";
         reply["client_version"] = GetSemanticVersion().ToStdString();
         reply["supported_versions"] = { REMOTE_SYMBOL_SESSION_VERSION };
         sendRpcReply( command, messageId, std::move( reply ) );

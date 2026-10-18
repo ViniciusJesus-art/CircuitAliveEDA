@@ -694,7 +694,7 @@ bool PANEL_JOBSET::OpenJobOptionsForListItem( size_t aItemIndex )
         }
         else
         {
-            DisplayErrorMessage( m_frame, wxString::Format( _( "This version of KiCad does not "
+            DisplayErrorMessage( m_frame, wxString::Format( _( "This version of CircuitAliveEDA does not "
                                                                "support the '%s' job type." ),
                                                             job.m_type ) );
         }

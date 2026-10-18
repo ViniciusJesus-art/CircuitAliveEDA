@@ -409,8 +409,8 @@ wxString KIPLATFORM::ENV::GetAppUserModelId()
     // Because longer scope Windows features, such as "Pin to Taskbar"
     // on a running application, depend on this being consistent.
     std::vector<wxString> modelIdComponents;
-    modelIdComponents.push_back( wxS( "Kicad" ) );
-    modelIdComponents.push_back( wxS( "Kicad" ) );
+    modelIdComponents.push_back( wxS( "CircuitAliveEDA" ) );
+    modelIdComponents.push_back( wxS( "CircuitAliveEDA" ) );
     modelIdComponents.push_back( wxTheApp->GetAppName() );
     modelIdComponents.push_back( KICAD_MAJOR_MINOR_VERSION );
 

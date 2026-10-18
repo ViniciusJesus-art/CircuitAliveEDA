@@ -21,6 +21,7 @@
         "KICAD_VERSION_EXTRA": "CircuitAliveEDA",
         "KICAD_CONFIG_DIR": "circuitalive-eda",
         "KICAD_BUILD_QA_TESTS": true,
+        "KICAD_BUILD_I18N": true,
         "KICAD_SPICE_QA": true,
         "KICAD_SCRIPTING_WXPYTHON": true,
         "KICAD_IPC_API": true,

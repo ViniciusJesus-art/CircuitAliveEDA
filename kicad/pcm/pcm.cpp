@@ -310,7 +310,7 @@ bool PLUGIN_CONTENT_MANAGER::FetchRepository( const wxString& aUrl, PCM_REPOSITO
         if( m_dialog )
         {
             wxLogError( _( "Unable to parse repository: %s" ), e.what() );
-            wxLogError( _( "The given repository URL does not look like a valid KiCad package "
+            wxLogError( _( "The given repository URL does not look like a valid CircuitAliveEDA package "
                            "repository. Please double check the URL." ) );
         }
 
@@ -1262,9 +1262,9 @@ void PLUGIN_CONTENT_MANAGER::ShowApiEnablePromptIfNeeded()
     m_apiEnablePromptNeeded = false;
 
     if( m_dialog
-        && wxMessageBox( _( "This plugin requires the KiCad API, which is currently "
+        && wxMessageBox( _( "This plugin requires the CircuitAliveEDA API, which is currently "
                             "disabled in preferences. Would you like to enable it?" ),
-                         _( "Enable KiCad API" ), wxICON_QUESTION | wxYES_NO, m_dialog )
+                         _( "Enable CircuitAliveEDA API" ), wxICON_QUESTION | wxYES_NO, m_dialog )
                    == wxYES )
     {
         Pgm().GetCommonSettings()->m_Api.enable_server = true;

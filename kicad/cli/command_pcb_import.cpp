@@ -37,7 +37,7 @@ CLI::PCB_IMPORT_COMMAND::PCB_IMPORT_COMMAND() : COMMAND( "import" )
     addCommonArgs( true, true, IO_TYPE::FILE, IO_TYPE::FILE );
 
     m_argParser.add_description(
-            UTF8STDSTR( _( "Import a non-KiCad PCB file to KiCad format" ) ) );
+            UTF8STDSTR( _( "Import a non-CircuitAliveEDA PCB file to CircuitAliveEDA format" ) ) );
 
     m_argParser.add_argument( ARG_FORMAT )
             .default_value( std::string( "auto" ) )

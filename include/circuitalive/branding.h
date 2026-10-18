@@ -7,7 +7,18 @@
 namespace CIRCUITALIVE
 {
 inline wxString ProductName() { return wxS( "CircuitAliveEDA" ); }
+inline wxString ProjectUrl() { return wxS( "https://github.com/ViniciusJesus-art/CircuitAliveEDA" ); }
+inline wxString DocumentationUrl() { return ProjectUrl() + wxS( "/tree/main/docs/circuitalive" ); }
 inline wxString DesktopId() { return wxS( "org.circuitaliveeda.CircuitAliveEDA" ); }
+// Library type tokens remain unchanged on disk; only their UI labels use our brand.
+inline wxString LibraryTypeLabel( const wxString& type )
+{
+    return type == wxS( "KiCad" ) ? ProductName() : type;
+}
+inline wxString LibraryTypeId( const wxString& label )
+{
+    return label == ProductName() ? wxS( "KiCad" ) : label;
+}
 inline wxString AppTitle( const wxString& role ) { return ProductName() + " " + wxGetTranslation( role ); }
 inline wxString WindowTitle( const wxString& title )
 {

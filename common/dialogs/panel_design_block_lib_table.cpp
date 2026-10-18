@@ -40,6 +40,7 @@
 #include <widgets/grid_readonly_text_helpers.h>
 #include <confirm.h>
 #include <lib_table_grid_data_model.h>
+#include <circuitalive/branding.h>
 #include <wildcards_and_files_ext.h>
 #include <pgm_base.h>
 #include <env_paths.h>
@@ -164,7 +165,7 @@ public:
                     DESIGN_BLOCK_IO_MGR::GuessPluginTypeFromLibPath( uri );
 
             if( pluginType != DESIGN_BLOCK_IO_MGR::FILE_TYPE_NONE )
-                SetValue( aRow, COL_TYPE, DESIGN_BLOCK_IO_MGR::ShowType( pluginType ) );
+                SetValue( aRow, COL_TYPE, CIRCUITALIVE::LibraryTypeLabel( DESIGN_BLOCK_IO_MGR::ShowType( pluginType ) ) );
         }
     }
 
@@ -395,7 +396,7 @@ PANEL_DESIGN_BLOCK_LIB_TABLE::PANEL_DESIGN_BLOCK_LIB_TABLE( DIALOG_EDIT_LIBRARY_
     populatePluginList();
 
     for( auto& [fileType, desc] : m_supportedDesignBlockFiles )
-        m_pluginChoices.Add( DESIGN_BLOCK_IO_MGR::ShowType( fileType ) );
+        m_pluginChoices.Add( CIRCUITALIVE::LibraryTypeLabel( DESIGN_BLOCK_IO_MGR::ShowType( fileType ) ) );
 
     std::optional<LIBRARY_TABLE*> table = Pgm().GetLibraryManager().Table( LIBRARY_TABLE_TYPE::DESIGN_BLOCK,
                                                                            LIBRARY_TABLE_SCOPE::GLOBAL );
@@ -441,7 +442,7 @@ PANEL_DESIGN_BLOCK_LIB_TABLE::PANEL_DESIGN_BLOCK_LIB_TABLE( DIALOG_EDIT_LIBRARY_
 
     for( auto& [type, desc] : m_supportedDesignBlockFiles )
     {
-        wxString entryStr = DESIGN_BLOCK_IO_MGR::ShowType( type );
+        wxString entryStr = CIRCUITALIVE::LibraryTypeLabel( DESIGN_BLOCK_IO_MGR::ShowType( type ) );
         wxString midPart;
 
         if( desc.m_IsFile && !desc.m_FileExtensions.empty() )
@@ -492,7 +493,7 @@ void PANEL_DESIGN_BLOCK_LIB_TABLE::populatePluginList()
     {
         if( type == DESIGN_BLOCK_IO_MGR::NESTED_TABLE )
         {
-            m_pluginChoices.Add( DESIGN_BLOCK_IO_MGR::ShowType( type ) );
+            m_pluginChoices.Add( CIRCUITALIVE::LibraryTypeLabel( DESIGN_BLOCK_IO_MGR::ShowType( type ) ) );
             continue;
         }
 
@@ -609,7 +610,7 @@ void PANEL_DESIGN_BLOCK_LIB_TABLE::onMigrateLibraries( wxCommandEvent& event )
         selectedRows.push_back( cur_grid()->GetGridCursorRow() );
 
     wxArrayInt rowsToMigrate;
-    wxString   kicadType = DESIGN_BLOCK_IO_MGR::ShowType( DESIGN_BLOCK_IO_MGR::KICAD_SEXP );
+    wxString   kicadType = CIRCUITALIVE::LibraryTypeLabel( DESIGN_BLOCK_IO_MGR::ShowType( DESIGN_BLOCK_IO_MGR::KICAD_SEXP ) );
     wxString   nestedTableType = LIBRARY_TABLE_ROW::TABLE_TYPE_NAME;
     wxString   msg;
 
@@ -624,19 +625,19 @@ void PANEL_DESIGN_BLOCK_LIB_TABLE::onMigrateLibraries( wxCommandEvent& event )
 
     if( rowsToMigrate.size() <= 0 )
     {
-        wxMessageBox( _( "Select one or more rows containing libraries to save as current KiCad format." ) );
+        wxMessageBox( _( "Select one or more rows containing libraries to save as current CircuitAliveEDA format." ) );
         return;
     }
     else
     {
         if( rowsToMigrate.size() == 1 )
         {
-            msg.Printf( _( "Save '%s' as current KiCad format and replace entry in table?" ),
+            msg.Printf( _( "Save '%s' as current CircuitAliveEDA format and replace entry in table?" ),
                         cur_grid()->GetCellValue( rowsToMigrate[0], COL_NICKNAME ) );
         }
         else
         {
-            msg.Printf( _( "Save %d libraries as current KiCad format and replace entries in table?" ),
+            msg.Printf( _( "Save %d libraries as current CircuitAliveEDA format and replace entries in table?" ),
                         (int) rowsToMigrate.size() );
         }
 
@@ -719,7 +720,7 @@ void PANEL_DESIGN_BLOCK_LIB_TABLE::browseLibrariesHandler( wxCommandEvent& event
     const IO_BASE::IO_FILE_DESC& fileDesc = m_supportedDesignBlockFiles.at( fileType );
     KICAD_SETTINGS*              cfg = GetAppSettings<KICAD_SETTINGS>( "kicad" );
 
-    wxString  title = wxString::Format( _( "Select %s Library" ), DESIGN_BLOCK_IO_MGR::ShowType( fileType ) );
+    wxString  title = wxString::Format( _( "Select %s Library" ), CIRCUITALIVE::LibraryTypeLabel( DESIGN_BLOCK_IO_MGR::ShowType( fileType ) ) );
     wxString  dummy;
     wxString* lastDir;
 
@@ -798,7 +799,7 @@ void PANEL_DESIGN_BLOCK_LIB_TABLE::browseLibrariesHandler( wxCommandEvent& event
             int last_row = cur_grid()->GetNumberRows() - 1;
 
             cur_grid()->SetCellValue( last_row, COL_NICKNAME, nickname );
-            cur_grid()->SetCellValue( last_row, COL_TYPE, DESIGN_BLOCK_IO_MGR::ShowType( fileType ) );
+            cur_grid()->SetCellValue( last_row, COL_TYPE, CIRCUITALIVE::LibraryTypeLabel( DESIGN_BLOCK_IO_MGR::ShowType( fileType ) ) );
 
             // try to use path normalized to an environmental variable or project path
             wxString path = NormalizePath( filePath, &envVars, m_project->GetProjectPath() );

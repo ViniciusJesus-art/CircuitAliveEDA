@@ -265,7 +265,7 @@ PROJECT_TREE_PANE::PROJECT_TREE_PANE( KICAD_MANAGER_FRAME* parent ) :
     for( int ii = 0; s_allowedExtensionsToList[ii] != nullptr; ii++ )
         m_filters.emplace_back( s_allowedExtensionsToList[ii] );
 
-    m_filters.emplace_back( wxT( "^no KiCad files found" ) );
+    m_filters.emplace_back( wxT( "^no CircuitAliveEDA files found" ) );
 
     ReCreateTreePrj();
 }
@@ -1124,7 +1124,7 @@ void PROJECT_TREE_PANE::onOpenSelectedFileWithTextEditor( wxCommandEvent& event 
 
     if( editorname.IsEmpty() )
     {
-        wxMessageBox( _( "No text editor selected in KiCad.  Please choose one." ) );
+        wxMessageBox( _( "No text editor selected in CircuitAliveEDA.  Please choose one." ) );
         return;
     }
 

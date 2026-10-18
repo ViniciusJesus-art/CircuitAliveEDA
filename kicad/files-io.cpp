@@ -39,7 +39,7 @@
 
 void KICAD_MANAGER_FRAME::OnFileHistory( wxCommandEvent& event )
 {
-    wxString filename = GetFileFromHistory( event.GetId(), _( "KiCad project file" ) );
+    wxString filename = GetFileFromHistory( event.GetId(), _( "CircuitAliveEDA project file" ) );
 
     if( !filename.IsEmpty() )
         LoadProject( wxFileName( filename ) );

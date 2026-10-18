@@ -1,11 +1,12 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "session_runner.h"
+#include "visual_signals.h"
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <set>
 #include <stdexcept>
-#include <unistd.h>
+#include <sim/platform_runtime.h>
 
 namespace CIRCUITALIVE
 {
@@ -13,16 +14,22 @@ std::string FindSessionWorker( const std::string& aApplicationExecutable )
 {
     namespace fs = std::filesystem;
     const auto directory = fs::path( aApplicationExecutable ).parent_path();
+    const std::string name =
+#ifdef _WIN32
+        "circuitalive-sim-worker.exe";
+#else
+        "circuitalive-sim-worker";
+#endif
     const fs::path candidates[] = {
-        directory / "circuitalive-sim-worker",
-        directory / "sim/circuitalive-sim-worker",
-        directory.parent_path() / "eeschema/sim/circuitalive-sim-worker"
+        directory / name,
+        directory / "sim" / name,
+        directory.parent_path() / "eeschema/sim" / name
     };
     for( const auto& candidate : candidates )
     {
         std::error_code error;
-        if( fs::is_regular_file( candidate, error ) && access( candidate.c_str(), X_OK ) == 0 )
-            return candidate.string();
+        if( fs::is_regular_file( candidate, error ) )
+            return PathUtf8(candidate);
     }
     // Keep startup usable if the install is incomplete; the control thread reports a Play error.
     return candidates[0].string();
@@ -43,10 +50,11 @@ void SESSION_RUNNER::Start( CIRCUIT_SNAPSHOT aCircuit )
     std::lock_guard lock( m_mutex );
     ++m_revision;
     m_commands.clear();
-    m_commands.push_back( { COMMAND_TYPE::START, m_revision, std::move( aCircuit ), 0, m_speed } );
+    m_commands.push_back( { COMMAND_TYPE::START, m_revision, std::move( aCircuit ), 0, m_speed, m_preferences } );
     m_view = {};
     m_view.state = EDITOR_SESSION_STATE::PREPARING;
     m_view.speed = m_speed;
+    m_view.preferences = m_preferences;
     m_wake.notify_one();
 }
 
@@ -59,11 +67,13 @@ void SESSION_RUNNER::enqueue( COMMAND_TYPE aType, std::size_t aIndex )
         m_commands.clear();
         m_view = {};
         m_view.speed = m_speed;
+        m_view.preferences = m_preferences;
     }
     // Bound input pressure; Stop always bypasses the limit and supersedes pending input.
     if( m_commands.size() >= 128 )
         return;
-    m_commands.push_back( { aType, m_revision, {}, aIndex, aType == COMMAND_TYPE::STOP ? m_speed : 0 } );
+    m_commands.push_back( { aType, m_revision, {}, aIndex,
+                            aType == COMMAND_TYPE::STOP ? m_speed : 0, m_preferences } );
     m_wake.notify_one();
 }
 
@@ -85,6 +95,21 @@ void SESSION_RUNNER::SetSpeed( double value )
         m_commands.push_back( { COMMAND_TYPE::SPEED, m_revision, {}, 0, value } );
     else return;
     m_speed = value;
+    m_wake.notify_one();
+}
+
+void SESSION_RUNNER::SetPreferences( SIMULATION_PREFERENCES preferences )
+{
+    preferences.Normalize();
+    std::lock_guard lock( m_mutex );
+    if( preferences.playbackSpeed != m_preferences.playbackSpeed ) m_speed = preferences.playbackSpeed;
+    m_preferences = preferences;
+    // Coalesce preference edits, and capture them again on Start even when it
+    // supersedes the queued update. Runtime speed selections remain independent.
+    if( !m_commands.empty() && m_commands.back().type == COMMAND_TYPE::PREFERENCES )
+        m_commands.back().preferences = preferences;
+    else
+        m_commands.push_back( { COMMAND_TYPE::PREFERENCES, m_revision, {}, 0, 0, preferences } );
     m_wake.notify_one();
 }
 
@@ -118,6 +143,7 @@ void SESSION_RUNNER::run()
     std::uint64_t revision = 0;
     bool running = false;
     double speed = 1;
+    SIMULATION_PREFERENCES preferences;
     std::map<std::string, std::string> latchedWarnings;
     auto next = std::chrono::steady_clock::now();
 
@@ -143,21 +169,26 @@ void SESSION_RUNNER::run()
                 {
                 case COMMAND_TYPE::START:
                     speed = command.value;
+                    preferences = command.preferences;
                     session.reset();
                     circuit = std::move( command.circuit );
+                    ConfigureVisualSignals( circuit );
                     hasScope = std::any_of( circuit.measurements.begin(), circuit.measurements.end(), []( const auto& c ) { return c.scope; } );
-                    scopeHistory = SCOPE_HISTORY( std::min<std::size_t>( 8192, 65536 / std::max<std::size_t>( 1, circuit.config.signals.size() ) ) );
-                    session = std::make_unique<INTERACTIVE_SIM_SESSION>( m_worker );
+                    scopeHistory = SCOPE_HISTORY( std::min<std::size_t>( preferences.scopeHistorySamples,
+                            65536 / std::max<std::size_t>( 1, circuit.config.signals.size() ) ) );
+                    session = std::make_unique<INTERACTIVE_SIM_SESSION>( m_worker,
+                            std::chrono::milliseconds( std::lround( preferences.workerTimeoutSeconds * 1000 ) ) );
                     session->Configure( circuit.netlist, circuit.config );
                     session->AdvanceTo( circuit.config.step );
                     view = {};
                     latchedWarnings.clear();
                     view.sample = session->Snapshot( true );
-                    view.switches.assign( circuit.switches.size(), true );
+                    for( const auto& control : circuit.switches )
+                        view.switches.push_back( control.initiallyClosed );
                     for( const auto& control : circuit.adjustments )
                         view.adjustments.push_back( control.initial );
                     running = true;
-                    next = std::chrono::steady_clock::now() + std::chrono::milliseconds( 20 );
+                    next = std::chrono::steady_clock::now() + preferences.FrameInterval();
                     break;
                 case COMMAND_TYPE::RESUME:
                     if( session && view.sample.state != SIM_SESSION_STATE::COMPLETED )
@@ -171,6 +202,7 @@ void SESSION_RUNNER::run()
                     break;
                 case COMMAND_TYPE::STOP:
                     speed = command.value;
+                    preferences = command.preferences;
                     session.reset();
                     view = {};
                     scopeHistory = SCOPE_HISTORY();
@@ -204,6 +236,12 @@ void SESSION_RUNNER::run()
                     break;
                 case COMMAND_TYPE::SPEED:
                     speed = command.value;
+                    break;
+                case COMMAND_TYPE::PREFERENCES:
+                    if( preferences.playbackSpeed != command.preferences.playbackSpeed )
+                        speed = command.preferences.playbackSpeed;
+                    preferences = command.preferences;
+                    next = std::chrono::steady_clock::now() + preferences.FrameInterval();
                     break;
                 case COMMAND_TYPE::MEMORY:
                     running = false;
@@ -240,7 +278,7 @@ void SESSION_RUNNER::run()
                 case COMMAND_TYPE::STEP:
                     if( session && !running && view.sample.state != SIM_SESSION_STATE::COMPLETED )
                     {
-                        session->AdvanceTo( std::min( view.sample.latest.time + .02 * speed,
+                        session->AdvanceTo( std::min( view.sample.latest.time + preferences.stepMs * .001 * speed,
                                                      circuit.config.horizon ) );
                         view.sample = session->Snapshot( true );
                     }
@@ -249,34 +287,27 @@ void SESSION_RUNNER::run()
             }
             if( session && running && std::chrono::steady_clock::now() >= next )
             {
-                session->AdvanceTo( std::min( view.sample.latest.time + 0.02 * speed,
+                const auto frameStart = std::chrono::steady_clock::now();
+                session->AdvanceTo( std::min( view.sample.latest.time
+                                             + std::chrono::duration<double>( preferences.FrameInterval() ).count() * speed,
                                              circuit.config.horizon ) );
                 view.sample = session->Snapshot( true );
                 if( view.sample.state == SIM_SESSION_STATE::ERROR )
                     throw std::runtime_error( view.sample.error );
                 running = view.sample.state != SIM_SESSION_STATE::COMPLETED;
-                next = std::chrono::steady_clock::now() + std::chrono::milliseconds( 20 );
+                // Solver work belongs inside the frame budget. Adding a fresh
+                // full frame sleep after every solve makes even slow clocks drift.
+                next = frameStart + preferences.FrameInterval();
             }
             if( session )
             {
                 view.state = view.sample.state == SIM_SESSION_STATE::COMPLETED
                         ? EDITOR_SESSION_STATE::COMPLETED
                         : running ? EDITOR_SESSION_STATE::RUNNING : EDITOR_SESSION_STATE::PAUSED;
-                view.ledCurrents.clear();
-                for( const auto& led : circuit.leds )
-                {
-                    double sum = 0;
-                    for( const auto& sample : view.sample.history )
-                        sum += std::max( 0.0, sample.values.at( led.signal ) );
-                    view.ledCurrents.push_back( view.sample.history.empty()
-                            ? view.sample.latest.values.at( led.signal )
-                            : sum / view.sample.history.size() );
-                }
+                UpdateVisualSignals( circuit, view, speed, preferences );
                 view.measurements.clear();
                 for( const auto& channel : circuit.measurements )
                     view.measurements.push_back( MeasurementValue( channel, view.sample.latest ) );
-                view.logicLevels.clear();
-                for( const auto& pin : circuit.logicPins ) view.logicLevels.push_back( PinLogicLevel( pin, view.sample.latest ) );
                 auto warn = [&]( const std::string& name, double limit, std::size_t signal )
                 {
                     bool exceeded = std::abs( view.sample.latest.values.at( signal ) ) > limit;
@@ -288,10 +319,11 @@ void SESSION_RUNNER::run()
                 for( const auto& led : circuit.leds )
                     if( led.ratedCurrent > 0 ) warn( led.reference.empty() ? "LED" : led.reference, led.ratedCurrent, led.signal );
                 view.warnings.clear();
-                for( const auto& [name, warning] : latchedWarnings ) view.warnings.push_back( warning );
+                if( preferences.warnOvercurrent )
+                    for( const auto& [name, warning] : latchedWarnings ) view.warnings.push_back( warning );
                 std::set<std::size_t> checkedSupplies;
                 for( const auto& pin : circuit.logicPins )
-                    if( pin.digital && checkedSupplies.insert( pin.component ).second )
+                    if( preferences.warnSupply && pin.digital && checkedSupplies.insert( pin.component ).second )
                     {
                         auto v = [&]( std::size_t index ) { return index == NO_SIGNAL ? 0.0 : view.sample.latest.values.at( index ); };
                         const double supply = v( pin.vcc ) - v( pin.ground );
@@ -316,6 +348,7 @@ void SESSION_RUNNER::run()
         {
             std::lock_guard lock( m_mutex );
             view.speed = speed;
+            view.preferences = preferences;
             if( revision == m_revision )
                 m_view = view;
         }

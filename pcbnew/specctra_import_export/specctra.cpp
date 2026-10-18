@@ -3887,7 +3887,7 @@ PARSER::PARSER( ELEM* aParent ) :
     via_rotate_first = true;
     generated_by_freeroute = false;
 
-    host_cad = "KiCad's Pcbnew";
+    host_cad = "CircuitAliveEDA's Pcbnew";
     wxString msg = GetBuildVersion();
     host_version = TO_UTF8(msg);
 }

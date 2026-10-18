@@ -3134,7 +3134,7 @@ void PCB_SELECTION_TOOL::ZoomFitCrossProbeBBox( const BOX2I& aBBox )
         // Use standard KiCad zoom algorithm for parts too wide to fit screen/
         ratio = kicadRatio;
         compRatioBent = 1.0; // Reset so we don't modify the "KiCad" ratio
-        wxLogTrace( "CROSS_PROBE_SCALE", "Part TOO WIDE for screen.  Using normal KiCad zoom ratio: %1.5f", ratio );
+        wxLogTrace( "CROSS_PROBE_SCALE", "Part TOO WIDE for screen.  Using normal CircuitAliveEDA zoom ratio: %1.5f", ratio );
     }
 
     // Now that "compRatioBent" holds our final scaling factor we apply it to the original

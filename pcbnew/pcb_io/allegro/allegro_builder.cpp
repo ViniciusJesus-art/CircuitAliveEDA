@@ -786,7 +786,7 @@ public:
             if( IsUserLayer( layerId ) )
                 userLayers++;
 
-            wxLogTrace( traceAllegroBuilder, "Mapping Allegro layer '%s' to KiCad layer '%s' (%d)", name,
+            wxLogTrace( traceAllegroBuilder, "Mapping Allegro layer '%s' to CircuitAliveEDA layer '%s' (%d)", name,
                         m_board.GetLayerName( layerId ), layerId );
 
             m_board.SetLayerName( layerId, name );
@@ -1864,7 +1864,7 @@ static std::unordered_set<LAYER_INFO> ScanForLayers( const BRD_DB& aDb )
 
 void BOARD_BUILDER::setupLayers()
 {
-    wxLogTrace( traceAllegroBuilder, "Setting up layer mapping from Allegro to KiCad" );
+    wxLogTrace( traceAllegroBuilder, "Setting up layer mapping from Allegro to CircuitAliveEDA" );
 
     const auto& layerMap = m_brdDb.m_Header->m_LayerMap;
 

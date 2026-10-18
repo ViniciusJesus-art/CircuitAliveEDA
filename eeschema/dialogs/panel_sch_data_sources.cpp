@@ -47,7 +47,7 @@ PANEL_SCH_DATA_SOURCES::PANEL_SCH_DATA_SOURCES( wxWindow* aParent, EDA_BASE_FRAM
     wxBoxSizer* topSizer = new wxBoxSizer( wxVERTICAL );
 
     m_description = new wxStaticText( this, wxID_ANY,
-            _( "Install schematic data sources from the Plugin and Content Manager. Data sources extend KiCad "
+            _( "Install schematic data sources from the Plugin and Content Manager. Data sources extend CircuitAliveEDA "
                "by linking schematic items to external data providers." ) );
     m_description->Wrap( FromDIP( 480 ) );
     m_description->SetFont( KIUI::GetInfoFont( this ) );

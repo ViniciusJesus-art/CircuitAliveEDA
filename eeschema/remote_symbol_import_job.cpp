@@ -57,7 +57,7 @@ bool validateSymbolPayload( const std::vector<uint8_t>& aPayload, const wxString
 
     if( payload.find( "(kicad_symbol_lib" ) == std::string_view::npos )
     {
-        aError = _( "Downloaded symbol payload was not a KiCad symbol library." );
+        aError = _( "Downloaded symbol payload was not a CircuitAliveEDA symbol library." );
         return false;
     }
 
@@ -320,7 +320,7 @@ bool REMOTE_SYMBOL_IMPORT_JOB::Import( const REMOTE_PROVIDER_METADATA& aProvider
 
                     if( !plugin )
                     {
-                        aError = _( "Unable to access the KiCad symbol plugin." );
+                        aError = _( "Unable to access the CircuitAliveEDA symbol plugin." );
                         return false;
                     }
 

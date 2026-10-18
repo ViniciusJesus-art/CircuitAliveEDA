@@ -78,7 +78,7 @@ namespace CLI
 #define DEPRECATED_ARG_INCLUDE_EXCLUDED_FROM_BOM "--include-excluded-from-bom"
 #define DEPRECATED_ARG_INCLUDE_EXCLUDED_FROM_BOM_DESC "Deprecated.  Has no effect."
 #define DEPRECATED_ARG_INCLUDE_EXCLUDED_FROM_BOM_WARNING "--include-excluded-from-bom has been deprecated as of " \
-                                                         "KiCad 10.0.0.  It will have no effect."
+                                                         "CircuitAliveEDA 10.0.0.  It will have no effect."
 
 class SCH_EXPORT_BOM_COMMAND : public COMMAND
 {

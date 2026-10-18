@@ -3,7 +3,7 @@
   "backend": "ngspice",
   "id": "resistor",
   "name": "Ideal resistor",
-  "description": "",
+  "description": "A resistive path between its two terminals. Resistance sets the current for a given voltage difference.",
   "license": "GPL-3.0-or-later",
   "pins": [
     {
@@ -58,5 +58,8 @@
       "r": "resistance"
     },
     "only_if_value_invalid": true
-  }
+  },
+  "equations": [
+    "I = (V1 − V2) / R."
+  ]
 }

@@ -62,9 +62,10 @@ cd $SOURCEDIR
 NPROC=`nproc --ignore=1`
 
 #Generate/update template pot file
+python3 "$SOURCEDIR/tools/circuitalive/update-model-translations.py"
 find $POTDIRS -name '*.cpp' -or -name '*.h' -or -name '*.xml.in' -or -name '*.desktop.in' |
   sort |
-  xgettext -f- -k_ -k_HKI -kwxPLURAL:1,2 --force-po --from-code utf-8 -o $LOCALDIR/pofiles/kicad.pot
+  xgettext -f- -k_ -k_HKI -kwxTRANSLATE -kwxPLURAL:1,2 --force-po --from-code utf-8 -o $LOCALDIR/pofiles/kicad.pot
 
 LINGUAS=`cat $LOCALDIR/pofiles/LINGUAS|grep -v '^#'|grep -v '^\s*$'` #Read file without comment and empty lines
 

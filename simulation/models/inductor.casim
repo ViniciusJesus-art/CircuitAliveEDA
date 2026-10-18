@@ -3,7 +3,7 @@
   "backend": "ngspice",
   "id": "inductor",
   "name": "Ideal inductor",
-  "description": "Modelo didático configurável; não é um macromodelo certificado pelo fabricante.",
+  "description": "Stores magnetic energy. Its voltage depends on how quickly the current changes.",
   "license": "GPL-3.0-or-later",
   "pins": [
     {
@@ -57,5 +57,8 @@
       "l": "inductance"
     },
     "only_if_value_invalid": true
-  }
+  },
+  "equations": [
+    "V1 − V2 = L × dI/dt."
+  ]
 }
