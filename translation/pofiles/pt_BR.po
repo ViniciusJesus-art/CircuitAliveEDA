@@ -82402,6 +82402,11 @@ msgid "Simulation Model Editor — CircuitAliveEDA"
 msgstr "Editor de modelos de simulação — CircuitAliveEDA"
 
 
+#. CircuitAliveEDA manager launcher.
+msgid "Choose a component and build its simulation behavior"
+msgstr "Escolha um componente e construa seu comportamento na simulação"
+
+
 #. CircuitAliveEDA interface and bundled simulation models.
 msgid "Simulation model"
 msgstr "Modelo de simulação"
