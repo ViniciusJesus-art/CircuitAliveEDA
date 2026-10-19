@@ -52,7 +52,7 @@ void SetRuntimeEnvironment(const char* name,const std::string& value)
     setenv(name,value.c_str(),1);
 #endif
 }
-void ReplaceFile(const std::filesystem::path& source,const std::filesystem::path& destination)
+void ReplaceSavedFile(const std::filesystem::path& source,const std::filesystem::path& destination)
 {
 #ifdef _WIN32
     if(!MoveFileExW(source.c_str(),destination.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))

@@ -31,7 +31,7 @@ class HEX_TABLE : public wxGridTableBase
     }
     wxString GetColLabelValue( int col ) override
     {
-        return col == 16 ? "ASCII" : wxString::Format( "%X", col );
+        return col == 16 ? wxString( "ASCII" ) : wxString::Format( "%X", col );
     }
     wxString GetRowLabelValue( int row ) override
     {
@@ -57,7 +57,7 @@ class HEX_TABLE : public wxGridTableBase
         {
             return ( ( image.known[index] >> shift ) & 15 ) == 15
                            ? wxString::Format( "%X", ( image.data[index] >> shift ) & 15 )
-                           : "?";
+                           : wxString( "?" );
         };
         return nibble( 4 ) + nibble( 0 );
     }

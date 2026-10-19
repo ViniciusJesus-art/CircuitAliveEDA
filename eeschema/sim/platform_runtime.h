@@ -11,5 +11,5 @@ std::uint64_t ResidentMemoryBytes();
 std::string PathUtf8(const std::filesystem::path& path);
 void SetRuntimeEnvironment(const char* name,const std::string& value);
 void UnsetRuntimeEnvironment(const char* name);
-void ReplaceFile(const std::filesystem::path& source,const std::filesystem::path& destination);
+void ReplaceSavedFile(const std::filesystem::path& source,const std::filesystem::path& destination);
 }

@@ -432,7 +432,7 @@ private:
         const auto temporary = path.string() + ".tmp." + std::to_string( ProcessId() );
         try
         {
-            std::ofstream out( temporary ); out.exceptions( std::ios::failbit | std::ios::badbit ); out << text; out.close(); ReplaceFile( temporary, path );
+            std::ofstream out( temporary ); out.exceptions( std::ios::failbit | std::ios::badbit ); out << text; out.close(); ReplaceSavedFile( temporary, path );
         }
         catch( ... ) { std::error_code error; fs::remove( temporary, error ); throw; }
         m_file = path;

@@ -132,7 +132,8 @@ void DIALOG_MANAGE_REPOSITORIES::addRepository( const wxString& aUrl )
     if( m_pcm->FetchRepository( aUrl, repository, &reporter ) )
     {
         wxString repositoryName = aUrl == wxS( PCM_DEFAULT_REPOSITORY_URL )
-                                          ? wxS( "Community package repository" ) : repository.name;
+                                          ? wxString( wxS( "Community package repository" ) )
+                                          : repository.name;
         wxString name = repositoryName;
         int      increment = 1;
 

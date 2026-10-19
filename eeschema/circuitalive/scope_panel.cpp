@@ -375,7 +375,7 @@ void SCOPE_PANEL::present()
     const bool changed = m_serial != frame.serial;
     const wxString states[] = { _( "Waiting for trigger" ), _( "Acquiring post-trigger" ), _( "Triggered" ), _( "Auto · no edge" ),
         _( "Hold · capture frozen" ), _( "Single · capture complete" ), _( "Roll · trigger off" ) };
-    const auto status = states[static_cast<int>( m_acquisition.State() )] + ( frame.partial && !frame.samples.empty() ? _( " · partial history" ) : "" );
+    const auto status = states[static_cast<int>( m_acquisition.State() )] + ( frame.partial && !frame.samples.empty() ? _( " · partial history" ) : wxString() );
     if( m_status->GetLabel() != status ) m_status->SetLabel( status );
     bool scaleChanged = false;
     if( changed )

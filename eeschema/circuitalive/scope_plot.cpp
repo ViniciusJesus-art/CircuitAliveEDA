@@ -257,7 +257,7 @@ void SCOPE_PLOT::paint( wxPaintEvent& )
         const wxPoint arrow[] = { { tip - 7, cy - 5 }, { tip, cy }, { tip - 7, cy + 5 } };
         dc.SetPen( wxPen( ink ) ); dc.SetBrush( marker.outside ? *wxTRANSPARENT_BRUSH : wxBrush( ink ) ); dc.DrawPolygon( 3, arrow );
         dc.SetTextForeground( ink );
-        wxString label = marker.channel < 0 ? "T" : utf8( m_owner.m_channels[marker.channel].name );
+        wxString label = marker.channel < 0 ? wxString( "T" ) : utf8( m_owner.m_channels[marker.channel].name );
         while( !label.empty() && dc.GetTextExtent( label ).x > r.width - 10 ) label.RemoveLast();
         dc.DrawText( label, r.x, cy - 7 );
         if( marker.outside ) dc.DrawText( "!", tip - 5, cy - 8 );

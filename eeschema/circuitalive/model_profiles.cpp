@@ -76,7 +76,7 @@ void Write( const fs::path& file, const JSON& j )
     {
         std::ofstream out( temporary ); out.exceptions( std::ios::failbit | std::ios::badbit );
         out << j.dump( 2 ) << '\n'; out.close();
-        ReplaceFile( temporary, file );
+        ReplaceSavedFile( temporary, file );
     }
     catch( ... ) { std::error_code error; fs::remove( temporary, error ); throw; }
 }

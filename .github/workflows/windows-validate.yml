@@ -10,7 +10,7 @@ jobs:
   validate:
     if: github.ref == 'refs/heads/main'
     runs-on: windows-2022
-    timeout-minutes: 120
+    timeout-minutes: 150
     env:
       CA_WINDOWS_TOOLS: D:/ca-tools
     defaults:
@@ -89,7 +89,7 @@ jobs:
             build/windows-msvc/CMakeCache.txt
             build/windows-msvc/CMakeFiles/CMakeConfigureLog.yaml
           if-no-files-found: warn
-      - name: Check branding header with MSVC before compiling shared libraries
+      - name: Check branding and Windows header order with MSVC before shared libraries
         timeout-minutes: 2
         run: |
           ./tools/circuitalive/release/build-windows.ps1 -Phase environment -Jobs 2
@@ -100,7 +100,8 @@ jobs:
           #include <circuitalive/branding.h>
           '@ | Set-Content $source -Encoding utf8
           & cl /nologo /std:c++20 /permissive- /EHsc /utf-8 /Zs /DUNICODE /D_UNICODE /DNOMINMAX `
-            /Iinclude "/I$prefix/include" "/I$prefix/lib/mswu" $source 2>&1 |
+            /Iinclude /Ieeschema /Ithirdparty/nlohmann_json "/I$prefix/include" "/I$prefix/lib/mswu" `
+            $source qa/tests/spice/test_interactive_windows_headers.cpp 2>&1 |
             Tee-Object -FilePath build/windows-validation/branding-check.log
           if ($LASTEXITCODE -ne 0) { throw "MSVC branding header check failed ($LASTEXITCODE)." }
       - name: Compile complete XSPICE memory module before shared libraries
@@ -117,8 +118,8 @@ jobs:
           retention-days: 14
           path: build/windows-validation/memory-module.log
           if-no-files-found: error
-      - name: Compile affected sources and run interactive simulator tests only
-        timeout-minutes: 50
+      - name: Compile CA interface and branding consumers, collect independent errors and test simulator
+        timeout-minutes: 80
         run: |
           $output = (Resolve-Path build/windows-validation).Path
           Set-Content "$output/current-phase.txt" 'validate'
@@ -126,7 +127,7 @@ jobs:
           Start-Transcript -Path "$output/validate-transcript.log"
           try {
             Start-ResourceMonitor
-            ./tools/circuitalive/release/build-windows.ps1 -Phase validate -Jobs 2 2>&1 |
+            ./tools/circuitalive/release/validate-windows-sources.ps1 -Jobs 2 2>&1 |
               Tee-Object -FilePath "$output/validate.log"
           } finally {
             Stop-ResourceMonitor
