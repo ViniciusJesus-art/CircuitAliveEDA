@@ -46,7 +46,7 @@ publicação usa o `GITHUB_TOKEN` do próprio Actions com `contents: write`.
 | Job | O que faz |
 | --- | --- |
 | Validate version and release destination | Confere branch, versão e formatos. Se for publicar, recusa tag/release já existente. Fixa o commit de origem. |
-| Windows installer | Reutiliza o workflow MSVC existente: dependências, testes, compilação completa, NSIS e teste da instalação. |
+| Windows installer | Compila com MSVC, executa os testes e salva o runtime completo; outro job gera o EXE com Inno Setup x64 e testa a instalação. |
 | Fedora packages | Compila no contêiner Fedora 44 e gera os formatos Fedora selecionados. RPM e AppImage compartilham uma única compilação quando pedidos juntos. |
 | Ubuntu DEB package | Compila nativamente no Ubuntu 24.04, incluindo ngspice 47 e nng 1.9.0 fixados. Gera o DEB com dependências calculadas pelo dpkg, extrai o pacote e testa CLI, Python/wx e o worker. |
 | Publish selected verified packages together | Aguarda todos os builds selecionados, confere os formatos e SHA-256, envia os arquivos para um rascunho e então publica. É omitido no modo de artefatos. |
@@ -110,11 +110,38 @@ O workflow **Local Windows installer (MSVC)** continua disponível para gerar
 somente o `.exe` como artefato, sem publicar release. O novo workflow permite
 essa mesma escolha com `target=exe` e **publish_release** desmarcado.
 
+### Repetir somente o empacotamento Windows
+
+O job de compilação agora preserva `windows-runtime-x86_64` por 14 dias, antes de
+baixar as bibliotecas de componentes e gerar o instalador. Se apenas o job
+**Package and verify Windows installer** falhar, use **Re-run failed jobs**
+para repetir o empacotamento com o mesmo código, sem recompilar os aplicativos.
+
+Se a correção do empacotador exigir um novo commit, abra **Local Windows installer
+(MSVC) → Run workflow**, mantenha a mesma versão dos binários e informe em
+**runtime_run_id** o número da execução que salvou o runtime. O workflow baixa e
+verifica os hashes desse artefato e omite a compilação. A origem dos binários
+continua registrada em `PACKAGE-INFO.json`; trocar a versão sem recompilar é
+recusado. Esse modo gera somente artefatos, sem publicar uma release.
+
+A execução `39308253615` é anterior a esse checkpoint: salvou apenas logs e
+dependências, portanto seus aplicativos precisam ser recompilados uma vez.
+
+O empacotador usa Inno Setup **7.1.0 x64**, fixado por SHA-256 e assinatura do
+fornecedor. Substitui o NSIS, que falhou com `error mapping datablock` no pacote
+completo. Mantém um único `.exe`, compressão LZMA2 com dois threads e verifica CLI,
+Python/wx/pcbnew e worker a partir da instalação, sem caminhos do build no `PATH`.
+Os logs, o script `.iss` e o inventário de tamanhos ficam no artefato
+`windows-installer-diagnostics`. Um EXE único tem limite de 4,2 GB comprimidos no
+Inno Setup; pacotes que ultrapassem isso exigirão outra forma de distribuição,
+como partes externas. As bibliotecas 3D continuam incluídas.
+
 ## Verificação local da configuração
 
 ```bash
 actionlint
 python3 qa/tests/cli/test_release_artifacts.py
+python3 qa/tests/cli/test_windows_installer.py
 bash -n tools/circuitalive/release/build-linux.sh tools/circuitalive/release/build-deb.sh tools/circuitalive/dependencies-fedora.sh
 ```
 
@@ -126,4 +153,7 @@ runners. As ferramentas AppImage e as dependências compiladas no Ubuntu têm ve
 
 Referências: [workflows reutilizáveis do GitHub](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
 e [appimagetool](https://github.com/AppImage/appimagetool), além do
-[empacotador dpkg-deb](https://manpages.debian.org/testing/dpkg/dpkg-deb.1.en.html).
+[empacotador dpkg-deb](https://manpages.debian.org/testing/dpkg/dpkg-deb.1.en.html),
+[limites do NSIS](https://nsis.sourceforge.io/I_get_an_error_when_compiling_large_installers),
+[Inno Setup x64](https://jrsoftware.org/ishelp/topic_64bit.htm) e
+[limite do EXE único](https://jrsoftware.org/ishelp/topic_setup_diskspanning.htm).

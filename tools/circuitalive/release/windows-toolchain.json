@@ -2,5 +2,7 @@
   "vcpkgCommit": "66c0373dc7fca549e5803087b9487edfe3aca0a1",
   "legacyMsbuildHelperSha256": "9a8367ac19733fc51b8e7edc77968725d2efe1400aaf1fdd767bb329a7b04532",
   "swigVersion": "4.3.1",
-  "swigSha256": "7ea5197c557af20b2f7780ffcfe803bbe0e2009f5846874112aea37e5f693417"
+  "swigSha256": "7ea5197c557af20b2f7780ffcfe803bbe0e2009f5846874112aea37e5f693417",
+  "innoVersion": "7.1.0",
+  "innoSha256": "0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f"
 }

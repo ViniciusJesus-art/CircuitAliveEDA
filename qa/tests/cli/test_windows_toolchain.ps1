@@ -47,7 +47,7 @@ $saved = @{}
 foreach ($name in @('OS','MINGW_PREFIX','VCPKG_ROOT','SWIG_EXECUTABLE','VCPKG_DEFAULT_BINARY_CACHE','VCPKG_BINARY_SOURCES','VCPKG_MAX_CONCURRENCY','CMAKE_BUILD_PARALLEL_LEVEL','_CL_','MSYS2_ENV_CONV_EXCL')) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
 try {
     $env:OS = 'Windows_NT'; Remove-Item Env:MINGW_PREFIX -ErrorAction SilentlyContinue
-    foreach ($phase in @('environment','setup','dependencies','configure','validate','build','package','all')) {
+    foreach ($phase in @('environment','setup','dependencies','configure','validate','build','stage','package','all')) {
         $script:visited = [System.Collections.Generic.List[string]]::new()
         $script:imported = $false
         & $program -Phase $phase -ToolsRoot $script:expectedTools

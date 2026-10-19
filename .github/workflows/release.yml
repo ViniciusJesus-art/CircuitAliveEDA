@@ -6,20 +6,32 @@ on:
         description: Installer version (artifact only, no GitHub release)
         required: true
         default: 10.0.7-alpha.1
+      runtime_run_id:
+        description: Optional previous run ID with windows-runtime-x86_64; repackage without compiling
+        required: false
+        default: ''
+        type: string
   workflow_call:
     inputs:
       version:
         description: Installer version supplied by the manual release workflow
         required: true
         type: string
+      runtime_run_id:
+        description: Optional preserved runtime from an earlier run
+        required: false
+        default: ''
+        type: string
 concurrency:
   group: windows-msvc-${{ github.ref }}
   cancel-in-progress: false
 permissions:
   contents: read
+  actions: read
 jobs:
   windows:
-    if: github.ref == 'refs/heads/main'
+    name: Compile and preserve Windows runtime
+    if: github.ref == 'refs/heads/main' && inputs.runtime_run_id == ''
     runs-on: windows-2022
     timeout-minutes: 360
     env:
@@ -40,9 +52,19 @@ jobs:
         with:
           path: D:/ca-tools/binary-cache
           key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-installer
-          restore-keys: windows-msvc-v143-${{ steps.profile.outputs.value }}-
+          # vcpkg validates each archive's compiler/port ABI, including on this fallback.
+          # Packaging-only script changes must not hide otherwise compatible packages.
+          restore-keys: |
+            windows-msvc-v143-${{ steps.profile.outputs.value }}-
+            windows-msvc-v143-
       - name: Check toolchain initialization against Developer PowerShell overrides
-        run: ./qa/tests/cli/test_windows_toolchain.ps1
+        run: |
+          ./qa/tests/cli/test_windows_toolchain.ps1
+          python qa/tests/cli/test_windows_installer.py
+      - name: Check real x64 installer before the expensive application build
+        run: ./tools/circuitalive/release/prepare-inno.ps1
+      - name: Test installer generation and extraction
+        run: python qa/tests/cli/test_windows_installer.py WindowsInstallerTests.test_real_installer_extracts_libraries_and_excludes_git_metadata
       - name: Prepare Visual Studio, vcpkg and SWIG
         run: ./tools/circuitalive/release/build-windows.ps1 -Phase setup
       - name: Record resources before dependency preparation
@@ -59,22 +81,17 @@ jobs:
         run: ./tools/circuitalive/release/build-windows.ps1 -Phase configure -Version $env:RELEASE_VERSION
       - name: Validate affected sources and simulator, then build all applications
         run: ./tools/circuitalive/release/build-windows.ps1 -Phase build
-      - name: Prepare component libraries and NSIS
-        run: |
-          choco install nsis --no-progress -y
-          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
-          ./tools/circuitalive/release/prepare-windows-libraries.ps1
-      - name: Package and verify installed runtime
-        run: ./tools/circuitalive/release/build-windows.ps1 -Phase package -Version $env:RELEASE_VERSION
-      - name: Keep installer available for local download
+      - name: Stage application and dependencies without building an installer
+        run: ./tools/circuitalive/release/build-windows.ps1 -Phase stage -Version $env:RELEASE_VERSION
+      - name: Preserve verified runtime before packaging
         uses: actions/upload-artifact@v4
         with:
-          name: windows-x86_64
-          path: |
-            dist/*-windows-x86_64-setup.exe
-            dist/*-windows-x86_64-setup.exe.sha256
+          name: windows-runtime-x86_64
+          path: stage/windows-msvc/
           if-no-files-found: error
-          compression-level: 0
+          include-hidden-files: true
+          compression-level: 6
+          retention-days: 14
       - name: Keep validation logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -85,3 +102,59 @@ jobs:
             build/windows-msvc/CMakeFiles/CMakeConfigureLog.yaml
             build/windows-msvc/Testing/Temporary/*.log
           if-no-files-found: ignore
+
+  package:
+    name: Package and verify Windows installer
+    needs: windows
+    if: >-
+      always() && !cancelled() && github.ref == 'refs/heads/main' &&
+      (needs.windows.result == 'success' || inputs.runtime_run_id != '')
+    runs-on: windows-2022
+    timeout-minutes: 180
+    env:
+      CA_WINDOWS_TOOLS: D:/ca-tools
+      RELEASE_VERSION: ${{ inputs.version }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore preserved application without a C++ build
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-runtime-x86_64
+          path: stage/windows-msvc
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.runtime_run_id || github.run_id }}
+      - name: Verify runtime integrity and packaging regression tests
+        run: |
+          python qa/tests/cli/test_windows_installer.py
+          python tools/circuitalive/release/package-windows.py stage/windows-msvc --version $env:RELEASE_VERSION --verify-only
+      - name: Prepare pinned native x64 Inno Setup
+        run: ./tools/circuitalive/release/prepare-inno.ps1
+      - name: Exercise real installer and extraction before acquiring large libraries
+        run: python qa/tests/cli/test_windows_installer.py WindowsInstallerTests.test_real_installer_extracts_libraries_and_excludes_git_metadata
+      - name: Prepare component libraries
+        run: ./tools/circuitalive/release/prepare-windows-libraries.ps1
+      - name: Package and test a clean installed runtime
+        run: python tools/circuitalive/release/package-windows.py stage/windows-msvc --version $env:RELEASE_VERSION
+      - name: Keep verified installer available for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: |
+            dist/*-windows-x86_64-setup.exe
+            dist/*-windows-x86_64-setup.exe.sha256
+          if-no-files-found: error
+          compression-level: 0
+      - name: Preserve installer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-diagnostics
+          path: |
+            dist/installer.iss
+            dist/installer-smoke.log
+            dist/windows-package-report.json
+          retention-days: 14
+          if-no-files-found: warn

@@ -93,7 +93,35 @@ No MSVC, o editor agora usa variantes `circuitalive_interactive_gui` e `circuita
 
 `qa_circuitalive_json_link` vincula a variante do editor junto com `kicommon`, exercita modelos, perfis em diretório temporário, arquivos de memória, chamadas JSON importadas e uma sessão real com o worker. A validação Windows passa a construir e executar esse teste antes da compilação completa dos aplicativos, além dos 178 casos isolados. O teste isolado, sozinho, não verifica as colisões entre bibliotecas estáticas e a DLL do editor.
 
-A compilação e os dois testes CTest passaram localmente no Linux. A correção da importação de templates exige uma nova validação nativa MSVC; o resultado local não é uma confirmação de que o instalador Windows foi gerado.
+A compilação e os dois testes CTest passaram localmente no Linux. Depois, a execução
+`39308253615` confirmou a correção no MSVC: os testes e a compilação completa dos
+aplicativos passaram. Essa execução ainda não gerou o instalador devido à falha
+de empacotamento descrita a seguir.
+
+## Empacotamento grande e preservação do runtime
+
+A [execução 39308253615](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39308253615)
+concluiu a compilação completa, incluindo o teste de link com `kicommon`, mas
+falhou ao criar o instalador NSIS com `Internal compiler error #12345: error
+mapping datablock`. Esse erro ocorre na ferramenta de empacotamento; não é uma
+nova falha de compilação C++ nem do simulador.
+
+O instalador passou a usar Inno Setup 7.1.0 x64, com hash e assinatura verificados.
+A compilação e o empacotamento são jobs distintos, e o runtime com DLLs, Python e
+comprovante SHA-256 fica preservado por 14 dias. Isso permite repetir somente o
+empacotamento em falhas futuras. Consulte [as instruções de retomada](RELEASE_WORKFLOW.md#repetir-somente-o-empacotamento-windows).
+
+O instalador tenta primeiro o cache do perfil exato e depois snapshots anteriores
+`windows-msvc-v143-`. Alterações apenas nos scripts de empacotamento não devem
+ocultar binários compatíveis. O vcpkg continua verificando o ABI de cada pacote,
+com rastreamento do compilador habilitado; pacotes incompatíveis não são aceitos
+por esse fallback e precisam ser recompilados.
+
+O teste real local usou Inno Setup x64 sob Wine, gerou e instalou um arquivo de
+2.147.487.744 bytes junto com quatro bibliotecas de teste, em caminhos com espaços.
+Conferiu os dados extraídos e a exclusão de `.git`. A verificação nativa de um
+instalador pequeno também ocorre no Actions antes de compilar os aplicativos.
+Isso não substitui o teste do pacote completo com os binários MSVC e os dados reais.
 
 ## Validação
 

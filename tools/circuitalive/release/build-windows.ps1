@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Version = '10.0.7-alpha.1',
-    [ValidateSet('all', 'environment', 'setup', 'dependencies', 'configure', 'validate', 'build', 'package')]
+    [ValidateSet('all', 'environment', 'setup', 'dependencies', 'configure', 'validate', 'build', 'stage', 'package')]
     [string]$Phase = 'all',
     [ValidateRange(1, 2)][int]$Jobs = 2,
     [string]$ToolsRoot = $env:CA_WINDOWS_TOOLS
@@ -104,7 +104,10 @@ if ($Phase -in @('all', 'validate', 'build')) { Validate-Project }
 if ($Phase -in @('all', 'build')) {
     Invoke-Checked -Program cmake -Arguments @('--build', '--preset', 'circuitalive-windows-msvc', '--parallel', "$Jobs")
 }
-if ($Phase -in @('all', 'package')) {
+if ($Phase -in @('all', 'stage', 'package')) {
     Invoke-Checked -Program cmake -Arguments @('--install', $build)
-    Invoke-Checked -Program $python -Arguments @("$PSScriptRoot/package-windows.py", "$root/stage/windows-msvc", $prefix, $Version)
+    Invoke-Checked -Program $python -Arguments @("$PSScriptRoot/package-windows.py", "$root/stage/windows-msvc", $prefix, '--version', $Version, '--prepare-only')
+}
+if ($Phase -in @('all', 'package')) {
+    Invoke-Checked -Program $python -Arguments @("$PSScriptRoot/package-windows.py", "$root/stage/windows-msvc", '--version', $Version)
 }
