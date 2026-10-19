@@ -30,15 +30,18 @@ jobs:
             build/windows-audit/inventory.json
             build/windows-audit/resources.jsonl
           if-no-files-found: error
+      - name: Identify dependency profile
+        id: profile
+        run: |
+          . ./tools/circuitalive/release/windows-dependencies-data.ps1
+          "value=$(Get-WindowsDependencyProfile (Get-Location).Path)" | Add-Content $env:GITHUB_OUTPUT
       - name: Restore compatible MSVC binary cache
         id: cache
         uses: actions/cache/restore@v4
         with:
           path: D:/ca-tools/binary-cache
-          key: windows-msvc-v143-${{ hashFiles('vcpkg*.json', 'tools/circuitalive/release/windows-toolchain.json', 'tools/circuitalive/release/triplets/*.cmake') }}-audit-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            windows-msvc-v143-${{ hashFiles('vcpkg*.json', 'tools/circuitalive/release/windows-toolchain.json', 'tools/circuitalive/release/triplets/*.cmake') }}-
-            windows-msvc-v143-${{ hashFiles('vcpkg*.json', 'tools/circuitalive/release/windows-toolchain.json', 'tools/circuitalive/release/triplets/*.cmake') }}
+          key: windows-msvc-v143-${{ steps.profile.outputs.value }}-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: windows-msvc-v143-${{ steps.profile.outputs.value }}-
       - name: Record cache restoration evidence
         env:
           AUDIT_CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}

@@ -19,23 +19,7 @@ New-Item -ItemType Directory -Force $OutputDirectory | Out-Null
 $output = (Resolve-Path $OutputDirectory).Path
 Set-Content "$output/current-phase.txt" $Phase
 . "$PSScriptRoot/windows-audit-data.ps1"
-
-function Start-ResourceMonitor {
-    Remove-Item "$output/monitor.stop" -ErrorAction SilentlyContinue
-    $script = Join-Path $PSScriptRoot 'monitor-windows-runner.ps1'
-    $monitor = Start-Process -FilePath (Get-Process -Id $PID).Path -PassThru `
-        -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', "`"$script`"", '-OutputDirectory', "`"$output`"") `
-        -RedirectStandardOutput "$output/monitor-stdout.log" -RedirectStandardError "$output/monitor-stderr.log"
-    $monitor.Id | Set-Content "$output/monitor.pid"
-    Write-Host "Resource monitor started: $($monitor.Id)"
-}
-function Stop-ResourceMonitor {
-    Set-Content "$output/monitor.stop" 'stop'
-    if (Test-Path "$output/monitor.pid") {
-        $monitor = Get-Process -Id ([int](Get-Content "$output/monitor.pid")) -ErrorAction SilentlyContinue
-        if ($monitor -and !$monitor.WaitForExit(10000)) { Write-Warning 'Monitor did not exit within ten seconds.' }
-    }
-}
+. "$PSScriptRoot/windows-monitor-control.ps1"
 if ($Phase -eq 'stop-monitor') { Stop-ResourceMonitor; exit 0 }
 if ($Phase -eq 'inventory') {
     Remove-Item "$output/monitor.stop" -ErrorAction SilentlyContinue
@@ -75,17 +59,20 @@ if ($Phase -eq 'collect') {
         }
     }
     try {
-        Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 2004; StartTime = (Get-Date).AddHours(-2) } -ErrorAction Stop |
+        Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 2004; StartTime = (Get-Date).AddHours(-6) } -ErrorAction Stop |
             Select-Object TimeCreated, ProviderName, Id, Message | ConvertTo-Json -Depth 4 | Set-Content "$output/resource-exhaustion-events.json"
     } catch { Set-Content "$output/resource-exhaustion-events.txt" $_.Exception.Message }
     Get-ChildItem $output -Filter '*-result.json' | ForEach-Object { Get-Content $_.FullName | Write-Host }
-    $summary = @('## Windows audit (no library/application builds)', '', "Binary cache files: $($inventory.packages); bytes: $($inventory.bytes)", '')
+    $title = if (Test-Path "$output/manifests") { 'Windows dependency preparation (no application builds)' } else { 'Windows audit (no library/application builds)' }
+    $summary = @("## $title", '', "Binary cache files: $($inventory.packages); bytes: $($inventory.bytes)", '')
     if (Test-Path "$output/inventory.json") {
         $hardware = Get-Content "$output/inventory.json" -Raw | ConvertFrom-Json
         $summary += "Runner: $($hardware.logicalProcessors) logical CPUs, $([math]::Round($hardware.totalMemoryBytes / 1GB, 2)) GiB RAM."
     }
     $samples = @(if (Test-Path "$output/resources.jsonl") {
-        Get-Content "$output/resources.jsonl" | ForEach-Object { $_ | ConvertFrom-Json }
+        Get-Content "$output/resources.jsonl" | ForEach-Object {
+            try { $_ | ConvertFrom-Json } catch { Write-Warning 'Incomplete resource sample retained in the raw log.' }
+        }
     })
     if ($samples.Count) {
         $minFree = ($samples | Measure-Object freeMemoryBytes -Minimum).Minimum
@@ -95,7 +82,7 @@ if ($Phase -eq 'collect') {
         Write-Warning 'No resource samples survived. Check monitor-errors.log and monitor-stderr.log.'
         $summary += 'No resource samples survived; consult monitor error logs.'
     }
-    foreach ($probe in @('plan', 'probe-local', 'probe-official')) {
+    foreach ($probe in @('plan', 'probe-local', 'probe-official', 'foundation-install', 'simulation-install', 'cad-install', 'complete-install')) {
         if (Test-Path "$output/$probe-result.json") {
             $result = Get-Content "$output/$probe-result.json" -Raw | ConvertFrom-Json
             $summary += "- ${probe}: $($result.outcome); planned $($result.plannedPackages); restored $($result.restoredPackages); missing $($result.missingPackages.Count); elapsed $([math]::Round($result.elapsedSeconds, 1)) s."
@@ -117,10 +104,7 @@ if ($Phase -eq 'setup') {
 }
 # Import MSVC first, then reapply the project's pinned vcpkg environment.
 & "$PSScriptRoot/build-windows.ps1" -Phase environment -ToolsRoot $ToolsRoot
-$env:VCPKG_MAX_CONCURRENCY = '2'
-$env:CMAKE_BUILD_PARALLEL_LEVEL = '2'
 $env:VSLANG = '1033'
-$env:_CL_ = (($env:_CL_ + ' /MP1').Trim())
 $vcpkg = Join-Path $env:VCPKG_ROOT 'vcpkg.exe'
 if (!(Test-Path $vcpkg)) { throw 'Run tool setup before the audit.' }
 if ($Phase -eq 'plan') {

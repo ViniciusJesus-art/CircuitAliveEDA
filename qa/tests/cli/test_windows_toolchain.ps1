@@ -40,12 +40,13 @@ function Assert-ProjectToolchain {
     if ($env:SWIG_EXECUTABLE -ne (Join-Path $script:expectedTools "swigwin-$script:swigVersion/swig.exe")) { throw 'Wrong SWIG path' }
     if ($env:VCPKG_DEFAULT_BINARY_CACHE -ne (Join-Path $script:expectedTools 'binary-cache')) { throw 'Wrong binary cache' }
     if ($env:VCPKG_BINARY_SOURCES -ne 'clear;default') { throw 'Unexpected external binary source' }
+    if ($env:VCPKG_MAX_CONCURRENCY -ne '2' -or $env:CMAKE_BUILD_PARALLEL_LEVEL -ne '2' -or $env:_CL_ -ne '/MP1') { throw 'Unsafe dependency/compiler concurrency' }
 }
 $saved = @{}
-foreach ($name in @('OS','MINGW_PREFIX','VCPKG_ROOT','SWIG_EXECUTABLE','VCPKG_DEFAULT_BINARY_CACHE','VCPKG_BINARY_SOURCES')) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
+foreach ($name in @('OS','MINGW_PREFIX','VCPKG_ROOT','SWIG_EXECUTABLE','VCPKG_DEFAULT_BINARY_CACHE','VCPKG_BINARY_SOURCES','VCPKG_MAX_CONCURRENCY','CMAKE_BUILD_PARALLEL_LEVEL','_CL_')) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
 try {
     $env:OS = 'Windows_NT'; Remove-Item Env:MINGW_PREFIX -ErrorAction SilentlyContinue
-    foreach ($phase in @('environment','setup','configure','validate','build','package','all')) {
+    foreach ($phase in @('environment','setup','dependencies','configure','validate','build','package','all')) {
         $script:visited = [System.Collections.Generic.List[string]]::new()
         $script:imported = $false
         & $program -Phase $phase -ToolsRoot $script:expectedTools

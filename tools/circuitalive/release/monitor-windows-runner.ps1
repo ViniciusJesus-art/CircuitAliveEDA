@@ -41,6 +41,8 @@ while (!(Test-Path $stopFile)) {
         }
         # Close each write immediately; partial diagnostics survive an ordinary failure.
         [IO.File]::AppendAllText($samples, (($sample | ConvertTo-Json -Depth 6 -Compress) + "`n"))
+        $diskSummary = ($disks | ForEach-Object { "$($_.volume)=$([math]::Round($_.freeBytes / 1GB, 1))GiB" }) -join ','
+        Write-Output "[resources] $($sample.timestampUtc) phase=$($sample.phase) CPU=$($sample.cpuPercent)% RAMfree=$([math]::Round($sample.freeMemoryBytes / 1GB, 2))GiB disks=$diskSummary buildProcesses=$($processes.Count)"
         if ($sample.freeMemoryBytes -lt 2GB -or $sample.committedBytes -gt 0.9 * $sample.commitLimitBytes -or $disks.Where({ $_.freeBytes -lt 5GB }).Count) {
             [IO.File]::AppendAllText("$OutputDirectory/resource-warnings.log", "$($sample.timestampUtc) Low RAM or disk headroom; see resources.jsonl`n")
         }

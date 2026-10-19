@@ -1,0 +1,93 @@
+name: Prepare Windows dependencies only (MSVC)
+on:
+  workflow_dispatch:
+concurrency:
+  group: windows-msvc-${{ github.ref }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  dependencies:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 360
+    env:
+      CA_WINDOWS_TOOLS: D:/ca-tools
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate dependency safety and toolchain initialization
+        run: |
+          ./qa/tests/cli/test_windows_toolchain.ps1
+          ./qa/tests/cli/test_windows_audit.ps1
+          ./qa/tests/cli/test_windows_dependencies.ps1
+      - name: Record actual public runner resources
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase inventory -OutputDirectory build/windows-dependencies
+      - name: Identify compiler-tracked dependency profile
+        id: profile
+        run: |
+          . ./tools/circuitalive/release/windows-dependencies-data.ps1
+          "value=$(Get-WindowsDependencyProfile (Get-Location).Path)" | Add-Content $env:GITHUB_OUTPUT
+      - name: Restore compatible dependency cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: D:/ca-tools/binary-cache
+          key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-final
+          restore-keys: windows-msvc-v143-${{ steps.profile.outputs.value }}-
+      - name: Record actual cache restoration
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          CACHE_MATCHED_KEY: ${{ steps.cache.outputs.cache-matched-key }}
+          CACHE_PRIMARY_KEY: ${{ steps.cache.outputs.cache-primary-key }}
+        run: |
+          @{ cacheHit = $env:CACHE_HIT; matchedKey = $env:CACHE_MATCHED_KEY; primaryKey = $env:CACHE_PRIMARY_KEY } |
+            ConvertTo-Json | Tee-Object -FilePath build/windows-dependencies/actions-cache.json
+      - name: Prepare native tools and bound the pinned legacy MSBuild helper
+        timeout-minutes: 10
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase setup -OutputDirectory build/windows-dependencies
+      - name: Resolve full dependency plan without application configuration
+        timeout-minutes: 10
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase plan -OutputDirectory build/windows-dependencies
+      - name: Verify actual MSBuild arguments before compiling any port
+        run: ./qa/tests/cli/test_windows_dependencies.ps1 -HelperPath "$env:CA_WINDOWS_TOOLS/vcpkg/scripts/cmake/vcpkg_build_msbuild.cmake"
+      - name: Preserve plan before compiling dependencies
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-dependencies-plan
+          path: build/windows-dependencies/
+      - name: Prepare foundation libraries and Python runtime
+        timeout-minutes: 100
+        run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage foundation
+      - name: Checkpoint foundation libraries
+        uses: ./.github/actions/windows-dependency-checkpoint
+        with:
+          name: foundation
+          cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-foundation
+      - name: Prepare ngspice and all XSPICE code models
+        timeout-minutes: 40
+        run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage simulation
+      - name: Checkpoint simulator dependencies
+        uses: ./.github/actions/windows-dependency-checkpoint
+        with:
+          name: simulation
+          cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-simulation
+      - name: Prepare OpenCascade with the current CAD features
+        timeout-minutes: 70
+        run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage cad
+      - name: Checkpoint CAD dependencies
+        uses: ./.github/actions/windows-dependency-checkpoint
+        with:
+          name: cad
+          cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-cad
+      - name: Complete full manifest including wxWidgets and wxPython
+        timeout-minutes: 110
+        run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage complete
+      - name: Preserve final or failed preparation checkpoint
+        if: always()
+        uses: ./.github/actions/windows-dependency-checkpoint
+        with:
+          name: final
+          cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-final

@@ -24,16 +24,32 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
+      - name: Identify dependency profile
+        id: profile
+        run: |
+          . ./tools/circuitalive/release/windows-dependencies-data.ps1
+          "value=$(Get-WindowsDependencyProfile (Get-Location).Path)" | Add-Content $env:GITHUB_OUTPUT
       - name: Restore compiler-tracked vcpkg cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: D:/ca-tools/binary-cache
-          key: windows-msvc-v143-${{ hashFiles('vcpkg*.json', 'tools/circuitalive/release/windows-toolchain.json', 'tools/circuitalive/release/triplets/*.cmake') }}
+          key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-installer
+          restore-keys: windows-msvc-v143-${{ steps.profile.outputs.value }}-
       - name: Check toolchain initialization against Developer PowerShell overrides
         run: ./qa/tests/cli/test_windows_toolchain.ps1
       - name: Prepare Visual Studio, vcpkg and SWIG
         run: ./tools/circuitalive/release/build-windows.ps1 -Phase setup
-      - name: Configure dependencies and applications
+      - name: Record resources before dependency preparation
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase inventory -OutputDirectory build/windows-dependencies
+      - name: Prepare dependencies explicitly before CMake
+        run: ./tools/circuitalive/release/build-windows.ps1 -Phase dependencies
+      - name: Preserve dependency cache and diagnostics before applications
+        if: always()
+        uses: ./.github/actions/windows-dependency-checkpoint
+        with:
+          name: installer
+          cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-installer
+      - name: Configure applications with dependency installation disabled
         run: ./tools/circuitalive/release/build-windows.ps1 -Phase configure -Version $env:RELEASE_VERSION
       - name: Validate affected sources and simulator, then build all applications
         run: ./tools/circuitalive/release/build-windows.ps1 -Phase build

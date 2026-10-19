@@ -1,9 +1,9 @@
 [CmdletBinding()]
 param(
     [string]$Version = '10.0.7-alpha.1',
-    [ValidateSet('all', 'environment', 'setup', 'configure', 'validate', 'build', 'package')]
+    [ValidateSet('all', 'environment', 'setup', 'dependencies', 'configure', 'validate', 'build', 'package')]
     [string]$Phase = 'all',
-    [ValidateRange(1, 64)][int]$Jobs = 2,
+    [ValidateRange(1, 2)][int]$Jobs = 2,
     [string]$ToolsRoot = $env:CA_WINDOWS_TOOLS
 )
 $ErrorActionPreference = 'Stop'
@@ -46,6 +46,8 @@ function Initialize-Tools {
     $actual = & git -C $env:VCPKG_ROOT rev-parse HEAD
     if ($actual -ne $lock.vcpkgCommit) { throw "Use a vcpkg clone pinned to $($lock.vcpkgCommit): $env:VCPKG_ROOT" }
     Invoke-Checked -Program "$env:VCPKG_ROOT/bootstrap-vcpkg.bat" -Arguments @('-disableMetrics')
+    . "$PSScriptRoot/limit-windows-toolchain.ps1"
+    Set-LegacyMsbuildLimit -Path "$env:VCPKG_ROOT/scripts/cmake/vcpkg_build_msbuild.cmake" -OriginalSha256 $lock.legacyMsbuildHelperSha256
     if (!(Test-Path $env:SWIG_EXECUTABLE)) {
         & "$PSScriptRoot/prepare-swig.ps1" -ToolsRoot $ToolsRoot `
             -Version $lock.swigVersion -Sha256 $lock.swigSha256
@@ -53,8 +55,14 @@ function Initialize-Tools {
     Invoke-Checked -Program $env:SWIG_EXECUTABLE -Arguments @('-version')
 }
 
+function Prepare-Dependencies {
+    & "$PSScriptRoot/prepare-windows-dependencies.ps1" -ToolsRoot $ToolsRoot -Jobs $Jobs
+}
+
 function Configure-Project {
     if (!(Test-Path $env:SWIG_EXECUTABLE)) { throw 'Run -Phase setup first.' }
+    . "$PSScriptRoot/windows-dependencies-data.ps1"
+    Assert-WindowsDependenciesComplete -Root $root
     Invoke-Checked -Program cmake -Arguments @('--preset', 'circuitalive-windows-msvc', "-DCIRCUITALIVE_RELEASE_VERSION=$Version")
     $compilerFile = Get-ChildItem "$build/CMakeFiles/*/CMakeCXXCompiler.cmake" | Select-Object -First 1
     if (!(Select-String -Path $compilerFile.FullName -Pattern 'CMAKE_CXX_COMPILER_ID "MSVC"' -Quiet)) {
@@ -82,8 +90,12 @@ $env:SWIG_EXECUTABLE = Join-Path $ToolsRoot "swigwin-$($lock.swigVersion)/swig.e
 $env:VCPKG_DEFAULT_BINARY_CACHE = Join-Path $ToolsRoot 'binary-cache'
 # Compiler-tracked local cache only: no MinGW or untracked feed packages.
 $env:VCPKG_BINARY_SOURCES = 'clear;default'
+$env:VCPKG_MAX_CONCURRENCY = "$Jobs"
+$env:CMAKE_BUILD_PARALLEL_LEVEL = "$Jobs"
+$env:_CL_ = '/MP1'
 Write-Host "Using project vcpkg: $env:VCPKG_ROOT"
 if ($Phase -in @('all', 'setup')) { Initialize-Tools }
+if ($Phase -in @('all', 'dependencies')) { Prepare-Dependencies }
 if ($Phase -in @('all', 'configure')) { Configure-Project }
 if ($Phase -in @('all', 'validate', 'build')) { Validate-Project }
 if ($Phase -in @('all', 'build')) {

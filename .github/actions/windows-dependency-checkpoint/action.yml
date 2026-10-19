@@ -1,0 +1,30 @@
+name: Preserve Windows dependency checkpoint
+description: Save logs before the compiler-tracked binary cache; no build commands.
+inputs:
+  name:
+    description: Unique checkpoint name within this run
+    required: true
+  cache-key:
+    description: Immutable cache snapshot key
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Collect available dependency diagnostics
+      id: inventory
+      shell: pwsh
+      run: ./tools/circuitalive/release/audit-windows.ps1 -Phase collect -OutputDirectory build/windows-dependencies
+    - name: Preserve logs and resource samples
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-dependencies-${{ inputs.name }}
+        path: build/windows-dependencies/
+        if-no-files-found: warn
+        retention-days: 14
+    - name: Save completed compatible packages, including partial preparations
+      if: always() && steps.inventory.outputs.cached-packages != '' && steps.inventory.outputs.cached-packages != '0'
+      uses: actions/cache/save@v4
+      with:
+        path: D:/ca-tools/binary-cache
+        key: ${{ inputs.cache-key }}

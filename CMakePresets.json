@@ -76,6 +76,8 @@
         "VCPKG_HOST_TRIPLET": "x64-windows",
         "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/tools/circuitalive/release/triplets",
         "VCPKG_MANIFEST_MODE": true,
+        "VCPKG_MANIFEST_INSTALL": false,
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/build/windows-msvc/vcpkg_installed",
         "SWIG_EXECUTABLE": "$env{SWIG_EXECUTABLE}",
         "PYTHON_EXECUTABLE": "${sourceDir}/build/windows-msvc/vcpkg_installed/x64-windows/tools/python3/python.exe",
         "KICAD_VERSION_EXTRA": "CircuitAliveEDA",
