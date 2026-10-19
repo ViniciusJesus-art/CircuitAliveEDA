@@ -2,7 +2,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$OutputDirectory,
-    [ValidateRange(1, 300)][int]$IntervalSeconds = 30
+    [ValidateRange(1, 300)][int]$IntervalSeconds = 30,
+    [switch]$Once
 )
 $ErrorActionPreference = 'Stop'
 $ErrorView = 'NormalView'
@@ -46,6 +47,7 @@ while (!(Test-Path $stopFile)) {
     } catch {
         [IO.File]::AppendAllText("$OutputDirectory/monitor-errors.log", "$([DateTime]::UtcNow.ToString('o')) $($_.Exception.Message)`n")
     }
+    if ($Once) { break }
     for ($second = 0; $second -lt $IntervalSeconds -and !(Test-Path $stopFile); $second++) {
         Start-Sleep -Seconds 1
     }

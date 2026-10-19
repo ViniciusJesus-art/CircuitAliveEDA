@@ -138,7 +138,7 @@ Primeiro uma execução de auditoria/cache, sem build dos aplicativos: inventár
 O workflow manual `.github/workflows/windows-audit.yml` usa `windows-2022` e compartilha o grupo de concorrência do instalador, impedindo que esses dois jobs disputem execução simultaneamente na mesma referência. Não chama configuração CMake, build ou empacotamento.
 
 - Inventário real de CPU, RAM, volumes, pagefile, imagem, compilador e ferramentas.
-- Monitor CIM independente a cada 30 segundos: memória física/commit, CPU, discos e processos de compilação com PID/PPID e consumo. Cada amostra JSONL é fechada imediatamente.
+- Monitor CIM independente a cada 30 segundos durante cada operação longa: memória física/commit, CPU, discos e processos de compilação com PID/PPID e consumo. O processo pai permanece vivo durante a operação, e `finally` encerra o monitor; cada amostra JSONL é fechada imediatamente. Há também uma amostra síncrona inicial.
 - Plano nativo separado (`--dry-run`), sondagem do cache local e sondagem somente de leitura do feed KiCad com `--only-binarycaching --keep-going`. Este último flag proíbe fallback para compilação de ports. O vcpkg ainda pode executar a pequena detecção de compilador/ABI.
 - Limites de dois workers para vcpkg/CMake durante a auditoria e `/MP1` no ambiente MSVC. Como a auditoria não compila ports, ela não comprova ainda a eficácia desses limites nos helpers legados.
 - Restauração explícita do cache Actions, registro de chave/hit e inventário antes/depois. Pacotes ausentes são resultados da sondagem; erros de configuração/rede são falhas.
@@ -146,6 +146,21 @@ O workflow manual `.github/workflows/windows-audit.yml` usa `windows-2022` e com
 - Testes offline verificam os argumentos que proíbem builds, interpretação de hits/misses/erros, inventário de cache e inicialização do ambiente sem operações de compilação.
 
 Os resultados da execução devem ser lidos nos artefatos `windows-audit-inventory`, `windows-audit-plan` e `windows-audit-diagnostics`. O sucesso do workflow de auditoria não significa que todas as dependências estejam disponíveis em cache: consultar `*-result.json` e `summary.md`.
+
+### Primeira medição no runner público
+
+[Auditoria 39233128984](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39233128984), commit `1a1344ccf7`:
+
+- Windows Server 2022, imagem `win22`/`20261012.333.1`, **4 CPUs lógicas, 15,99 GiB de RAM**. Espaço livre inicial: **82,66 GiB em C:** e **145,62 GiB em D:**. Pagefile alocado em D: de 2944 MiB.
+- MSVC 19.44.35229, toolset 14.44.35207, MSBuild 17.14.60, SDK 10.0.26100.0, CMake 3.31.6, Ninja 1.13.2; vcpkg fixado conforme lock.
+- Plano nativo concluído em **44,8 s**, com os mesmos **133 pacotes**. Isso valida a resolução Windows, não a compilação das bibliotecas/aplicativos.
+- Cache Actions sem chave correspondente (`cacheHit` e `matchedKey` vazios); cache binário local com zero arquivos/pacotes. Sondagem local: **0 restaurados, 133 ausentes**, 8,2 s.
+- Feed oficial acessível: **133 requisições `.nupkg`, 133 respostas `NotFound`, zero restaurados**, 11,6 s. Não há pacotes para os hashes ABI solicitados; não significa que o feed inteiro esteja vazio. Não houve erro de autenticação ou transporte identificado nesse log.
+- Inventário, plano e diagnósticos finais foram enviados e baixados em `.circuitalive/reports/windows-audit-39233128984/`.
+
+Essa primeira execução revelou duas falhas na instrumentação: o parser confundiu o aviso agregado do NuGet (exit 1 por pacotes ausentes) com erro real, e o monitor iniciado em um step anterior só deixou uma amostra. O parser foi corrigido para aceitar apenas o aviso específico quando todas as requisições têm respostas `OK`/`NotFound`, mantendo falhas de rede/autenticação como erro. O monitor passou a acompanhar cada operação longa dentro do tempo de vida de seu pai. A amostra inicial tinha 12,85 GiB livres, mas **não permite concluir picos de RAM/CPU dessa execução**.
+
+Continua necessário criar cache próprio ou validar integralmente um perfil oficial compatível antes de esperar reaproveitamento de binários. Não houve build de bibliotecas ou aplicativos nesta auditoria, nem publicação de release.
 
 ## Referências
 

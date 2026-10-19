@@ -20,8 +20,6 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
-      - name: Start resource sampling every 30 seconds
-        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase start-monitor
       - name: Record actual public runner resources
         run: ./tools/circuitalive/release/audit-windows.ps1 -Phase inventory
       - name: Preserve initial hardware checkpoint
@@ -56,7 +54,7 @@ jobs:
       - name: Prepare tools only (no dependency builds)
         id: setup
         timeout-minutes: 10
-        run: ./tools/circuitalive/release/build-windows.ps1 -Phase setup 2>&1 | Tee-Object -FilePath build/windows-audit/setup.log
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase setup
       - name: Resolve native Windows dependency plan
         timeout-minutes: 10
         run: ./tools/circuitalive/release/audit-windows.ps1 -Phase plan

@@ -45,6 +45,22 @@ if ((Get-VcpkgAuditResult 'unknown failure' 1).outcome -ne 'error' -or
 }
 Write-Output 'PASS: cache misses remain distinct from configuration, network and build failures'
 
+$nugetFixture = $fixture + @'
+
+warning: "C:\tools\nuget.exe" install packages.config -Source https://example.org/index.json failed with exit code 1
+  GET https://example.org/missing.nupkg
+  NotFound https://example.org/missing.nupkg 123ms
+'@
+if ((Get-VcpkgAuditResult $nugetFixture 1).outcome -ne 'cache-miss') { throw 'Expected NuGet package 404 was treated as an error' }
+foreach ($badResponse in @('  GET https://example.org/no-response.nupkg',
+    '  ServiceUnavailable https://example.org/other.nupkg 200ms', 'error: unexpected NuGet configuration',
+    '  Unauthorized https://example.org/private.nupkg 100ms')) {
+    if ((Get-VcpkgAuditResult ($nugetFixture + "`n" + $badResponse) 1).outcome -ne 'error') {
+        throw "Unexpected NuGet failure was hidden: $badResponse"
+    }
+}
+Write-Output 'PASS: NuGet missing-package warning is accepted only with accounted-for responses and no real errors'
+
 $directory = Join-Path ([IO.Path]::GetTempPath()) ('ca-cache-qa-' + [guid]::NewGuid())
 try {
     if ((Get-VcpkgCacheInventory $directory).files -ne 0) { throw 'Missing cache is not empty' }

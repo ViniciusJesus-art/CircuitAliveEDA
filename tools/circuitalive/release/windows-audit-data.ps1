@@ -18,7 +18,16 @@ function Get-VcpkgAuditResult {
         }
     } | Sort-Object name -Unique)
     $hasMisses = $Text -match 'CACHE_MISSING|There are packages that have not been built'
-    $hasFailure = $Text -match '(?im)BUILD_FAILED|POST_BUILD_CHECKS_FAILED|FILE_CONFLICTS|^error:|^(?:warning:).*?(?:failed|unable|could not|HTTP [45])'
+    # NuGet returns 1 even when every request received an ordinary package 404.
+    # Ignore only that known wrapper warning, with a complete set of responses.
+    $requests = @([regex]::Matches($Text, '(?m)^\s+GET (?<url>https://\S+\.nupkg)\s*$') | ForEach-Object { $_.Groups['url'].Value } | Sort-Object -Unique)
+    $responses = @([regex]::Matches($Text, '(?m)^\s+(?:NotFound|OK) (?<url>https://\S+\.nupkg) [^\r\n]+') | ForEach-Object { $_.Groups['url'].Value } | Sort-Object -Unique)
+    $accountedFor = $requests.Count -gt 0 -and $requests.Count -eq $responses.Count -and
+        @($requests | Where-Object { $_ -notin $responses }).Count -eq 0
+    $diagnosticText = if ($accountedFor) {
+        $Text -replace '(?m)^warning: "[^"\r\n]*nuget\.exe" install [^\r\n]+ failed with exit code 1\r?$', ''
+    } else { $Text }
+    $hasFailure = $diagnosticText -match '(?im)BUILD_FAILED|POST_BUILD_CHECKS_FAILED|FILE_CONFLICTS|^error:|^warning:.*?(?:failed|unable|could not|HTTP [45])|Unauthorized|Forbidden|ServiceUnavailable|InternalServerError|BadGateway|GatewayTimeout|TooManyRequests|timed out|unable to load|HTTP [45]\d\d'
     $missing = @([regex]::Matches($Text, '(?m)^\s*([a-z0-9-]+):x64-windows: CACHE_MISSING:.*$') | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
     $restored = @([regex]::Matches($Text, '(?m)^Restored (\d+) package.*$') | ForEach-Object { [int]$_.Groups[1].Value })
     [pscustomobject]@{

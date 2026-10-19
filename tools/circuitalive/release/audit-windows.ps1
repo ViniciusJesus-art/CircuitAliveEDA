@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('start-monitor', 'inventory', 'plan', 'probe-local', 'probe-official', 'collect', 'stop-monitor')]
+    [ValidateSet('inventory', 'setup', 'plan', 'probe-local', 'probe-official', 'collect', 'stop-monitor')]
     [string]$Phase,
     [string]$ToolsRoot = $env:CA_WINDOWS_TOOLS,
     [string]$OutputDirectory = 'build/windows-audit'
@@ -20,7 +20,7 @@ $output = (Resolve-Path $OutputDirectory).Path
 Set-Content "$output/current-phase.txt" $Phase
 . "$PSScriptRoot/windows-audit-data.ps1"
 
-if ($Phase -eq 'start-monitor') {
+function Start-ResourceMonitor {
     Remove-Item "$output/monitor.stop" -ErrorAction SilentlyContinue
     $script = Join-Path $PSScriptRoot 'monitor-windows-runner.ps1'
     $monitor = Start-Process -FilePath (Get-Process -Id $PID).Path -PassThru `
@@ -28,17 +28,18 @@ if ($Phase -eq 'start-monitor') {
         -RedirectStandardOutput "$output/monitor-stdout.log" -RedirectStandardError "$output/monitor-stderr.log"
     $monitor.Id | Set-Content "$output/monitor.pid"
     Write-Host "Resource monitor started: $($monitor.Id)"
-    exit 0
 }
-if ($Phase -eq 'stop-monitor') {
+function Stop-ResourceMonitor {
     Set-Content "$output/monitor.stop" 'stop'
     if (Test-Path "$output/monitor.pid") {
         $monitor = Get-Process -Id ([int](Get-Content "$output/monitor.pid")) -ErrorAction SilentlyContinue
         if ($monitor -and !$monitor.WaitForExit(10000)) { Write-Warning 'Monitor did not exit within ten seconds.' }
     }
-    exit 0
 }
+if ($Phase -eq 'stop-monitor') { Stop-ResourceMonitor; exit 0 }
 if ($Phase -eq 'inventory') {
+    Remove-Item "$output/monitor.stop" -ErrorAction SilentlyContinue
+    & "$PSScriptRoot/monitor-windows-runner.ps1" -OutputDirectory $output -Once
     $system = Get-CimInstance Win32_ComputerSystem
     $os = Get-CimInstance Win32_OperatingSystem
     [ordered]@{
@@ -106,6 +107,14 @@ if ($Phase -eq 'collect') {
     exit 0
 }
 
+# Keep the monitor's parent alive throughout each long operation. A background
+# process launched by a previous Actions step did not survive that step's shell.
+Start-ResourceMonitor
+try {
+if ($Phase -eq 'setup') {
+    & "$PSScriptRoot/build-windows.ps1" -Phase setup -ToolsRoot $ToolsRoot 2>&1 | Tee-Object -FilePath "$output/setup.log"
+    return
+}
 # Import MSVC first, then reapply the project's pinned vcpkg environment.
 & "$PSScriptRoot/build-windows.ps1" -Phase environment -ToolsRoot $ToolsRoot
 $env:VCPKG_MAX_CONCURRENCY = '2'
@@ -144,3 +153,4 @@ if ($result.outcome -eq 'error') { throw "The audit encountered an error (exit $
 if ($result.outcome -eq 'cache-miss') { Write-Host 'Cache misses recorded. No library build was started.' }
 # GitHub's PowerShell wrapper propagates LASTEXITCODE even after a handled cache miss.
 $global:LASTEXITCODE = 0
+} finally { Stop-ResourceMonitor }
