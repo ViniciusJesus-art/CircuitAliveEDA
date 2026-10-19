@@ -1,6 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #pragma once
 #include <bitmaps.h>
+#include <wx/bitmap.h>
 #include <wx/iconbndl.h>
 #include <wx/intl.h>
 

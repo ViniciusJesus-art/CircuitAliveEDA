@@ -6,7 +6,7 @@ class TOOL_MANAGER;
 
 namespace CIRCUITALIVE
 {
-#ifdef __linux__
+#if defined( __linux__ ) || defined( _WIN32 )
 void RegisterEditorSimulation( TOOL_MANAGER* aManager );
 void InstallEditorSimulation( SCH_EDIT_FRAME* aFrame );
 void ShutdownEditorSimulation( SCH_EDIT_FRAME* aFrame );

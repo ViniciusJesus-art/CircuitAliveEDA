@@ -96,8 +96,17 @@ jobs:
           $prefix = (Resolve-Path build/windows-msvc/vcpkg_installed/x64-windows).Path
           $source = Join-Path (Resolve-Path build/windows-validation).Path 'branding-check.cpp'
           @'
-          #include <wx/wx.h>
           #include <circuitalive/branding.h>
+          #include <circuitalive/editor_simulation.h>
+          // Implement the declarations to reject accidental inline platform stubs.
+          namespace CIRCUITALIVE {
+          void RegisterEditorSimulation(TOOL_MANAGER*) {}
+          void InstallEditorSimulation(SCH_EDIT_FRAME*) {}
+          void ShutdownEditorSimulation(SCH_EDIT_FRAME*) {}
+          void InvalidateEditorSimulation(SCH_EDIT_FRAME*) {}
+          void RebindEditorSimulation(SCH_EDIT_FRAME*) {}
+          void ReloadEditorSimulationPreferences(SCH_EDIT_FRAME*) {}
+          }
           '@ | Set-Content $source -Encoding utf8
           & cl /nologo /std:c++20 /permissive- /EHsc /utf-8 /Zs /DUNICODE /D_UNICODE /DNOMINMAX `
             /Iinclude /Ieeschema /Ithirdparty/nlohmann_json "/I$prefix/include" "/I$prefix/lib/mswu" `

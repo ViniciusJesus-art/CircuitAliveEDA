@@ -75,6 +75,8 @@ A [validação 39268033043](https://github.com/ViniciusJesus-art/CircuitAliveEDA
 
 A compilação usa Ninja `-k 0`: continua os objetos independentes após uma falha, mas mantém o resultado de erro e não executa os testes até todos os alvos selecionados passarem. Objetos que dependem de uma etapa com erro ainda ficam bloqueados. `source-plan.json` registra os arquivos, objetos e comando; `compile.log` e `compile-result.json` preservam a saída completa e os diagnósticos destacados. O limite de dois jobs e o perfil binário das dependências permanecem iguais.
 
+A [validação 39277359494](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39277359494) concluiu a configuração em 22 segundos e percorreu as 938 tarefas da compilação ampliada em cerca de 22 minutos. Os diagnósticos agruparam duas causas: `branding.h` dependia de um include indireto de `wxBitmap`, e `editor_simulation.h` ainda fornecia stubs fora do Linux, conflitando com as seis implementações reais no Windows. O header agora inclui `wx/bitmap.h` explicitamente e habilita as declarações reais também sob `_WIN32`, conforme o CMake já fazia. A checagem inicial deixou de incluir `wx/wx.h`, que mascarava o include ausente, e define as seis funções em uma unidade compilada somente com `/Zs`, para detectar regressões dos stubs antes da compilação maior.
+
 ## Validação
 
 Os testes offline verificam manifestos cumulativos e finais, pins/registries/features, argumentos, rejeição de preparação ausente/desatualizada, conteúdo conhecido e reaplicação do patch. Após o setup, um teste executa o helper CMake real com o processo MSBuild substituído por um verificador: comprova `/m:2` e somente Release antes de compilar qualquer port. Nenhum compilador é executado nesse teste.
