@@ -162,6 +162,29 @@ Essa primeira execução revelou duas falhas na instrumentação: o parser confu
 
 Continua necessário criar cache próprio ou validar integralmente um perfil oficial compatível antes de esperar reaproveitamento de binários. Não houve build de bibliotecas ou aplicativos nesta auditoria, nem publicação de release.
 
+### Auditoria corrigida aprovada
+
+[Execução 39233966933](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39233966933), commit `4f33cfd092`: **sucesso em 2min36s**. Todos os testes e fases passaram; nenhum build de port/aplicativo foi iniciado.
+
+| Medição | Resultado |
+| --- | --- |
+| Runner | 4 CPUs lógicas, 15,99 GiB RAM |
+| Plano nativo | 133 pacotes, 46,9 s |
+| Cache local | 0 restaurados, 133 ausentes, 9,1 s |
+| Feed oficial, ABI atual | 0 restaurados, 133 ausentes, 14,2 s |
+| Amostras de recursos | 6: inventário, setup, duas no plano, cache local e feed |
+| RAM livre mínima amostrada | 12,75 GiB |
+| CPU máxima amostrada | 30% |
+| Commit máximo amostrado | 15,14% do limite |
+| Espaço livre mínimo amostrado | C: 82,80 GiB; D: 145,21 GiB |
+| Processos de ferramentas de build simultâneos nas amostras | Máximo 1 |
+
+Os artefatos foram baixados em `.circuitalive/reports/windows-audit-39233966933/`. A validação local confirmou amostras do plano e o resultado `cache-miss` das duas sondagens, com 133 ausentes em cada uma. A gravação de cache foi corretamente pulada porque nenhum binário foi obtido.
+
+Esses números medem resolução e sondagem, **não a carga de compilar OpenCascade/wxPython/etc.** Não comprovam a causa da perda da VM anterior nem permitem aumentar o paralelismo com segurança. Confirmam um perfil de dependências totalmente frio neste runner e que o simples acesso ao feed oficial não fornece os binários do ABI atual.
+
+Próxima etapa recomendada: aplicar os limites também aos caminhos MSBuild legados, separar a instalação explícita de dependências da configuração CMake e planejar a persistência do cache próprio. Só então iniciar uma preparação de dependências autorizada, com checkpoints; a compilação completa permanece manual e parada.
+
 ## Referências
 
 - [Execução investigada](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39177604474).
