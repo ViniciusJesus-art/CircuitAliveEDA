@@ -70,10 +70,11 @@ jobs:
           $output = (New-Item -ItemType Directory -Force build/windows-validation).FullName
           Set-Content "$output/current-phase.txt" 'configure'
           . ./tools/circuitalive/release/windows-monitor-control.ps1
-          Start-Transcript -Path "$output/configure.log"
+          Start-Transcript -Path "$output/configure-transcript.log"
           try {
             Start-ResourceMonitor
-            ./tools/circuitalive/release/build-windows.ps1 -Phase configure -Jobs 2
+            ./tools/circuitalive/release/build-windows.ps1 -Phase configure -Jobs 2 2>&1 |
+              Tee-Object -FilePath "$output/configure.log"
           } finally {
             Stop-ResourceMonitor
             Stop-Transcript
@@ -88,16 +89,31 @@ jobs:
             build/windows-msvc/CMakeCache.txt
             build/windows-msvc/CMakeFiles/CMakeConfigureLog.yaml
           if-no-files-found: warn
+      - name: Check branding header with MSVC before compiling shared libraries
+        timeout-minutes: 2
+        run: |
+          ./tools/circuitalive/release/build-windows.ps1 -Phase environment -Jobs 2
+          $prefix = (Resolve-Path build/windows-msvc/vcpkg_installed/x64-windows).Path
+          $source = Join-Path (Resolve-Path build/windows-validation).Path 'branding-check.cpp'
+          @'
+          #include <wx/wx.h>
+          #include <circuitalive/branding.h>
+          '@ | Set-Content $source -Encoding utf8
+          & cl /nologo /std:c++20 /permissive- /EHsc /utf-8 /Zs /DUNICODE /D_UNICODE /DNOMINMAX `
+            /Iinclude "/I$prefix/include" "/I$prefix/lib/mswu" $source 2>&1 |
+            Tee-Object -FilePath build/windows-validation/branding-check.log
+          if ($LASTEXITCODE -ne 0) { throw "MSVC branding header check failed ($LASTEXITCODE)." }
       - name: Compile affected sources and run interactive simulator tests only
         timeout-minutes: 50
         run: |
           $output = (Resolve-Path build/windows-validation).Path
           Set-Content "$output/current-phase.txt" 'validate'
           . ./tools/circuitalive/release/windows-monitor-control.ps1
-          Start-Transcript -Path "$output/validate.log"
+          Start-Transcript -Path "$output/validate-transcript.log"
           try {
             Start-ResourceMonitor
-            ./tools/circuitalive/release/build-windows.ps1 -Phase validate -Jobs 2
+            ./tools/circuitalive/release/build-windows.ps1 -Phase validate -Jobs 2 2>&1 |
+              Tee-Object -FilePath "$output/validate.log"
           } finally {
             Stop-ResourceMonitor
             Stop-Transcript

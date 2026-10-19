@@ -17,7 +17,10 @@ inline wxString LibraryTypeLabel( const wxString& type )
 }
 inline wxString LibraryTypeId( const wxString& label )
 {
-    return label == ProductName() ? wxS( "KiCad" ) : label;
+    if( label == ProductName() )
+        return wxS( "KiCad" );
+
+    return label;
 }
 inline wxString AppTitle( const wxString& role ) { return ProductName() + " " + wxGetTranslation( role ); }
 inline wxString WindowTitle( const wxString& title )

@@ -59,6 +59,10 @@ O workflow manual `windows-validate.yml` restaura esse mesmo perfil de cache e v
 
 Em seguida, executa separadamente `-Phase configure` e `-Phase validate`, com dois jobs e `/MP1`. Compila o alvo `qa_interactive_sim`, suas dependências (incluindo o worker) e os objetos de `instrument_panel.cpp` e `simulation_overlay.cpp`; executa os testes do simulador interativo. As duas fases registram transcrições e recursos a cada 30 segundos, com upload final dos logs CMake/CTest e métricas mesmo em falhas normais. Esse workflow não chama `-Phase build`, não compila todos os aplicativos e não gera instalador ou release.
 
+A [validação 39253280301](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39253280301) restaurou os 133 pacotes em 61,1 segundos e configurou o CMake com sucesso. A compilação parou no erro MSVC C2445 em `LibraryTypeId`, no cabeçalho `include/circuitalive/branding.h`: a expressão condicional entre um literal `wchar_t` e `wxString` tinha duas conversões possíveis. Retornos separados eliminam a ambiguidade e preservam o token `KiCad` dos arquivos. Durante a compilação, as amostras registraram pelo menos 12,19 GiB de RAM livre.
+
+Antes dos alvos maiores, o workflow agora verifica esse cabeçalho com `cl /Zs` e os headers wxWidgets da instalação MSVC. A saída dos processos nativos também passa explicitamente por `Tee-Object`: a transcrição PowerShell da primeira execução não reteve as mensagens do compilador; o log completo foi recuperado do Actions. Os diagnósticos dessa execução estão em `.circuitalive/reports/windows-validation-39253280301/`.
+
 ## Validação
 
 Os testes offline verificam manifestos cumulativos e finais, pins/registries/features, argumentos, rejeição de preparação ausente/desatualizada, conteúdo conhecido e reaplicação do patch. Após o setup, um teste executa o helper CMake real com o processo MSBuild substituído por um verificador: comprova `/m:2` e somente Release antes de compilar qualquer port. Nenhum compilador é executado nesse teste.
