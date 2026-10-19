@@ -55,4 +55,18 @@ O preset CMake tem `VCPKG_MANIFEST_INSTALL=OFF` e usa a mesma instalação `buil
 
 Os testes offline verificam manifestos cumulativos e finais, pins/registries/features, argumentos, rejeição de preparação ausente/desatualizada, conteúdo conhecido e reaplicação do patch. Após o setup, um teste executa o helper CMake real com o processo MSBuild substituído por um verificador: comprova `/m:2` e somente Release antes de compilar qualquer port. Nenhum compilador é executado nesse teste.
 
+### Falha gperf e correção comprovada no Windows
+
+A [execução 39236685543](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39236685543) falhou no `gperf` durante a configuração Autotools (exit 77, `C compiler cannot create executables`). Os pacotes anteriores não geraram cache porque a configuração `clear;default` permitia apenas leitura. O coletor original também excluía `x64-windows-rel/lib/config.log`; isso foi corrigido para preservar logs internos, mantendo objetos/fontes fora da coleta.
+
+O [preflight 39240310569](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39240310569), commit `ab9dce02d2`, **passou em 4min58s** e comprovou:
+
+- Sem proteção, o shell MSYS2 adquirido pelo port transforma `_CL_=/MP1` em `D:/ca-tools/vcpkg/downloads/tools/msys2/19f68f647e350a23/MP1`. O teste nativo reproduz `LNK1181` tentando abrir `MP1.obj`, com exit 2.
+- Com `MSYS2_ENV_CONV_EXCL=_CL_`, o compilador recebe `/MP1` intacto; compilação e execução do pequeno programa C retornam zero.
+- `gperf` e suas três dependências concluem com sucesso, em 150,9 segundos.
+- O cache com `readwrite` contém **4 ZIPs, 186591 bytes**. Uma instalação nova restaura os quatro pacotes em 102 ms, usando `--only-binarycaching`, sem fallback para compilação.
+- A API Actions confirma snapshots `preflight` e `final` salvos remotamente para o perfil `0a5e80f7c79251e1c1629b5b3106ffd38fb1a2a20e5df4107280f67f393496ad`, com 179950 bytes comprimidos cada.
+
+Os diagnósticos foram baixados em `.circuitalive/reports/windows-preflight-39240310569/`. Nenhum aplicativo foi compilado nessa validação. A aprovação do preflight valida o port que falhou e o mecanismo de cache; as demais dependências continuam sendo verificadas na preparação subsequente.
+
 Referências: [triplets e ambiente limpo do vcpkg](https://learn.microsoft.com/en-us/vcpkg/users/triplets), [limpeza e instalação explícita](https://learn.microsoft.com/en-us/vcpkg/commands/install), [MSVC `/MP`](https://learn.microsoft.com/en-us/cpp/build/reference/mp-build-with-multiple-processes), [modos de leitura/gravação do cache](https://learn.microsoft.com/en-us/vcpkg/reference/binarycaching), [conversão de variáveis no MSYS2](https://www.msys2.org/docs/filesystem-paths/).
