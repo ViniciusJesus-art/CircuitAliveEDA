@@ -1,0 +1,118 @@
+name: Validate Windows affected sources (MSVC)
+on:
+  workflow_dispatch:
+concurrency:
+  group: windows-msvc-${{ github.ref }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      CA_WINDOWS_TOOLS: D:/ca-tools
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate dependency safety and toolchain initialization
+        run: |
+          ./qa/tests/cli/test_windows_toolchain.ps1
+          ./qa/tests/cli/test_windows_audit.ps1
+          ./qa/tests/cli/test_windows_dependencies.ps1
+      - name: Record actual runner resources
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase inventory -OutputDirectory build/windows-dependencies
+      - name: Identify compiler-tracked dependency profile
+        id: profile
+        run: |
+          . ./tools/circuitalive/release/windows-dependencies-data.ps1
+          "value=$(Get-WindowsDependencyProfile (Get-Location).Path)" | Add-Content $env:GITHUB_OUTPUT
+      - name: Restore compatible dependency cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: D:/ca-tools/binary-cache
+          key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-validation
+          restore-keys: windows-msvc-v143-${{ steps.profile.outputs.value }}-
+      - name: Record actual cache restoration
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          CACHE_MATCHED_KEY: ${{ steps.cache.outputs.cache-matched-key }}
+          CACHE_PRIMARY_KEY: ${{ steps.cache.outputs.cache-primary-key }}
+        run: |
+          @{ cacheHit = $env:CACHE_HIT; matchedKey = $env:CACHE_MATCHED_KEY; primaryKey = $env:CACHE_PRIMARY_KEY } |
+            ConvertTo-Json | Tee-Object -FilePath build/windows-dependencies/actions-cache.json
+          if (!$env:CACHE_MATCHED_KEY) { throw 'Dependency cache unavailable; run dependency preparation separately.' }
+      - name: Prepare native tools
+        timeout-minutes: 10
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase setup -OutputDirectory build/windows-dependencies
+      - name: Verify complete ABI cache without compiling library ports
+        timeout-minutes: 15
+        run: |
+          ./tools/circuitalive/release/audit-windows.ps1 -Phase probe-local -OutputDirectory build/windows-dependencies
+          $result = Get-Content build/windows-dependencies/probe-local-result.json -Raw | ConvertFrom-Json
+          if ($result.outcome -ne 'complete') { throw 'Compatible binary packages are missing; prepare dependencies separately.' }
+      - name: Install complete cached manifest and record completion proof
+        timeout-minutes: 20
+        run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage complete -Jobs 2
+      - name: Preserve dependency checkpoint before CMake
+        if: always()
+        uses: ./.github/actions/windows-dependency-checkpoint
+        with:
+          name: validation
+          cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-validation
+      - name: Configure applications with dependency installation disabled
+        timeout-minutes: 15
+        run: |
+          $output = (New-Item -ItemType Directory -Force build/windows-validation).FullName
+          Set-Content "$output/current-phase.txt" 'configure'
+          . ./tools/circuitalive/release/windows-monitor-control.ps1
+          Start-Transcript -Path "$output/configure.log"
+          try {
+            Start-ResourceMonitor
+            ./tools/circuitalive/release/build-windows.ps1 -Phase configure -Jobs 2
+          } finally {
+            Stop-ResourceMonitor
+            Stop-Transcript
+          }
+      - name: Preserve configuration before compiling affected sources
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msvc-configure
+          retention-days: 14
+          path: |
+            build/windows-validation/
+            build/windows-msvc/CMakeCache.txt
+            build/windows-msvc/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: warn
+      - name: Compile affected sources and run interactive simulator tests only
+        timeout-minutes: 50
+        run: |
+          $output = (Resolve-Path build/windows-validation).Path
+          Set-Content "$output/current-phase.txt" 'validate'
+          . ./tools/circuitalive/release/windows-monitor-control.ps1
+          Start-Transcript -Path "$output/validate.log"
+          try {
+            Start-ResourceMonitor
+            ./tools/circuitalive/release/build-windows.ps1 -Phase validate -Jobs 2
+          } finally {
+            Stop-ResourceMonitor
+            Stop-Transcript
+          }
+      - name: Preserve configuration, compilation and test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msvc-validation
+          retention-days: 14
+          path: |
+            build/windows-validation/
+            build/windows-msvc/CMakeCache.txt
+            build/windows-msvc/CMakeFiles/CMakeConfigureLog.yaml
+            build/windows-msvc/compile_commands.json
+            build/windows-msvc/dependencies-complete.json
+            build/windows-msvc/Testing/Temporary/
+          if-no-files-found: warn

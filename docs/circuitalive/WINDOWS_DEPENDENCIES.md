@@ -51,6 +51,14 @@ Somente após a instalação completa bem-sucedida é criado `build/windows-msvc
 
 O preset CMake tem `VCPKG_MANIFEST_INSTALL=OFF` e usa a mesma instalação `build/windows-msvc/vcpkg_installed`. Configurar o aplicativo não inicia outra compilação oculta de dependências. O workflow de instalador também ganhou uma fase explícita de dependências, mas continua exclusivamente manual e não é disparado pelo workflow de dependências.
 
+## Próxima etapa: validar os fontes com MSVC
+
+A [preparação 39241396473](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39241396473) concluiu todas as etapas em 1h24min20s, incluindo ngspice/XSPICE, OpenCascade, wxWidgets e wxPython. O checkpoint final contém 133 pacotes binários; as amostras registraram no mínimo 11,53 GiB de RAM livre.
+
+O workflow manual `windows-validate.yml` restaura esse mesmo perfil de cache e verifica todos os pacotes com `--only-binarycaching`. Se faltar algum pacote compatível, interrompe antes do CMake para que a preparação seja tratada separadamente. Como cada runner começa com uma instalação vazia, instala o manifesto completo a partir do cache e gera novamente o comprovante de conclusão.
+
+Em seguida, executa separadamente `-Phase configure` e `-Phase validate`, com dois jobs e `/MP1`. Compila o alvo `qa_interactive_sim`, suas dependências (incluindo o worker) e os objetos de `instrument_panel.cpp` e `simulation_overlay.cpp`; executa os testes do simulador interativo. As duas fases registram transcrições e recursos a cada 30 segundos, com upload final dos logs CMake/CTest e métricas mesmo em falhas normais. Esse workflow não chama `-Phase build`, não compila todos os aplicativos e não gera instalador ou release.
+
 ## Validação
 
 Os testes offline verificam manifestos cumulativos e finais, pins/registries/features, argumentos, rejeição de preparação ausente/desatualizada, conteúdo conhecido e reaplicação do patch. Após o setup, um teste executa o helper CMake real com o processo MSBuild substituído por um verificador: comprova `/m:2` e somente Release antes de compilar qualquer port. Nenhum compilador é executado nesse teste.
