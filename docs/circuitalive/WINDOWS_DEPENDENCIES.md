@@ -77,6 +77,14 @@ A compilação usa Ninja `-k 0`: continua os objetos independentes após uma fal
 
 A [validação 39277359494](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39277359494) concluiu a configuração em 22 segundos e percorreu as 938 tarefas da compilação ampliada em cerca de 22 minutos. Os diagnósticos agruparam duas causas: `branding.h` dependia de um include indireto de `wxBitmap`, e `editor_simulation.h` ainda fornecia stubs fora do Linux, conflitando com as seis implementações reais no Windows. O header agora inclui `wx/bitmap.h` explicitamente e habilita as declarações reais também sob `_WIN32`, conforme o CMake já fazia. A checagem inicial deixou de incluir `wx/wx.h`, que mascarava o include ausente, e define as seis funções em uma unidade compilada somente com `/Zs`, para detectar regressões dos stubs antes da compilação maior.
 
+### Histerese do clock no ngspice 46
+
+A [tentativa 2 da validação 39283417390](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39283417390/attempts/2) compilou os fontes selecionados e chegou aos 178 casos do simulador. As duas asserções com falha pertenciam a `PipelineThresholdRippleIsOneClockEdgeUntilClockReturnsLow`, nas variantes HC e HCT: Q2 subia após uma oscilação dentro da faixa de histerese.
+
+O `adc_bridge` do [ngspice 46](https://github.com/imr/ngspice/blob/ngspice-46/src/xspice/icm/digital/adc_bridge/cfunc.mod) não retém o estado quando `in_low > in_high`, ao contrário da versão 47 usada localmente. O compilador de modelos agora usa comparadores dos limiares e um latch SR, com ADCs em ordem crescente. Os testes e as dependências Windows continuam os mesmos.
+
+A reprodução local isolou o conversor original da versão 46, mantendo a ABI do runtime local: o compilador de modelos anterior reproduziu exatamente as duas asserções e os valores de Q2 próximos a 5 V observados no Actions. Com a correção, os cinco casos de pipeline passaram tanto nesse conversor quanto no runtime 47; a suíte completa de 178 casos também passou no runtime 47. Essa reprodução verifica o comportamento do ADC; a validação nativa MSVC continua necessária.
+
 ## Validação
 
 Os testes offline verificam manifestos cumulativos e finais, pins/registries/features, argumentos, rejeição de preparação ausente/desatualizada, conteúdo conhecido e reaplicação do patch. Após o setup, um teste executa o helper CMake real com o processo MSBuild substituído por um verificador: comprova `/m:2` e somente Release antes de compilar qualquer port. Nenhum compilador é executado nesse teste.

@@ -15,10 +15,13 @@ há cálculo de metastabilidade ou validação de setup/hold.
 
 Essa ação Schmitt está descrita na
 [folha de dados HC/HCT74 da Nexperia](https://assets.nexperia.com/documents/data-sheet/74HC_HCT74.pdf).
-O compilador usa o modo Schmitt do `adc_bridge` do
-[ngspice](https://ngspice.sourceforge.io/docs/ngspice-manual.pdf), habilitado
-por `behavioral.clock_hysteresis: true` no `.casim`. A opção atua somente nas
-entradas físicas conectadas ao clock de blocos `dff` daquele modelo.
+O compilador combina comparadores dos dois limiares, `adc_bridge` com
+limiares em ordem crescente e um latch SR do
+[ngspice](https://ngspice.sourceforge.io/docs/ngspice-manual.pdf). Assim, a
+histerese funciona também no ngspice 46 usado no Windows, que não oferece o
+modo Schmitt por inversão dos limiares do `adc_bridge`. A opção
+`behavioral.clock_hysteresis: true` no `.casim` atua somente nas entradas
+físicas conectadas ao clock de blocos `dff` daquele modelo.
 
 ## Ver sinais rápidos
 

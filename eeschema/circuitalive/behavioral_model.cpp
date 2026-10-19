@@ -52,11 +52,12 @@ void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
                 if( name.starts_with( '!' ) ) name.erase( 0, 1 );
                 clockInputs.insert( std::move( name ) );
             }
-        // ngspice's ADC uses hysteresis when in_low > in_high. Clock inputs
-        // retain their phase in the threshold band instead of emitting X and
-        // then creating another rising edge on the return to HIGH. Data pins
-        // keep the ordinary 0/X/1 thresholds.
-        def( ".model bh_clock_adc_${id} adc_bridge(in_low=${param:vih} in_high=${param:vil})" );
+        // ngspice 46 does not support reversed ADC thresholds as hysteresis.
+        // Convert the two threshold comparisons to digital set/reset signals
+        // and retain the clock phase in a latch while neither is asserted.
+        // Data pins keep the ordinary 0/X/1 thresholds.
+        def( ".model bh_clock_adc_${id} adc_bridge(in_low=0.25 in_high=0.75 rise_delay=1p fall_delay=1p)" );
+        def( ".model bh_clock_hold_${id} d_srlatch(sr_delay=1p enable_delay=1p set_delay=1p reset_delay=1p rise_delay=1p fall_delay=1p ic=2)" );
     }
     def( ".model bh_dac_${id} dac_bridge(out_low=0 out_high=1 out_undef=0.5 t_rise=${param:transition} t_fall=${param:transition})" );
     def( ".model bh_zero_${id} d_pulldown" ); def( ".model bh_one_${id} d_pullup" );
@@ -82,8 +83,16 @@ void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
         const auto d = output( p.id ), n = "bh_n_" + p.id + "_${id}", physical = "${pin:" + p.id + "}";
         add( "Bbh_in_" + p.id + "_${id} " + n + " 0 V={(v(bh_power_${id}) > 0.5 && ${drive:" + p.id + "} > 0.5) ? v(" + physical + "," + gnd + ")/max(v(" + vcc + "," + gnd + "),1u) : 0.5}" );
         add( "Cbh_in_" + p.id + "_${id} " + physical + " " + gnd + " ${param:cin}" );
-        add( "Abh_adc_" + p.id + "_${id} [" + n + "] [" + d + "] "
-            + ( clockInputs.contains( p.id ) ? "bh_clock_adc_${id}" : "bh_adc_${id}" ) );
+        if( clockInputs.contains( p.id ) )
+        {
+            const auto stem = "bh_clock_" + p.id + "_${id}";
+            add( "B" + stem + "_high " + stem + "_high 0 V={v(" + n + ") >= ${param:vih} ? 1 : 0}" );
+            add( "B" + stem + "_low " + stem + "_low 0 V={v(" + n + ") <= ${param:vil} ? 1 : 0}" );
+            add( "A" + stem + "_adc [" + stem + "_high " + stem + "_low] [" + stem + "_set " + stem + "_reset] bh_clock_adc_${id}" );
+            add( "A" + stem + "_hold " + stem + "_set " + stem + "_reset bh_d_1_${id} bh_d_0_${id} bh_d_0_${id} " + d + " NULL bh_clock_hold_${id}" );
+        }
+        else
+            add( "Abh_adc_" + p.id + "_${id} [" + n + "] [" + d + "] bh_adc_${id}" );
     }
     std::size_t index = 0, memoryBits = 0;
     for( const auto& block : blocks )
