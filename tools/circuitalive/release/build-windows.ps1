@@ -72,14 +72,14 @@ function Configure-Project {
 
 function Validate-Project {
     # Compile the affected controller, worker, tests and GUI consumers before the full build.
-    $targets = @('qa_interactive_sim',
+    $targets = @('qa_interactive_sim', 'qa_circuitalive_json_link',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/instrument_panel.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/simulation_overlay.cpp.obj')
     Invoke-Checked -Program cmake -Arguments (@('--build', $build, '--parallel', "$Jobs", '--target') + $targets)
     Invoke-Checked -Program $python -Arguments @("$PSScriptRoot/prepare-runtime.py", "$build/eeschema/sim", "$prefix/lib/ngspice")
     $env:SPICE_SCRIPTS = "$build/eeschema/sim/ngspice/scripts"
     $env:PATH = "$prefix/bin;$prefix/tools/python3;$build/common;$build/api;$build/common/gal;$env:PATH"
-    Invoke-Checked -Program ctest -Arguments @('--test-dir', $build, '-R', '^qa_interactive_sim$', '--output-on-failure')
+    Invoke-Checked -Program ctest -Arguments @('--test-dir', $build, '-R', '^qa_(interactive_sim|circuitalive_json_link)$', '--output-on-failure')
 }
 
 Import-Msvc

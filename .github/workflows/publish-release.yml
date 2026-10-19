@@ -1,0 +1,243 @@
+name: Release packages (all or individual)
+run-name: Packages ${{ inputs.version }} — ${{ inputs.target }}
+
+# Commits, pushes and tags do not start a release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: New alpha version, for example 10.0.7-alpha.2 (without v)
+        required: true
+        default: 10.0.7-alpha.1
+        type: string
+      target:
+        description: Packages to build (all = RPM + AppImage + DEB + EXE)
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - linux
+          - exe
+          - rpm
+          - appimage
+          - deb
+      publish_release:
+        description: Publish selected packages as a new prerelease (uncheck for test artifacts only)
+        type: boolean
+        default: true
+
+concurrency:
+  group: publish-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Validate version and release destination
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.release.outputs.commit }}
+      formats: ${{ steps.release.outputs.formats }}
+      fedora_formats: ${{ steps.release.outputs.fedora_formats }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check release publication guard
+        run: python3 qa/tests/cli/test_release_artifacts.py
+      - uses: actions/github-script@v7
+        id: release
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_TARGET: ${{ inputs.target }}
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
+        with:
+          script: |
+            if (context.ref !== 'refs/heads/main') {
+              throw new Error('Run this release workflow from main.');
+            }
+            const version = process.env.RELEASE_VERSION;
+            if (!/^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$/.test(version)) {
+              throw new Error('Expected an alpha version such as 10.0.7-alpha.2, without v.');
+            }
+            const targets = {all: ['rpm', 'appimage', 'deb', 'exe'],
+              linux: ['rpm', 'appimage', 'deb'], exe: ['exe'],
+              rpm: ['rpm'], appimage: ['appimage'], deb: ['deb']};
+            const formats = targets[process.env.RELEASE_TARGET];
+            if (!formats) throw new Error('Unknown package target.');
+            const tag = `v${version}`;
+            if (process.env.PUBLISH_RELEASE === 'true') for (const lookup of [
+              () => github.rest.git.getRef({...context.repo, ref: `tags/${tag}`}),
+              () => github.rest.repos.getReleaseByTag({...context.repo, tag})
+            ]) {
+              try { await lookup(); }
+              catch (error) {
+                if (error.status === 404) continue;
+                throw error;
+              }
+              throw new Error(`Tag or release ${tag} already exists. Choose an unused version.`);
+            }
+            core.setOutput('version', version);
+            core.setOutput('tag', tag);
+            core.setOutput('commit', context.sha);
+            core.setOutput('formats', formats.join(','));
+            core.setOutput('fedora_formats', formats.filter(f => ['rpm', 'appimage'].includes(f)).join(','));
+            await core.summary.addHeading(`CircuitAliveEDA ${version}`)
+              .addRaw(`Building ${formats.join(', ')} from commit ${context.sha}. ` +
+                (process.env.PUBLISH_RELEASE === 'true' ? 'A new prerelease will be published after all selected jobs pass.' : 'Artifacts only; no release or tag will be created.'))
+              .write();
+
+  windows:
+    name: Windows installer
+    needs: prepare
+    if: contains(needs.prepare.outputs.formats, 'exe')
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+
+  linux:
+    name: Fedora packages
+    needs: prepare
+    if: needs.prepare.outputs.fedora_formats != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+      RELEASE_FORMATS: ${{ needs.prepare.outputs.fedora_formats }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+      - name: Free hosted runner disk for builds and component libraries
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h .
+      - name: Restore Linux compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .circuitalive/ccache
+          key: linux-fedora44-release-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: linux-fedora44-release-v1-
+      - name: Compile, test and package selected formats in Fedora 44
+        run: |
+          docker run --rm \
+            -e RELEASE_VERSION -e RELEASE_COMMIT -e RELEASE_FORMATS -e CIRCUITALIVE_JOBS=2 \
+            -v "$GITHUB_WORKSPACE:/work" -w /work \
+            fedora:44 bash tools/circuitalive/release/build-linux.sh
+      - name: Preserve verified Linux packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: fedora-x86_64
+          path: |
+            dist/*-fedora44-x86_64.rpm
+            dist/*-fedora44-x86_64.rpm.sha256
+            dist/*-linux-x86_64.AppImage
+            dist/*-linux-x86_64.AppImage.sha256
+          if-no-files-found: error
+          compression-level: 0
+      - name: Preserve Linux diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-diagnostics
+          path: |
+            .circuitalive/logs/linux-release.log
+            build/circuitalive/CMakeCache.txt
+            build/circuitalive/CMakeFiles/CMakeConfigureLog.yaml
+            build/circuitalive/Testing/Temporary/
+          if-no-files-found: warn
+          retention-days: 14
+
+  deb:
+    name: Ubuntu DEB package
+    needs: prepare
+    if: contains(needs.prepare.outputs.formats, 'deb')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+      - name: Free hosted runner disk for the native Ubuntu build
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h .
+      - name: Restore Ubuntu compiler cache
+        uses: actions/cache@v4
+        with:
+          path: .circuitalive/ccache-deb
+          key: linux-ubuntu2404-deb-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: linux-ubuntu2404-deb-v1-
+      - name: Compile and test natively on Ubuntu 24.04, then package and verify DEB
+        run: bash tools/circuitalive/release/build-deb.sh
+      - name: Preserve verified DEB package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-x86_64
+          path: |
+            dist/*-ubuntu24.04-amd64.deb
+            dist/*-ubuntu24.04-amd64.deb.sha256
+          if-no-files-found: error
+          compression-level: 0
+      - name: Preserve Ubuntu diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-release-diagnostics
+          path: |
+            .circuitalive/logs/deb-release.log
+            build/deb/CMakeCache.txt
+            build/deb/CMakeFiles/CMakeConfigureLog.yaml
+            build/deb/Testing/Temporary/
+          if-no-files-found: warn
+          retention-days: 14
+
+  publish:
+    name: Publish selected verified packages together
+    needs: [prepare, windows, linux, deb]
+    # Optional platform jobs are deliberately skipped for individual builds.
+    if: >-
+      always() && !cancelled() && inputs.publish_release &&
+      needs.prepare.result == 'success' &&
+      (needs.windows.result == 'success' || needs.windows.result == 'skipped') &&
+      (needs.linux.result == 'success' || needs.linux.result == 'skipped') &&
+      (needs.deb.result == 'success' || needs.deb.result == 'skipped')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+      RELEASE_FORMATS: ${{ needs.prepare.outputs.formats }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+      - uses: actions/download-artifact@v4
+        if: needs.windows.result == 'success'
+        with:
+          name: windows-x86_64
+          path: dist
+      - uses: actions/download-artifact@v4
+        if: needs.linux.result == 'success'
+        with:
+          name: fedora-x86_64
+          path: dist
+      - uses: actions/download-artifact@v4
+        if: needs.deb.result == 'success'
+        with:
+          name: deb-x86_64
+          path: dist
+      - name: Verify formats and checksums, then publish the release
+        run: |
+          python3 tools/circuitalive/release/publish-release.py \
+            --version "$RELEASE_VERSION" --commit "$RELEASE_COMMIT" \
+            --formats "$RELEASE_FORMATS" --repository "$GITHUB_REPOSITORY" --directory dist --publish

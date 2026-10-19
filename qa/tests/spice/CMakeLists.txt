@@ -136,6 +136,20 @@ if( TARGET circuitalive_sim_session )
     add_dependencies( qa_interactive_sim circuitalive-sim-worker )
     add_test( NAME qa_interactive_sim COMMAND qa_interactive_sim --log_level=test_suite )
     set_tests_properties( qa_interactive_sim PROPERTIES TIMEOUT 120 )
+    # Exercise the desktop JSON imports as well as the standalone worker build.
+    # A static-only test cannot expose collisions with kicommon's import library.
+    add_executable( qa_circuitalive_json_link test_circuitalive_json_link.cpp )
+    if( MSVC )
+        target_link_libraries( qa_circuitalive_json_link PRIVATE circuitalive_interactive_gui kicommon )
+    else()
+        target_link_libraries( qa_circuitalive_json_link PRIVATE circuitalive_interactive kicommon )
+    endif()
+    target_compile_definitions( qa_circuitalive_json_link PRIVATE
+        CIRCUITALIVE_TEST_WORKER="$<TARGET_FILE:circuitalive-sim-worker>"
+        CIRCUITALIVE_JSON_LINK_MODEL="${PROJECT_SOURCE_DIR}/simulation/models/resistor.casim" )
+    add_dependencies( qa_circuitalive_json_link circuitalive-sim-worker )
+    add_test( NAME qa_circuitalive_json_link COMMAND qa_circuitalive_json_link )
+    set_tests_properties( qa_circuitalive_json_link PROPERTIES TIMEOUT 30 )
     target_sources( qa_spice PRIVATE test_interactive_schematic.cpp )
     target_compile_definitions( qa_spice PRIVATE
         CIRCUITALIVE_TEST_WORKER="$<TARGET_FILE:circuitalive-sim-worker>"

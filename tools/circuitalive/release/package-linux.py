@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """Bundle the Fedora 44 x86_64 build, component libraries, Python and runtime dependencies."""
-import argparse,hashlib,json,os,re,shutil,subprocess,sys
+import argparse,hashlib,importlib.util,json,os,re,shutil,subprocess,sys
 from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--prefix',type=Path,required=True);p.add_argument('--libraries',type=Path,required=True)
 p.add_argument('--version',default='10.0.7-alpha.1');p.add_argument('--commit',required=True)
-p.add_argument('--output',type=Path,required=True);p.add_argument('--reuse',action='store_true');args=p.parse_args()
-if not re.fullmatch(r'10\.0\.7-alpha\.[0-9]+',args.version):raise SystemExit('Invalid alpha version')
+p.add_argument('--output',type=Path,required=True);p.add_argument('--reuse',action='store_true')
+p.add_argument('--skip-tar',action='store_true',help='Omit the additional tar.zst portable archive')
+p.add_argument('--skip-rpm',action='store_true',help='Generate the bundle/AppImage without building an RPM')
+p.add_argument('--appimagetool',type=Path,help='Also generate and smoke-test an AppImage')
+p.add_argument('--appimage-runtime',type=Path,help='Pinned x86_64 type-2 AppImage runtime')
+args=p.parse_args()
+if bool(args.appimagetool) != bool(args.appimage_runtime):p.error('AppImage creation requires both tool and runtime')
+if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+',args.version):raise SystemExit('Invalid alpha version')
 root=Path(__file__).resolve().parents[3];out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 work=out/'work';app=work/'CircuitAliveEDA';app.mkdir(parents=True,exist_ok=True)
 ignore=shutil.ignore_patterns('.git','.history','*-backups','*.kicad_prl','~*.lck','__pycache__','*.pyc','*.pyo')
@@ -25,7 +31,11 @@ else:
      if directory.exists():shutil.copytree(directory,app/'lib'/python_version,dirs_exist_ok=True,ignore=shutil.ignore_patterns('site-packages','test','__pycache__','*.pyc'))
     site=app/'lib'/python_version/'site-packages';site.mkdir(parents=True,exist_ok=True)
     wx=root/'.circuitalive/deps/usr/lib64'/python_version/'site-packages/wx'
-    if wx.exists():shutil.copytree(wx,site/'wx',dirs_exist_ok=True,ignore=ignore)
+    if not wx.exists():
+     wx_spec=importlib.util.find_spec('wx')
+     if wx_spec and wx_spec.origin:wx=Path(wx_spec.origin).parent
+    if not wx.exists():raise SystemExit('Missing wxPython runtime')
+    shutil.copytree(wx,site/'wx',dirs_exist_ok=True,ignore=ignore)
     for module in ('six.py','typing_extensions.py'):
      for directory in (Path('/usr/lib')/python_version/'site-packages',Path('/usr/lib64')/python_version/'site-packages'):
       if (directory/module).exists():shutil.copy2(directory/module,site/module);break
@@ -137,13 +147,14 @@ smoke_env['LD_LIBRARY_PATH']=str(app/'lib64')
 subprocess.run([sys.executable,str(root/'tools/circuitalive/release/smoke-worker.py'),
                str(app/'bin/circuitalive-sim-worker'),'--scripts',str(work/'smoke/cache/circuitaliveeda/ngspice')],
                check=True,timeout=150,env=smoke_env)
-rpm_alias=Path('/tmp')/('circuitalive-rpm-'+str(os.getuid())+'-'+hashlib.sha256(str(work).encode()).hexdigest()[:12])
-if not rpm_alias.exists():rpm_alias.symlink_to(work,target_is_directory=True)
-if rpm_alias.resolve()!=work.resolve():raise SystemExit('RPM build alias is occupied')
-rpmdir=rpm_alias/'rpmbuild'
-for directory in ('BUILD','BUILDROOT','RPMS','SOURCES','SPECS','SRPMS'):(rpmdir/directory).mkdir(parents=True,exist_ok=True)
-spec=rpmdir/'SPECS/circuitaliveeda.spec';numeric=args.version.split('-')[0];alpha=args.version.split('-alpha.')[1]
-spec.write_text(f'''%global debug_package %{{nil}}
+if not args.skip_rpm:
+ rpm_alias=Path('/tmp')/('circuitalive-rpm-'+str(os.getuid())+'-'+hashlib.sha256(str(work).encode()).hexdigest()[:12])
+ if not rpm_alias.exists():rpm_alias.symlink_to(work,target_is_directory=True)
+ if rpm_alias.resolve()!=work.resolve():raise SystemExit('RPM build alias is occupied')
+ rpmdir=rpm_alias/'rpmbuild'
+ for directory in ('BUILD','BUILDROOT','RPMS','SOURCES','SPECS','SRPMS'):(rpmdir/directory).mkdir(parents=True,exist_ok=True)
+ spec=rpmdir/'SPECS/circuitaliveeda.spec';numeric=args.version.split('-')[0];alpha=args.version.split('-alpha.')[1]
+ spec.write_text(f'''%global debug_package %{{nil}}
 %global __os_install_post %{{nil}}
 %global _binary_payload w9T2.zstdio
 Name: circuitaliveeda
@@ -179,11 +190,17 @@ cp "{app}/share/icons/hicolor/128x128/apps/circuitaliveeda.png" %{{buildroot}}/u
 /usr/bin/circuitalive-eda
 /usr/share/applications/circuitaliveeda.desktop
 /usr/share/icons/hicolor/128x128/apps/circuitaliveeda.png
-''')
-temporary=rpm_alias/'tmp';temporary.mkdir(exist_ok=True)
-subprocess.run(['rpmbuild','-bb','--define',f'_topdir {rpmdir}','--define',f'_tmppath {temporary}',str(spec)],check=True)
-for file in (rpmdir/'RPMS').rglob('*.rpm'):shutil.copy2(file,out/f'CircuitAliveEDA-{args.version}-fedora44-x86_64.rpm')
-subprocess.run(['tar','--zstd','-cf',str(out/f'CircuitAliveEDA-{args.version}-linux-x86_64.tar.zst'),'-C',str(work),app.name],check=True)
+ ''')
+ temporary=rpm_alias/'tmp';temporary.mkdir(exist_ok=True)
+ subprocess.run(['rpmbuild','-bb','--define',f'_topdir {rpmdir}','--define',f'_tmppath {temporary}',str(spec)],check=True)
+ for file in (rpmdir/'RPMS').rglob('*.rpm'):shutil.copy2(file,out/f'CircuitAliveEDA-{args.version}-fedora44-x86_64.rpm')
+if args.appimagetool:
+ subprocess.run([sys.executable,str(root/'tools/circuitalive/release/create-appimage.py'),
+                 '--appdir',str(app),'--output',str(out/f'CircuitAliveEDA-{args.version}-linux-x86_64.AppImage'),
+                 '--version',args.version,'--tool',str(args.appimagetool.resolve()),
+                 '--runtime',str(args.appimage_runtime.resolve())],check=True)
+if not args.skip_tar:
+ subprocess.run(['tar','--zstd','-cf',str(out/f'CircuitAliveEDA-{args.version}-linux-x86_64.tar.zst'),'-C',str(work),app.name],check=True)
 for file in out.iterdir():
  if file.is_file() and not file.name.endswith('.sha256'):
   file.with_suffix(file.suffix+'.sha256').write_text(hashlib.file_digest(file.open('rb'),'sha256').hexdigest()+'  '+file.name+'\n')

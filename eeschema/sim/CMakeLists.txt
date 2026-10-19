@@ -1,13 +1,27 @@
 # Isolated solver process on Linux and Windows.
 if( CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 )
     find_package( Threads REQUIRED )
-    add_library( circuitalive_sim_session STATIC interactive_sim_session.cpp memory_image.cpp runtime_memory.cpp platform_runtime.cpp )
-    target_include_directories( circuitalive_sim_session PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} )
-    target_include_directories( circuitalive_sim_session SYSTEM PRIVATE
-        ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann_json )
-    target_link_libraries( circuitalive_sim_session PRIVATE Threads::Threads )
-    if(WIN32)
-        target_link_libraries(circuitalive_sim_session PRIVATE psapi)
+    set( CIRCUITALIVE_SIM_SESSION_SOURCES
+        interactive_sim_session.cpp memory_image.cpp runtime_memory.cpp platform_runtime.cpp )
+    function( circuitalive_add_session_library target )
+        add_library( ${target} STATIC ${CIRCUITALIVE_SIM_SESSION_SOURCES} )
+        target_include_directories( ${target} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} )
+        target_include_directories( ${target} SYSTEM PRIVATE
+            ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann_json )
+        target_link_libraries( ${target} PRIVATE Threads::Threads )
+        if( WIN32 )
+            target_link_libraries( ${target} PRIVATE psapi )
+        endif()
+    endfunction()
+    circuitalive_add_session_library( circuitalive_sim_session )
+    if( MSVC )
+        # kicommon exports nlohmann::json through JSON_COMMON_EXPORT_STUB.
+        # Desktop objects must see its dllimport before instantiating JSON.
+        # Keep the original library independent for the isolated worker/tests.
+        circuitalive_add_session_library( circuitalive_sim_session_gui )
+        target_include_directories( circuitalive_sim_session_gui PRIVATE ${PROJECT_SOURCE_DIR}/include )
+        target_compile_options( circuitalive_sim_session_gui PRIVATE /FIjson_common.h )
+        target_link_libraries( circuitalive_sim_session_gui PRIVATE kicommon )
     endif()
 
     add_library( circuitalive-memory MODULE memory_cm/ifspec.c memory_cm/cfunc.c memory_cm/module.c

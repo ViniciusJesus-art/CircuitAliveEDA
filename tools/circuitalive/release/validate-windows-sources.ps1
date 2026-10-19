@@ -43,14 +43,14 @@ if (!$selected.Count -or 'eeschema/circuitalive/model_author.cpp' -notin $select
     throw 'The source plan is incomplete; configure the full Windows preset first.'
 }
 $objects = @($selected.Keys | Sort-Object)
-$arguments = @('--build', $build, '--parallel', "$Jobs", '--target', 'qa_interactive_sim') + $objects + @('--', '-k', '0')
+$arguments = @('--build', $build, '--parallel', "$Jobs", '--target', 'qa_interactive_sim', 'qa_circuitalive_json_link') + $objects + @('--', '-k', '0')
 [ordered]@{
     sourceCount = @($selected.Values | Sort-Object -Unique).Count
     objectCount = $objects.Count; fullApplicationBuild = $false
     command = @('cmake') + $arguments
     objects = @($objects | ForEach-Object { @{ target = $_; source = $selected[$_] } })
 } | ConvertTo-Json -Depth 6 | Set-Content "$output/source-plan.json"
-Write-Host "Portability validation: $($objects.Count) objects plus qa_interactive_sim; Ninja -k 0, jobs=$Jobs"
+Write-Host "Portability validation: $($objects.Count) objects plus simulator and desktop JSON link tests; Ninja -k 0, jobs=$Jobs"
 if ($Plan) { return }
 & "$PSScriptRoot/build-windows.ps1" -Phase environment -Jobs $Jobs
 # Keep compiling independent objects after failures, while preserving a failing exit status.

@@ -1,0 +1,24 @@
+{
+  "ubuntu_nng": {
+    "version": "1.9.0",
+    "url": "https://codeload.github.com/nanomsg/nng/tar.gz/refs/tags/v1.9.0",
+    "sha256": "ff882bda0a854abd184a7c1eb33329e526928ef98e80ef0457dd9a708bb5b0b1"
+  },
+  "ubuntu_ngspice": {
+    "version": "47",
+    "url": "https://codeload.github.com/imr/ngspice/tar.gz/refs/tags/ngspice-47",
+    "sha256": "815b3dc041418fafab096295a9d12b4f4cca03538082600eb8eef2c594b1328a"
+  },
+  "appimage": {
+    "appimagetool-x86_64.AppImage": {
+      "version": "1.9.1",
+      "url": "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage",
+      "sha256": "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+    },
+    "runtime-x86_64": {
+      "version": "20251108",
+      "url": "https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64",
+      "sha256": "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d"
+    }
+  }
+}

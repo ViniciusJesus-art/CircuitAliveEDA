@@ -85,6 +85,16 @@ O `adc_bridge` do [ngspice 46](https://github.com/imr/ngspice/blob/ngspice-46/sr
 
 A reprodução local isolou o conversor original da versão 46, mantendo a ABI do runtime local: o compilador de modelos anterior reproduziu exatamente as duas asserções e os valores de Q2 próximos a 5 V observados no Actions. Com a correção, os cinco casos de pipeline passaram tanto nesse conversor quanto no runtime 47; a suíte completa de 178 casos também passou no runtime 47. Essa reprodução verifica o comportamento do ADC; a validação nativa MSVC continua necessária.
 
+### Colisão de templates JSON ao vincular o esquemático
+
+O [instalador 39297287630](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39297287630) passou pelos testes interativos, mas falhou ao vincular `_eeschema.dll`, com `LNK2005` e `LNK1169`. Os objetos JSON de `circuitalive_interactive.lib` e `circuitalive_sim_session.lib` já tinham definições das funções que `kicommon.dll` exporta por meio de `JSON_COMMON_EXPORT_STUB`. Essa exportação de uma classe derivada também exporta a especialização de template da base, conforme a [regra do MSVC](https://learn.microsoft.com/en-us/cpp/cpp/dllexport-dllimport?view=msvc-170).
+
+No MSVC, o editor agora usa variantes `circuitalive_interactive_gui` e `circuitalive_sim_session_gui`, compiladas com `json_common.h` incluído antes dos fontes e vinculadas a `kicommon`. Os mesmos fontes continuam formando as bibliotecas independentes usadas pelo worker e pelos testes isolados. Assim, o transporte do solver não passa a depender de Python/wxWidgets ou de `kicommon.dll`. As bibliotecas GUI importam as funções JSON já fornecidas pelo KiCad.
+
+`qa_circuitalive_json_link` vincula a variante do editor junto com `kicommon`, exercita modelos, perfis em diretório temporário, arquivos de memória, chamadas JSON importadas e uma sessão real com o worker. A validação Windows passa a construir e executar esse teste antes da compilação completa dos aplicativos, além dos 178 casos isolados. O teste isolado, sozinho, não verifica as colisões entre bibliotecas estáticas e a DLL do editor.
+
+A compilação e os dois testes CTest passaram localmente no Linux. A correção da importação de templates exige uma nova validação nativa MSVC; o resultado local não é uma confirmação de que o instalador Windows foi gerado.
+
 ## Validação
 
 Os testes offline verificam manifestos cumulativos e finais, pins/registries/features, argumentos, rejeição de preparação ausente/desatualizada, conteúdo conhecido e reaplicação do patch. Após o setup, um teste executa o helper CMake real com o processo MSBuild substituído por um verificador: comprova `/m:2` e somente Release antes de compilar qualquer port. Nenhum compilador é executado nesse teste.

@@ -14,7 +14,11 @@ packages=(
 )
 case "${1:---system}" in
     --system)
-        exec sudo dnf install "${packages[@]}"
+        shift
+        if [[ $EUID -eq 0 ]]; then
+            exec dnf install "$@" "${packages[@]}"
+        fi
+        exec sudo dnf install "$@" "${packages[@]}"
         ;;
     --local)
         # Build headers and tools are extracted locally; component libraries

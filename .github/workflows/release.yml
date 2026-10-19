@@ -6,6 +6,12 @@ on:
         description: Installer version (artifact only, no GitHub release)
         required: true
         default: 10.0.7-alpha.1
+  workflow_call:
+    inputs:
+      version:
+        description: Installer version supplied by the manual release workflow
+        required: true
+        type: string
 concurrency:
   group: windows-msvc-${{ github.ref }}
   cancel-in-progress: false
