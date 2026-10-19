@@ -45,11 +45,14 @@ $saved = @{}
 foreach ($name in @('OS','MINGW_PREFIX','VCPKG_ROOT','SWIG_EXECUTABLE','VCPKG_DEFAULT_BINARY_CACHE','VCPKG_BINARY_SOURCES')) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
 try {
     $env:OS = 'Windows_NT'; Remove-Item Env:MINGW_PREFIX -ErrorAction SilentlyContinue
-    foreach ($phase in @('setup','configure','validate','build','package','all')) {
+    foreach ($phase in @('environment','setup','configure','validate','build','package','all')) {
         $script:visited = [System.Collections.Generic.List[string]]::new()
         $script:imported = $false
         & $program -Phase $phase -ToolsRoot $script:expectedTools
-        if (!$script:visited.Count) { throw "No operation was checked for $phase" }
+        Assert-ProjectToolchain
+        if ($phase -eq 'environment') {
+            if ($script:visited.Count) { throw 'Environment initialization attempted setup or a build' }
+        } elseif (!$script:visited.Count) { throw "No operation was checked for $phase" }
         Write-Output "PASS: $phase ($($script:visited -join ', '))"
     }
 } finally {

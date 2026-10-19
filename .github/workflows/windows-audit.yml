@@ -1,0 +1,99 @@
+name: Windows runner and binary cache audit
+on:
+  workflow_dispatch:
+concurrency:
+  group: windows-msvc-${{ github.ref }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  audit:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      CA_WINDOWS_TOOLS: D:/ca-tools
+      VCPKG_MAX_CONCURRENCY: '2'
+      CMAKE_BUILD_PARALLEL_LEVEL: '2'
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start resource sampling every 30 seconds
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase start-monitor
+      - name: Record actual public runner resources
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase inventory
+      - name: Preserve initial hardware checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-audit-inventory
+          path: |
+            build/windows-audit/inventory.json
+            build/windows-audit/resources.jsonl
+          if-no-files-found: error
+      - name: Restore compatible MSVC binary cache
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: D:/ca-tools/binary-cache
+          key: windows-msvc-v143-${{ hashFiles('vcpkg*.json', 'tools/circuitalive/release/windows-toolchain.json', 'tools/circuitalive/release/triplets/*.cmake') }}-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            windows-msvc-v143-${{ hashFiles('vcpkg*.json', 'tools/circuitalive/release/windows-toolchain.json', 'tools/circuitalive/release/triplets/*.cmake') }}-
+            windows-msvc-v143-${{ hashFiles('vcpkg*.json', 'tools/circuitalive/release/windows-toolchain.json', 'tools/circuitalive/release/triplets/*.cmake') }}
+      - name: Record cache restoration evidence
+        env:
+          AUDIT_CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          AUDIT_CACHE_MATCHED_KEY: ${{ steps.cache.outputs.cache-matched-key }}
+          AUDIT_CACHE_PRIMARY_KEY: ${{ steps.cache.outputs.cache-primary-key }}
+        run: |
+          @{ cacheHit = $env:AUDIT_CACHE_HIT; matchedKey = $env:AUDIT_CACHE_MATCHED_KEY; primaryKey = $env:AUDIT_CACHE_PRIMARY_KEY } |
+            ConvertTo-Json | Tee-Object -FilePath build/windows-audit/actions-cache.json
+      - name: Validate audit and toolchain regression checks
+        run: |
+          ./qa/tests/cli/test_windows_toolchain.ps1
+          ./qa/tests/cli/test_windows_audit.ps1
+      - name: Prepare tools only (no dependency builds)
+        id: setup
+        timeout-minutes: 10
+        run: ./tools/circuitalive/release/build-windows.ps1 -Phase setup 2>&1 | Tee-Object -FilePath build/windows-audit/setup.log
+      - name: Resolve native Windows dependency plan
+        timeout-minutes: 10
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase plan
+      - name: Preserve plan before binary probes
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-audit-plan
+          path: |
+            build/windows-audit/plan*
+            build/windows-audit/actions-cache.json
+            build/windows-audit/tool-versions.log
+            build/windows-audit/resources.jsonl
+          if-no-files-found: error
+      - name: Probe restored local cache (compilation prohibited)
+        timeout-minutes: 10
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase probe-local
+      - name: Probe official KiCad feed with current compiler ABI (read only)
+        timeout-minutes: 15
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase probe-official
+      - name: Stop resource monitor
+        if: always()
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase stop-monitor
+      - name: Collect diagnostics and cache inventory
+        id: collect
+        if: always()
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase collect
+      - name: Save any compatible packages obtained during the audit
+        if: always() && steps.collect.outputs.cached-packages != '' && steps.collect.outputs.cached-packages != '0'
+        uses: actions/cache/save@v4
+        with:
+          path: D:/ca-tools/binary-cache
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+      - name: Preserve all available audit diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-audit-diagnostics
+          path: build/windows-audit/
+          if-no-files-found: warn
+          retention-days: 14

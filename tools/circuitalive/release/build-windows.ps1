@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Version = '10.0.7-alpha.1',
-    [ValidateSet('all', 'setup', 'configure', 'validate', 'build', 'package')]
+    [ValidateSet('all', 'environment', 'setup', 'configure', 'validate', 'build', 'package')]
     [string]$Phase = 'all',
     [ValidateRange(1, 64)][int]$Jobs = 2,
     [string]$ToolsRoot = $env:CA_WINDOWS_TOOLS
