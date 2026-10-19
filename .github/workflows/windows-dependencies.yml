@@ -1,6 +1,11 @@
 name: Prepare Windows dependencies only (MSVC)
 on:
   workflow_dispatch:
+    inputs:
+      preflight_only:
+        type: boolean
+        description: Validate gperf, MSYS2/MSVC and binary-cache writes/restores before heavy dependencies
+        default: false
 concurrency:
   group: windows-msvc-${{ github.ref }}
   cancel-in-progress: false
@@ -58,31 +63,49 @@ jobs:
         with:
           name: windows-dependencies-plan
           path: build/windows-dependencies/
+      - name: Validate the previously failing gperf port in isolation
+        timeout-minutes: 15
+        run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage gperf
+      - name: Verify MSYS2 to MSVC flags and actual binary cache write and restore
+        timeout-minutes: 5
+        run: ./qa/tests/cli/test_windows_autotools.ps1
+      - name: Preserve validated compiler and cache checkpoint
+        uses: ./.github/actions/windows-dependency-checkpoint
+        with:
+          name: preflight
+          cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-preflight
       - name: Prepare foundation libraries and Python runtime
+        if: ${{ !inputs.preflight_only }}
         timeout-minutes: 100
         run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage foundation
       - name: Checkpoint foundation libraries
+        if: ${{ !inputs.preflight_only }}
         uses: ./.github/actions/windows-dependency-checkpoint
         with:
           name: foundation
           cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-foundation
       - name: Prepare ngspice and all XSPICE code models
+        if: ${{ !inputs.preflight_only }}
         timeout-minutes: 40
         run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage simulation
       - name: Checkpoint simulator dependencies
+        if: ${{ !inputs.preflight_only }}
         uses: ./.github/actions/windows-dependency-checkpoint
         with:
           name: simulation
           cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-simulation
       - name: Prepare OpenCascade with the current CAD features
+        if: ${{ !inputs.preflight_only }}
         timeout-minutes: 70
         run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage cad
       - name: Checkpoint CAD dependencies
+        if: ${{ !inputs.preflight_only }}
         uses: ./.github/actions/windows-dependency-checkpoint
         with:
           name: cad
           cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-cad
       - name: Complete full manifest including wxWidgets and wxPython
+        if: ${{ !inputs.preflight_only }}
         timeout-minutes: 110
         run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage complete
       - name: Preserve final or failed preparation checkpoint

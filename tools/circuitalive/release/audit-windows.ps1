@@ -49,8 +49,7 @@ if ($Phase -eq 'collect') {
     if (Test-Path "$vcpkg/buildtrees") {
         # Include logs/ABI files, not sources or object trees that can exhaust the artifact budget.
         Get-ChildItem "$vcpkg/buildtrees" -File -Recurse | Where-Object {
-            $_.Extension -in @('.log', '.json', '.txt') -and $_.Length -lt 10MB -and
-            $_.FullName -notmatch '[\\/](src|x64-windows-rel|x64-windows-dbg)[\\/]'
+            Test-WindowsDiagnosticFile $_
         } | ForEach-Object {
             $relative = [IO.Path]::GetRelativePath("$vcpkg/buildtrees", $_.FullName)
             $target = Join-Path $logs $relative
@@ -82,7 +81,7 @@ if ($Phase -eq 'collect') {
         Write-Warning 'No resource samples survived. Check monitor-errors.log and monitor-stderr.log.'
         $summary += 'No resource samples survived; consult monitor error logs.'
     }
-    foreach ($probe in @('plan', 'probe-local', 'probe-official', 'foundation-install', 'simulation-install', 'cad-install', 'complete-install')) {
+    foreach ($probe in @('plan', 'probe-local', 'probe-official', 'gperf-install', 'foundation-install', 'simulation-install', 'cad-install', 'complete-install')) {
         if (Test-Path "$output/$probe-result.json") {
             $result = Get-Content "$output/$probe-result.json" -Raw | ConvertFrom-Json
             $summary += "- ${probe}: $($result.outcome); planned $($result.plannedPackages); restored $($result.restoredPackages); missing $($result.missingPackages.Count); elapsed $([math]::Round($result.elapsedSeconds, 1)) s."

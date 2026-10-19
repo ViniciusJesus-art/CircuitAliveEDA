@@ -39,11 +39,12 @@ function Assert-ProjectToolchain {
     if ($env:VCPKG_ROOT -ne (Join-Path $script:expectedTools 'vcpkg')) { throw "Developer shell replaced the project vcpkg: $env:VCPKG_ROOT" }
     if ($env:SWIG_EXECUTABLE -ne (Join-Path $script:expectedTools "swigwin-$script:swigVersion/swig.exe")) { throw 'Wrong SWIG path' }
     if ($env:VCPKG_DEFAULT_BINARY_CACHE -ne (Join-Path $script:expectedTools 'binary-cache')) { throw 'Wrong binary cache' }
-    if ($env:VCPKG_BINARY_SOURCES -ne 'clear;default') { throw 'Unexpected external binary source' }
+    if ($env:VCPKG_BINARY_SOURCES -ne 'clear;default,readwrite') { throw 'Binary cache must allow writes as well as reads' }
+    if ($env:MSYS2_ENV_CONV_EXCL -ne '_CL_') { throw 'MSYS2 can reinterpret MSVC flags as filesystem paths' }
     if ($env:VCPKG_MAX_CONCURRENCY -ne '2' -or $env:CMAKE_BUILD_PARALLEL_LEVEL -ne '2' -or $env:_CL_ -ne '/MP1') { throw 'Unsafe dependency/compiler concurrency' }
 }
 $saved = @{}
-foreach ($name in @('OS','MINGW_PREFIX','VCPKG_ROOT','SWIG_EXECUTABLE','VCPKG_DEFAULT_BINARY_CACHE','VCPKG_BINARY_SOURCES','VCPKG_MAX_CONCURRENCY','CMAKE_BUILD_PARALLEL_LEVEL','_CL_')) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
+foreach ($name in @('OS','MINGW_PREFIX','VCPKG_ROOT','SWIG_EXECUTABLE','VCPKG_DEFAULT_BINARY_CACHE','VCPKG_BINARY_SOURCES','VCPKG_MAX_CONCURRENCY','CMAKE_BUILD_PARALLEL_LEVEL','_CL_','MSYS2_ENV_CONV_EXCL')) { $saved[$name] = [Environment]::GetEnvironmentVariable($name) }
 try {
     $env:OS = 'Windows_NT'; Remove-Item Env:MINGW_PREFIX -ErrorAction SilentlyContinue
     foreach ($phase in @('environment','setup','dependencies','configure','validate','build','package','all')) {

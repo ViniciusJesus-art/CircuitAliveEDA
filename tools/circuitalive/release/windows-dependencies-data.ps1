@@ -20,7 +20,7 @@ function Get-WindowsDependencyProfile {
 }
 
 function Write-WindowsDependencyManifest {
-    param([string]$Root, [ValidateSet('foundation', 'simulation', 'cad', 'complete')][string]$Stage,
+    param([string]$Root, [ValidateSet('gperf', 'foundation', 'simulation', 'cad', 'complete')][string]$Stage,
         [string]$Destination)
     $manifest = Get-Content "$Root/vcpkg.json" -Raw | ConvertFrom-Json -AsHashtable
     $excluded = switch ($Stage) {
@@ -33,6 +33,7 @@ function Write-WindowsDependencyManifest {
         $name = if ($_ -is [string]) { $_ } else { $_.name }
         $name -notin $excluded
     })
+    if ($Stage -eq 'gperf') { $manifest.dependencies = @('gperf') }
     New-Item -ItemType Directory -Force $Destination | Out-Null
     $manifest | ConvertTo-Json -Depth 30 | Set-Content "$Destination/vcpkg.json"
     Copy-Item "$Root/vcpkg-configuration.json" "$Destination/vcpkg-configuration.json"

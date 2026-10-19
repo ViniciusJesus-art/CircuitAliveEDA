@@ -1,7 +1,7 @@
 # Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later
 [CmdletBinding()]
 param(
-    [ValidateSet('all', 'foundation', 'simulation', 'cad', 'complete')][string]$Stage = 'all',
+    [ValidateSet('all', 'gperf', 'foundation', 'simulation', 'cad', 'complete')][string]$Stage = 'all',
     [switch]$Plan,
     [ValidateRange(1, 2)][int]$Jobs = 2,
     [string]$ToolsRoot = $env:CA_WINDOWS_TOOLS,
@@ -42,6 +42,7 @@ foreach ($current in $stages) {
         command = @($vcpkg) + $arguments; dependencyBuildsAllowed = !$Plan; applicationBuildsAllowed = $false
         buildType = 'release'; vcpkgConcurrency = $env:VCPKG_MAX_CONCURRENCY
         cmakeParallelLevel = $env:CMAKE_BUILD_PARALLEL_LEVEL; msvcFlags = $env:_CL_
+        msysEnvironmentConversionExclusions = $env:MSYS2_ENV_CONV_EXCL
         compiler = $env:VCToolsVersion; sdk = $env:WindowsSDKVersion; binarySources = $env:VCPKG_BINARY_SOURCES
     } | ConvertTo-Json -Depth 5 | Set-Content "$output/$label-command.json"
     # A failed/restarted preparation cannot leave an old completion proof behind.

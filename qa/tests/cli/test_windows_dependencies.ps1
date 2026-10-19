@@ -24,6 +24,10 @@ try {
         $previous = $names
     }
     Write-Output 'PASS: cumulative dependency manifests preserve all final features, pins, registries and installed path'
+    $directory = Write-WindowsDependencyManifest -Root $root -Stage gperf -Destination "$temporary/gperf"
+    $preflight = Get-Content "$directory/vcpkg.json" -Raw | ConvertFrom-Json
+    if ($preflight.dependencies.Count -ne 1 -or $preflight.dependencies[0] -ne 'gperf') { throw 'Preflight must isolate the failing tool' }
+    Write-Output 'PASS: the native preflight requests only gperf and its own dependencies'
 
     # Patching is narrow, idempotent and refuses any unknown vendor helper.
     $fixture = "function(f)`n  set(args `"/m`")`nendfunction()`n"

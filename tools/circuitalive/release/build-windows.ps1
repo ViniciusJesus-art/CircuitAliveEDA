@@ -89,10 +89,13 @@ $env:VCPKG_ROOT = Join-Path $ToolsRoot 'vcpkg'
 $env:SWIG_EXECUTABLE = Join-Path $ToolsRoot "swigwin-$($lock.swigVersion)/swig.exe"
 $env:VCPKG_DEFAULT_BINARY_CACHE = Join-Path $ToolsRoot 'binary-cache'
 # Compiler-tracked local cache only: no MinGW or untracked feed packages.
-$env:VCPKG_BINARY_SOURCES = 'clear;default'
+$env:VCPKG_BINARY_SOURCES = 'clear;default,readwrite'
 $env:VCPKG_MAX_CONCURRENCY = "$Jobs"
 $env:CMAKE_BUILD_PARALLEL_LEVEL = "$Jobs"
 $env:_CL_ = '/MP1'
+# Autotools ports invoke native cl.exe through MSYS2. /MP1 is an option,
+# not a POSIX path to convert when exporting the native process environment.
+$env:MSYS2_ENV_CONV_EXCL = '_CL_'
 Write-Host "Using project vcpkg: $env:VCPKG_ROOT"
 if ($Phase -in @('all', 'setup')) { Initialize-Tools }
 if ($Phase -in @('all', 'dependencies')) { Prepare-Dependencies }

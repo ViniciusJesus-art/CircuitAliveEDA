@@ -51,3 +51,11 @@ function Get-VcpkgCacheInventory {
         packages = @($files | Where-Object Extension -eq '.zip').Count
     }
 }
+
+function Test-WindowsDiagnosticFile {
+    param([IO.FileInfo]$File)
+    # Keep nested Autoconf config.log and CMake configure diagnostics as well
+    # as top-level vcpkg logs. Exclude sources/objects, not whole build dirs.
+    return $File.Length -lt 10MB -and $File.Extension -in @('.log', '.json', '.txt', '.yaml') -and
+        $File.FullName -notmatch '[\\/]src[\\/]'
+}

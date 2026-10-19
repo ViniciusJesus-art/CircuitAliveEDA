@@ -73,6 +73,20 @@ try {
 } finally { Remove-Item $directory -Recurse -Force -ErrorAction SilentlyContinue }
 Write-Output 'PASS: absent, single-file and mixed cache inventories'
 
+$directory = Join-Path ([IO.Path]::GetTempPath()) ('ca-log-qa-' + [guid]::NewGuid())
+try {
+    New-Item -ItemType Directory -Force "$directory/gperf/x64-windows-rel/lib", "$directory/gperf/src" | Out-Null
+    Set-Content "$directory/gperf/x64-windows-rel/lib/config.log" 'nested compiler error'
+    Set-Content "$directory/gperf/x64-windows-rel/lib/conftest.obj" 'object'
+    Set-Content "$directory/gperf/src/irrelevant.txt" 'source'
+    if (!(Test-WindowsDiagnosticFile (Get-Item "$directory/gperf/x64-windows-rel/lib/config.log")) -or
+        (Test-WindowsDiagnosticFile (Get-Item "$directory/gperf/x64-windows-rel/lib/conftest.obj")) -or
+        (Test-WindowsDiagnosticFile (Get-Item "$directory/gperf/src/irrelevant.txt"))) {
+        throw 'The collector must keep nested configure errors without archiving sources/objects'
+    }
+} finally { Remove-Item $directory -Recurse -Force -ErrorAction SilentlyContinue }
+Write-Output 'PASS: nested Autoconf logs survive failure diagnostics'
+
 Get-ChildItem "$PSScriptRoot/../../../tools/circuitalive/release" -Filter '*windows*.ps1' | ForEach-Object {
     $tokens = $null; $errors = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
