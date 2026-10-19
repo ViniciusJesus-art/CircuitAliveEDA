@@ -16,13 +16,11 @@ if( CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 )
     set_target_properties( circuitalive-memory PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON )
     target_compile_features( circuitalive-memory PRIVATE c_std_11 )
     if( MSVC )
-        # The vcpkg port installs the complete internal headers and Visual C++ config.
+        # Use the port's internal headers and Visual C++ config, completing
+        # the private RFSPICE header omitted by its install rules.
         # Its ngspice 46 ABI differs from the bundled ngspice 47/MSYS2 headers.
-        if( NOT EXISTS "${NGSPICE_INCLUDE_DIR}/ngspice/dllitf.h" OR
-            NOT EXISTS "${NGSPICE_INCLUDE_DIR}/ngspice/config.h" )
-            message( FATAL_ERROR "MSVC requires the matching internal ngspice headers from vcpkg" )
-        endif()
-        set( CA_NGSPICE_CM_INCLUDE "${NGSPICE_INCLUDE_DIR}" )
+        include( "${PROJECT_SOURCE_DIR}/cmake/CircuitAliveNgspiceHeaders.cmake" )
+        circuitalive_ngspice_msvc_includes( "${NGSPICE_INCLUDE_DIR}" CA_NGSPICE_CM_INCLUDE )
     else()
         set( CA_NGSPICE_CM_INCLUDE "${PROJECT_SOURCE_DIR}/thirdparty/ngspice-xspice/include" )
         include( CheckLibraryExists )
@@ -35,7 +33,7 @@ if( CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 )
             target_compile_definitions( circuitalive-memory PRIVATE CIDER )
         endif()
     endif()
-    target_include_directories( circuitalive-memory SYSTEM PRIVATE "${CA_NGSPICE_CM_INCLUDE}" )
+    target_include_directories( circuitalive-memory SYSTEM PRIVATE ${CA_NGSPICE_CM_INCLUDE} )
     include( CMakePushCheckState )
     include( CheckStructHasMember )
     cmake_push_check_state( RESET )

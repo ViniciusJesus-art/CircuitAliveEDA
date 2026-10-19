@@ -103,6 +103,20 @@ jobs:
             /Iinclude "/I$prefix/include" "/I$prefix/lib/mswu" $source 2>&1 |
             Tee-Object -FilePath build/windows-validation/branding-check.log
           if ($LASTEXITCODE -ne 0) { throw "MSVC branding header check failed ($LASTEXITCODE)." }
+      - name: Compile complete XSPICE memory module before shared libraries
+        timeout-minutes: 5
+        run: |
+          ./tools/circuitalive/release/build-windows.ps1 -Phase environment -Jobs 2
+          cmake --build build/windows-msvc --parallel 2 --verbose --target circuitalive-memory 2>&1 |
+            Tee-Object -FilePath build/windows-validation/memory-module.log
+          if ($LASTEXITCODE -ne 0) { throw "XSPICE memory module failed ($LASTEXITCODE)." }
+      - name: Preserve isolated memory module compilation log
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msvc-memory-module
+          retention-days: 14
+          path: build/windows-validation/memory-module.log
+          if-no-files-found: error
       - name: Compile affected sources and run interactive simulator tests only
         timeout-minutes: 50
         run: |
@@ -130,5 +144,6 @@ jobs:
             build/windows-msvc/CMakeFiles/CMakeConfigureLog.yaml
             build/windows-msvc/compile_commands.json
             build/windows-msvc/dependencies-complete.json
+            build/windows-msvc/eeschema/sim/ngspice-cm-support/
             build/windows-msvc/Testing/Temporary/
           if-no-files-found: warn

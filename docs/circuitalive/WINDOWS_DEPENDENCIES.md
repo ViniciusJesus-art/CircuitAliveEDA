@@ -63,6 +63,10 @@ A [validação 39253280301](https://github.com/ViniciusJesus-art/CircuitAliveEDA
 
 Antes dos alvos maiores, o workflow agora verifica esse cabeçalho com `cl /Zs` e os headers wxWidgets da instalação MSVC. A saída dos processos nativos também passa explicitamente por `Tee-Object`: a transcrição PowerShell da primeira execução não reteve as mensagens do compilador; o log completo foi recuperado do Actions. Os diagnósticos dessa execução estão em `.circuitalive/reports/windows-validation-39253280301/`.
 
+A [validação 39256144749](https://github.com/ViniciusJesus-art/CircuitAliveEDA/actions/runs/39256144749) passou pela checagem de branding e avançou até o módulo XSPICE de memória. Falhou em `cktdefs.h`, que inclui `../maths/dense/dense.h` quando RFSPICE está ativo. A receita fixada do ngspice 46 copia `src/include` e a configuração Visual C++, mas omite `src/maths/dense/dense.h`. Desativar RFSPICE mudaria o layout ABI e não é uma solução válida.
+
+`cmake/CircuitAliveNgspiceHeaders.cmake` completa apenas esse include privado em uma pasta do build. O arquivo existente foi comparado com a revisão exata do port e é idêntico; a configuração valida versão 46 e SHA-256 normalizado, preserva os headers e flags do pacote e não expõe os headers ABI da versão 47 ao MSVC. O perfil das dependências e seus ZIPs continuam os mesmos. O workflow agora compila e vincula `circuitalive-memory` inteiro antes das bibliotecas comuns, permitindo diagnosticar rapidamente qualquer outro problema nessa integração. Os logs dessa falha estão em `.circuitalive/reports/windows-validation-39256144749/`; as amostras da compilação registraram no mínimo 12,44 GiB de RAM livre.
+
 ## Validação
 
 Os testes offline verificam manifestos cumulativos e finais, pins/registries/features, argumentos, rejeição de preparação ausente/desatualizada, conteúdo conhecido e reaplicação do patch. Após o setup, um teste executa o helper CMake real com o processo MSBuild substituído por um verificador: comprova `/m:2` e somente Release antes de compilar qualquer port. Nenhum compilador é executado nesse teste.
