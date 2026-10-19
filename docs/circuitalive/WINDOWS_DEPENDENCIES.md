@@ -25,7 +25,7 @@ As quatro etapas usam manifestos cumulativos derivados do manifesto original, pr
 | cad | OpenCascade e suas features atuais | 70 min |
 | complete | wxWidgets e wxPython com todas as features do manifesto | 110 min |
 
-Antes dessas quatro etapas, um preflight compila apenas `gperf` e suas próprias dependências. Um teste nativo usa o shell MSYS2 adquirido pelo port para verificar os flags e compilar/executar um pequeno programa C. Em seguida, prova gravação de ZIPs e restauração vcpkg com `--only-binarycaching` para uma instalação nova. Nenhuma etapa pesada começa se essas verificações falharem. O input manual `preflight_only=true` encerra o workflow após esse diagnóstico.
+Antes dessas quatro etapas, um preflight prepara apenas `gperf` e suas próprias dependências. Um teste nativo usa o shell MSYS2 adquirido pelo port, ou um shell MSYS instalado no runner quando o cache dispensa downloads de ferramentas de build, para verificar os flags e compilar/executar um pequeno programa C. Em seguida, prova gravação de ZIPs e restauração vcpkg com `--only-binarycaching` para uma instalação nova. Nenhuma etapa pesada começa se essas verificações falharem. O input manual `preflight_only=true` encerra o workflow após esse diagnóstico.
 
 O job tem limite de 360 minutos. Timeout de step deixa margem para coleta final se o agente ainda responder. Cada instalação grava log incremental, argumentos, duração, resultado, inventário do cache e métricas de RAM/commit, CPU, disco e processos a cada 30 segundos. O monitor é encerrado em `finally`; o processo pai permanece vivo durante a instalação.
 

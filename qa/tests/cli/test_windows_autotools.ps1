@@ -12,9 +12,17 @@ Set-Location $root
 . "$root/tools/circuitalive/release/windows-dependencies-data.ps1"
 . "$root/tools/circuitalive/release/windows-audit-data.ps1"
 $output = (Resolve-Path $OutputDirectory).Path
-$shell = Get-ChildItem "$env:VCPKG_ROOT/downloads/tools/msys2/*/usr/bin/bash.exe" -File |
-    Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (!$shell) { throw 'The gperf MSYS2 shell is missing; run the gperf preflight first.' }
+# A binary-cache hit does not acquire the port's build-only MSYS2 runtime.
+# Prefer that runtime; otherwise use an explicit MSYS shell from the runner.
+# Never resolve a generic bash.exe, which could be the unrelated WSL launcher.
+$shell = $null
+foreach ($candidate in @("$env:VCPKG_ROOT/downloads/tools/msys2/*/usr/bin/bash.exe",
+    'C:/msys64/usr/bin/bash.exe', "${env:ProgramFiles}/Git/usr/bin/bash.exe")) {
+    $shell = Get-ChildItem $candidate -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($shell) { break }
+}
+if (!$shell) { throw 'An MSYS shell is required for the native regression check.' }
 $probe = Join-Path $output 'msys-native-cl-probe.ps1'
 @'
 param([string]$Directory)
@@ -34,7 +42,7 @@ $global:LASTEXITCODE = 0
 
 $savedExclusions = $env:MSYS2_ENV_CONV_EXCL
 try {
-    $results = @{}
+    $results = @{ shell = $shell.FullName }
     foreach ($case in @('baseline', 'protected')) {
         $directory = Join-Path $output "msys-$case"
         $env:MSYS2_ENV_CONV_EXCL = if ($case -eq 'baseline') { $null } else { '_CL_' }
