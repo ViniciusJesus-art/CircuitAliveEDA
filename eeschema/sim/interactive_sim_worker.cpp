@@ -102,7 +102,7 @@ public:
         else if( op == "advance" )
             Advance( aRequest.at( "time" ) );
         else if( op == "source" )
-            Source( aRequest.at( "reference" ), aRequest.at( "value" ) );
+            Source( aRequest.at( "reference" ), aRequest.at( "value" ), aRequest.value( "changes", JSON::array() ) );
         else if( op == "memory" )
             return Memory( aRequest );
         else if( op == "snapshot" )
@@ -466,7 +466,7 @@ private:
             throw std::runtime_error( "Simulation produced no data" );
     }
 
-    void Source( const std::string& aReference, double aValue )
+    void Source( const std::string& aReference, double aValue, const JSON& changes )
     {
         if( m_state != SIM_SESSION_STATE::PAUSED )
             throw std::runtime_error( "Source changes require a confirmed pause" );
@@ -477,7 +477,32 @@ private:
                      && std::tolower( aReference.front() ) != 'i' ) )
             throw std::runtime_error( "A V/I source reference and finite value are required" );
 
+        if( !changes.is_array() || changes.size() > 1024 ) throw std::runtime_error( "Invalid parameter updates" );
+        std::vector<std::string> commands;
+        for( const auto& change : changes )
+        {
+            const std::string reference = change.at( "reference" ), parameter = change.at( "parameter" );
+            auto identifier = []( const std::string& s )
+            { return !s.empty() && s.size() <= 240 && s.find_first_not_of( "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_" ) == std::string::npos; };
+            if( !identifier( reference ) || !identifier( parameter ) ) throw std::runtime_error( "Invalid parameter target" );
+            const auto values = change.at( "expressions" ).get<std::vector<std::string>>();
+            if( values.empty() || values.size() > 256 ) throw std::runtime_error( "Invalid parameter values" );
+            std::string expression;
+            for( const auto& value : values )
+            {
+                // Numeric expressions only: no interpreter commands, paths, substitutions or redirection.
+                if( value.empty() || value.size() > 4096 || value.find_first_not_of(
+                    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.+-*/^(), " ) != std::string::npos )
+                    throw std::runtime_error( "Invalid numeric parameter expression" );
+                if( !expression.empty() ) expression += " ";
+                expression += "(" + value + ")";
+            }
+            if( values.size() > 1 ) expression = "[ " + expression + " ]";
+            commands.push_back( std::string( change.value( "model", false ) ? "altermod " : "alter " )
+                    + reference + " " + parameter + " = " + expression );
+        }
         Command( "alter " + aReference + " dc = " + Number( aValue ) );
+        for( const auto& command : commands ) { Command( command ); CheckError(); }
         CheckError();
         std::lock_guard lock( m_mutex );
         ++m_events;

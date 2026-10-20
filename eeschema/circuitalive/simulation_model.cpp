@@ -2,6 +2,7 @@
 #include "simulation_model.h"
 #include "circuit_snapshot.h"
 #include "behavioral_model.h"
+#include "control_visual_json.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
@@ -290,6 +291,8 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
             const auto& c = j.at( "control" );
             m.controlSource = c.at( "source" );
             m.controlOn = c.value( "on", 5.0 ); m.controlOff = c.value( "off", 0.0 );
+            m.controlInitiallyClosed = c.value( "initially_closed", true );
+            m.controlVisual = ReadControlVisual( c.value( "visual", JSON::object() ) );
             m.controlInitiallyOpenSymbols = c.value( "initially_open_symbols", std::vector<std::string>{} );
             if( !std::isfinite( m.controlOn ) || !std::isfinite( m.controlOff ) )
                 throw std::runtime_error( "Invalid control levels" );
@@ -315,6 +318,60 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
                 || a.minimum < parameter->minimum || a.maximum > parameter->maximum )
                 throw std::runtime_error( "Invalid live adjustment" );
             m.adjustments.push_back( std::move( a ) );
+            m.adjustments.back().visual = ReadControlVisual( control.value( "visual", JSON::object() ) );
+        }
+        if( j.value( "controls", JSON::array() ).size() > 64 || m.adjustments.size() > 64 )
+            throw std::runtime_error( "Too many interactive controls" );
+        for( const auto& c : j.value( "controls", JSON::array() ) )
+        {
+            MODEL_CONTROL control{ c.at( "id" ), c.at( "label" ), c.at( "source" ),
+                c.value( "on", 5.0 ), c.value( "off", 0.0 ), c.value( "initially_closed", false ),
+                ReadControlVisual( c.value( "visual", JSON::object() ) ) };
+            if( !Identifier( control.id ) || !adjustmentIds.insert( control.id ).second
+                || !adjustmentSources.insert( control.source ).second || control.source.empty()
+                || control.source.find_first_of( " \t\r\n" ) != std::string::npos
+                || ( control.source.front() != 'V' && control.source.front() != 'v'
+                     && control.source.front() != 'I' && control.source.front() != 'i' )
+                || !std::isfinite( control.on ) || !std::isfinite( control.off ) || control.on == control.off
+                || control.source == m.controlSource )
+                throw std::runtime_error( "Invalid interactive button" );
+            m.controls.push_back( std::move( control ) );
+        }
+        if( j.value("live_updates",JSON::array()).size()>1024 ) throw std::runtime_error("Too many live parameter updates");
+        for( const auto& update : j.value("live_updates",JSON::array()) )
+        {
+            MODEL_LIVE_UPDATE u;
+            u.change.reference=update.at("reference"); u.change.parameter=update.at("parameter");
+            u.change.expressions=update.at("expressions").get<std::vector<std::string>>();
+            u.change.model=update.value("model",false);
+            u.sources=update.at("sources").get<std::vector<std::string>>();
+            u.initials=update.at("initials").get<std::vector<std::string>>();
+            if(u.sources.empty()||u.sources.size()>64||u.initials.size()!=u.sources.size()||u.change.expressions.empty()
+                ||u.change.expressions.size()>256||!Identifier(u.change.parameter)||u.change.reference.empty()
+                ||u.change.reference.find_first_of(" \t\r\n")!=std::string::npos)
+                throw std::runtime_error("Invalid live parameter update");
+            for(const auto& expression:u.change.expressions)
+            {
+                if(expression.size()>4096)throw std::runtime_error("Oversized live parameter expression");
+                std::size_t at=0;
+                while((at=expression.find('#',at))!=std::string::npos)
+                {
+                    const auto end=expression.find('#',at+1);const auto number=expression.substr(at+1,end-at-1);
+                    if(end==std::string::npos||number.empty()||number.size()>2||number.find_first_not_of("0123456789")!=std::string::npos
+                        ||std::stoul(number)>=u.sources.size())throw std::runtime_error("Invalid live control input");
+                    at=end+1;
+                }
+            }
+            m.liveUpdates.push_back(std::move(u));
+        }
+        if(j.value("live_texts",JSON::array()).size()>128)throw std::runtime_error("Too many live text fields");
+        for(const auto& text:j.value("live_texts",JSON::array()))
+        {
+            MODEL_LIVE_TEXT t{text.at("target"),text.at("field"),text.at("source"),text.at("initial"),
+                text.at("on_text"),text.at("off_text"),text.at("on"),text.at("off"),text.at("slider")};
+            if((t.field!="label"&&t.field!="unit")||!Identifier(t.target)||t.onText.size()>256||t.offText.size()>256
+                ||!std::isfinite(t.on)||!std::isfinite(t.off)||t.on==t.off)throw std::runtime_error("Invalid live text field");
+            m.liveTexts.push_back(std::move(t));
         }
         m.ignoreLegacyFields = j.value( "ignore_legacy_spice_fields", false );
         m.legacyFields = j.value( "legacy_spice_fields", std::map<std::string, std::string>{} );
@@ -453,6 +510,7 @@ RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
 {
     RESOLVED_MODEL r;
     r.model = SelectModel( c );
+    r.controlInitiallyClosed = r.model.controlInitiallyClosed;
     const auto symbol = c.libraryId.substr( c.libraryId.find( ':' ) + 1 );
     for( const auto& identity : r.model.controlInitiallyOpenSymbols )
         if( identity == c.libraryId || identity == symbol ) r.controlInitiallyClosed = false;

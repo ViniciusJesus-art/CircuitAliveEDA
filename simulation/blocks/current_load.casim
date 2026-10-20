@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "current_load",
+  "name": "Load",
+  "description": "Draws the configured current from Supply (+) to Return (-). Connect Supply to VCC and Return to GND. Ideal constant current consumption, added to other internal current paths.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Supply (+)",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Return (-)",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "current",
+      "label": "Consumed current",
+      "default": "20m",
+      "unit": "A",
+      "min": 0,
+      "max": 1000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "I${id} ${pin:p} ${pin:n} DC ${param:current}"
+    ],
+    "definitions": []
+  },
+  "ignore_legacy_spice_fields": true,
+  "category": "Building blocks",
+  "family": "Loads"
+}

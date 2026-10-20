@@ -2,6 +2,8 @@
 #include <sim/platform_runtime.h>
 #include "model_design.h"
 #include "circuit_snapshot.h"
+#include "control_visual_json.h"
+#include "control_references.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
@@ -75,6 +77,16 @@ MODEL_DESIGN MODEL_DESIGN::Open( const std::string& text )
         d.baseJson = a.value( "base", "" );
         d.coreBlock = a.value( "core_block", "" );
         d.libraryId = a.value( "symbol", d.libraryId );
+        d.interactionsConfigured = a.value( "interactions_configured", false );
+        for( const auto& i : a.value( "interactions", JSON::array() ) )
+        {
+            if( d.interactions.size() >= 64 ) throw std::runtime_error( "Too many interactive controls" );
+            d.interactions.push_back( { i.at( "block" ), i.at( "control" ), i.value( "label", "" ),
+                ReadControlVisual( i.value( "visual", JSON::object() ) ) } );
+            d.interactions.back().reference = i.value( "reference", "" );
+            d.interactions.back().onValue = i.value( "on_value", "1" );
+            d.interactions.back().offValue = i.value( "off_value", "0" );
+        }
         for( const auto& b : a.at( "blocks" ) )
             d.blocks.push_back( { b.at( "id" ), b.at( "model" ).dump(),
                 b.at( "connections" ).get<std::map<std::string, std::string>>(),
@@ -102,6 +114,8 @@ void MODEL_DESIGN::MakeCoreVisible()
     // Compile the core once, in the block. Keep component-level observations on
     // the parent and point them at the namespaced devices inside that block.
     core.erase( "behavioral" );
+    core.erase( "live_updates" );
+    core.erase( "live_texts" );
     core["spice"] = { { "instance", JSON::array() }, { "definitions", JSON::array() } };
     if( !model.logicVcc.empty() )
         core["logic"] = { { "vcc", model.logicVcc }, { "gnd", model.logicGround },
@@ -120,7 +134,7 @@ void MODEL_DESIGN::MakeCoreVisible()
         }
         else if( item.is_structured() ) for( auto& child : item ) rename( child );
     };
-    for( const auto* key : { "logic", "indicator", "control", "adjustments", "current_warning" } )
+    for( const auto* key : { "logic", "indicator", "control", "controls", "adjustments", "current_warning" } )
         if( core.contains( key ) ) rename( core[key] );
     baseJson = core.dump(); coreBlock = block.id;
     // A native PN diode has a real series path followed by the nonlinear
@@ -160,15 +174,36 @@ void MODEL_DESIGN::MakeCoreVisible()
     }
     blocks.push_back( std::move( block ) );
 }
+std::vector<DESIGN_INTERACTION> MODEL_DESIGN::AvailableInteractions() const
+{
+    std::vector<DESIGN_INTERACTION> result;
+    for( const auto& b : blocks )
+    {
+        const auto m = MODEL_REPOSITORY::LoadText( b.modelJson );
+        if( !m.controlSource.empty() ) result.push_back( { b.id, "switch", "Button", m.controlVisual } );
+        for( const auto& c : m.controls ) result.push_back( { b.id, "toggle:" + c.id, c.label, c.visual } );
+        for( const auto& a : m.adjustments ) result.push_back( { b.id, "adjust:" + a.id, a.label, a.visual } );
+    }
+    return result;
+}
+void MODEL_DESIGN::ConfigureInteractions()
+{
+    if( interactionsConfigured ) return;
+    // Existing imported components already expose their core's controls on the parent.
+    for( const auto& i : AvailableInteractions() )
+        if( i.block == coreBlock ) interactions.push_back( i );
+    interactionsConfigured = true;
+}
 void MODEL_DESIGN::RemoveBlock( const std::string& blockId )
 {
     blocks.erase( std::remove_if( blocks.begin(), blocks.end(), [&]( const auto& b ) { return b.id == blockId; } ), blocks.end() );
     wireRoutes.erase( std::remove_if( wireRoutes.begin(), wireRoutes.end(), [&]( const auto& r )
         { return r.fromBlock == blockId || r.toBlock == blockId; } ), wireRoutes.end() );
+    std::erase_if( interactions, [&]( const auto& i ) { return i.block == blockId; } );
     if( coreBlock == blockId )
     {
         auto base = JSON::parse( baseJson );
-        for( const auto* key : { "logic", "indicator", "control", "adjustments", "current_warning", "memories", "resources" } ) base.erase(key);
+        for( const auto* key : { "logic", "indicator", "control", "controls", "adjustments", "current_warning", "memories", "resources" } ) base.erase(key);
         baseJson = base.dump(); coreBlock.clear();
     }
 }
@@ -227,6 +262,9 @@ std::string MODEL_DESIGN::Export() const
     if( blocks.size() > 128 ) throw std::runtime_error( "Model design supports up to 128 blocks" );
     JSON j = baseJson.empty() ? JSON::object() : JSON::parse( baseJson );
     j.erase( "authoring" );
+    if( !blocks.empty() ) { j.erase( "live_updates" ); j.erase( "live_texts" ); }
+    if( interactionsConfigured )
+        for( const auto* key : { "control", "controls", "adjustments" } ) j.erase( key );
     j["schema_version"] = 1; j["backend"] = "ngspice"; j["id"] = id; j["name"] = name;
     j["description"] = description; j["license"] = j.value( "license", "GPL-3.0-or-later" );
     j["pins"] = JSON::array(); j["parameters"] = JSON::array();
@@ -259,15 +297,19 @@ std::string MODEL_DESIGN::Export() const
     if( !j.contains( "spice" ) ) j["spice"] = { { "instance", JSON::array() }, { "definitions", JSON::array() } };
     if( !j["spice"].contains( "definitions" ) ) j["spice"]["definitions"] = JSON::array();
     std::vector<SIMULATION_MODEL> models;
+    for( const auto& block : blocks ) models.push_back( MODEL_REPOSITORY::LoadText( block.modelJson ) );
+    CONTROL_REFERENCE_COMPILER references( *this, models );
     std::vector<std::map<std::string, std::string>> tokens;
     std::vector<std::map<std::string, std::string>> nets;
     std::set<std::string> blockIds;
-    for( const auto& b : blocks )
+    for( std::size_t blockIndex = 0; blockIndex < blocks.size(); ++blockIndex )
     {
+        const auto& b = blocks[blockIndex];
         if( !Identifier( b.id ) || !blockIds.insert( b.id ).second ) throw std::runtime_error( "Invalid/repeated block ID: " + b.id );
-        auto model = MODEL_REPOSITORY::LoadText( b.modelJson );
+        const auto& model = models[blockIndex];
         std::map<std::string, std::string> t{ { "id", "b_" + b.id + "_${id}" } }, connections;
-        t["control:initial"] = "${control:initial}";
+        t["control:initial"] = !interactionsConfigured && b.id == coreBlock ? "${control:initial}"
+                : Number( model.controlInitiallyClosed ? model.controlOn : model.controlOff );
         for( const auto& memory : model.memories ) t["memory:" + memory.id] = "${memory:" + memory.id + "}";
         for( const auto& pin : model.pins )
         {
@@ -281,6 +323,11 @@ std::string MODEL_DESIGN::Export() const
             {
                 if( !net.empty() && !Identifier( net ) ) throw std::runtime_error( "Invalid internal net: " + net );
                 t["pin:" + pin.id] = net.empty() ? "open_" + b.id + "_" + pin.id + "_${id}" : "wire_" + net + "_${id}";
+                if( net.empty() && pin.id == "ref" && ( model.id == "interactive_value" || model.id == "interactive_button" ) )
+                    t["pin:" + pin.id] = "0";
+                if( net.empty() && pin.id == "n" && model.id == "interactive_switch"
+                    && ( !b.connections.contains( "p" ) || b.connections.at( "p" ).empty() ) )
+                    t["pin:" + pin.id] = "0";
             }
             connections[pin.id] = net;
         }
@@ -289,7 +336,19 @@ std::string MODEL_DESIGN::Export() const
         for( const auto& p : model.parameters )
         {
             auto it = b.values.find( p.id ); auto value = it == b.values.end() || it->second.empty() ? p.defaultValue : it->second;
-            if( value.starts_with( "@" ) )
+            if( value.starts_with( "#" ) )
+            {
+                if( std::any_of( model.adjustments.begin(), model.adjustments.end(), [&]( const auto& a ) { return a.parameter == p.id; } ) )
+                    throw std::runtime_error( "A control's initial value cannot reference another control" );
+                if( p.id == model.maxStepParameter || p.id == model.frequencyParameter )
+                    throw std::runtime_error( "Solver timing parameters cannot change during simulation" );
+                if( p.id == model.brightnessParameter || p.id == model.ratingParameter || p.id == model.warningParameter
+                    || p.id == model.logicLow || p.id == model.logicHigh || p.id == model.logicMinSupply || p.id == model.logicMaxSupply
+                    || std::find( model.ledAppearance.ids.begin(), model.ledAppearance.ids.end(), p.id ) != model.ledAppearance.ids.end() )
+                    throw std::runtime_error( "This display or detection setting cannot change during simulation" );
+                t["param:" + p.id] = references.Placeholder( value, p );
+            }
+            else if( value.starts_with( "@" ) )
             {
                 auto found = std::find_if( parameters.begin(), parameters.end(), [&]( const auto& q ) { return q.id == value.substr( 1 ); } );
                 if( found == parameters.end() ) throw std::runtime_error( b.id + ": unknown public parameter " + value );
@@ -312,8 +371,61 @@ std::string MODEL_DESIGN::Export() const
         }
         for( const auto& [p, value] : b.values )
             if( !t.contains( "param:" + p ) ) throw std::runtime_error( b.id + ": unknown block parameter " + p );
-        models.push_back( std::move( model ) ); tokens.push_back( std::move( t ) ); nets.push_back( std::move( connections ) );
+        tokens.push_back( std::move( t ) ); nets.push_back( std::move( connections ) );
     }
+    if( interactions.size() > 64 ) throw std::runtime_error( "Too many interactive controls" );
+    std::set<std::pair<std::string, std::string>> exposed;
+    for( const auto& interaction : interactions )
+    {
+        if( !interactionsConfigured ) throw std::runtime_error( "Interaction configuration is missing" );
+        const auto b = std::find_if( blocks.begin(), blocks.end(), [&]( const auto& candidate ) { return candidate.id == interaction.block; } );
+        if( b == blocks.end() || !exposed.emplace( interaction.block, interaction.control ).second )
+            throw std::runtime_error( "Missing or repeated interaction block" );
+        const std::size_t n = b - blocks.begin(); const auto& model = models[n];
+        const auto visual = WriteControlVisual( interaction.visual ); ReadControlVisual( visual );
+        const std::string prefix = "b_" + b->id + "_";
+        if( interaction.control.starts_with( "adjust:" ) )
+        {
+            const auto controlId = interaction.control.substr( 7 );
+            const auto a = std::find_if( model.adjustments.begin(), model.adjustments.end(), [&]( const auto& candidate ) { return candidate.id == controlId; } );
+            if( a == model.adjustments.end() ) throw std::runtime_error( "Unknown slider control" );
+            const auto token = tokens[n].at( "param:" + a->parameter );
+            std::string parameter;
+            if( token.starts_with( "${param:" ) ) parameter = token.substr( 8, token.size() - 9 );
+            else
+            {
+                auto p = *std::find_if( model.parameters.begin(), model.parameters.end(), [&]( const auto& candidate ) { return candidate.id == a->parameter; } );
+                p.id = "live_" + prefix + a->parameter; p.label = interaction.label; p.defaultValue = token;
+                if( !parameterIds.contains( p.id ) ) addParameter( p );
+                else for( auto& savedParameter : j["parameters"] )
+                    if( savedParameter.at( "id" ) == p.id ) savedParameter["default"] = token;
+                parameter = p.id;
+                tokens[n]["param:" + a->parameter] = "${param:" + parameter + "}";
+            }
+            j["adjustments"].push_back( { { "id", prefix + controlId }, { "label", interaction.label },
+                { "source", Expand( a->source, tokens[n] ) }, { "parameter", parameter },
+                { "unit", a->unit }, { "min", a->minimum }, { "max", a->maximum }, { "step", a->step }, { "visual", visual } } );
+        }
+        else
+        {
+            MODEL_CONTROL c;
+            if( interaction.control == "switch" && !model.controlSource.empty() )
+                c = { "switch", interaction.label, model.controlSource, model.controlOn, model.controlOff,
+                    model.controlInitiallyClosed, interaction.visual };
+            else if( interaction.control.starts_with( "toggle:" ) )
+            {
+                const auto controlId = interaction.control.substr( 7 );
+                const auto found = std::find_if( model.controls.begin(), model.controls.end(), [&]( const auto& candidate ) { return candidate.id == controlId; } );
+                if( found == model.controls.end() ) throw std::runtime_error( "Unknown button control" );
+                c = *found;
+            }
+            else throw std::runtime_error( "Unknown interaction control" );
+            j["controls"].push_back( { { "id", prefix + c.id }, { "label", interaction.label },
+                { "source", Expand( c.source, tokens[n] ) }, { "on", c.on }, { "off", c.off },
+                { "initially_closed", c.initiallyClosed }, { "visual", visual } } );
+        }
+    }
+    references.Resolve( tokens, j );
     // A visible LED core may override or rebind display values in its properties.
     // Its component-level indicator must observe those exact block bindings.
     if(j.contains("indicator")&&!coreBlock.empty())for(std::size_t i=0;i<blocks.size();++i)if(blocks[i].id==coreBlock)
@@ -360,8 +472,12 @@ std::string MODEL_DESIGN::Export() const
             else if( !analog.contains( net ) ) for( const auto& d : drivers[net] ) drive += "+(" + d + ")";
             tokens[i]["drive:" + p.id] = "(" + drive + ")";
         }
-        for( const auto& line : models[i].instance ) j["spice"]["instance"].push_back( Expand( line, tokens[i] ) );
-        for( const auto& line : models[i].definitions ) j["spice"]["definitions"].push_back( Expand( line, tokens[i] ) );
+        const auto liveTokens = references.Expressions( tokens[i], i );
+        for( const auto& line : models[i].instance )
+            j["spice"]["instance"].push_back( references.CompileLine( Expand( line, tokens[i] ), Expand( line, liveTokens ), false, j ) );
+        for( const auto& line : models[i].definitions )
+            j["spice"]["definitions"].push_back( references.CompileLine( Expand( line, tokens[i] ), Expand( line, liveTokens ), true, j ) );
+        references.CopyNestedUpdates( models[i], tokens[i], j );
     }
     if( !j.contains( "measurement_ports" ) )
     {
@@ -430,6 +546,11 @@ std::string MODEL_DESIGN::Export() const
         { "connections", b.connections }, { "values", b.values }, { "x", b.x }, { "y", b.y } } );
     j["authoring"] = { { "version", 1 }, { "symbol", libraryId }, { "base", baseJson }, { "blocks", saved } };
     j["authoring"]["core_block"] = coreBlock;
+    j["authoring"]["interactions_configured"] = interactionsConfigured;
+    j["authoring"]["interactions"] = JSON::array();
+    for( const auto& i : interactions ) j["authoring"]["interactions"].push_back( {
+        { "block", i.block }, { "control", i.control }, { "label", i.label }, { "visual", WriteControlVisual( i.visual ) },
+        { "reference", i.reference }, { "on_value", i.onValue }, { "off_value", i.offValue } } );
     j["authoring"]["wire_routes"] = JSON::array();
     for( const auto& r : wireRoutes )
     {
@@ -437,6 +558,24 @@ std::string MODEL_DESIGN::Export() const
         for( const auto& p : r.bends ) bends.push_back( { p.x, p.y } );
         j["authoring"]["wire_routes"].push_back( { { "from_block", r.fromBlock }, { "from_port", r.fromPort },
             { "to_block", r.toBlock }, { "to_port", r.toPort }, { "bends", bends } } );
+    }
+    // Put button defaults into the deck before the first timestep. Altering a source
+    // after Configure would require running the solver first and would change initial state.
+    for( const auto& control : j.value( "controls", JSON::array() ) )
+    {
+        const std::string source = control.at( "source" ); bool found = false;
+        for( auto& line : j["spice"]["instance"] )
+        {
+            std::istringstream fields( line.get<std::string>() ); std::string device, p, n;
+            fields >> device >> p >> n;
+            if( device == source && !p.empty() && !n.empty() )
+            {
+                line = device + " " + p + " " + n + " DC " + Number( control.value( "initially_closed", false )
+                        ? control.value( "on", 5.0 ) : control.value( "off", 0.0 ) );
+                found = true; break;
+            }
+        }
+        if( !found ) throw std::runtime_error( "Interactive button needs an independent V/I source in the component instance" );
     }
     const auto compiled = MODEL_REPOSITORY::LoadText( j.dump() );
     bool anchor = false;

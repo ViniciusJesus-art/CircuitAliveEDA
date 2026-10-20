@@ -300,10 +300,16 @@ void INTERACTIVE_SIM_SESSION::AdvanceTo( double aTime )
     m_impl->Request( { { "op", "advance" }, { "time", aTime } } );
 }
 
-void INTERACTIVE_SIM_SESSION::SetSourceValue( const std::string& aReference, double aValue )
+void INTERACTIVE_SIM_SESSION::SetSourceValue( const std::string& aReference, double aValue,
+                                            const std::vector<SIM_PARAMETER_CHANGE>& aChanges )
 {
     std::lock_guard lock( m_impl->mutex );
-    m_impl->Request( { { "op", "source" }, { "reference", aReference }, { "value", aValue } } );
+    JSON request = { { "op", "source" }, { "reference", aReference }, { "value", aValue } };
+    request["changes"] = JSON::array();
+    for( const auto& change : aChanges ) request["changes"].push_back( {
+        {"reference",change.reference}, {"parameter",change.parameter},
+        {"expressions",change.expressions}, {"model",change.model} } );
+    m_impl->Request( request );
 }
 
 int INTERACTIVE_SIM_SESSION::WorkerPid() const

@@ -7,6 +7,7 @@
 #include "power_rails.h"
 #include "simulation_preferences.h"
 #include "led_appearance.h"
+#include "control_visual.h"
 #include <map>
 #include <string>
 #include <vector>
@@ -49,6 +50,8 @@ struct CIRCUIT_SWITCH
     double on = 5;
     double off = 0;
     bool initiallyClosed = true;
+    std::string id, label;
+    CONTROL_VISUAL visual;
 };
 
 struct CIRCUIT_ADJUSTMENT
@@ -56,6 +59,7 @@ struct CIRCUIT_ADJUSTMENT
     std::size_t component;
     std::string id, label, source, unit;
     double minimum, maximum, step, initial;
+    CONTROL_VISUAL visual;
 };
 
 struct CIRCUIT_SNAPSHOT
@@ -65,6 +69,16 @@ struct CIRCUIT_SNAPSHOT
     std::vector<CIRCUIT_INDICATOR> leds;
     std::vector<CIRCUIT_SWITCH> switches;
     std::vector<CIRCUIT_ADJUSTMENT> adjustments;
+    struct LIVE_UPDATE { SIM_PARAMETER_CHANGE change; std::vector<std::string> sources; std::vector<double> initials; };
+    std::vector<LIVE_UPDATE> liveUpdates;
+    struct LIVE_TEXT
+    {
+        std::size_t component;
+        std::string target, field, source, onText, offText;
+        double initial, on, off;
+        bool slider;
+    };
+    std::vector<LIVE_TEXT> liveTexts;
     std::vector<std::map<std::string, std::string>> pinNodes; // Physical pins -> solver nodes, including open pins.
     std::vector<std::string> automaticReferences; // Source reference + negative pin number.
     std::vector<std::string> floatingIslands;     // Representative component; no source or explicit ground.

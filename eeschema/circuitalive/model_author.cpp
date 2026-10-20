@@ -5,6 +5,7 @@
 #include "model_design_canvas.h"
 #include "model_design_presets.h"
 #include "panel_led_appearance.h"
+#include "panel_model_interactions.h"
 #include <cctype>
 #include <charconv>
 #include "model_profiles.h"
@@ -119,12 +120,14 @@ public:
             m_pins->SetReadOnly( r, 0 ); m_pins->SetReadOnly( r, 1 ); m_pins->SetCellEditor( r, 2, new CLICK_CHOICE_EDITOR( choices, true ) );
         }
         m_pins->SetColSize( 0, 260 ); m_pins->SetColSize( 2, 220 ); s->Add( m_pins, 1, wxEXPAND | wxALL, 10 );
-        s->Add( new wxStaticText( this, wxID_ANY, _( "Values: enter an SI value (10k, 100n, 5V), or choose @parameter to expose it in the component's configuration." ) ), 0, wxLEFT | wxRIGHT, 10 );
+        s->Add( new wxStaticText( this, wxID_ANY, _( "Values: enter an SI value, @parameter for a public setting, or #control to follow a slider/button during simulation." ) ), 0, wxLEFT | wxRIGHT, 10 );
         auto* parameterPages=new wxNotebook(this,wxID_ANY);
         auto* electrical=new wxPanel(parameterPages);auto* valueLayout=new wxBoxSizer(wxVERTICAL);
         m_values = Grid( electrical, { _( "Parameter" ), _( "Value" ), _( "Unit" ) } );
         wxArrayString parameterChoices;
         for( const auto& p : design.parameters ) parameterChoices.Add( W( "@" + p.id ) );
+        for( const auto& control : design.interactions )
+            if( !ControlReferenceName( control ).empty() ) parameterChoices.Add( W( "#" + ControlReferenceName( control ) ) );
         for( const auto& p : model.parameters )
         {
             int r = m_values->GetNumberRows(); m_values->AppendRows(); m_parameters.push_back( p.id );
@@ -185,7 +188,7 @@ public:
         m_pages = new wxNotebook( this, wxID_ANY );
         auto* behavior = new wxPanel( m_pages ); auto* layout = new wxBoxSizer( wxVERTICAL );
         auto* hint = new wxStaticText( behavior, wxID_ANY,
-            _( "Connect: click two terminals. Move: drag a block or a wire segment. Select a block to highlight its nets. Double-click to edit. Esc cancels a connection." ) );
+            _( "Connect: click two terminals. Move: drag a block or wire. Double left-click edits a block; double right-click deletes a block or wire. Esc cancels a connection." ) );
         hint->Wrap( 1240 ); layout->Add( hint, 0, wxALL, 8 );
         auto* workspace = new wxBoxSizer( wxHORIZONTAL );
         m_canvas = new DESIGN_CANVAS( behavior, m_design );
@@ -225,6 +228,8 @@ public:
         m_results = new wxTextCtrl( test, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY );
         ts->Add( m_results, 1, wxEXPAND | wxALL, 10 ); test->SetSizer( ts ); m_pages->AddPage( test, _( "Test model" ) );
         run->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& ) { try { testModel(); } catch( const std::exception& e ) { Error( this, e ); } } );
+        m_interactions = new PANEL_MODEL_INTERACTIONS( m_pages, kiway, m_design, [this] { changed(); } );
+        m_pages->AddPage( m_interactions, _( "Interactive controls" ) );
         s->Add( m_pages, 1, wxEXPAND | wxLEFT | wxRIGHT, 10 );
         m_associate = new wxCheckBox( this, wxID_ANY, _( "Use this model for new symbols of the selected component" ) ); m_associate->SetValue( true );
         s->Add( m_associate, 0, wxALL, 10 ); m_status = new wxStaticText( this, wxID_ANY, "" ); s->Add( m_status, 0, wxLEFT | wxRIGHT | wxBOTTOM, 10 );
@@ -232,7 +237,7 @@ public:
         const auto display = wxGetClientDisplayRect(); SetSize( std::min( 1400, display.width - 60 ), std::min( 950, display.height - 60 ) ); SetMinSize( { 950, 620 } ); Centre();
         m_name->Bind( wxEVT_TEXT, [this]( wxCommandEvent& ) { if( !m_loading ) m_dirty = true; } ); m_id->Bind( wxEVT_TEXT, [this]( wxCommandEvent& ) { if( !m_loading ) m_dirty = true; } );
         for( auto* g : { m_pins, m_parameters } ) g->Bind( wxEVT_GRID_CELL_CHANGED, [this]( wxGridEvent& e ) { m_dirty = true; e.Skip(); } );
-        m_pages->Bind( wxEVT_NOTEBOOK_PAGE_CHANGED, [this]( wxBookCtrlEvent& e ) { if( !m_loading ) { try { collect(); m_canvas->Refresh(); inspectSelection(); } catch( const std::exception& error ) { Error( this, error ); } } e.Skip(); } );
+        m_pages->Bind( wxEVT_NOTEBOOK_PAGE_CHANGED, [this]( wxBookCtrlEvent& e ) { if( !m_loading ) { try { collect(); m_canvas->Refresh(); inspectSelection(); if( e.GetSelection() == 4 ) m_interactions->Reload(); } catch( const std::exception& error ) { Error( this, error ); } } e.Skip(); } );
         close->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& ) { if( discard() ) EndModal( wxID_CLOSE ); } );
         Bind( wxEVT_CLOSE_WINDOW, [this]( wxCloseEvent& e ) { if( discard() ) EndModal( wxID_CLOSE ); else if( e.CanVeto() ) e.Veto(); } );
         Bind( wxEVT_BUTTON, [this]( wxCommandEvent& ) { if( discard() ) EndModal( wxID_CANCEL ); }, wxID_CANCEL );
@@ -397,6 +402,7 @@ private:
         }
         m_canvas->selected = m_design.blocks.size()==1 ? 0 : -1;
         m_canvas->CancelConnection(); m_canvas->Refresh(); m_results->Clear(); inspectSelection();
+        m_interactions->Reload();
         m_associate->Enable( !m_design.libraryId.empty() ); m_status->SetLabel( m_file.empty() ? _( "Not saved" ) : W( m_file.string() ) ); m_loading = false; Layout();
     }
     bool discard()
@@ -571,6 +577,7 @@ private:
     wxTextCtrl *m_name, *m_id, *m_testValue, *m_testTime, *m_results, *m_inspector;
     wxStaticText *m_symbol, *m_status; wxNotebook* m_pages; wxGrid *m_pins, *m_parameters, *m_stimuli;
     DESIGN_CANVAS* m_canvas; wxCheckBox* m_associate; bool m_loading = false, m_dirty = false;
+    PANEL_MODEL_INTERACTIONS* m_interactions;
 };
 }
 void ShowModelAuthor( wxWindow* parent, KIWAY* kiway )

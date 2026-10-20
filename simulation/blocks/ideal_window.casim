@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "ideal_window",
+  "name": "Voltage window / supply valid (ideal, no supply pins)",
+  "description": "Y = HIGH when Minimum <= V(Plus,Minus) <= Maximum; otherwise LOW. Plus and Minus are differential measurement inputs, not supply pins. Input loading is 1 teraohm between Plus and Minus. An inverted range always produces LOW. This tests voltage, not whether a wire is physically connected. Output energy is ideal and supply current is not modeled. No supply pins are required. Signal and control voltages use circuit ground as reference.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "plus",
+      "label": "Measured voltage (+)",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "minus",
+      "label": "Measured reference (-)",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "y",
+      "label": "Output Y",
+      "role": "output",
+      "default_pin": "3"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "minimum",
+      "label": "Minimum voltage (inclusive)",
+      "default": "4.5",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "maximum",
+      "label": "Maximum voltage (inclusive)",
+      "default": "5.5",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "high",
+      "label": "HIGH output level",
+      "default": "5",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "low",
+      "label": "LOW output level",
+      "default": "0",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "rout",
+      "label": "Output resistance",
+      "default": "1",
+      "unit": "Ohm",
+      "min": 1e-06,
+      "max": 1000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Bresult_${id} result_${id} 0 V={(v(${pin:plus},${pin:minus}) >= ${param:minimum} && v(${pin:plus},${pin:minus}) <= ${param:maximum}) ? ${param:high} : ${param:low}}",
+      "Rout_${id} result_${id} ${pin:y} ${param:rout}",
+      "Rinput_${id} ${pin:plus} ${pin:minus} 1e12"
+    ],
+    "definitions": []
+  },
+  "ignore_legacy_spice_fields": true,
+  "category": "Building blocks/Ideal primitives",
+  "family": "Ideal logic and conditions"
+}

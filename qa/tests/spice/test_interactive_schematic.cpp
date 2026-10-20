@@ -3,6 +3,7 @@
 #include <eeschema_test_utils.h>
 #include <circuitalive/schematic_adapter.h>
 #include <circuitalive/simulation_overlay.h>
+#include <circuitalive/control_geometry.h>
 #include <schematic.h>
 #include <sch_symbol.h>
 #include <sch_field.h>
@@ -28,6 +29,59 @@
 #include <base_units.h>
 
 using namespace CIRCUITALIVE;
+
+BOOST_AUTO_TEST_CASE( PositionedModelControlsUseTheirOwnRectanglesAndCurrentPage )
+{
+    SCHEMATIC_SNAPSHOT snapshot;
+    SYMBOL_LOCATION location; location.sheet = "page1";
+    location.body = BOX2I( VECTOR2I( 1000000, 2000000 ), VECTOR2I( 6000000, 4000000 ) );
+    snapshot.locations.push_back( location );
+    const CONTROL_VISUAL button{true,1.2,.1,.4,.3};
+    const CONTROL_VISUAL slider{true,-.7,.1,.4,.3};
+    snapshot.circuit.switches.push_back( {0,"Vbutton",5,0,false,"button","Button",button} );
+    snapshot.circuit.adjustments.push_back( {0,"slider","Light","Vlight","lux",0,1000,1,100,slider} );
+    SIMULATION_OVERLAY overlay;
+    const auto buttonPoint = ControlBounds( location.body, button ).Centre();
+    const auto sliderPoint = ControlBounds( location.body, slider ).Centre();
+    BOOST_CHECK_EQUAL( overlay.SwitchAt( snapshot,"page1",buttonPoint ), 0 );
+    BOOST_CHECK_EQUAL( overlay.AdjustmentAt( snapshot,"page1",sliderPoint ), 0 );
+    BOOST_CHECK_EQUAL( overlay.SwitchAt( snapshot,"page1",sliderPoint ), -1 );
+    BOOST_CHECK_EQUAL( overlay.AdjustmentAt( snapshot,"page1",buttonPoint ), -1 );
+    BOOST_CHECK_EQUAL( overlay.SwitchAt( snapshot,"page2",buttonPoint ), -1 );
+    BOOST_CHECK_EQUAL( overlay.AdjustmentAt( snapshot,"page2",sliderPoint ), -1 );
+    BOOST_CHECK_EQUAL( overlay.SwitchAt( snapshot,"page1",location.body.Centre() ), -1 );
+    // A custom button inside the body still works beside a legacy whole-symbol slider.
+    snapshot.circuit.switches[0].visual = {true,.1,.1,.3,.3};
+    snapshot.circuit.adjustments[0].visual = {};
+    const auto inside = ControlBounds( location.body, snapshot.circuit.switches[0].visual ).Centre();
+    BOOST_CHECK_EQUAL( overlay.AdjustmentAt( snapshot,"page1",inside ), -1 );
+    BOOST_CHECK_EQUAL( overlay.SwitchAt( snapshot,"page1",inside ), 0 );
+    const VECTOR2I outside( 1234567, 2345678 );
+    snapshot.locations[0].body.Move( outside );
+    BOOST_CHECK_EQUAL( overlay.SwitchAt( snapshot,"page1",inside + outside ), 0 );
+    // Visibility affects drawing only, including after moving the symbol.
+    snapshot.circuit.switches[0].visual.visible = false;
+    snapshot.circuit.adjustments[0].visual.visible = false;
+    BOOST_CHECK_EQUAL( overlay.SwitchAt( snapshot,"page1",inside + outside ), 0 );
+    BOOST_CHECK_EQUAL( overlay.AdjustmentAt( snapshot,"page1",snapshot.locations[0].body.Centre() ), 0 );
+}
+
+BOOST_AUTO_TEST_CASE( ResizingControlEdgesKeepsOppositeEdgesAndVisibility )
+{
+    const CONTROL_VISUAL original{true,-.3,.2,.6,.4,false};
+    auto resized = DragControlVisual( original, CONTROL_LEFT | CONTROL_TOP, -.2, -.1 );
+    BOOST_CHECK_CLOSE( resized.x, -.5, 1e-8 );
+    BOOST_CHECK_CLOSE( resized.y, .1, 1e-8 );
+    BOOST_CHECK_CLOSE( resized.x + resized.width, original.x + original.width, 1e-8 );
+    BOOST_CHECK_CLOSE( resized.y + resized.height, original.y + original.height, 1e-8 );
+    BOOST_CHECK( !resized.visible );
+    resized = DragControlVisual( original, CONTROL_RIGHT | CONTROL_BOTTOM, .3, .2 );
+    BOOST_CHECK_EQUAL( resized.x, original.x ); BOOST_CHECK_EQUAL( resized.y, original.y );
+    BOOST_CHECK_CLOSE( resized.width, .9, 1e-8 ); BOOST_CHECK_CLOSE( resized.height, .6, 1e-8 );
+    resized = DragControlVisual( original, CONTROL_LEFT, 100, 0 );
+    BOOST_CHECK_CLOSE( resized.width, .05, 1e-8 );
+    BOOST_CHECK_CLOSE( resized.x + resized.width, original.x + original.width, 1e-8 );
+}
 
 BOOST_FIXTURE_TEST_CASE( SimulationControlsAndIndicatorsBelongToTheirPage,
                          KI_TEST::SCHEMATIC_TEST_FIXTURE )

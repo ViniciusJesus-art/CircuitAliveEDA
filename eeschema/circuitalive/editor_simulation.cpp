@@ -12,6 +12,7 @@
 #include "instrument_panel.h"
 #include "probe_placement.h"
 #include "live_control_popup.h"
+#include "control_references.h"
 #include <tool/actions.h>
 #include <wx/textdlg.h>
 #include <algorithm>
@@ -519,10 +520,17 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
         {
             dismissControl();
             const auto component = m_circuit.circuit.adjustments.at( adjustment ).component;
+            auto controls=m_circuit.circuit.adjustments;
+            for(auto& control:controls)
+            {
+                control.label=LiveControlText(m_circuit.circuit,m_session.switches,m_session.adjustments,control.component,control.id,"label",control.label);
+                control.unit=LiveControlText(m_circuit.circuit,m_session.switches,m_session.adjustments,control.component,control.id,"unit",control.unit);
+            }
             m_liveControl = new LIVE_CONTROL_POPUP( m_frame,
                 m_circuit.locations.at( component ).reference.ToStdString(wxConvUTF8),
-                m_circuit.circuit.adjustments, m_session.adjustments, component,
-                [this]( std::size_t index, double value ) { m_runner->SetAdjustment( index, value ); } );
+                controls, m_session.adjustments, component,
+                [this]( std::size_t index, double value ) { m_runner->SetAdjustment( index, value ); },
+                m_circuit.circuit.adjustments[adjustment].visual.custom ? adjustment : NO_SIGNAL );
             m_liveControl->Position( m_frame->GetCanvas()->ClientToScreen( aEvent.GetPosition() ), wxSize( 0, 16 ) );
             m_liveControl->Popup();
             return;

@@ -20,6 +20,12 @@ struct DESIGN_BLOCK
     std::map<std::string, std::string> values;      // @parameter = public parameter, otherwise an SI value.
     int x = 280, y = 80;
 };
+struct DESIGN_INTERACTION
+{
+    std::string block, control, label;
+    CONTROL_VISUAL visual;
+    std::string reference = {}, onValue = "1", offValue = "0";
+};
 struct MODEL_DESIGN
 {
     std::string id = "my_model", name = "My simulation model", description, libraryId;
@@ -27,6 +33,8 @@ struct MODEL_DESIGN
     std::vector<MODEL_PARAMETER> parameters;
     std::vector<DESIGN_BLOCK> blocks;
     std::vector<DESIGN_WIRE_ROUTE> wireRoutes; // Drawing only; connectivity remains in block.connections.
+    std::vector<DESIGN_INTERACTION> interactions;
+    bool interactionsConfigured = false;
     std::string baseJson; // Preserves an existing SPICE/behavioral core and its metadata.
     std::string coreBlock; // Block owning the imported component's observations and controls.
     static MODEL_DESIGN Open( const std::string& aJson );
@@ -34,6 +42,9 @@ struct MODEL_DESIGN
     // Expose an imported electrical core as a wired, parameter-bound block.
     // Keeps indicators, controls and component metadata on the outer model.
     void MakeCoreVisible();
+    // Adopt legacy controls when opening the visual interaction editor for the first time.
+    void ConfigureInteractions();
+    std::vector<DESIGN_INTERACTION> AvailableInteractions() const;
     void RemoveBlock( const std::string& aId );
     // Joining existing nets updates all connections. External terminals stay distinct.
     void Connect( const std::string& aBlock, const std::string& aPort,
@@ -41,4 +52,5 @@ struct MODEL_DESIGN
     static std::vector<std::filesystem::path> BlockDirectories();
 };
 std::string ModelBehaviorSummary( const std::string& aModelJson );
+std::string ControlReferenceName( const DESIGN_INTERACTION& );
 }

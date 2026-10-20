@@ -1,6 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "session_runner.h"
 #include "visual_signals.h"
+#include "control_references.h"
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -137,6 +138,7 @@ void SESSION_RUNNER::run()
 {
     std::unique_ptr<INTERACTIVE_SIM_SESSION> session;
     CIRCUIT_SNAPSHOT circuit;
+    std::map<std::string,double> controlValues;
     EDITOR_SESSION_VIEW view;
     SCOPE_HISTORY scopeHistory;
     bool hasScope = false;
@@ -172,6 +174,11 @@ void SESSION_RUNNER::run()
                     preferences = command.preferences;
                     session.reset();
                     circuit = std::move( command.circuit );
+                    controlValues.clear();
+                    for(const auto& update:circuit.liveUpdates)for(std::size_t n=0;n<update.sources.size();++n)
+                        controlValues[update.sources[n]]=update.initials.at(n);
+                    for(const auto& c:circuit.switches)controlValues[c.controlSource]=c.initiallyClosed?c.on:c.off;
+                    for(const auto& c:circuit.adjustments)controlValues[c.source]=c.initial;
                     ConfigureVisualSignals( circuit );
                     hasScope = std::any_of( circuit.measurements.begin(), circuit.measurements.end(), []( const auto& c ) { return c.scope; } );
                     scopeHistory = SCOPE_HISTORY( std::min<std::size_t>( preferences.scopeHistorySamples,
@@ -215,7 +222,9 @@ void SESSION_RUNNER::run()
                     {
                         bool closed = !view.switches[command.index];
                         const auto& control = circuit.switches[command.index];
-                        session->SetSourceValue( control.controlSource, closed ? control.on : control.off );
+                        controlValues[control.controlSource]=closed?control.on:control.off;
+                        session->SetSourceValue( control.controlSource, closed ? control.on : control.off,
+                            LiveParameterChanges(circuit,controlValues,control.controlSource) );
                         view.switches[command.index] = closed;
                         view.sample = session->Snapshot( true );
                     }
@@ -228,7 +237,8 @@ void SESSION_RUNNER::run()
                         const double value = std::clamp( command.value, control.minimum, control.maximum );
                         if( value != view.adjustments[command.index] )
                         {
-                            session->SetSourceValue( control.source, value );
+                            controlValues[control.source]=value;
+                            session->SetSourceValue( control.source, value, LiveParameterChanges(circuit,controlValues,control.source) );
                             view.adjustments[command.index] = value;
                             view.sample = session->Snapshot( true );
                         }

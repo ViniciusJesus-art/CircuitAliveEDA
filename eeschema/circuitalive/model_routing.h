@@ -30,4 +30,6 @@ std::vector<DESIGN_POINT> OrthogonalWire( DESIGN_POINT aFrom, DESIGN_POINT aTo,
 DESIGN_WIRE MoveDesignWireSegment( const DESIGN_WIRE& aWire, std::size_t aSegment, int aDelta );
 // Three or more arms of the same electrical net meet at a filled junction.
 std::vector<DESIGN_JUNCTION> DesignWireJunctions( const std::vector<DESIGN_WIRE>& aWires );
+// Split the electrical net along the selected routed connection, preserving other branches.
+bool DisconnectDesignWire( MODEL_DESIGN&, const std::vector<DESIGN_WIRE>&, std::size_t aWire );
 }

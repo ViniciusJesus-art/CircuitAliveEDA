@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "interactive_value",
+  "name": "Interactive value input",
+  "description": "An adjustable input for a model. Output voltage relative to Return equals the chosen numeric value. Connect it to a comparator or other sensing circuit; the displayed unit can represent light, distance or another stimulus.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {"id":"out", "label":"Output", "role":"output", "default_pin":"1"},
+    {"id":"ref", "label":"Return", "role":"reference", "default_pin":"2"}
+  ],
+  "parameters": [
+    {"id":"value", "label":"Initial value", "default":"0.5", "unit":"", "min":-1e12, "max":1e12}
+  ],
+  "spice": {"instance":["Vinput_${id} ${pin:out} ${pin:ref} ${param:value}"]},
+  "adjustments": [
+    {"id":"value", "label":"Value", "source":"Vinput_${id}", "parameter":"value", "unit":"", "min":0, "max":1, "step":0.01}
+  ],
+  "ignore_legacy_spice_fields": true,
+  "category":"Building blocks",
+  "family":"Interactive inputs"
+}

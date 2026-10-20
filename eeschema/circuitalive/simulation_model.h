@@ -6,7 +6,9 @@
 #include <string>
 #include <vector>
 #include <sim/memory_image.h>
+#include <sim/interactive_sim_session.h>
 #include "led_appearance.h"
+#include "control_visual.h"
 
 namespace CIRCUITALIVE
 {
@@ -34,6 +36,15 @@ struct MODEL_ADJUSTMENT
 {
     std::string id, label, source, parameter, unit;
     double minimum = 0, maximum = 1, step = .01;
+    CONTROL_VISUAL visual = {};
+};
+
+struct MODEL_CONTROL
+{
+    std::string id, label, source;
+    double on = 5, off = 0;
+    bool initiallyClosed = false;
+    CONTROL_VISUAL visual;
 };
 
 struct MODEL_RESOURCE
@@ -49,6 +60,18 @@ struct MODEL_MEMORY
     unsigned addressBits = 0, wordBits = 8;
     bool writable = false;
     int fill = -1;
+};
+struct MODEL_LIVE_UPDATE
+{
+    SIM_PARAMETER_CHANGE change;
+    std::vector<std::string> sources;
+    std::vector<std::string> initials;
+};
+struct MODEL_LIVE_TEXT
+{
+    std::string target, field, source, initial, onText, offText;
+    double on = 5, off = 0;
+    bool slider = false;
 };
 
 struct SIMULATION_MODEL
@@ -73,10 +96,15 @@ struct SIMULATION_MODEL
     LED_APPEARANCE_PARAMETERS ledAppearance;
     std::string controlSource;
     double controlOn = 5, controlOff = 0;
+    bool controlInitiallyClosed = true;
+    CONTROL_VISUAL controlVisual;
     std::vector<std::string> controlInitiallyOpenSymbols;
     std::vector<MODEL_ADJUSTMENT> adjustments;
+    std::vector<MODEL_CONTROL> controls;
     std::vector<MODEL_RESOURCE> resources;
     std::vector<MODEL_MEMORY> memories;
+    std::vector<MODEL_LIVE_UPDATE> liveUpdates;
+    std::vector<MODEL_LIVE_TEXT> liveTexts;
     bool ignoreLegacyFields = false;
     std::map<std::string, std::string> legacyFields;
     std::string measurePositive, measureNegative;

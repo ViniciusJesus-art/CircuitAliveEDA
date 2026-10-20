@@ -1,0 +1,24 @@
+{
+  "schema_version":1,
+  "backend":"ngspice",
+  "id":"interactive_switch",
+  "name":"Interactive pass-through button",
+  "description":"ON connects Input to Output through the closed resistance. OFF opens the path through the open resistance. The button can also supply ON/OFF values through its #reference.",
+  "license":"GPL-3.0-or-later",
+  "pins":[
+    {"id":"p","label":"Input","role":"passive","default_pin":"1"},
+    {"id":"n","label":"Output","role":"passive","default_pin":"2"}
+  ],
+  "parameters":[
+    {"id":"on_resistance","label":"Closed resistance","default":"0.01","unit":"Ohm","min":1e-9,"max":1e6},
+    {"id":"off_resistance","label":"Open resistance","default":"1e12","unit":"Ohm","min":1,"max":1e15}
+  ],
+  "spice":{
+    "instance":["Vcontrol_${id} control_${id} 0 ${control:initial}","S${id} ${pin:p} ${pin:n} control_${id} 0 model_${id}"],
+    "definitions":[".model model_${id} SW(Ron=${param:on_resistance} Roff=${param:off_resistance} Vt=2.5 Vh=0.1)"]
+  },
+  "control":{"source":"Vcontrol_${id}","on":5,"off":0,"initially_closed":false},
+  "ignore_legacy_spice_fields":true,
+  "category":"Building blocks",
+  "family":"Interactive inputs"
+}

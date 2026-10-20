@@ -20,6 +20,13 @@ namespace CIRCUITALIVE
 
 enum class SIM_SESSION_STATE { STOPPED, RUNNING, PAUSED, COMPLETED, FAILED };
 
+struct SIM_PARAMETER_CHANGE
+{
+    std::string reference, parameter;
+    std::vector<std::string> expressions;
+    bool model = false;
+};
+
 struct SIM_SESSION_CONFIG
 {
     double                   step = 1e-5;
@@ -88,7 +95,8 @@ public:
     void AdvanceTo( double aTime );
 
     /// Change a V/I source's DC value at the confirmed paused time, in request order.
-    void SetSourceValue( const std::string& aReference, double aValue );
+    void SetSourceValue( const std::string& aReference, double aValue,
+                        const std::vector<SIM_PARAMETER_CHANGE>& aChanges = {} );
     MEMORY_SNAPSHOT ReadMemory( const std::string& id, std::size_t offset, std::size_t length );
 
     SIM_SESSION_SNAPSHOT Snapshot( bool aDrainHistory = false );

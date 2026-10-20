@@ -24,7 +24,7 @@ MODEL_DESIGN MakeTimer555Design( const std::map<std::string, std::string>& t )
         { { "rout", "@rout" }, { "imax", "@imax" }, { "high_drop", "@high_drop" }, { "low_drop", "@low_drop" }, { "cout", "@cout" }, { "vmin", "@vmin" }, { "vmax", "@vmax" } }, 1240, 110 );
     add( "Discharge", "discharge", { { "state", "state" }, { "out", "@discharge" }, { "vcc", "@vcc" }, { "gnd", "@gnd" } },
         { { "ron", "@discharge_r" }, { "vmin", "@vmin" }, { "vmax", "@vmax" } }, 1240, 420 );
-    add( "Consumption", "constant_current", { { "p", "@vcc" }, { "n", "@gnd" } }, { { "current", "@iq" } }, 920, 640 );
+    add( "Consumption", "current_load", { { "p", "@vcc" }, { "n", "@gnd" } }, { { "current", "@iq" } }, 920, 640 );
     return d;
 }
 }

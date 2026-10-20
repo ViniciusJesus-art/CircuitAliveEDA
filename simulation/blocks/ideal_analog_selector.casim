@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "ideal_analog_selector",
+  "name": "Analog selector SPDT (ideal, no supply pins)",
+  "description": "Bidirectional common contact Y selects A when Select >= threshold, or B otherwise. Unselected contact opens. Finite closed/open resistances preserve analog voltage and current paths; the selector does not generate signal voltage. No supply pins are required. Signal and control voltages use circuit ground as reference.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "a",
+      "label": "Contact A (selected HIGH)",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "b",
+      "label": "Contact B (selected LOW)",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "y",
+      "label": "Common Y",
+      "role": "passive",
+      "default_pin": "3"
+    },
+    {
+      "id": "select",
+      "label": "Select",
+      "role": "input",
+      "default_pin": "4"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "threshold",
+      "label": "Control threshold",
+      "default": "2.5",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "on_resistance",
+      "label": "Closed resistance",
+      "default": "0.01",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000.0
+    },
+    {
+      "id": "off_resistance",
+      "label": "Open resistance",
+      "default": "1e12",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Bselect_${id} select_${id} 0 V={v(${pin:select}) >= ${param:threshold} ? 1 : 0}",
+      "Bother_${id} other_${id} 0 V={1-v(select_${id})}",
+      "Sa_${id} ${pin:a} ${pin:y} select_${id} 0 switch_${id}",
+      "Sb_${id} ${pin:b} ${pin:y} other_${id} 0 switch_${id}",
+      "Rinput_select_${id} ${pin:select} 0 1e12"
+    ],
+    "definitions": [
+      ".model switch_${id} SW(Ron=${param:on_resistance} Roff=${param:off_resistance} Vt=0.5 Vh=0)"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "category": "Building blocks/Ideal primitives",
+  "family": "Ideal switches and routing"
+}

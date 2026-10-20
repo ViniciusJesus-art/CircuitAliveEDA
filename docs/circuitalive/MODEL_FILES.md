@@ -53,6 +53,36 @@ Uma nova sessão, iniciada após Stop, lê novamente os arquivos. Play durante P
 retoma a cópia já carregada. **Reload file** atualiza a descrição na janela de
 configuração. Uma alteração somente no arquivo não modifica uma sessão em curso.
 
+### Interações visuais
+
+O [editor de modelos](MODEL_AUTHOR.md#controles-visuais-durante-a-simulação) permite
+configurar botões e sliders sem escrever SPICE ou JSON. O arquivo exportado usa
+`controls` para botões independentes e `adjustments` para ajustes contínuos.
+Os controles de blocos internos são associados a fontes V/I com nomes próprios
+por bloco e por instância. O formato antigo `control` continua aceito.
+
+Cada controle pode conter `visual: {"target":"symbol"}` para usar o símbolo
+inteiro, ou `visual: {"target":"rectangle","x":1.2,"y":0,"width":0.5,"height":0.3}`
+para uma área posicionada. As coordenadas são frações do corpo exibido do símbolo,
+com origem no canto superior esquerdo. As mesmas áreas são usadas para desenho
+e clique, sempre filtradas pela folha atual.
+O campo opcional `visual.visible`, com padrão `true`, permite ocultar borda e
+texto com `false`; ele não altera a área de clique. A configuração vale tanto
+para o alvo `symbol` quanto para `rectangle`.
+
+A seção `authoring.interactions` conserva o bloco, o controle, o rótulo e o
+posicionamento editáveis. Os estados iniciais dos botões e os parâmetros iniciais
+dos sliders são aplicados ao circuito gerado antes do primeiro passo; os cliques
+seguintes alteram a fonte da instância ativa, sem reconstruir o circuito.
+
+Referências de valores `#name` ficam preservadas em `authoring.blocks[].values`.
+O exportador valida os tipos e os limites e gera `live_updates` para parâmetros
+elétricos mutáveis, ou fontes de controle internas para expressões comportamentais.
+Alterações são enviadas junto com o evento do controle, no mesmo instante pausado
+do solver, sem reset da análise. Os nomes dos dispositivos são exclusivos por
+bloco e por instância. `live_texts` mantém referências de Label/Display unit fora
+do deck elétrico; texto de apresentação nunca é inserido como comando SPICE.
+
 Modelos visuais guardam o diagrama e seus blocos incorporados na seção
 `authoring`. O simulador usa a seção elétrica já gerada. A seção opcional
 `logic.internal_drive` associa portas externas a sinais internos de presença

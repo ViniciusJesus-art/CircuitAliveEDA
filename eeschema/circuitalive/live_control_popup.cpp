@@ -13,7 +13,7 @@ namespace CIRCUITALIVE
 {
 LIVE_CONTROL_POPUP::LIVE_CONTROL_POPUP( wxWindow* parent, const std::string& reference,
         const std::vector<CIRCUIT_ADJUSTMENT>& controls, const std::vector<double>& values,
-        std::size_t component, std::function<void( std::size_t, double )> change ) :
+        std::size_t component, std::function<void( std::size_t, double )> change, std::size_t selected ) :
         wxPopupTransientWindow( parent, wxBORDER_SIMPLE )
 {
     auto* panel = new wxPanel( this ); auto* layout = new wxBoxSizer( wxVERTICAL );
@@ -22,6 +22,7 @@ LIVE_CONTROL_POPUP::LIVE_CONTROL_POPUP( wxWindow* parent, const std::string& ref
     for( std::size_t i = 0; i < controls.size(); ++i )
     {
         const auto& c = controls[i]; if( c.component != component ) continue;
+        if( selected != NO_SIGNAL && i != selected ) continue;
         layout->Add( new wxStaticText( panel, wxID_ANY, ModelText( c.label ) ), 0, wxLEFT | wxRIGHT, 8 );
         auto* row = new wxBoxSizer( wxHORIZONTAL );
         const int steps = std::clamp( int( std::min( 10000., std::ceil( ( c.maximum - c.minimum ) / c.step ) ) ), 1, 10000 );

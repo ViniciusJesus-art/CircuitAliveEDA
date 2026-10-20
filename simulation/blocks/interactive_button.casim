@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "interactive_button",
+  "name": "Interactive button input",
+  "description": "Click toggles the input between OFF and ON. Output voltage relative to Return equals the selected level. Connect these terminals to the internal circuit of your model.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {"id":"out", "label":"Output", "role":"output", "default_pin":"1"},
+    {"id":"ref", "label":"Return", "role":"reference", "default_pin":"2"}
+  ],
+  "parameters": [],
+  "spice": {"instance":["Vinput_${id} ${pin:out} ${pin:ref} ${control:initial}"]},
+  "control": {"source":"Vinput_${id}", "on":5, "off":0, "initially_closed":false},
+  "ignore_legacy_spice_fields": true,
+  "category":"Building blocks",
+  "family":"Interactive inputs"
+}

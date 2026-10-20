@@ -9,6 +9,42 @@
 #include <tuple>
 namespace CIRCUITALIVE
 {
+bool DisconnectDesignWire( MODEL_DESIGN& design, const std::vector<DESIGN_WIRE>& wires, std::size_t index )
+{
+    if(index>=wires.size())return false;
+    using END=std::pair<std::string,std::string>;
+    const auto& cut=wires[index];const auto& net=cut.from.net;
+    auto key=[](const DESIGN_TERMINAL& t){return END{t.block,t.port};};
+    std::map<END,std::vector<END>> graph;
+    for(std::size_t i=0;i<wires.size();++i)if(wires[i].from.net==net)
+    {
+        const auto a=key(wires[i].from),b=key(wires[i].to);graph[a];graph[b];
+        if(i!=index){graph[a].push_back(b);graph[b].push_back(a);}
+    }
+    std::set<END> side;std::vector<END> pending{key(cut.from)};
+    while(!pending.empty())
+    {
+        const auto item=pending.back();pending.pop_back();
+        if(!side.insert(item).second)continue;
+        for(const auto& next:graph[item])pending.push_back(next);
+    }
+    if(side.contains(key(cut.to)))return false;
+    const bool includesExternal=std::any_of(side.begin(),side.end(),[](const auto& p){return p.first.empty();});
+    std::set<END> detached;
+    for(const auto& [item,edges]:graph)if(side.contains(item)!=includesExternal)detached.insert(item);
+    if(detached.empty()||std::any_of(detached.begin(),detached.end(),[](const auto& p){return p.first.empty();}))return false;
+    std::set<std::string> used;
+    for(const auto& b:design.blocks)for(const auto& [port,n]:b.connections)used.insert(n);
+    std::string newNet;
+    if(detached.size()>1)
+    {
+        int n=1;do{newNet="wire"+std::to_string(n++);}while(used.contains(newNet));
+    }
+    for(auto& b:design.blocks)for(auto& [port,n]:b.connections)if(detached.contains({b.id,port}))n=newNet;
+    std::erase_if(design.wireRoutes,[&](const DESIGN_WIRE_ROUTE& route)
+    {return detached.contains({route.fromBlock,route.fromPort})!=detached.contains({route.toBlock,route.toPort});});
+    return true;
+}
 namespace
 {
 bool Same( const DESIGN_TERMINAL& t, const std::string& block, const std::string& port )

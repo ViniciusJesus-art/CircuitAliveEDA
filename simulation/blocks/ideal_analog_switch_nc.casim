@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "ideal_analog_switch_nc",
+  "name": "Analog switch NC (ideal, no supply pins)",
+  "description": "Bidirectional contact A-B. Closes when Enable < threshold; otherwise opens. Signal voltages pass unchanged, including intermediate and negative values. Closed/open paths use configurable finite resistances; this contact does not generate signal voltage. No supply pins are required. Signal and control voltages use circuit ground as reference.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "a",
+      "label": "Contact A",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "b",
+      "label": "Contact B",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "enable",
+      "label": "Enable",
+      "role": "input",
+      "default_pin": "3"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "threshold",
+      "label": "Control threshold",
+      "default": "2.5",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "on_resistance",
+      "label": "Closed resistance",
+      "default": "0.01",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000.0
+    },
+    {
+      "id": "off_resistance",
+      "label": "Open resistance",
+      "default": "1e12",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Ben_${id} enable_${id} 0 V={v(${pin:enable}) < ${param:threshold} ? 1 : 0}",
+      "Scontact_${id} ${pin:a} ${pin:b} enable_${id} 0 switch_${id}",
+      "Rinput_enable_${id} ${pin:enable} 0 1e12"
+    ],
+    "definitions": [
+      ".model switch_${id} SW(Ron=${param:on_resistance} Roff=${param:off_resistance} Vt=0.5 Vh=0)"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "category": "Building blocks/Ideal primitives",
+  "family": "Ideal switches and routing",
+  "equations": [
+    "A <-> B when enabled; otherwise high impedance (open resistance)."
+  ]
+}

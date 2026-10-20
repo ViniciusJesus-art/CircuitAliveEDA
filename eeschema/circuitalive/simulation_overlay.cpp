@@ -1,5 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "simulation_overlay.h"
+#include "control_geometry.h"
+#include "control_references.h"
 #include <base_units.h>
 #include <algorithm>
 #include <set>
@@ -70,21 +72,27 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
     for( std::size_t i = 0; i < aCircuit.circuit.adjustments.size(); ++i )
     {
         const auto& control = aCircuit.circuit.adjustments[i];
-        if( !adjusted.insert( control.component ).second ) continue;
+        if( !control.visual.visible ) continue;
+        if( !control.visual.custom && !adjusted.insert( control.component ).second ) continue;
         const auto& location = aCircuit.locations.at( control.component );
         if( location.sheet != aCurrentSheet ) continue;
         const double value = i < aSession.adjustments.size() ? aSession.adjustments[i] : control.initial;
         SetIsFill( false ); SetIsStroke( true ); SetStrokeColor( KIGFX::COLOR4D( .05, .7, .75, 1 ) );
-        BOX2I box = location.body; box.Inflate( schIUScale.mmToIU( .6 ) );
+        const BOX2I box = ControlBounds( location.body, control.visual );
         Rectangle( VECTOR2D( box.GetOrigin() ), VECTOR2D( box.GetEnd() ) );
         SetGlyphSize( VECTOR2I( schIUScale.mmToIU( 1 ), schIUScale.mmToIU( 1 ) ) );
-        const auto text = control.unit == "%" ? wxString::Format( "%.1f%%", 100 * value )
-            : wxString::Format( "%.3g %s", value, wxString::FromUTF8( control.unit ) );
+        const auto label=LiveControlText(aCircuit.circuit,aSession.switches,aSession.adjustments,control.component,control.id,"label",control.label);
+        const auto unit=LiveControlText(aCircuit.circuit,aSession.switches,aSession.adjustments,control.component,control.id,"unit",control.unit);
+        auto text = unit == "%" ? wxString::Format( "%.1f%%", 100 * value )
+            : wxString::Format( "%.3g %s", value, wxString::FromUTF8( unit ) );
+        if( !label.empty() && control.visual.custom ) text.Prepend( wxString::FromUTF8( label ) + ": " );
         BitmapText( text, box.GetOrigin() - VECTOR2I( 0, schIUScale.mmToIU( 1.5 ) ), ANGLE_0 );
     }
     for( std::size_t i = 0; i < aCircuit.circuit.switches.size(); ++i )
     {
-        const auto& location = aCircuit.locations.at( aCircuit.circuit.switches[i].component );
+        const auto& control = aCircuit.circuit.switches[i];
+        if( !control.visual.visible ) continue;
+        const auto& location = aCircuit.locations.at( control.component );
         if( location.sheet != aCurrentSheet )
             continue;
         bool closed = i < aSession.switches.size() && aSession.switches[i];
@@ -92,11 +100,13 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
         SetIsStroke( true );
         SetStrokeColor( closed ? KIGFX::COLOR4D( 0.05, 0.8, 0.25, 1 )
                                : KIGFX::COLOR4D( 1, 0.55, 0.1, 1 ) );
-        BOX2I box = location.body;
-        box.Inflate( schIUScale.mmToIU( 0.6 ) );
+        const BOX2I box = ControlBounds( location.body, control.visual );
         Rectangle( VECTOR2D( box.GetOrigin() ), VECTOR2D( box.GetEnd() ) );
         SetGlyphSize( VECTOR2I( schIUScale.mmToIU( 1 ), schIUScale.mmToIU( 1 ) ) );
-        BitmapText( closed ? "ON" : "OFF", box.GetOrigin() - VECTOR2I( 0, schIUScale.mmToIU( 1.5 ) ),
+        const auto label=LiveControlText(aCircuit.circuit,aSession.switches,aSession.adjustments,control.component,control.id,"label",control.label);
+        const auto text = ( label.empty() ? wxString() : wxString::FromUTF8( label ) + ": " )
+                + ( closed ? "ON" : "OFF" );
+        BitmapText( text, box.GetOrigin() - VECTOR2I( 0, schIUScale.mmToIU( 1.5 ) ),
                     ANGLE_0 );
     }
 }
@@ -105,11 +115,13 @@ int SIMULATION_OVERLAY::SwitchAt( const SCHEMATIC_SNAPSHOT& aCircuit,
                                   const wxString& aCurrentSheet,
                                   const VECTOR2I& aPosition ) const
 {
+    for( bool custom : { true, false } )
     for( std::size_t i = 0; i < aCircuit.circuit.switches.size(); ++i )
     {
-        const auto& location = aCircuit.locations.at( aCircuit.circuit.switches[i].component );
-        BOX2I box = location.body;
-        box.Inflate( schIUScale.mmToIU( 0.8 ) );
+        const auto& control = aCircuit.circuit.switches[i];
+        if( control.visual.custom != custom ) continue;
+        const auto& location = aCircuit.locations.at( control.component );
+        const BOX2I box = ControlBounds( location.body, control.visual );
         if( location.sheet == aCurrentSheet && box.Contains( aPosition ) )
             return static_cast<int>( i );
     }
@@ -119,10 +131,19 @@ int SIMULATION_OVERLAY::SwitchAt( const SCHEMATIC_SNAPSHOT& aCircuit,
 int SIMULATION_OVERLAY::AdjustmentAt( const SCHEMATIC_SNAPSHOT& circuit,
                                     const wxString& sheet, const VECTOR2I& position ) const
 {
+    // Explicit rectangles take priority over whole-symbol targets of either kind.
+    for( bool custom : { true, false } )
     for( std::size_t i = 0; i < circuit.circuit.adjustments.size(); ++i )
     {
-        const auto& location = circuit.locations.at( circuit.circuit.adjustments[i].component );
-        BOX2I box = location.body; box.Inflate( schIUScale.mmToIU( .8 ) );
+        const auto& control = circuit.circuit.adjustments[i];
+        if( control.visual.custom != custom ) continue;
+        const auto& location = circuit.locations.at( control.component );
+        if( !custom )
+            for( const auto& button : circuit.circuit.switches )
+                if( button.visual.custom && circuit.locations.at( button.component ).sheet == sheet
+                    && ControlBounds( circuit.locations.at( button.component ).body, button.visual ).Contains( position ) )
+                    return -1;
+        const BOX2I box = ControlBounds( location.body, control.visual );
         if( location.sheet == sheet && box.Contains( position ) ) return i;
     }
     return -1;

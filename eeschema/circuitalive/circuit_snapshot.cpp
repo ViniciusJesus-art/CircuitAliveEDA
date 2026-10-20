@@ -274,6 +274,17 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 { return ExpandModelTemplate( text, model, modelNodes, i ); };
             for( const auto& line : model.model.instance ) deck << expand( line ) << '\n';
             for( const auto& line : model.model.definitions ) deck << expand( line ) << '\n';
+            for( const auto& update : model.model.liveUpdates )
+            {
+                CIRCUIT_SNAPSHOT::LIVE_UPDATE u; u.change=update.change;
+                u.change.reference=expand(u.change.reference);
+                for(auto& expression:u.change.expressions)expression=expand(expression);
+                for(const auto& source:update.sources)u.sources.push_back(expand(source));
+                for(const auto& value:update.initials)u.initials.push_back(ParseComponentValue(expand(value)));
+                result.liveUpdates.push_back(std::move(u));
+            }
+            for(const auto& t:model.model.liveTexts)result.liveTexts.push_back({i,t.target,t.field,expand(t.source),
+                t.onText,t.offText,ParseComponentValue(expand(t.initial)),t.on,t.off,t.slider});
             if( !model.model.indicatorSignal.empty() )
             {
                 result.leds.push_back( { i, result.config.signals.size(),
@@ -285,14 +296,17 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             if( !model.model.controlSource.empty() )
                 result.switches.push_back( { i, expand( model.model.controlSource ),
                                             model.model.controlOn, model.model.controlOff,
-                                            model.controlInitiallyClosed } );
+                                            model.controlInitiallyClosed, {}, {}, model.model.controlVisual } );
+            for( const auto& control : model.model.controls )
+                result.switches.push_back( { i, expand( control.source ), control.on, control.off,
+                    control.initiallyClosed, control.id, control.label, control.visual } );
             for( const auto& control : model.model.adjustments )
             {
                 const double initial = model.parameters.at( control.parameter );
                 if( initial < control.minimum || initial > control.maximum )
                     throw std::runtime_error( "Live adjustment initial value is out of range" );
                 result.adjustments.push_back( { i, control.id, control.label, expand( control.source ),
-                    control.unit, control.minimum, control.maximum, control.step, initial } );
+                    control.unit, control.minimum, control.maximum, control.step, initial, control.visual } );
             }
             if( !model.model.warningSignal.empty() && model.parameters.at( model.model.warningParameter ) > 0 )
                 warnings.push_back( { expand( model.model.warningSignal ),

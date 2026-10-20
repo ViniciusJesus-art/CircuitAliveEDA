@@ -29,6 +29,7 @@ private:
     void motion( wxMouseEvent& aEvent );
     void paint();
     void release();
+    void eraseAt( wxMouseEvent& );
     void storeRoute( const DESIGN_WIRE& aWire );
     std::pair<int,int> hitWire( wxPoint aPoint );
     mutable std::map<std::string, std::pair<std::string, SIMULATION_MODEL>> m_models;

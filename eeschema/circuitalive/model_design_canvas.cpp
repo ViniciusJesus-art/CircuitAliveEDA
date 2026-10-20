@@ -26,8 +26,32 @@ DESIGN_CANVAS::DESIGN_CANVAS( wxWindow* parent, MODEL_DESIGN& doc ) : wxScrolled
     Bind( wxEVT_MOUSE_CAPTURE_LOST, [this]( wxMouseCaptureLostEvent& ) { m_drag = -1; m_dragWire.reset(); } );
     Bind( wxEVT_LEFT_DCLICK, [this]( wxMouseEvent& e )
     { down( e ); release(); if( selected >= 0 && edit ) edit(); } );
+    Bind( wxEVT_RIGHT_DCLICK, &DESIGN_CANVAS::eraseAt, this );
     Bind( wxEVT_CHAR_HOOK, [this]( wxKeyEvent& e )
     { if( e.GetKeyCode() == WXK_ESCAPE ) CancelConnection(); else e.Skip(); } );
+}
+void DESIGN_CANVAS::eraseAt( wxMouseEvent& event )
+{
+    const auto point=logicalPosition(event.GetPosition());CancelConnection();
+    bool removed=false;
+    for(std::size_t i=0;i<design.blocks.size();++i)
+    {
+        const auto& b=design.blocks[i];
+        if(wxRect(b.x,b.y,240,height(b)).Contains(point))
+        {const auto id=b.id;design.RemoveBlock(id);m_models.erase(id);removed=true;break;}
+    }
+    if(!removed)
+    {
+        const auto wire=hitWire(point).first;
+        if(wire>=0){const auto routes=wires();removed=DisconnectDesignWire(design,routes,wire);}
+    }
+    if(removed)
+    {
+        selected=-1;m_selectedWire=-1;m_geometry.clear();
+        if(changed)changed();
+        if(selectionChanged)selectionChanged();
+        updateExtent();Refresh();
+    }
 }
 void DESIGN_CANVAS::release()
 {
