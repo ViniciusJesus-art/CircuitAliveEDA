@@ -28,6 +28,7 @@
 #include "kicad_manager_frame.h"
 #include <eda_base_frame.h>
 #include <nlohmann/json.hpp>
+#include <widgets/wx_menubar.h>
 
 #include <advanced_config.h>
 #include <bitmaps.h>
@@ -598,6 +599,9 @@ void EDA_BASE_FRAME::OnCharHook( wxKeyEvent& aKeyEvent )
 
 void EDA_BASE_FRAME::OnMenuEvent( wxMenuEvent& aEvent )
 {
+    if( auto* menuBar = dynamic_cast<WX_MENUBAR*>( GetMenuBar() ) )
+        menuBar->OnMenuEvent( aEvent );
+
     if( !m_toolDispatcher )
         aEvent.Skip();
     else
@@ -2001,13 +2005,19 @@ void EDA_BASE_FRAME::OnMaximize( wxMaximizeEvent& aEvent )
 
 wxSize EDA_BASE_FRAME::GetWindowSize()
 {
-#if defined( __WXGTK__ ) && !wxCHECK_VERSION( 3, 2, 9 )
+#if defined( __WXGTK__ )
     wxSize winSize = GetSize();
 
     // GTK includes the window decorations in the normal GetSize call,
     // so we have to use a GTK-specific sizing call that returns the
     // non-decorated window size.
-    if( m_ident == KICAD_MAIN_FRAME_T )
+    // Eeschema also needs the undecorated size on current GTK versions: restoring the
+    // decorated height would grow the globally saved window on every project opening.
+    if( m_ident == FRAME_SCH
+#if !wxCHECK_VERSION( 3, 2, 9 )
+        || m_ident == KICAD_MAIN_FRAME_T
+#endif
+      )
     {
         int width  = 0;
         int height = 0;

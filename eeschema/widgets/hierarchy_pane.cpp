@@ -33,6 +33,7 @@
 #include <tool/tool_manager.h>
 #include <tools/sch_actions.h>
 #include <hierarchy_pane.h>
+#include <widgets/pages_menu.h>
 #include <project/project_local_settings.h>
 #include <kiface_base.h>
 #include <wx/object.h>
@@ -305,6 +306,14 @@ void HIERARCHY_PANE::UpdateHierarchyTree( bool aClear )
 
     // Get all top-level sheets
     std::vector<SCH_SHEET*> topLevelSheets = m_frame->Schematic().GetTopLevelSheets();
+    std::stable_sort( topLevelSheets.begin(), topLevelSheets.end(),
+            []( SCH_SHEET* a, SCH_SHEET* b )
+            {
+                SCH_SHEET_PATH first, second;
+                first.push_back( a );
+                second.push_back( b );
+                return first.ComparePageNum( second ) < 0;
+            } );
 
     // For each top-level sheet, build its hierarchy under the project root
     for( SCH_SHEET* sheet : topLevelSheets )
@@ -441,6 +450,7 @@ void HIERARCHY_PANE::UpdateLabelsHierarchyTree()
             };
 
     recursiveDescent( rootId );
+    UpdatePagesMenu( *m_frame );
 }
 
 
@@ -559,55 +569,7 @@ void HIERARCHY_PANE::onRightClick( wxTreeItemId aItem )
     {
     case NEW_TOP_LEVEL_SHEET:
     {
-        // Create a new top-level sheet
-        wxTextEntryDialog dlg( m_frame, _( "Enter name for new top-level sheet:" ),
-                                        _( "New Top-Level Sheet" ),
-                                        _( "Untitled" ) );
-
-        if( dlg.ShowModal() == wxID_OK )
-        {
-            wxString newName = dlg.GetValue();
-
-            if( !newName.IsEmpty() )
-            {
-                SCH_SHEET_PATH previousSheet = m_frame->GetCurrentSheet();
-
-                // Create new sheet and screen
-                SCH_SHEET* newSheet = new SCH_SHEET( &m_frame->Schematic() );
-                SCH_SCREEN* newScreen = new SCH_SCREEN( &m_frame->Schematic() );
-
-                newSheet->SetScreen( newScreen );
-                newSheet->GetField( FIELD_T::SHEET_NAME )->SetText( newName );
-
-                // Generate a unique filename
-                wxString filename = newName;
-                filename.Replace( " ", "_" );
-                filename = filename.Lower();
-
-                if( !filename.EndsWith( ".kicad_sch" ) )
-                    filename += ".kicad_sch";
-
-                newScreen->SetFileName( filename );
-
-                // Find the lowest unused page number
-                SCH_SHEET_LIST hierarchy = m_frame->Schematic().Hierarchy();
-                int            nextPage = 1;
-                wxString       pageStr;
-
-                do
-                {
-                    pageStr = wxString::Format( "%d", nextPage++ );
-                } while( hierarchy.PageNumberExists( pageStr ) );
-
-                m_frame->Schematic().AddTopLevelSheet( newSheet );
-
-                SCH_SHEET_PATH newSheetPath;
-                newSheetPath.push_back( newSheet );
-                newSheetPath.SetPageNumber( pageStr );
-
-                resyncAfterTopLevelSheetChange( previousSheet );
-            }
-        }
+        m_frame->NewPage();
         break;
     }
 

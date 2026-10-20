@@ -13,6 +13,7 @@ class wxStaticText;
 class wxListCtrl;
 class wxToggleButton;
 class wxButton;
+class wxBookCtrlEvent;
 namespace CIRCUITALIVE
 {
 
@@ -24,11 +25,11 @@ public:
     ~INSTRUMENT_PANEL() override;
     std::string ProbeName() const;
     void ClearProbeName();
-    void SelectTools();
     void SetPlacement( std::optional<PROBE_KIND> aKind );
     void UpdateSession( const SCHEMATIC_SNAPSHOT& aCircuit, const EDITOR_SESSION_VIEW& aSession, bool aActive );
 
 private:
+    void tabChanged( wxBookCtrlEvent& );
     wxNotebook* m_tabs;
     wxTextCtrl* m_name;
     wxStaticText* m_help;
@@ -42,6 +43,7 @@ private:
     SCOPE_PREFERENCES m_scopePreferences;
     std::vector<std::string> m_rows;
     bool m_wasActive = false;
+    bool m_hasTabPreference = false;
     std::chrono::steady_clock::time_point m_lastValues{};
 };
 }

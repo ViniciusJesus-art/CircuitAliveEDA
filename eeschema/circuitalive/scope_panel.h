@@ -36,6 +36,7 @@ public:
     SCOPE_PANEL( wxWindow*, SCOPE_PREFERENCES&, std::function<void()> aExpand );
     ~SCOPE_PANEL() override;
     void UpdateSession( const CIRCUIT_SNAPSHOT&, const EDITOR_SESSION_VIEW& );
+    void ResetSession();
 
 private:
     friend class SCOPE_PLOT;

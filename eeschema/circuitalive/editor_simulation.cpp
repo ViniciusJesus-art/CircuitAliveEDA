@@ -25,6 +25,8 @@
 #include <sch_draw_panel.h>
 #include <sch_edit_frame.h>
 #include <eeschema_settings.h>
+#include <paths.h>
+#include <widgets/wx_aui_utils.h>
 #include <pgm_base.h>
 #include <settings/settings_manager.h>
 #include <schematic.h>
@@ -84,6 +86,8 @@ private:
     int ToggleProbes( const TOOL_EVENT& );
     int ToggleLogic( const TOOL_EVENT& );
     void showInstruments( bool );
+    void rememberInstruments();
+    void saveInstrumentLayout();
     void tick( wxTimerEvent& );
     void click( wxMouseEvent& );
     void key( wxKeyEvent& );
@@ -109,6 +113,10 @@ private:
     bool m_errorShown = false;
     bool m_probePanel = false, m_logicLevels = false, m_instrumentsVisible = false;
     bool m_resultOpened = false;
+    std::optional<wxAuiPaneInfo> m_instrumentLayout;
+    wxString m_instrumentLayoutKey;
+    bool m_instrumentLayoutPending = false;
+    std::chrono::steady_clock::time_point m_instrumentLayoutChanged{};
     bool m_overlayCached = false, m_overlayVisible = false, m_overlayLogic = false;
     wxString m_overlaySheet;
     std::vector<int> m_overlayBrightness;
@@ -145,7 +153,7 @@ void EDITOR_SIMULATION_TOOL::Install()
         } );
     auto* actions = m_toolMgr->GetActionManager();
     actions->SetConditions( SIMULATION_ACTIONS::probes, ACTION_CONDITIONS().Check(
-        [this]( const SELECTION& ) { return m_probePanel; } ) );
+        [this]( const SELECTION& ) { return m_instrumentsVisible; } ) );
     actions->SetConditions( SIMULATION_ACTIONS::logicLevels, ACTION_CONDITIONS().Check(
         [this]( const SELECTION& ) { return m_logicLevels; } ) );
     actions->SetConditions( SIMULATION_ACTIONS::play, ACTION_CONDITIONS().Enable(
@@ -159,12 +167,29 @@ void EDITOR_SIMULATION_TOOL::Install()
     EnsureSimulationToolbar( *m_frame );
     m_instruments = std::make_unique<INSTRUMENT_PANEL>( m_frame,
         [this]( PROBE_KIND kind ) { chooseProbe( kind ); },
-        [this]( double speed ) { m_runner->SetSpeed( speed ); }, [this]() { m_runner->Step(); } );
+        [this]( double speed )
+        {
+            m_preferences.playbackSpeed = speed;
+            m_frame->eeconfig()->m_RealtimeSimulation.playbackSpeed = speed;
+            m_frame->GetSettingsManager()->Save( m_frame->eeconfig() );
+            m_runner->SetSpeed( speed );
+        }, [this]() { m_runner->Step(); } );
     if( auto* manager = wxAuiManager::GetManager( m_frame ) )
     {
-        manager->AddPane( m_instruments.get(), wxAuiPaneInfo().Name( "CircuitAliveInstruments" )
+        wxAuiPaneInfo pane = wxAuiPaneInfo().Name( "CircuitAliveInstruments" )
             .Caption( _( "Simulation" ) ).Right().Layer( 1 ).Position( 0 ).CloseButton( false )
-            .TopDockable( false ).BottomDockable( false ).MinSize( 300, 220 ).BestSize( 350, 650 ).Hide() );
+            .TopDockable( false ).BottomDockable( false )
+            .MinSize( m_frame->FromDIP( wxSize( 300, 220 ) ) )
+            .BestSize( m_frame->FromDIP( wxSize( 350, 650 ) ) )
+            .FloatingSize( m_frame->FromDIP( wxSize( 900, 750 ) ) );
+        if( const auto saved = m_frame->eeconfig()->Get<wxAuiPaneInfo>( "appearance.simulation_pane" ) )
+        {
+            pane.SafeSet( *saved );
+            pane.Name( "CircuitAliveInstruments" ).Caption( _( "Simulation" ) );
+            m_instrumentLayout = pane;
+        }
+        pane.Hide();
+        manager->AddPane( m_instruments.get(), pane );
         manager->Update();
     }
     setStatus( _( "Stopped — t = 0 s" ) );
@@ -191,6 +216,8 @@ void EDITOR_SIMULATION_TOOL::Shutdown()
     if( !m_installed )
         return;
     m_timer.Stop();
+    rememberInstruments();
+    saveInstrumentLayout();
     dismissControl();
     Unbind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
     m_frame->GetCanvas()->Unbind( wxEVT_LEFT_DOWN, &EDITOR_SIMULATION_TOOL::click, this );
@@ -279,19 +306,64 @@ void EDITOR_SIMULATION_TOOL::showInstruments( bool visible )
     if( visible == m_instrumentsVisible ) return;
     if( auto* manager = wxAuiManager::GetManager( m_frame ) )
     {
-        manager->GetPane( m_instruments.get() ).Show( visible ); manager->Update();
+        rememberInstruments();
+        auto& pane = manager->GetPane( m_instruments.get() );
+        if( visible && m_instrumentLayout )
+            pane.SafeSet( *m_instrumentLayout );
+        pane.Show( visible );
+        manager->Update();
+        if( visible && m_instrumentLayout && pane.IsDocked() && pane.best_size.x > 0 )
+            SetAuiPaneSize( *manager, pane, pane.best_size.x, -1 );
         m_instrumentsVisible = visible;
+        if( !visible )
+            saveInstrumentLayout();
+    }
+}
+
+void EDITOR_SIMULATION_TOOL::rememberInstruments()
+{
+    if( !m_instruments || !m_instrumentsVisible )
+        return;
+    auto* manager = wxAuiManager::GetManager( m_frame );
+    wxAuiPaneInfo pane = manager->GetPane( m_instruments.get() );
+    if( !pane.IsShown() )
+        return;
+    // AUI stores dock widths on the dock, not on the pane's best_size. Keep the actual
+    // size as well, so recreating a dock after Hide does not restore the original width.
+    if( pane.IsDocked() )
+    {
+        pane.BestSize( m_instruments->GetSize() );
+        manager->GetPane( m_instruments.get() ).BestSize( pane.best_size );
+    }
+    else if( m_instrumentLayout )
+        pane.BestSize( m_instrumentLayout->best_size );
+    const wxString key = manager->SavePaneInfo( pane );
+    if( key != m_instrumentLayoutKey )
+    {
+        m_instrumentLayout = pane;
+        m_instrumentLayoutKey = key;
+        m_frame->eeconfig()->Set<wxAuiPaneInfo>( "appearance.simulation_pane", pane );
+        m_instrumentLayoutPending = true;
+        m_instrumentLayoutChanged = std::chrono::steady_clock::now();
+    }
+}
+
+void EDITOR_SIMULATION_TOOL::saveInstrumentLayout()
+{
+    if( m_instrumentLayoutPending )
+    {
+        m_frame->eeconfig()->SaveToFile( PATHS::GetUserSettingsPath(), true );
+        m_instrumentLayoutPending = false;
     }
 }
 
 int EDITOR_SIMULATION_TOOL::ToggleProbes( const TOOL_EVENT& )
 {
-    m_probePanel = !m_probePanel;
+    m_probePanel = !m_instrumentsVisible;
     m_placing.reset(); m_instruments->SetPlacement( {} );
     m_toolMgr->RunAction( ACTIONS::cancelInteractive );
     m_toolMgr->RunAction( ACTIONS::selectionTool );
     showInstruments( m_probePanel );
-    if( m_probePanel ) m_instruments->SelectTools();
     m_frame->GetCanvas()->SetFocus();
     return 0;
 }
@@ -442,7 +514,7 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
         VECTOR2D position = m_frame->GetCanvas()->GetView()->ToWorld(
                 VECTOR2D( aEvent.GetPosition().x, aEvent.GetPosition().y ) );
         const int adjustment = m_overlay->AdjustmentAt( m_circuit,
-            m_frame->GetCurrentSheet().PathAsString(), VECTOR2I( position ) );
+            m_frame->GetCurrentSheet().Path().AsString(), VECTOR2I( position ) );
         if( adjustment >= 0 )
         {
             dismissControl();
@@ -455,7 +527,7 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
             m_liveControl->Popup();
             return;
         }
-        int index = m_overlay->SwitchAt( m_circuit, m_frame->GetCurrentSheet().PathAsString(),
+        int index = m_overlay->SwitchAt( m_circuit, m_frame->GetCurrentSheet().Path().AsString(),
                                         VECTOR2I( position ) );
         if( index >= 0 )
         {
@@ -496,7 +568,7 @@ void EDITOR_SIMULATION_TOOL::redraw( bool force )
         return;
     const bool visible = m_session.state != EDITOR_SESSION_STATE::STOPPED
                          && m_session.state != EDITOR_SESSION_STATE::FAILED;
-    const auto sheet = m_frame->GetCurrentSheet().PathAsString();
+    const auto sheet = m_frame->GetCurrentSheet().Path().AsString();
     std::vector<int> brightness;
     for( std::size_t i = 0; visible && i < m_circuit.circuit.leds.size(); ++i )
         brightness.push_back( int( 255 * LedBrightness( i < m_session.ledCurrents.size() ? m_session.ledCurrents[i] : 0,
@@ -513,7 +585,7 @@ void EDITOR_SIMULATION_TOOL::redraw( bool force )
     m_overlayLevels = m_logicLevels ? m_session.logicLevels : std::vector<LOGIC_LEVEL>{};
     m_overlayRapid = m_logicLevels ? m_session.logicRapid : std::vector<bool>{};
     auto* view = m_frame->GetCanvas()->GetView();
-    m_overlay->Render( m_circuit, m_session, m_frame->GetCurrentSheet().PathAsString(), m_logicLevels );
+    m_overlay->Render( m_circuit, m_session, m_frame->GetCurrentSheet().Path().AsString(), m_logicLevels );
     if( !view->HasItem( m_overlay.get() ) )
         view->Add( m_overlay.get() );
     view->Update( m_overlay.get() );
@@ -525,6 +597,9 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     if( !m_runner )
         return;
     const auto now = std::chrono::steady_clock::now();
+    rememberInstruments();
+    if( m_instrumentLayoutPending && now - m_instrumentLayoutChanged >= std::chrono::milliseconds( 400 ) )
+        saveInstrumentLayout();
     if( now - m_lastToolbar >= std::chrono::seconds( 1 ) )
     { EnsureSimulationToolbar( *m_frame ); m_lastToolbar = now; }
     const auto oldState = m_session.state;

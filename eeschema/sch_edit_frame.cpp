@@ -35,6 +35,9 @@
 #include <dialogs/dialog_symbol_fields_table.h>
 #include <widgets/sch_design_block_pane.h>
 #include <widgets/panel_remote_symbol.h>
+#include <widgets/pages_menu.h>
+#include <widgets/used_symbols.h>
+#include <widgets/editor_layout.h>
 #include <wx/srchctrl.h>
 #include <mail_type.h>
 #include <wx/clntdata.h>
@@ -287,7 +290,9 @@ SCH_EDIT_FRAME::SCH_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
                       .DestroyOnClose( false )
                       .Show( m_show_search ) );
 
+    CIRCUITALIVE::InstallUsedSymbols( this );
     RestoreAuiLayout();
+    CIRCUITALIVE::RestoreUsedSymbolsVisibility( this );
     FinishAUIInitialization();
 
     wxAuiPaneInfo& hierarchy_pane = m_auimgr.GetPane( SchematicHierarchyPaneName() );
@@ -582,6 +587,7 @@ void SCH_EDIT_FRAME::OnCrossProbeFlashTimer( wxTimerEvent& aEvent )
 
 SCH_EDIT_FRAME::~SCH_EDIT_FRAME()
 {
+    CIRCUITALIVE::ShutdownUsedSymbols( this );
     CIRCUITALIVE::ShutdownEditorSimulation( this );
     // Ensure that teardowns without doCloseWindow are fully unregistered
     if( m_schematic )
@@ -700,6 +706,8 @@ void SCH_EDIT_FRAME::setupTools()
     m_toolManager->RegisterTool( new PROPERTIES_TOOL );
     m_toolManager->RegisterTool( new EMBED_TOOL );
     CIRCUITALIVE::RegisterEditorSimulation( m_toolManager );
+    CIRCUITALIVE::RegisterUsedSymbols( m_toolManager );
+    CIRCUITALIVE::RegisterEditorLayout( m_toolManager );
     m_toolManager->InitTools();
 
     // Run the selection tool, it is supposed to be always active
@@ -1392,6 +1400,7 @@ void SCH_EDIT_FRAME::UpdateHierarchyNavigator( bool aRefreshNetNavigator, bool a
 {
     m_toolManager->GetTool<SCH_NAVIGATE_TOOL>()->CleanHistory();
     m_hierarchy->UpdateHierarchyTree( aClear );
+    UpdatePagesMenu( *this );
 
     if( aRefreshNetNavigator )
         RefreshNetNavigator();
@@ -3050,6 +3059,7 @@ void SCH_EDIT_FRAME::SetSchematic( SCHEMATIC* aSchematic )
     m_toolManager->SetEnvironment( m_schematic, GetCanvas()->GetView(), GetCanvas()->GetViewControls(), config(),
                                    this );
     CIRCUITALIVE::RebindEditorSimulation( this );
+    CIRCUITALIVE::RebindUsedSymbols( this );
 }
 
 

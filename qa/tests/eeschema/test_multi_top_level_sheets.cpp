@@ -30,6 +30,15 @@
 #include <project/project_file.h>
 #include <settings/settings_manager.h>
 #include <pgm_base.h>
+#include <eeschema_helpers.h>
+#include <widgets/used_symbols.h>
+#include <widgets/project_pages.h>
+#include <sch_symbol.h>
+#include <sch_label.h>
+#include <lib_symbol.h>
+#include <sch_io/kicad_sexpr/sch_io_kicad_sexpr.h>
+#include <wx/ffile.h>
+#include <wx/filename.h>
 
 static SCH_SHEET* createTopLevelSheet( SCHEMATIC& aSchematic, const wxString& aName,
                                        const wxString& aFileName )
@@ -46,6 +55,289 @@ static SCH_SHEET* createTopLevelSheet( SCHEMATIC& aSchematic, const wxString& aN
 }
 
 BOOST_AUTO_TEST_SUITE( MultiTopLevelSheets )
+
+struct PROJECT_PAGES_FIXTURE
+{
+    PROJECT_PAGES_FIXTURE()
+    {
+        directory = wxFileName::CreateTempFileName( wxFileName::GetTempDir() + "/ca-pages-" );
+        wxRemoveFile( directory );
+        wxFileName::Mkdir( directory );
+        project = wxFileName( directory, "project.kicad_pro" ).GetFullPath();
+        wxFFile file( project, "w" );
+        file.Write( "{}" );
+        file.Close();
+        manager.LoadProject( project );
+        schematic = std::make_unique<SCHEMATIC>( &manager.Prj() );
+        first = createTopLevelSheet( *schematic, "First", "first.kicad_sch" );
+        second = createTopLevelSheet( *schematic, "Second", "second.kicad_sch" );
+        first->GetScreen()->SetFileName( Path( "first.kicad_sch" ) );
+        second->GetScreen()->SetFileName( Path( "second.kicad_sch" ) );
+        schematic->SetTopLevelSheets( { first, second } );
+        SCH_SHEET_PATH a, b;
+        a.push_back( first );
+        b.push_back( second );
+        a.SetPageNumber( "1" );
+        b.SetPageNumber( "2" );
+        schematic->RefreshHierarchy();
+    }
+
+    ~PROJECT_PAGES_FIXTURE()
+    {
+        schematic.reset();
+        manager.UnloadProject( &manager.Prj(), false );
+        wxFileName::Rmdir( directory, wxPATH_RMDIR_RECURSIVE );
+    }
+
+    wxString Path( const wxString& name ) const
+    {
+        return wxFileName( directory, name ).GetFullPath();
+    }
+
+    void Save()
+    {
+        SCH_IO_KICAD_SEXPR plugin;
+        for( const auto& path : schematic->Hierarchy() )
+            plugin.SaveSchematicFile( path.LastScreen()->GetFileName(), path.Last(), schematic.get() );
+    }
+
+    void Open( const wxString& name )
+    {
+        schematic.reset();
+        schematic = std::make_unique<SCHEMATIC>( &manager.Prj() );
+        SCH_IO_KICAD_SEXPR plugin;
+        renumbered = EESCHEMA_HELPERS::LoadProjectSheets( plugin, *schematic, Path( name ) );
+    }
+
+    wxString directory, project;
+    SETTINGS_MANAGER manager;
+    std::unique_ptr<SCHEMATIC> schematic;
+    SCH_SHEET* first;
+    SCH_SHEET* second;
+    bool renumbered = false;
+};
+
+BOOST_FIXTURE_TEST_CASE( OpenAnyPageDiscoversSiblingsAndRetainsOrder, PROJECT_PAGES_FIXTURE )
+{
+    Save();
+    wxCopyFile( Path( "first.kicad_sch" ), Path( "_autosave-ignored.kicad_sch" ) );
+    Open( "second.kicad_sch" );
+    BOOST_REQUIRE_EQUAL( schematic->GetTopLevelSheets().size(), 2u );
+    BOOST_CHECK_EQUAL( schematic->CurrentSheet().LastScreen()->GetFileName(), Path( "second.kicad_sch" ) );
+    auto pages = schematic->Hierarchy();
+    BOOST_CHECK_EQUAL( pages[0].LastScreen()->GetFileName(), Path( "first.kicad_sch" ) );
+    BOOST_CHECK_EQUAL( pages[1].LastScreen()->GetFileName(), Path( "second.kicad_sch" ) );
+    pages[0].SetPageNumber( "2" );
+    pages[1].SetPageNumber( "1" );
+    Save();
+    Open( "first.kicad_sch" );
+    BOOST_REQUIRE_EQUAL( schematic->Hierarchy().size(), 2u );
+    BOOST_CHECK_EQUAL( schematic->Hierarchy()[0].LastScreen()->GetFileName(), Path( "second.kicad_sch" ) );
+    BOOST_CHECK_EQUAL( schematic->CurrentSheet().LastScreen()->GetFileName(), Path( "first.kicad_sch" ) );
+}
+
+BOOST_FIXTURE_TEST_CASE( DuplicateStandalonePageNumbersFollowProjectOrder, PROJECT_PAGES_FIXTURE )
+{
+    auto pages = schematic->Hierarchy();
+    pages[1].SetPageNumber( "1" );
+    manager.Prj().GetProjectFile().GetTopLevelSheets() = {
+        { second->m_Uuid, "Second", "second.kicad_sch" },
+        { first->m_Uuid, "First", "first.kicad_sch" }
+    };
+    Save();
+    Open( "first.kicad_sch" );
+    BOOST_REQUIRE_EQUAL( schematic->Hierarchy().size(), 2u );
+    BOOST_CHECK_EQUAL( schematic->Hierarchy()[0].Last()->GetName(), "Second" );
+    BOOST_CHECK_EQUAL( schematic->Hierarchy()[0].GetPageNumber(), "1" );
+    BOOST_CHECK_EQUAL( schematic->Hierarchy()[1].GetPageNumber(), "2" );
+    BOOST_CHECK( renumbered );
+    BOOST_CHECK( !schematic->Hierarchy().IsModified() );
+}
+
+BOOST_FIXTURE_TEST_CASE( IgnoreNonSchematicProjectEntries, PROJECT_PAGES_FIXTURE )
+{
+    Save();
+    for( const auto& name : { "notes.txt", "board.kicad_pcb", "library.kicad_sym", "legacy.sch" } )
+    {
+        wxFFile file( Path( name ), "w" );
+        file.Write( "This is not a schematic in the selected format." );
+        manager.Prj().GetProjectFile().GetTopLevelSheets().emplace_back( niluuid, name, name );
+    }
+    Open( "second.kicad_sch" );
+    BOOST_CHECK_EQUAL( schematic->GetTopLevelSheets().size(), 2u );
+    BOOST_CHECK_EQUAL( schematic->CurrentSheet().LastScreen()->GetFileName(), Path( "second.kicad_sch" ) );
+}
+
+BOOST_FIXTURE_TEST_CASE( DeletedPageStaysRemovedAfterDiscovery, PROJECT_PAGES_FIXTURE )
+{
+    Save();
+    SCH_SHEET_PATH deleted;
+    deleted.push_back( second );
+    schematic->SetCurrentSheet( deleted );
+    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, deleted ) );
+    BOOST_CHECK( schematic->CurrentSheet().Last() == first );
+    BOOST_CHECK( wxFileExists( Path( "second.kicad_sch" ) ) );
+    BOOST_CHECK( CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "second.kicad_sch" ) ) );
+    manager.SaveProject();
+    schematic.reset();
+    manager.UnloadProject( &manager.Prj(), false );
+    manager.LoadProject( project );
+    Open( "first.kicad_sch" );
+    BOOST_REQUIRE_EQUAL( schematic->GetTopLevelSheets().size(), 1u );
+    BOOST_CHECK( !CIRCUITALIVE::CanDeleteProjectPage( *schematic, schematic->CurrentSheet() ) );
+    BOOST_CHECK( !CIRCUITALIVE::RemoveProjectPage( *schematic, schematic->CurrentSheet() ) );
+    // Opening a removed file explicitly restores it instead of showing an unrelated page.
+    Open( "second.kicad_sch" );
+    BOOST_CHECK_EQUAL( schematic->GetTopLevelSheets().size(), 2u );
+    BOOST_CHECK( !CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "second.kicad_sch" ) ) );
+}
+
+BOOST_FIXTURE_TEST_CASE( DeleteHierarchicalPageRetargetsParentAndExcludesFile, PROJECT_PAGES_FIXTURE )
+{
+    auto* child = createTopLevelSheet( *schematic, "Child", "child.kicad_sch" );
+    child->GetScreen()->SetFileName( Path( "child.kicad_sch" ) );
+    child->SetParent( first );
+    first->GetScreen()->Append( child );
+    SCH_SHEET_PATH childPath;
+    childPath.push_back( first );
+    childPath.push_back( child );
+    childPath.SetPageNumber( "3" );
+    schematic->RefreshHierarchy();
+    Save();
+    schematic->SetCurrentSheet( childPath );
+    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, childPath ) );
+    BOOST_CHECK( schematic->CurrentSheet().Last() == first );
+    BOOST_CHECK_EQUAL( schematic->Hierarchy().size(), 2u );
+    BOOST_CHECK( CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "child.kicad_sch" ) ) );
+    Save();
+    Open( "second.kicad_sch" );
+    BOOST_CHECK_EQUAL( schematic->Hierarchy().size(), 2u );
+}
+
+BOOST_FIXTURE_TEST_CASE( DeleteFirstPageKeepsSharedChildInSurvivingHierarchy, PROJECT_PAGES_FIXTURE )
+{
+    auto* child = createTopLevelSheet( *schematic, "Child", "child.kicad_sch" );
+    child->GetScreen()->SetFileName( Path( "child.kicad_sch" ) );
+    child->SetParent( first );
+    first->GetScreen()->Append( child );
+    auto* shared = new SCH_SHEET( second );
+    shared->SetName( "Shared" );
+    shared->SetFileName( "child.kicad_sch" );
+    shared->SetScreen( child->GetScreen() );
+    second->GetScreen()->Append( shared );
+    schematic->RefreshHierarchy();
+    SCH_SHEET_PATH removed;
+    removed.push_back( first );
+    schematic->SetCurrentSheet( removed );
+    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, removed ) );
+    BOOST_CHECK( schematic->CurrentSheet().Last() == second );
+    BOOST_CHECK_EQUAL( schematic->Hierarchy().size(), 2u );
+    BOOST_CHECK( CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "first.kicad_sch" ) ) );
+    BOOST_CHECK( !CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "child.kicad_sch" ) ) );
+}
+
+BOOST_FIXTURE_TEST_CASE( UsedComponentsReflectCurrentPageAndType, PROJECT_PAGES_FIXTURE )
+{
+    SCH_SHEET_PATH path;
+    path.push_back( first );
+    LIB_SYMBOL lib( "NE555" );
+    lib.GetReferenceField().SetText( "U" );
+    lib.SetUnitCount( 2, false );
+    auto* source = new SCH_SYMBOL( lib, LIB_ID( "Timer", "NE555" ), &path, 1,
+                                   0, VECTOR2I( 0, 0 ), schematic.get() );
+    source->SetRef( &path, "U1" );
+    source->GetField( FIELD_T::VALUE )->SetText( "NE555" );
+    first->GetScreen()->Append( source );
+    auto copy = CIRCUITALIVE::CopyUsedSymbol( *source, path, VECTOR2I( 10000, 20000 ) );
+    BOOST_CHECK( copy->m_Uuid != source->m_Uuid );
+    BOOST_CHECK_EQUAL( copy->GetRef( &path ), "U?" );
+    BOOST_CHECK_EQUAL( source->GetRef( &path ), "U1" );
+    BOOST_CHECK( copy->GetPosition() == VECTOR2I( 10000, 20000 ) );
+    copy->SetRef( &path, "U2" );
+    first->GetScreen()->Append( copy.release() );
+    auto configured = CIRCUITALIVE::CopyUsedSymbol( *source, path, VECTOR2I( 30000, 40000 ) );
+    configured->GetField( FIELD_T::VALUE )->SetText( "LM555" );
+    configured->GetField( FIELD_T::FOOTPRINT )->SetText( "Package_DIP:DIP-8_W7.62mm" );
+    configured->SetRef( &path, "U3" );
+    configured->SetUnit( 2 );
+    SCH_FIELD model( configured.get(), FIELD_T::USER, "Sim.Model" );
+    model.SetText( "different_model" );
+    configured->AddField( model );
+    first->GetScreen()->Append( configured.release() );
+    first->GetScreen()->Append( new SCH_LABEL( VECTOR2I( 0, 0 ), "SUPPLY" ) );
+    auto* ground = new SCH_SYMBOL();
+    auto* groundLib = new LIB_SYMBOL( "GND" );
+    groundLib->SetGlobalPower();
+    ground->SetLibSymbol( groundLib );
+    first->GetScreen()->Append( ground );
+    auto* probe = new SCH_SYMBOL();
+    SCH_FIELD probeField( probe, FIELD_T::USER, "CA.Probe" );
+    probe->AddField( probeField );
+    first->GetScreen()->Append( probe );
+
+    auto entries = CIRCUITALIVE::BuildUsedSymbolList( path );
+    BOOST_REQUIRE_EQUAL( entries.size(), 1u );
+    BOOST_CHECK_EQUAL( entries[0].label, "Timer:NE555" );
+    BOOST_CHECK( entries[0].symbol == source->m_Uuid );
+    SCH_SHEET_PATH other;
+    other.push_back( second );
+    BOOST_CHECK( CIRCUITALIVE::BuildUsedSymbolList( other ).empty() );
+    source->GetField( FIELD_T::VALUE )->SetText( "LM555" );
+    entries = CIRCUITALIVE::BuildUsedSymbolList( path );
+    BOOST_REQUIRE_EQUAL( entries.size(), 1u );
+    BOOST_CHECK_EQUAL( entries[0].label, "Timer:NE555" );
+    first->GetScreen()->Remove( source );
+    delete source;
+    entries = CIRCUITALIVE::BuildUsedSymbolList( path );
+    BOOST_REQUIRE_EQUAL( entries.size(), 1u );
+    BOOST_CHECK_EQUAL( entries[0].label, "Timer:NE555" );
+
+    LIB_SYMBOL resistor( "R" );
+    auto* r1 = new SCH_SYMBOL( resistor, LIB_ID( "Device", "R" ), &path, 1,
+                              0, VECTOR2I( 0, 0 ), schematic.get() );
+    r1->GetField( FIELD_T::VALUE )->SetText( "10k" );
+    first->GetScreen()->Append( r1 );
+    auto r2 = CIRCUITALIVE::CopyUsedSymbol( *r1, path, VECTOR2I( 10000, 0 ) );
+    r2->GetField( FIELD_T::VALUE )->SetText( "330" );
+    first->GetScreen()->Append( r2.release() );
+    entries = CIRCUITALIVE::BuildUsedSymbolList( path );
+    BOOST_REQUIRE_EQUAL( entries.size(), 2u );
+    BOOST_CHECK_EQUAL( entries[0].label, "Device:R" );
+    BOOST_CHECK_EQUAL( entries[1].label, "Timer:NE555" );
+}
+
+BOOST_FIXTURE_TEST_CASE( DiscoverPagesKeepsHierarchicalChildrenAsSingleInstances, PROJECT_PAGES_FIXTURE )
+{
+    auto* child = createTopLevelSheet( *schematic, "Child", "child.kicad_sch" );
+    child->GetScreen()->SetFileName( Path( "child.kicad_sch" ) );
+    child->SetParent( first );
+    first->GetScreen()->Append( child );
+    SCH_SHEET_PATH childPath;
+    childPath.push_back( first );
+    childPath.push_back( child );
+    childPath.SetPageNumber( "3" );
+    schematic->RefreshHierarchy();
+    Save();
+    // Discovery also runs when the child file itself is the file opened by the user.
+    Open( "child.kicad_sch" );
+    BOOST_REQUIRE_EQUAL( schematic->GetTopLevelSheets().size(), 2u );
+    BOOST_REQUIRE_EQUAL( schematic->Hierarchy().size(), 3u );
+    BOOST_CHECK_EQUAL( schematic->CurrentSheet().size(), 2u );
+    BOOST_CHECK_EQUAL( schematic->CurrentSheet().LastScreen()->GetFileName(), Path( "child.kicad_sch" ) );
+}
+
+BOOST_FIXTURE_TEST_CASE( DirectPageFindsOwningProjectWithDifferentBasename, PROJECT_PAGES_FIXTURE )
+{
+    Save();
+    wxFFile file( project, "w" );
+    file.Write( R"({"schematic":{"top_level_sheets":[{"filename":"second.kicad_sch"}]}})" );
+    file.Close();
+    // Another project in the folder must not hide an explicit page membership.
+    wxFFile other( Path( "other.kicad_pro" ), "w" );
+    other.Write( "{}" );
+    other.Close();
+    BOOST_CHECK_EQUAL( EESCHEMA_HELPERS::FindProjectForSchematic( Path( "second.kicad_sch" ) ), project );
+}
 
 BOOST_AUTO_TEST_CASE( TestVirtualRootCreation )
 {

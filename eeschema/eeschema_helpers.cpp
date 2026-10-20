@@ -30,6 +30,8 @@
 #include <sch_commit.h>
 #include <sch_edit_frame.h>
 #include <sch_label.h>
+#include <sch_screen.h>
+#include <sch_sheet.h>
 #include <sch_io/sch_io.h>
 #include <sch_io/sch_io_mgr.h>
 #include <settings/settings_manager.h>
@@ -38,9 +40,190 @@
 #include <kiface_base.h>
 
 #include <wx/app.h>
+#include <wx/dir.h>
+#include <widgets/project_pages.h>
+#include <wx/ffile.h>
+#include <nlohmann/json.hpp>
+#include <algorithm>
+#include <set>
 
 
 SCH_EDIT_FRAME*   EESCHEMA_HELPERS::s_SchEditFrame = nullptr;
+
+
+wxString EESCHEMA_HELPERS::FindProjectForSchematic( const wxString& aFileName )
+{
+    wxFileName selected( aFileName );
+    wxFileName sameName( selected );
+    sameName.SetExt( FILEEXT::ProjectFileExtension );
+    if( sameName.FileExists() )
+        return sameName.GetFullPath();
+
+    wxDir directory( selected.GetPath() );
+    if( !directory.IsOpened() )
+        return sameName.GetFullPath();
+    wxString name;
+    std::vector<wxString> projects;
+    for( bool found = directory.GetFirst( &name, "*.kicad_pro", wxDIR_FILES ); found;
+         found = directory.GetNext( &name ) )
+    {
+        wxFileName candidate( selected.GetPath(), name );
+        projects.push_back( candidate.GetFullPath() );
+        wxFFile file( candidate.GetFullPath(), "r" );
+        wxString content;
+        if( !file.IsOpened() || !file.ReadAll( &content ) )
+            continue;
+        try
+        {
+            const auto json = nlohmann::json::parse( content.ToStdString( wxConvUTF8 ) );
+            const auto& sheets = json.at( "schematic" ).at( "top_level_sheets" );
+            for( const auto& sheet : sheets )
+            {
+                wxFileName page( wxString::FromUTF8( sheet.at( "filename" ).get<std::string>() ) );
+                page.MakeAbsolute( selected.GetPath() );
+                if( page.SameAs( selected ) )
+                    return candidate.GetFullPath();
+            }
+        }
+        catch( const nlohmann::json::exception& )
+        {
+            // Projects without a page manifest can still be identified by their directory.
+        }
+    }
+    return projects.size() == 1 ? projects.front() : sameName.GetFullPath();
+}
+
+
+bool EESCHEMA_HELPERS::LoadProjectSheets( SCH_IO& aPlugin, SCHEMATIC& aSchematic,
+                                          const wxString& aFileName )
+{
+    const wxFileName selected( aFileName );
+    // Explicitly opening an excluded file restores it; discovering its siblings does not.
+    CIRCUITALIVE::IncludeProjectPage( aSchematic.Project(), aFileName );
+    const wxString projectDirectory = aSchematic.Project().GetProjectPath();
+    std::vector<TOP_LEVEL_SHEET_INFO> candidates =
+            aSchematic.Project().GetProjectFile().GetTopLevelSheets();
+    std::erase_if( candidates, []( const TOP_LEVEL_SHEET_INFO& info )
+    {
+        const auto extension = wxFileName( info.filename ).GetExt().Lower();
+        return extension != FILEEXT::KiCadSchematicFileExtension
+               && extension != FILEEXT::LegacySchematicFileExtension;
+    } );
+    if( selected.GetExt() == FILEEXT::LegacySchematicFileExtension )
+    {
+        for( auto& info : candidates )
+        {
+            wxFileName file( info.filename );
+            file.SetExt( FILEEXT::LegacySchematicFileExtension );
+            info.filename = file.GetFullPath();
+        }
+    }
+
+    auto addCandidate = [&]( const wxString& filename )
+    {
+        wxFileName file( filename );
+        file.MakeAbsolute( projectDirectory );
+        for( const auto& info : candidates )
+        {
+            wxFileName existing( info.filename );
+            existing.MakeAbsolute( projectDirectory );
+            if( existing.SameAs( file ) )
+                return;
+        }
+        candidates.emplace_back( niluuid, file.GetName(), file.GetFullPath() );
+    };
+    if( selected.GetExt() == FILEEXT::KiCadSchematicFileExtension )
+    {
+        wxDir directory( selected.GetPath() );
+        wxString name;
+        std::vector<wxFileName> siblings;
+        for( bool found = directory.GetFirst( &name, "*.kicad_sch", wxDIR_FILES ); found;
+             found = directory.GetNext( &name ) )
+        {
+            if( name.StartsWith( "_autosave-" ) || name.StartsWith( "~" ) || name.StartsWith( "." ) )
+                continue;
+            siblings.emplace_back( selected.GetPath(), name );
+        }
+        std::stable_sort( siblings.begin(), siblings.end(),
+                []( const wxFileName& a, const wxFileName& b )
+                {
+                    wxDateTime createdA, createdB;
+                    a.GetTimes( nullptr, nullptr, &createdA );
+                    b.GetTimes( nullptr, nullptr, &createdB );
+                    if( createdA.IsValid() != createdB.IsValid() )
+                        return createdA.IsValid();
+                    if( createdA.IsValid() && createdA != createdB )
+                        return createdA < createdB;
+                    return a.GetFullName() < b.GetFullName();
+                } );
+        for( const auto& file : siblings )
+            addCandidate( file.GetFullPath() );
+    }
+    addCandidate( aFileName );
+
+    std::vector<std::unique_ptr<SCH_SHEET>> loaded;
+    std::set<wxString> loadedFiles;
+    for( const auto& info : candidates )
+    {
+        wxFileName file( info.filename );
+        file.MakeAbsolute( projectDirectory );
+        if( file.GetExt().CmpNoCase( selected.GetExt() ) != 0 )
+            continue;
+        if( CIRCUITALIVE::IsExcludedProjectPage( aSchematic.Project(), file.GetFullPath() ) )
+            continue;
+        if( !file.FileExists() || loadedFiles.contains( file.GetFullPath() ) )
+            continue;
+        auto sheet = std::unique_ptr<SCH_SHEET>(
+                aPlugin.LoadSchematicFile( file.GetFullPath(), &aSchematic ) );
+        if( !sheet )
+            continue;
+        if( info.uuid != niluuid )
+            const_cast<KIID&>( sheet->m_Uuid ) = info.uuid;
+        sheet->SetName( info.name.IsEmpty() ? file.GetName() : info.name );
+        for( const auto& path : SCH_SHEET_LIST( sheet.get() ) )
+            loadedFiles.insert( path.LastScreen()->GetFileName() );
+        loaded.push_back( std::move( sheet ) );
+    }
+
+    // A child may have been selected before its parent was discovered. Keep its hierarchy
+    // instance and remove only the extra top-level wrapper (the screen is reference counted).
+    std::set<wxString> childFiles;
+    for( const auto& sheet : loaded )
+    {
+        for( const auto& path : SCH_SHEET_LIST( sheet.get() ) )
+        {
+            if( path.size() > 1 )
+                childFiles.insert( path.LastScreen()->GetFileName() );
+        }
+    }
+    std::vector<SCH_SHEET*> pages;
+    for( auto& sheet : loaded )
+    {
+        if( !childFiles.contains( sheet->GetScreen()->GetFileName() ) )
+            pages.push_back( sheet.release() );
+    }
+    if( pages.empty() )
+    {
+        aSchematic.CreateDefaultScreens();
+        return false;
+    }
+    aSchematic.SetTopLevelSheets( pages );
+    // Old standalone files often all claim page 1. Resolve ties in manifest/discovery order
+    // before sorting, otherwise UUID order would determine which page keeps its number.
+    auto hierarchy = aSchematic.BuildUnorderedSheetList();
+    const bool renumbered = hierarchy.RepairPageNumbers();
+    if( renumbered )
+        aSchematic.RefreshHierarchy();
+    for( const auto& path : aSchematic.Hierarchy() )
+    {
+        if( wxFileName( path.LastScreen()->GetFileName() ).SameAs( selected ) )
+        {
+            aSchematic.SetCurrentSheet( path );
+            break;
+        }
+    }
+    return renumbered;
+}
 
 
 void EESCHEMA_HELPERS::SetSchEditFrame( SCH_EDIT_FRAME* aSchEditFrame )

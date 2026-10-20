@@ -37,7 +37,271 @@
 #include "sch_edit_frame.h"
 #include <widgets/wx_menubar.h>
 #include <widgets/panel_remote_symbol.h>
+#include <widgets/pages_menu.h>
+#include <widgets/project_pages.h>
+#include <widgets/used_symbols.h>
 #include <advanced_config.h>
+#include <sch_commit.h>
+#include <sch_screen.h>
+#include <sch_sheet.h>
+#include <dialog_shim.h>
+#include <project.h>
+#include <wx/filename.h>
+#include <wx/sizer.h>
+#include <wx/spinctrl.h>
+#include <wx/stattext.h>
+#include <wx/textctrl.h>
+#include <wx/textdlg.h>
+#include <widgets/ui_common.h>
+
+
+namespace
+{
+class PAGE_DIALOG : public DIALOG_SHIM
+{
+public:
+    using DIALOG_SHIM::DIALOG_SHIM;
+    using DIALOG_SHIM::finishDialogSettings;
+};
+
+class PAGES_MENU : public ACTION_MENU
+{
+public:
+    PAGES_MENU( SCH_EDIT_FRAME* aFrame, SCH_SELECTION_TOOL* aTool ) :
+            ACTION_MENU( false, aTool ), m_frame( aFrame )
+    {
+        Add( SCH_ACTIONS::navigatePrevious );
+        Add( SCH_ACTIONS::navigateNext );
+        const int newId = wxWindow::NewControlId();
+        const int editId = wxWindow::NewControlId();
+        Append( newId, _( "New Page..." ) );
+        Append( editId, _( "Edit Page..." ) );
+        m_deleteId = wxWindow::NewControlId();
+        Append( m_deleteId, _( "Delete Page..." ) );
+        AppendSeparator();
+        Bind( wxEVT_MENU, [this]( wxCommandEvent& ) { m_frame->NewPage(); }, newId );
+        Bind( wxEVT_MENU, [this]( wxCommandEvent& ) { m_frame->EditPage(); }, editId );
+        Bind( wxEVT_MENU, [this]( wxCommandEvent& ) { CIRCUITALIVE::DeleteCurrentPage( *m_frame ); }, m_deleteId );
+        update();
+    }
+
+protected:
+    void update() override
+    {
+        // Rebuild only when the list changes; never accumulate event bindings on the frame.
+        const auto sheets = m_frame->Schematic().Hierarchy();
+        Enable( m_deleteId, CIRCUITALIVE::CanDeleteProjectPage(
+                m_frame->Schematic(), m_frame->GetCurrentSheet() ) );
+        std::vector<wxString> labels;
+        std::vector<KIID_PATH> paths;
+        for( const auto& sheet : sheets )
+        {
+            wxString name = sheet.size() == 1 ? sheet.Last()->GetShownName( false )
+                                               : sheet.PathHumanReadable( false, true );
+            if( name.IsEmpty() )
+                name = wxFileName( sheet.LastScreen()->GetFileName() ).GetName();
+            labels.push_back( wxString::Format( _( "%s (page %s)" ), name, sheet.GetPageNumber() ) );
+            paths.push_back( sheet.Path() );
+        }
+        if( paths != m_paths || labels != m_labels )
+        {
+            for( int id : m_ids )
+            {
+                Unbind( wxEVT_MENU, &PAGES_MENU::onPage, this, id );
+                Destroy( id );
+            }
+            m_ids.clear();
+            m_paths = std::move( paths );
+            m_labels = std::move( labels );
+            for( const auto& label : m_labels )
+            {
+                const int id = wxWindow::NewControlId();
+                m_ids.push_back( id );
+                wxString escaped = label;
+                escaped.Replace( "&", "&&" );
+                AppendCheckItem( id, escaped );
+                Bind( wxEVT_MENU, &PAGES_MENU::onPage, this, id );
+            }
+        }
+        for( std::size_t i = 0; i < m_ids.size(); ++i )
+            Check( m_ids[i], m_paths[i] == m_frame->GetCurrentSheet().Path() );
+    }
+
+private:
+    void onPage( wxCommandEvent& aEvent )
+    {
+        const auto at = std::find( m_ids.begin(), m_ids.end(), aEvent.GetId() );
+        if( at == m_ids.end() )
+            return;
+        const auto& path = m_paths[at - m_ids.begin()];
+        for( auto sheet : m_frame->Schematic().Hierarchy() )
+        {
+            if( sheet.Path() == path )
+            {
+                m_frame->GetToolManager()->RunAction<SCH_SHEET_PATH*>(
+                        SCH_ACTIONS::changeSheet, &sheet );
+                return;
+            }
+        }
+    }
+
+    SCH_EDIT_FRAME* m_frame;
+    int m_deleteId;
+    std::vector<int> m_ids;
+    std::vector<KIID_PATH> m_paths;
+    std::vector<wxString> m_labels;
+};
+}
+
+
+void UpdatePagesMenu( SCH_EDIT_FRAME& aFrame )
+{
+    if( wxMenuBar* bar = aFrame.GetMenuBar() )
+    {
+        for( std::size_t i = 0; i < bar->GetMenuCount(); ++i )
+        {
+            if( auto* pages = dynamic_cast<PAGES_MENU*>( bar->GetMenu( i ) ) )
+                pages->UpdateAll();
+        }
+    }
+}
+
+
+void SCH_EDIT_FRAME::NewPage()
+{
+    wxTextEntryDialog dlg( this, _( "Page name:" ), _( "New Page" ), _( "Untitled" ) );
+    if( dlg.ShowModal() != wxID_OK )
+        return;
+    wxString name = dlg.GetValue().Trim().Trim( false );
+    if( name.IsEmpty() )
+        return;
+
+    wxString stem = name.Lower();
+    for( wxUniChar character : wxFileName::GetForbiddenChars() + "/\\" )
+        stem.Replace( wxString( character ), "_" );
+    stem.Replace( " ", "_" );
+    if( stem.EndsWith( ".kicad_sch" ) )
+        stem.RemoveLast( 10 );
+    if( stem.IsEmpty() || stem == "." || stem == ".." )
+        stem = "page";
+
+    const wxString directory = Prj().GetProjectPath();
+    wxFileName file( directory, stem + ".kicad_sch" );
+    const auto hierarchy = Schematic().Hierarchy();
+    auto used = [&]()
+    {
+        if( file.FileExists() )
+            return true;
+        for( const auto& path : hierarchy )
+        {
+            wxFileName existing( path.LastScreen()->GetFileName() );
+            existing.MakeAbsolute( directory );
+            if( existing.SameAs( file ) )
+                return true;
+        }
+        return false;
+    };
+    for( int suffix = 2; used(); ++suffix )
+        file.SetFullName( wxString::Format( "%s_%d.kicad_sch", stem, suffix ) );
+
+    auto* sheet = new SCH_SHEET( &Schematic() );
+    auto* screen = new SCH_SCREEN( &Schematic() );
+    const_cast<KIID&>( sheet->m_Uuid ) = screen->GetUuid();
+    sheet->SetScreen( screen );
+    sheet->SetName( name );
+    sheet->SetFileName( file.GetFullName() );
+    screen->SetFileName( file.GetFullPath() );
+    screen->SetContentModified();
+
+    // Append after existing pages, including projects with gaps in their numbering.
+    long lastPage = 0;
+    for( const auto& path : hierarchy )
+    {
+        long number = 0;
+        if( path.GetPageNumber().ToLong( &number ) )
+            lastPage = std::max( lastPage, number );
+    }
+    SCH_SHEET_PATH path;
+    path.push_back( sheet );
+    path.SetPageNumber( wxString::Format( "%ld", lastPage + 1 ) );
+    Schematic().AddTopLevelSheet( sheet );
+
+    SCH_COMMIT dummy( this );
+    RecalculateConnections( &dummy, NO_CLEANUP );
+    UpdateHierarchyNavigator();
+    m_toolManager->RunAction<SCH_SHEET_PATH*>( SCH_ACTIONS::changeSheet, &path );
+    OnModify();
+}
+
+
+void SCH_EDIT_FRAME::EditPage()
+{
+    auto pages = Schematic().Hierarchy();
+    const auto current = std::find( pages.begin(), pages.end(), GetCurrentSheet() );
+    if( current == pages.end() )
+        return;
+    const int oldPosition = current - pages.begin();
+    PAGE_DIALOG dlg( this, wxID_ANY, _( "Edit Page" ), wxDefaultPosition, wxDefaultSize,
+                     wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER );
+    dlg.OptOut( &dlg );
+    auto* layout = new wxBoxSizer( wxVERTICAL );
+    auto* fields = new wxFlexGridSizer( 2, 8, 12 );
+    fields->AddGrowableCol( 1 );
+    auto* name = new wxTextCtrl( &dlg, wxID_ANY, current->Last()->GetName() );
+    auto* order = new wxSpinCtrl( &dlg, wxID_ANY );
+    order->SetRange( 1, pages.size() );
+    order->SetValue( oldPosition + 1 );
+    fields->Add( new wxStaticText( &dlg, wxID_ANY, _( "Page name:" ) ), 0, wxALIGN_CENTER_VERTICAL );
+    fields->Add( name, 1, wxEXPAND );
+    fields->Add( new wxStaticText( &dlg, wxID_ANY, _( "Page order:" ) ), 0, wxALIGN_CENTER_VERTICAL );
+    fields->Add( order, 1, wxEXPAND );
+    layout->Add( fields, 1, wxEXPAND | wxALL, 12 );
+    layout->Add( dlg.CreateSeparatedButtonSizer( wxOK | wxCANCEL ), 0, wxEXPAND | wxALL, 12 );
+    dlg.SetSizerAndFit( layout );
+    dlg.finishDialogSettings();
+    dlg.SetMinSize( dlg.FromDIP( wxSize( 360, -1 ) ) );
+    dlg.SetSize( dlg.FromDIP( 360 ), dlg.GetSize().y );
+    dlg.SetInitialFocus( name );
+    if( dlg.ShowModal() != wxID_OK )
+        return;
+    const wxString newName = name->GetValue().Trim().Trim( false );
+    if( newName.IsEmpty() )
+        return;
+
+    SCH_COMMIT commit( this );
+    SCH_SHEET_PATH selected = *current;
+    auto modifyPage = [&]( const SCH_SHEET_PATH& page )
+    {
+        SCH_SHEET_PATH parent = page;
+        parent.pop_back();
+        // Snapshot the owning sheet through its name field. Passing a top-level sheet
+        // directly would promote the undo item to the virtual root instead.
+        commit.Modify( page.Last()->GetField( FIELD_T::SHEET_NAME ),
+                       parent.empty() ? Schematic().Root().GetScreen() : parent.LastScreen() );
+        page.LastScreen()->SetContentModified();
+    };
+    if( newName != selected.Last()->GetName() )
+    {
+        modifyPage( selected );
+        selected.Last()->SetName( newName );
+    }
+    if( order->GetValue() != oldPosition + 1 )
+    {
+        pages.erase( pages.begin() + oldPosition );
+        pages.insert( pages.begin() + order->GetValue() - 1, selected );
+        for( std::size_t i = 0; i < pages.size(); ++i )
+        {
+            auto& page = pages[i];
+            modifyPage( page );
+            page.SetPageNumber( wxString::Format( "%zu", i + 1 ) );
+        }
+    }
+    if( !commit.Empty() )
+        commit.Push( _( "Edit page" ) );
+    Schematic().RefreshHierarchy();
+    UpdateHierarchyNavigator();
+    OnPageSettingsChange();
+}
 
 
 void SCH_EDIT_FRAME::doReCreateMenuBar()
@@ -180,6 +444,7 @@ void SCH_EDIT_FRAME::doReCreateMenuBar()
     showHidePanels->Add( ACTIONS::showProperties,    ACTION_MENU::CHECK );
     showHidePanels->Add( ACTIONS::showSearch,        ACTION_MENU::CHECK );
     showHidePanels->Add( SCH_ACTIONS::showHierarchy, ACTION_MENU::CHECK );
+    showHidePanels->Add( CIRCUITALIVE::USED_SYMBOL_ACTIONS::showPanel, ACTION_MENU::CHECK );
 
     if( ADVANCED_CFG::GetCfg().m_IncrementalConnectivity )
         showHidePanels->Add( SCH_ACTIONS::showNetNavigator, ACTION_MENU::CHECK );
@@ -357,6 +622,7 @@ void SCH_EDIT_FRAME::doReCreateMenuBar()
     menuBar->Append( inspectMenu, _( "&Inspect" ) );
     menuBar->Append( toolsMenu,   _( "&Tools" ) );
     menuBar->Append( prefsMenu,   _( "P&references" ) );
+    menuBar->Append( new PAGES_MENU( this, selTool ), _( "Pa&ges" ) );
     AddStandardHelpMenu( menuBar );
 
     SetMenuBar( menuBar );

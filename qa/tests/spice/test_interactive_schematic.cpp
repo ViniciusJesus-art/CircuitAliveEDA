@@ -2,6 +2,7 @@
 #include <boost/test/unit_test.hpp>
 #include <eeschema_test_utils.h>
 #include <circuitalive/schematic_adapter.h>
+#include <circuitalive/simulation_overlay.h>
 #include <schematic.h>
 #include <sch_symbol.h>
 #include <sch_field.h>
@@ -9,6 +10,7 @@
 #include <sch_textbox.h>
 #include <sch_io/kicad_sexpr/sch_io_kicad_sexpr.h>
 #include <sch_sheet_path.h>
+#include <sch_sheet.h>
 #include <sch_screen.h>
 #include <circuitalive/probe_placement.h>
 #include <circuitalive/model_profiles.h>
@@ -26,6 +28,43 @@
 #include <base_units.h>
 
 using namespace CIRCUITALIVE;
+
+BOOST_FIXTURE_TEST_CASE( SimulationControlsAndIndicatorsBelongToTheirPage,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    LoadSchematic( wxFileName( CIRCUITALIVE_TEST_SCHEMATIC ) );
+    auto first = m_schematic->CurrentSheet();
+    auto probe = MakeProbeSymbol( PROBE_KIND::VOLTAGE, first,
+            VECTOR2I( schIUScale.mmToIU( 70 ), schIUScale.mmToIU( 70 ) ), false, 1, "Page probe" );
+    first.LastScreen()->Append( probe.release() );
+
+    auto* secondSheet = new SCH_SHEET( m_schematic.get() );
+    secondSheet->SetScreen( new SCH_SCREEN( m_schematic.get() ) );
+    secondSheet->SetName( "Second" );
+    m_schematic->AddTopLevelSheet( secondSheet );
+    SCH_SHEET_PATH second;
+    second.push_back( secondSheet );
+    second.SetPageNumber( "2" );
+    m_schematic->ConnectionGraph()->Recalculate( m_schematic->Hierarchy(), true );
+    const auto snapshot = CaptureSchematic( *m_schematic, true );
+    BOOST_REQUIRE( !snapshot.circuit.switches.empty() );
+    BOOST_REQUIRE( !snapshot.circuit.leds.empty() );
+    BOOST_REQUIRE( !snapshot.pins.empty() );
+    BOOST_REQUIRE( !snapshot.probes.empty() );
+    for( const auto& location : snapshot.locations )
+    {
+        BOOST_CHECK_EQUAL( location.sheet, first.Path().AsString() );
+        BOOST_CHECK( location.sheet != second.Path().AsString() );
+    }
+    for( const auto& pin : snapshot.pins )
+        BOOST_CHECK_EQUAL( pin.sheet, first.Path().AsString() );
+    BOOST_CHECK_EQUAL( snapshot.probes.front().sheet, first.Path().AsString() );
+
+    SIMULATION_OVERLAY overlay;
+    const auto& button = snapshot.locations.at( snapshot.circuit.switches.front().component );
+    BOOST_CHECK_EQUAL( overlay.SwitchAt( snapshot, first.Path().AsString(), button.position ), 0 );
+    BOOST_CHECK_EQUAL( overlay.SwitchAt( snapshot, second.Path().AsString(), button.position ), -1 );
+}
 
 BOOST_AUTO_TEST_CASE( RealtimeSimulationPreferencesPersistAndOlderSettingsKeepDefaults )
 {

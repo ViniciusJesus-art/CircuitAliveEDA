@@ -302,8 +302,15 @@ void SCH_EDIT_FRAME::LoadSettings( APP_SETTINGS_BASE* aCfg )
 
 void SCH_EDIT_FRAME::SaveSettings( APP_SETTINGS_BASE* aCfg )
 {
+    SCH_BASE_FRAME::SaveSettings( eeconfig() );
+    SaveEditorLayoutSettings();
+}
+
+
+void SCH_EDIT_FRAME::SaveEditorLayoutSettings()
+{
     EESCHEMA_SETTINGS* cfg = eeconfig();
-    SCH_BASE_FRAME::SaveSettings( cfg );
+    SaveWindowSettings( &cfg->m_Window );
     wxAuiPaneInfo& hierarchy_pane = m_auimgr.GetPane( SchematicHierarchyPaneName() );
 
     if( cfg )

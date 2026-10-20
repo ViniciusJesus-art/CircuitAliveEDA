@@ -39,6 +39,7 @@
 #include <tool/actions.h>
 #include <tool/action_manager.h>
 #include <tool/action_menu.h>
+#include <widgets/wx_menubar.h>
 #include <view/view.h>
 #include <view/wx_view_controls.h>
 #include <eda_draw_frame.h>
@@ -552,7 +553,9 @@ void TOOL_DISPATCHER::DispatchWxEvent( wxEvent& aEvent )
     // is opened and is iconized on Windows).
     // In this case, give the focus to the parent frame (GAL canvas itself does not accept the
     // focus when iconized for some obscure reason)
-    if( focus == nullptr )
+    const auto* menuFrame = dynamic_cast<wxFrame*>( m_toolMgr->GetToolHolder() );
+    const bool menuOpen = WX_MENUBAR::IsMenuOpen( menuFrame );
+    if( focus == nullptr && !menuOpen )
     {
         wxWindow* holderWindow = dynamic_cast<wxWindow*>( m_toolMgr->GetToolHolder() );
 
@@ -568,7 +571,7 @@ void TOOL_DISPATCHER::DispatchWxEvent( wxEvent& aEvent )
         }
     }
 
-    if( isMouseClick( type ) )
+    if( isMouseClick( type ) && !menuOpen )
     {
         if( m_toolMgr->GetToolHolder() && m_toolMgr->GetToolHolder()->GetToolCanvas() &&
             !m_toolMgr->GetToolHolder()->GetToolCanvas()->HasFocus() )

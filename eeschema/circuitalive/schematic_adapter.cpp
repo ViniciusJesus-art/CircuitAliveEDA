@@ -143,6 +143,8 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
     std::vector<POWER_SYMBOL> powerSymbols;
     std::map<std::string, std::size_t> packages;
     const wxString variant = aSchematic.GetCurrentVariant();
+    // PathAsString omits the first sheet UUID and is "/" for every top-level page.
+    // Use the complete instance path for overlays and hit testing across pages.
     for( SCH_SHEET_PATH& sheet : aSchematic.Hierarchy() )
     {
         if( sheet.GetExcludedFromSim( variant ) )
@@ -178,7 +180,7 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
                 const auto at = std::upper_bound( probes.begin(), probes.end(), probe.sequence,
                     []( std::size_t sequence, const CIRCUIT_PROBE& p ) { return sequence < p.sequence; } ) - probes.begin();
                 probes.insert( probes.begin() + at, std::move( probe ) );
-                result.probes.insert( result.probes.begin() + at, { sheet.PathAsString(), symbol->m_Uuid.AsString(),
+                result.probes.insert( result.probes.begin() + at, { sheet.Path().AsString(), symbol->m_Uuid.AsString(),
                     symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition() } );
                 continue;
             }
@@ -220,11 +222,11 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
             {
                 if( symbol->IsMultiUnit() ) packages[component.reference] = index;
                 components.push_back( std::move( component ) );
-                result.locations.push_back( { sheet.PathAsString(), symbol->m_Uuid.AsString(),
+                result.locations.push_back( { sheet.Path().AsString(), symbol->m_Uuid.AsString(),
                                               symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition() } );
             }
             if( aPinIndicators ) for( const SCH_PIN* pin : symbol->GetPins( &sheet ) )
-                result.pins.push_back( { index, pin->GetShownNumber().ToStdString(), sheet.PathAsString(), pin->GetPosition() } );
+                result.pins.push_back( { index, pin->GetShownNumber().ToStdString(), sheet.Path().AsString(), pin->GetPosition() } );
         }
     }
     result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators, powerSymbols, aPreferences );

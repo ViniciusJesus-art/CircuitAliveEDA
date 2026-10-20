@@ -339,6 +339,24 @@ const SCOPE_HISTORY& SCOPE_PANEL::history() const
     static const SCOPE_HISTORY empty;
     return m_history ? *m_history : empty;
 }
+void SCOPE_PANEL::ResetSession()
+{
+    m_channels.clear();
+    m_statistics.clear();
+    m_source->Clear();
+    m_channel->Clear();
+    m_cursorSource->Clear();
+    m_readings->DeleteAllItems();
+    m_history.reset();
+    m_acquisition = SCOPE_ACQUISITION();
+    m_serial = std::numeric_limits<std::uint64_t>::max();
+    m_readingsSerial = 0;
+    m_hold->SetValue( false );
+    m_latest = -1;
+    m_frameGap = 0;
+    m_plot->Refresh( false );
+}
+
 void SCOPE_PANEL::UpdateSession( const CIRCUIT_SNAPSHOT& circuit, const EDITOR_SESSION_VIEW& session )
 {
     const bool changed = m_history != session.scopeHistory;

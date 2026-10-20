@@ -1,6 +1,11 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "instrument_panel.h"
 #include "choice_controls.h"
+#include <eeschema_settings.h>
+#include <paths.h>
+#include <pgm_base.h>
+#include <settings/settings_manager.h>
+#include <widgets/wx_aui_utils.h>
 #include <wx/aui/aui.h>
 #include <wx/button.h>
 #include <wx/listctrl.h>
@@ -61,6 +66,49 @@ INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_
         _( "V and scope use the circuit reference.\nA and W insert an ideal series sensor.\nCurrent: left → right or top → bottom.\nWire power: V(reference) × I.\n\nComponent V / I / P: Simulation model..." ) );
     description->Wrap( 300 ); contents->Add( description, 0, wxALL, 8 );
     tools->SetSizer( contents ); m_tabs->AddPage( tools, _( "Probes" ), true );
+    m_measurePage = new wxPanel( m_tabs );
+    auto* measurements = new wxBoxSizer( wxVERTICAL );
+    m_values = new wxListCtrl( m_measurePage, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                               wxLC_REPORT | wxLC_SINGLE_SEL );
+    m_values->InsertColumn( 0, _( "Name" ), wxLIST_FORMAT_LEFT, 108 );
+    m_values->InsertColumn( 1, _( "Type" ), wxLIST_FORMAT_LEFT, 42 );
+    m_values->InsertColumn( 2, _( "Value" ), wxLIST_FORMAT_LEFT, 140 );
+    measurements->Add( m_values, 1, wxEXPAND | wxALL, 4 );
+    auto* help = new wxStaticText( m_measurePage, wxID_ANY,
+                                  _( "Component P: positive = absorbed, negative = delivered." ) );
+    help->Wrap( 300 );
+    measurements->Add( help, 0, wxALL, 6 );
+    m_measurePage->SetSizer( measurements );
+    m_tabs->AddPage( m_measurePage, _( "Measurements" ) );
+
+    m_scopePage = new wxPanel( m_tabs );
+    auto* scope = new wxBoxSizer( wxVERTICAL );
+    m_scope = new SCOPE_PANEL( m_scopePage, m_scopePreferences, [this]()
+    {
+        if( auto* manager = wxAuiManager::GetManager( GetParent() ) )
+        {
+            auto& pane = manager->GetPane( this );
+            const bool docking = pane.IsFloating();
+            const int dockWidth = pane.best_size.x;
+            if( docking )
+                pane.Dock();
+            else
+                pane.Float().FloatingPosition( GetParent()->GetScreenPosition() + FromDIP( wxPoint( 40, 40 ) ) );
+            manager->Update();
+            if( docking && dockWidth > 0 )
+                SetAuiPaneSize( *manager, pane, dockWidth, -1 );
+        }
+    } );
+    scope->Add( m_scope, 1, wxEXPAND );
+    m_scopePage->SetSizer( scope );
+    m_tabs->AddPage( m_scopePage, _( "Oscilloscope" ) );
+    if( auto* cfg = GetAppSettings<EESCHEMA_SETTINGS>( "eeschema" ) )
+    {
+        const auto selected = cfg->Get<int>( "appearance.simulation_tab" );
+        m_hasTabPreference = selected.has_value();
+        m_tabs->ChangeSelection( std::clamp( selected.value_or( 0 ), 0, 2 ) );
+    }
+    m_tabs->Bind( wxEVT_NOTEBOOK_PAGE_CHANGED, &INSTRUMENT_PANEL::tabChanged, this );
     layout->Add( m_tabs, 1, wxEXPAND ); SetSizer( layout );
 }
 
@@ -72,7 +120,16 @@ INSTRUMENT_PANEL::~INSTRUMENT_PANEL()
 
 std::string INSTRUMENT_PANEL::ProbeName() const { return m_name->GetValue().ToStdString(); }
 void INSTRUMENT_PANEL::ClearProbeName() { m_name->Clear(); }
-void INSTRUMENT_PANEL::SelectTools() { m_tabs->SetSelection( 0 ); }
+void INSTRUMENT_PANEL::tabChanged( wxBookCtrlEvent& event )
+{
+    m_hasTabPreference = true;
+    if( auto* cfg = GetAppSettings<EESCHEMA_SETTINGS>( "eeschema" ) )
+    {
+        cfg->Set<int>( "appearance.simulation_tab", m_tabs->GetSelection() );
+        cfg->SaveToFile( PATHS::GetUserSettingsPath(), true );
+    }
+    event.Skip();
+}
 void INSTRUMENT_PANEL::SetPlacement( std::optional<PROBE_KIND> kind )
 {
     for( std::size_t i = 0; i < m_buttons.size(); ++i ) m_buttons[i]->SetValue( kind && static_cast<std::size_t>( *kind ) == i );
@@ -99,44 +156,10 @@ void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const 
     bool values = false, scope = false;
     for( const auto& channel : snapshot.circuit.measurements )
         if( channel.scope ) scope = true; else values = true;
-    values &= active; scope &= active;
-    auto remove = [&]( wxPanel*& page )
-    {
-        if( !page ) return;
-        const int index = m_tabs->FindPage( page );
-        if( index != wxNOT_FOUND ) m_tabs->DeletePage( index );
-        page = nullptr;
-    };
-    if( !values ) { remove( m_measurePage ); m_values = nullptr; m_rows.clear(); }
-    if( !scope ) { remove( m_scopePage ); m_scope = nullptr; }
-    if( values && !m_measurePage )
-    {
-        m_measurePage = new wxPanel( m_tabs ); auto* layout = new wxBoxSizer( wxVERTICAL );
-        m_values = new wxListCtrl( m_measurePage, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL );
-        m_values->InsertColumn( 0, _( "Name" ), wxLIST_FORMAT_LEFT, 108 );
-        m_values->InsertColumn( 1, _( "Type" ), wxLIST_FORMAT_LEFT, 42 );
-        m_values->InsertColumn( 2, _( "Value" ), wxLIST_FORMAT_LEFT, 140 );
-        layout->Add( m_values, 1, wxEXPAND | wxALL, 4 );
-        auto* help = new wxStaticText( m_measurePage, wxID_ANY, _( "Component P: positive = absorbed, negative = delivered." ) );
-        help->Wrap( 300 ); layout->Add( help, 0, wxALL, 6 ); m_measurePage->SetSizer( layout );
-        m_tabs->AddPage( m_measurePage, _( "Measurements" ) );
-    }
-    if( scope && !m_scopePage )
-    {
-        m_scopePage = new wxPanel( m_tabs ); auto* layout = new wxBoxSizer( wxVERTICAL );
-        m_scope = new SCOPE_PANEL( m_scopePage, m_scopePreferences, [this]()
-        {
-            if( auto* manager = wxAuiManager::GetManager( GetParent() ) )
-            {
-                auto& pane = manager->GetPane( this );
-                if( pane.IsFloating() ) pane.Dock().Right().BestSize( 350, 650 );
-                else pane.Float().FloatingSize( 1100, 900 ).FloatingPosition( GetParent()->GetScreenPosition() + wxPoint( 40, 40 ) );
-                manager->Update();
-            }
-        } );
-        layout->Add( m_scope, 1, wxEXPAND );
-        m_scopePage->SetSizer( layout ); m_tabs->AddPage( m_scopePage, _( "Oscilloscope" ) );
-    }
+    // Keep the controls alive across Stop/Play, including their column widths, scope
+    // settings and notebook selections. Only the acquired circuit data is reset.
+    if( active != m_wasActive )
+        m_scope->ResetSession();
     const auto now = std::chrono::steady_clock::now();
     if( m_values && m_values->IsShownOnScreen() && now - m_lastValues >= std::chrono::milliseconds( 100 ) )
     {
@@ -156,12 +179,15 @@ void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const 
             if( m_values->GetItemText( row, 2 ) != wxString::FromUTF8( value ) ) m_values->SetItem( row, 2, wxString::FromUTF8( value ) );
             ++row;
         }
+        while( m_values->GetItemCount() > static_cast<long>( row ) )
+            m_values->DeleteItem( m_values->GetItemCount() - 1 );
+        m_rows.resize( row );
     }
     if( m_scope ) m_scope->UpdateSession( snapshot.circuit, session );
-    if( active && !m_wasActive )
+    if( active && !m_wasActive && !m_hasTabPreference )
     {
-        auto* page = m_measurePage ? m_measurePage : m_scopePage;
-        if( page ) m_tabs->SetSelection( m_tabs->FindPage( page ) );
+        if( values || scope )
+            m_tabs->SetSelection( values ? 1 : 2 );
     }
     m_wasActive = active;
 }

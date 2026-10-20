@@ -1,5 +1,6 @@
 .downloads-by-cmake
 .gdb_history
+.gitignore
 boost_root
 /Build*
 /build*
@@ -121,6 +122,7 @@ CMakeSettings.json
 compile_commands.json
 /vcpkg_installed
 CMakePresets.json
+*.code-workspace
 
 # Sublime Text
 *.sublime-*

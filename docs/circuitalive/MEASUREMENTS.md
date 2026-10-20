@@ -2,7 +2,7 @@
 
 O painel **Simulation** inicia recolhido. Abra-o pela seta diagonal no final
 da barra direita; outro clique cancela a colocação e recolhe o painel.
-Ele contém a aba **Probes**.
+Ele contém as abas **Probes**, **Measurements** e **Oscilloscope**.
 Escolha Voltage, Current, Power ou Oscilloscope e clique em um fio elétrico.
 O símbolo é uma seta diagonal para cima e para a direita, com V, A, W ou ~.
 É possível colocar várias probes seguidas; **Esc** encerra a ferramenta.
@@ -68,14 +68,20 @@ Mudar essas opções encerra a sessão anterior; Play reconstrói o circuito.
 
 ## Abas durante a execução
 
-- **Measurements** abre automaticamente com Play se houver probes V/A/W ou
+- **Measurements** é selecionada no primeiro Play se houver probes V/A/W ou
   medições marcadas em componentes. Mostra nome, unidade e valor instantâneo,
   incluindo prefixos m, µ, k etc. Uma probe desconectada mostra `—`.
-- **Oscilloscope** só aparece quando existe uma probe desse tipo no esquema.
-  Se ela for o único instrumento, sua aba é selecionada automaticamente.
+- **Oscilloscope** recebe os sinais das probes desse tipo no esquema.
+  Se ela for o único instrumento e ainda não houver uma aba preferida, sua aba é selecionada automaticamente.
   Várias probes de osciloscópio geram curvas com cores diferentes no mesmo gráfico.
 - Pause congela o tempo, as leituras e as curvas. Play retoma a sessão;
-  Stop descarta os dados e recolhe as duas abas. A aba Probes permanece disponível.
+  Stop descarta os dados da sessão e mantém os controles das três abas.
+
+A largura, a posição fixa ou flutuante e a aba escolhida ficam nas configurações
+globais do editor, inclusive ao reabrir outro projeto. Ocultar/mostrar o painel
+ou usar Stop/Play conserva esses ajustes, os controles do osciloscópio e sua
+aba interna. Expandir e voltar a fixar o painel conserva os tamanhos da lateral
+e da janela flutuante separadamente.
 
 ## Osciloscópio
 

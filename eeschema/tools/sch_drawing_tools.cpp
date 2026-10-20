@@ -62,6 +62,7 @@
 #include <sch_label.h>
 #include <sch_bitmap.h>
 #include <schematic.h>
+#include <widgets/used_symbols.h>
 #include <sch_commit.h>
 #include <scoped_set_reset.h>
 #include <libraries/legacy_symbol_library.h>
@@ -295,6 +296,13 @@ int SCH_DRAWING_TOOLS::PlaceSymbol( const TOOL_EVENT& aEvent )
 
         if( evt->IsCancelInteractive() || ( symbol && evt->IsAction( &ACTIONS::undo ) ) )
         {
+            if( CIRCUITALIVE::CancelUsedSymbolPlacement( m_frame,
+                    evt->IsCancelInteractive() ? symbol : nullptr ) )
+            {
+                // Consume this Escape: the selection tool must only disarm the palette
+                // on a subsequent Escape, after the preview has gone away.
+                evt->SetPassEvent( false );
+            }
             m_frame->GetInfoBar()->Dismiss();
 
             if( symbol )
@@ -317,6 +325,7 @@ int SCH_DRAWING_TOOLS::PlaceSymbol( const TOOL_EVENT& aEvent )
             if( symbol )
             {
                 // A repeated preview must not prevent switching to another tool.
+                CIRCUITALIVE::FinishUsedSymbolPlacement( m_frame, symbol );
                 cleanup();
             }
 
@@ -465,6 +474,15 @@ int SCH_DRAWING_TOOLS::PlaceSymbol( const TOOL_EVENT& aEvent )
             }
             else
             {
+                if( CIRCUITALIVE::UsedSymbolPlacementOverExisting( m_frame, symbol, cursorPos ) )
+                {
+                    CIRCUITALIVE::FinishUsedSymbolPlacement( m_frame, symbol );
+                    cleanup();
+                    m_frame->PopTool( aEvent );
+                    m_selectionTool->SelectPoint( cursorPos, { SCH_SYMBOL_T } );
+                    break;
+                }
+                CIRCUITALIVE::FinishUsedSymbolPlacement( m_frame, symbol );
                 m_view->ClearPreview();
                 m_frame->AddToScreen( symbol, screen );
 

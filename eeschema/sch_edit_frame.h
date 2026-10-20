@@ -170,6 +170,7 @@ public:
 
     void LoadSettings( APP_SETTINGS_BASE* aCfg ) override;
     void SaveSettings( APP_SETTINGS_BASE* aCfg ) override;
+    void SaveEditorLayoutSettings();
 
     void CreateDefaultScreens();
 
@@ -439,6 +440,9 @@ public:
      * Draw the current sheet on the display.
      */
     void DisplayCurrentSheet();
+
+    void NewPage();
+    void EditPage();
 
     /**
      * Use the wxWidgets print code to draw an image of the current sheet onto the clipboard.

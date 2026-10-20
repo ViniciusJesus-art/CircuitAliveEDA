@@ -38,6 +38,7 @@
 #include <math/util.h> // for KiROUND
 #include <geometry/geometry_utils.h>
 #include <widgets/ui_common.h>
+#include <widgets/wx_menubar.h>
 #include <class_draw_panel_gal.h>
 #include <eda_draw_frame.h>
 #include <kiway.h>
@@ -601,7 +602,8 @@ void WX_VIEW_CONTROLS::onEnter( wxMouseEvent& aEvent )
     // Avoid stealing focus from text controls
     // This is particularly important for users using On-Screen-Keyboards
     // They may move the mouse over the canvas to reach the keyboard
-    if( KIUI::IsInputControlFocused() )
+    if( KIUI::IsInputControlFocused()
+        || WX_MENUBAR::IsMenuOpen( dynamic_cast<wxFrame*>( m_parentPanel->GetParent() ) ) )
     {
         return;
     }

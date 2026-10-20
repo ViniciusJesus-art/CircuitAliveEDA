@@ -31,6 +31,7 @@ class SCHEMATIC;
 class SCH_EDIT_FRAME;
 class SETTINGS_MANAGER;
 class PROJECT;
+class SCH_IO;
 
 /**
  * Helper functions to do things like load schematics behind the scenes for special functions
@@ -41,6 +42,15 @@ class PROJECT;
 class EESCHEMA_HELPERS
 {
 public:
+    /// Find the project that owns a page opened directly from the file browser.
+    static wxString FindProjectForSchematic( const wxString& aFileName );
+
+    /// Load declared pages plus schematic files beside the selected page, without duplicating
+    /// screens already used as hierarchical children. Select the file the user opened.
+    /// Return whether page numbers were assigned (normal setup, not a file repair).
+    static bool LoadProjectSheets( SCH_IO& aPlugin, SCHEMATIC& aSchematic,
+                                   const wxString& aFileName );
+
     static void              SetSchEditFrame( SCH_EDIT_FRAME* aSchEditFrame );
     static SCHEMATIC*        LoadSchematic( const wxString& aFileName, bool aSetActive,
                                             bool aForceDefaultProject,

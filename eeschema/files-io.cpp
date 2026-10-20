@@ -32,6 +32,7 @@
 #include <dialog_symbol_remap.h>
 #include <dialog_import_choose_project.h>
 #include <eeschema_settings.h>
+#include <eeschema_helpers.h>
 #include <id.h>
 #include <kiface_base.h>
 #include <kiplatform/app.h>
@@ -145,8 +146,7 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
     PROF_TIMER openFiles( "OpenProjectFile" );
 #endif
 
-    wxFileName pro = fullFileName;
-    pro.SetExt( FILEEXT::ProjectFileExtension );
+    wxFileName pro( EESCHEMA_HELPERS::FindProjectForSchematic( fullFileName ) );
 
     bool is_new = !wxFileName::IsFileReadable( fullFileName );
 
@@ -242,9 +242,8 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
         Prj().SetElem( PROJECT::ELEM::LEGACY_SYMBOL_LIBS, nullptr );
     }
 
-    wxFileName rfn( GetCurrentFileName() );
-    rfn.MakeRelativeTo( Prj().GetProjectPath() );
-    LoadWindowState( rfn.GetFullPath() );
+    // Editor geometry and pane layout are user preferences shared by all projects.
+    // Keep the global window state instead of restoring a per-schematic geometry.
 
     KIPLATFORM::APP::SetShutdownBlockReason( this, _( "Schematic file changes are unsaved" ) );
 
@@ -281,6 +280,7 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
         pi->SetProgressReporter( &progressReporter );
 
         bool failedLoad = false;
+        bool discoveredPageNumbers = false;
 
         try
         {
@@ -288,93 +288,8 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
                 wxBusyCursor    busy;
                 WINDOW_DISABLER raii( this );
 
-                // Check if project file has top-level sheets defined
-                PROJECT_FILE& projectFile = Prj().GetProjectFile();
-                const std::vector<TOP_LEVEL_SHEET_INFO>& topLevelSheets = projectFile.GetTopLevelSheets();
-
-                if( !topLevelSheets.empty() )
-                {
-                    std::vector<SCH_SHEET*> loadedSheets;
-
-                    // Load each top-level sheet
-                    for( const TOP_LEVEL_SHEET_INFO& sheetInfo : topLevelSheets )
-                    {
-                        wxFileName sheetFileName( Prj().GetProjectPath(), sheetInfo.filename );
-
-                        // When loading legacy schematic files, ensure we are referencing the correct extension
-                        if( schFileType == SCH_IO_MGR::SCH_LEGACY )
-                            sheetFileName.SetExt( FILEEXT::LegacySchematicFileExtension );
-
-                        wxString sheetPath = sheetFileName.GetFullPath();
-
-                        if( !wxFileName::FileExists( sheetPath ) )
-                        {
-                            wxLogWarning( wxT( "Top-level sheet file not found: %s" ), sheetPath );
-                            continue;
-                        }
-
-                        SCH_SHEET* sheet = pi->LoadSchematicFile( sheetPath, newSchematic.get() );
-
-                        if( sheet )
-                        {
-                            // Preserve the UUID from the project file, unless it's niluuid which is
-                            // just a placeholder meaning "use the UUID from the file"
-                            if( sheetInfo.uuid != niluuid )
-                            {
-                                const_cast<KIID&>( sheet->m_Uuid ) = sheetInfo.uuid;
-                            }
-
-                            sheet->SetName( sheetInfo.name );
-                            loadedSheets.push_back( sheet );
-
-                            wxLogTrace( tracePathsAndFiles,
-                                       wxS( "Loaded top-level sheet '%s' (UUID %s) from %s" ),
-                                       sheet->GetName(),
-                                       sheet->m_Uuid.AsString(),
-                                       sheetPath );
-                        }
-                    }
-
-                    if( !loadedSheets.empty() )
-                    {
-                        newSchematic->SetTopLevelSheets( loadedSheets );
-                    }
-                    else
-                    {
-                        wxLogTrace( tracePathsAndFiles,
-                                   wxS( "Loaded multi-root schematic with no top-level sheets!" ) );
-                        newSchematic->CreateDefaultScreens();
-                    }
-                }
-                else
-                {
-                    // Legacy single-root format: Load the single root sheet
-                    SCH_SHEET* rootSheet = pi->LoadSchematicFile( fullFileName, newSchematic.get() );
-
-                    if( rootSheet )
-                    {
-                        newSchematic->SetTopLevelSheets( { rootSheet } );
-
-                        // Make ${SHEETNAME} work on the root sheet until we properly support
-                        // naming the root sheet
-                        if( SCH_SHEET* topSheet = newSchematic->GetTopLevelSheet() )
-                            topSheet->SetName( _( "Root" ) );
-
-                        wxLogTrace( tracePathsAndFiles,
-                                   wxS( "Loaded schematic with root sheet UUID %s" ),
-                                   rootSheet->m_Uuid.AsString() );
-                        wxLogTrace( traceSchCurrentSheet,
-                                   "After loading: Current sheet path='%s', size=%zu, empty=%d",
-                                   newSchematic->CurrentSheet().Path().AsString(),
-                                   newSchematic->CurrentSheet().size(),
-                                   newSchematic->CurrentSheet().empty() ? 1 : 0 );
-                    }
-                    else
-                    {
-                        newSchematic->CreateDefaultScreens();
-                    }
-
-                }
+                discoveredPageNumbers = EESCHEMA_HELPERS::LoadProjectSheets(
+                        *pi, *newSchematic, fullFileName );
             }
 
             if( !pi->GetError().IsEmpty() )
@@ -442,17 +357,16 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
 
         SCH_SHEET_LIST sheetList = Schematic().Hierarchy();
 
-        bool repairedPageNumbers = false;
+        bool repairedPageNumbers = discoveredPageNumbers;
 
         if( sheetList.AllSheetPageNumbersEmpty() )
             sheetList.SetInitialPageNumbers();
         else
-            repairedPageNumbers = sheetList.RepairPageNumbers();
+            repairedPageNumbers |= sheetList.RepairPageNumbers();
 
-        // It's possible the schematic parser fixed errors due to bugs, or that we reassigned
-        // duplicate or blank sheet page numbers, so warn the user that the schematic has been
-        // fixed (modified).
-        if( sheetList.IsModified() || repairedPageNumbers )
+        // Assigning numbers to newly discovered pages is normal project setup. Only parser
+        // repairs indicate a damaged file; numbering changes are marked dirty below.
+        if( sheetList.IsModified() )
         {
             DisplayInfoMessage( this,
                                 _( "An error was found when loading the schematic that has "

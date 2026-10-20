@@ -26,7 +26,9 @@
 
 #include <wx/accel.h>
 #include <wx/menu.h>
+#include <wx/frame.h>
 #include <tool/action_menu.h>
+#include <set>
 
 
 /**
@@ -48,6 +50,26 @@ class WX_MENUBAR : public wxMenuBar
 public:
     // Just take all constructors
     using wxMenuBar::wxMenuBar;
+
+    // The canvas must leave focus with an open menu until the user chooses an item.
+    void OnMenuEvent( const wxMenuEvent& aEvent )
+    {
+        if( aEvent.GetEventType() == wxEVT_MENU_OPEN )
+            m_openMenus.insert( aEvent.GetMenu() );
+        else if( aEvent.GetEventType() == wxEVT_MENU_CLOSE )
+        {
+            if( aEvent.GetMenu() )
+                m_openMenus.erase( aEvent.GetMenu() );
+            else
+                m_openMenus.clear();
+        }
+    }
+
+    static bool IsMenuOpen( const wxFrame* aFrame )
+    {
+        auto* bar = aFrame ? dynamic_cast<WX_MENUBAR*>( aFrame->GetMenuBar() ) : nullptr;
+        return bar && !bar->m_openMenus.empty();
+    }
 
     void SetAcceleratorTable( const wxAcceleratorTable& aTable ) override
     {
@@ -71,6 +93,9 @@ public:
 
         return wxMenuBar::GetMenuLabelText( aPos );
     }
+
+private:
+    std::set<wxMenu*> m_openMenus;
 };
 
 #endif // COMMON_WIDGETS_WX_BUSY_INDICATOR__H

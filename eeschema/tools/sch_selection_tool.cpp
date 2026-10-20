@@ -44,6 +44,7 @@
 #include <preview_items/selection_area.h>
 #include <sch_commit.h>
 #include <sch_edit_frame.h>
+#include <widgets/used_symbols.h>
 #include <connection_graph.h>
 #include <sch_line.h>
 #include <sch_bus_entry.h>
@@ -573,6 +574,14 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
             SCH_SELECTION_FILTER_OPTIONS rejected;
 
             CollectHits( collector, evt->Position() );
+            if( collector.GetCount() == 0 && !hasModifier() )
+            {
+                if( auto* editor = dynamic_cast<SCH_EDIT_FRAME*>( m_frame ) )
+                {
+                    if( CIRCUITALIVE::BeginUsedSymbolPlacement( editor, evt->Position() ) )
+                        continue;
+                }
+            }
             size_t preFilterCount = collector.GetCount();
             rejected.SetAll( false );
             narrowSelection( collector, evt->Position(), false, false, &rejected );
@@ -1149,6 +1158,8 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
         }
         else if( evt->IsCancelInteractive() )
         {
+            if( auto* editor = dynamic_cast<SCH_EDIT_FRAME*>( m_frame ) )
+                CIRCUITALIVE::CancelUsedSymbolPlacement( editor );
             m_disambiguateTimer.Stop();
 
             // We didn't set these, but we have reports that they leak out of some other tools,

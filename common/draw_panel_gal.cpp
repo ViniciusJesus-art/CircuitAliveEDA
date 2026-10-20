@@ -48,6 +48,7 @@
 #include <tool/tool_manager.h>
 
 #include <widgets/wx_infobar.h>
+#include <widgets/wx_menubar.h>
 
 #include <kiplatform/ui.h>
 
@@ -871,6 +872,7 @@ bool EDA_DRAW_PANEL_GAL::SwitchBackend( GAL_TYPE aGalType )
 void EDA_DRAW_PANEL_GAL::OnEvent( wxEvent& aEvent )
 {
     bool shouldSetFocus = m_lostFocus && m_stealsFocus
+                          && !WX_MENUBAR::IsMenuOpen( m_edaFrame )
                           && !KIUI::IsInputControlFocused()                // Don't steal from input controls
                           && !KIUI::IsModalDialogFocused()                 // Don't steal from dialogs
                           && KIPLATFORM::UI::IsWindowActive( m_edaFrame ); // Don't steal from other windows
@@ -890,6 +892,7 @@ void EDA_DRAW_PANEL_GAL::OnEvent( wxEvent& aEvent )
 void EDA_DRAW_PANEL_GAL::onEnter( wxMouseEvent& aEvent )
 {
     bool shouldSetFocus = m_stealsFocus
+                          && !WX_MENUBAR::IsMenuOpen( m_edaFrame )
                           && !KIUI::IsInputControlFocused()                // Don't steal from input controls
                           && !KIUI::IsModalDialogFocused()                 // Don't steal from dialogs
                           && KIPLATFORM::UI::IsWindowActive( m_edaFrame ); // Don't steal from other windows
