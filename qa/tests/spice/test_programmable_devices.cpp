@@ -1080,6 +1080,53 @@ BOOST_AUTO_TEST_CASE( ProgrammableInputSnapshotsRemainImmutableWhenReusedOrRepla
     BOOST_CHECK( PinDrive( runtime, "OUT" ) == PROGRAMMABLE_DRIVE::LOW );
 }
 
+BOOST_AUTO_TEST_CASE( ProgrammableStopConditionsKeepPrecisionAcrossLongTimeRanges )
+{
+    // A small deterministic backend isolates the solver/stop-parser handoff
+    // from firmware execution cost. It emits exact half-second output edges.
+    PROGRAMMABLE_DEVICE_CONFIG device;
+    device.id = "CLOCK"; device.device = "synthetic-clock";
+    device.pins = { "OUT" };
+    device.quantumSeconds = 1e-6;
+    device.autonomousWindowSeconds = .001;
+    device.bindings = { { "OUT", "v(out)", "", "", "", 0 } };
+    device.source = R"JS(
+        globalThis.createDevice = function() {
+            let next = 0;
+            function prepare(time) {
+                const events = [];
+                while(next <= time) {
+                    events.push({pin:'OUT',drive:(Math.round(next*2)%2)?1:2,time:next});
+                    next += .5;
+                }
+                return {time,events,needsInputs:false};
+            }
+            return {nextEventTime:()=>Infinity,advanceTo:t=>prepare(t).events,prepareWindow:prepare};
+        };
+    )JS";
+    SIM_SESSION_CONFIG config;
+    config.step = config.maxStep = 100e-6;
+    config.horizon = 130;
+    config.signals = { "v(out)" };
+    config.programmableDevices = { device };
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( "Long-time stop precision\nVcc vcc 0 5\n"
+        "Aout %gd out 0 %gd out vcc gpio\n.model gpio ca_programmable_pin(slot=0)\n"
+        "Rload out 0 10k\n.end\n", config );
+    for( const double origin : { 32., 64., 128. } )
+    {
+        const double target = origin + .008041666662212;
+        session.AdvanceTo( target );
+        const auto high = session.Snapshot( true );
+        BOOST_REQUIRE_SMALL( high.latest.time - target, 1e-10 );
+        BOOST_REQUIRE_GT( high.latest.values[0], 4.9 );
+        session.AdvanceTo( origin + .504041666662212 );
+        const auto low = session.Snapshot( true );
+        BOOST_REQUIRE_SMALL( low.latest.time - origin - .504041666662212, 1e-10 );
+        BOOST_REQUIRE_LT( low.latest.values[0], .1 );
+    }
+}
+
 BOOST_FIXTURE_TEST_CASE( ProgrammableRepeatedEditorBatchesKeepAnalogSourcesConvergent, PROGRAM_FILES )
 {
     // A sine source AC-coupled into an amplifier exposed a tiny saved timestep

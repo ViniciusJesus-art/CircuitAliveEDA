@@ -39,6 +39,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <locale>
 #include <map>
 #include <mutex>
@@ -63,6 +64,15 @@ static std::string Number( double aValue )
     stream.imbue( std::locale::classic() );
     stream << std::setprecision( 17 ) << aValue;
     return stream.str();
+}
+
+static double StopThreshold( double time, double bias = 0 )
+{
+    // ngspice parses stop expressions separately from circuit values. At long
+    // times a fixed 10 fs guard becomes smaller than a few representable doubles
+    // (notably at 32 s), so the condition can miss the accepted boundary.
+    const double roundoff = 16 * std::numeric_limits<double>::epsilon() * time;
+    return time - std::max( bias, roundoff );
 }
 
 static bool Token( const std::string& aText )
@@ -281,7 +291,14 @@ private:
         // adaptive maximum; firmware sampling and display timing are unchanged.
         const double initialStep = mixedSignal || !expressions.Empty()
                 ? std::min( cfg.step, 1e-6 ) : cfg.step;
-        deck += "\n.tran " + Number( initialStep ) + " " + Number( cfg.horizon ) + " 0 "
+        // The public horizon is a controller stop, not ngspice's final-time
+        // subtraction. ngspice 46 can produce a zero delta at that subtraction
+        // on Windows. Leave one step of internal room and stop on the last
+        // accepted public point instead; no sample past the horizon is taken.
+        const double solverHorizon = cfg.horizon + std::min( cfg.step, cfg.maxStep );
+        if( !std::isfinite( solverHorizon ) )
+            throw std::runtime_error( "Simulation horizon is too large" );
+        deck += "\n.tran " + Number( initialStep ) + " " + Number( solverHorizon ) + " 0 "
                 + Number( cfg.maxStep ) + ( cfg.useInitialConditions ? " uic\n" : "\n" ) + ".end\n";
 
         if( aRequest.contains( "memories" ) )
@@ -477,6 +494,7 @@ private:
             Load();
         else
             Command( "delete all" );
+        Command( "stop when time >= " + Number( StopThreshold( m_config.horizon ) ) );
         Run( fresh );
     }
 
@@ -577,10 +595,8 @@ private:
         // Do not add a second permanent breakpoint here: a rounded stop just
         // before it would leave a femtosecond remainder to solve on resume.
         // Only actual pin transitions need permanent breakpoints.
-        // ngspice's expression parser may round the decimal threshold a few
-        // ULPs above the breakpoint double. Stop at that breakpoint instead of
-        // missing it and advancing an entire additional solver step.
-        const double threshold = exact ? aTime - std::min(aTime * 1e-9,m_programQuantum * 1e-8) : aTime;
+        const double bias = exact ? ProgrammableStopMargin( aTime ) : 0;
+        const double threshold = StopThreshold( aTime, bias );
         Command( "stop when time >= " + Number( threshold ) );
         Run( fresh );
         Wait();
@@ -746,25 +762,42 @@ private:
 
     double ProgrammableTolerance() const
     {
-        // XSPICE event times can differ from an analog breakpoint by sub-ns
-        // rounding. Bound acceptance to 0.1% of the input sampling interval.
-        return std::max(1e-12,m_programQuantum*1e-3);
+        // Bound acceptance to 0.1% of the sampling interval, while retaining
+        // enough representable doubles at large absolute simulation times.
+        const double roundoff = 32 * std::numeric_limits<double>::epsilon()
+                * std::max( m_programTarget, m_latest.time );
+        return std::max( { 1e-12, m_programQuantum * 1e-3, roundoff } );
+    }
+
+    double ProgrammableStopMargin( double target ) const
+    {
+        // Use one margin for both the stop expression and the last step cap.
+        // Otherwise a valid point just before the boundary can be too late to
+        // shorten its next step, yet too early to satisfy the stop expression.
+        return std::min( { target * 1e-9, ProgrammableTolerance() * .5, 1e-11 } );
     }
 
     static int LimitProgrammableStep( double time, double* delta, void* user )
     {
         auto& self=*static_cast<ENGINE*>(user);
-        if(self.m_config.programmableDevices.empty())return 0;
-        const double boundary=std::min(self.m_programTarget,
-            self.m_programReady?self.m_programBoundary:self.m_programQuantum);
-        const double remaining=boundary-time;
-        // Use the same acceptance tolerance as ScheduleProgrammable. A stop
-        // condition may lie slightly before its sampling boundary. Limiting
-        // the next step to that negligible remainder before the data callback
-        // poisons the solver's saved timestep on resume (especially with AC
-        // sources and capacitors), causing "Timestep too small".
-        if(remaining>self.ProgrammableTolerance()&&*delta>remaining)
-            *delta=remaining;
+        const bool programmable = !self.m_config.programmableDevices.empty();
+        auto limit = [&]( double boundary, double tolerance )
+        {
+            const double remaining = boundary - time;
+            if( remaining > tolerance && *delta > remaining ) *delta = remaining;
+        };
+        // Stop and input boundaries have separate roles. The last CPU window
+        // may end within its sampling tolerance before the requested stop;
+        // reaching that window must not disable the stop's independent cap.
+        if( programmable )
+        {
+            limit( self.m_programTarget, self.ProgrammableStopMargin( self.m_programTarget ) );
+            limit( self.m_programReady ? self.m_programBoundary : self.m_programQuantum,
+                   self.ProgrammableTolerance() );
+        }
+        else
+            limit( self.m_config.horizon,
+                   8 * std::numeric_limits<double>::epsilon() * self.m_config.horizon );
         return 0;
     }
 

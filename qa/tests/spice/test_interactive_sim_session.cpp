@@ -232,6 +232,46 @@ BOOST_AUTO_TEST_CASE( ExplicitHorizonCompletesWithoutSilentRestart )
     BOOST_CHECK_SMALL( session.Snapshot().latest.values[0] - end.latest.values[0], 1e-9 );
 }
 
+BOOST_AUTO_TEST_CASE( DecimalHorizonsEndAtTheLastPublicPointForBatchesAndBackgroundPlay )
+{
+    for( const double horizon : { .03, .07, .29 } )
+    for( const bool background : { false, true } )
+    {
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+        auto cfg = Config();
+        cfg.horizon = horizon;
+        session.Configure( RC, cfg );
+        SIM_SESSION_SNAPSHOT snapshot;
+        if( background )
+        {
+            session.Play();
+            const auto deadline = std::chrono::steady_clock::now() + 3s;
+            do
+            {
+                snapshot = session.Snapshot( true );
+                BOOST_REQUIRE_MESSAGE( snapshot.state != SIM_SESSION_STATE::FAILED, snapshot.error );
+                BOOST_REQUIRE( std::chrono::steady_clock::now() < deadline );
+            } while( snapshot.state != SIM_SESSION_STATE::COMPLETED );
+        }
+        else
+        {
+            double target = .008;
+            do
+            {
+                session.AdvanceTo( std::min( target, horizon ) );
+                snapshot = session.Snapshot( true );
+                target = snapshot.latest.time + .008;
+            } while( snapshot.state != SIM_SESSION_STATE::COMPLETED );
+        }
+        BOOST_CHECK_SMALL( snapshot.latest.time - horizon, 1e-12 );
+        BOOST_CHECK_SMALL( snapshot.latest.values[0] - Charge( snapshot.latest.time ), 2e-5 );
+        BOOST_CHECK( snapshot.error.empty() );
+        for( const auto& sample : snapshot.history )
+            BOOST_CHECK_LE( sample.time, horizon + 1e-14 );
+        BOOST_CHECK_THROW( session.Play(), std::runtime_error );
+    }
+}
+
 BOOST_AUTO_TEST_CASE( SelectedHistorySignalsKeepFullLatestValuesAndSurviveStop )
 {
     INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
