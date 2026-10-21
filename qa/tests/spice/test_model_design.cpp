@@ -388,7 +388,7 @@ BOOST_FIXTURE_TEST_CASE( Visual555PresetOscillatesAndResetDominatesItsLatch, DES
         { "CT", "Device:C", "1u", { { "1", "timing" }, { "2", "0" } } },
         { "RL", "Device:R", "10k", { { "1", "out" }, { "2", "0" } } } }, {}, true );
     c.config.signals = { "v(" + c.pinNodes[2].at( "3" ) + ")", "v(" + c.pinNodes[2].at( "2" ) + ")" };
-    BOOST_CHECK_LE( c.config.maxStep, 1e-5 );
+    BOOST_CHECK_LE( c.config.maxStep, 100e-6 );
     INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER ); session.Configure( c.netlist, c.config );
     bool high = false; double lastRise = 0, period = 0;
     for( int i = 1; i <= 1000; ++i )
@@ -437,6 +437,11 @@ BOOST_FIXTURE_TEST_CASE( VisibleCoresKeepAllBundledElectricalModelsAndTheirMetad
     {
         BOOST_TEST_CONTEXT( id )
         {
+            if( MODEL_REPOSITORY::LoadText( text ).runtime )
+            {
+                BOOST_CHECK_THROW( MODEL_DESIGN::Open( text ), std::runtime_error );
+                continue;
+            }
             auto design = MODEL_DESIGN::Open( text ); design.MakeCoreVisible();
             const auto count = design.blocks.size();
             BOOST_REQUIRE_GE( count, 1 );

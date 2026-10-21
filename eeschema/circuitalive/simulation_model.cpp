@@ -110,7 +110,7 @@ MODEL_REPOSITORY::MODEL_REPOSITORY( std::vector<fs::path> aDirectories ) :
 std::vector<fs::path> MODEL_REPOSITORY::DefaultDirectories( const std::string& aProjectDirectory )
 {
     std::vector<fs::path> paths;
-    if( !aProjectDirectory.empty() ) paths.push_back( fs::path( aProjectDirectory ) / "models" );
+    if( !aProjectDirectory.empty() ) paths.push_back( fs::u8path( aProjectDirectory ) / "models" );
     if( const char* directory = std::getenv( "CIRCUITALIVE_MODEL_DIR" ); directory && *directory )
         paths.emplace_back( directory );
     std::error_code error;
@@ -138,8 +138,10 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
     {
         if( text.size() > 512 * 1024 ) throw std::runtime_error( "Oversized model file" );
         const auto j = JSON::parse( text );
-        if( j.at( "schema_version" ) != 1 || j.at( "backend" ) != "ngspice" )
-            throw std::runtime_error( "Unsupported model version/backend; use ngspice for analog or XSPICE models" );
+        const bool runtime = j.contains( "runtime" );
+        if( ( !runtime && ( j.at( "schema_version" ) != 1 || j.at( "backend" ) != "ngspice" ) )
+            || ( runtime && ( j.at( "schema_version" ) != 2 || j.at( "backend" ) != "ngspice+runtime" ) ) )
+            throw std::runtime_error( "Unsupported model version/backend; programmable models require schema 2 and ngspice+runtime" );
         SIMULATION_MODEL m;
         m.file = fs::absolute( aFile ).lexically_normal();
         m.id = j.at( "id" );
@@ -235,6 +237,56 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
                 ( !memory.resource.empty() && !resourceIds.contains( memory.resource ) ) )
                 throw std::runtime_error( "Invalid model memory region" );
             m.memories.push_back( std::move( memory ) );
+        }
+        if( runtime )
+        {
+            const auto& r = j.at( "runtime" );
+            MODEL_RUNTIME descriptor;
+            if( r.at( "api_version" ) != 1 ) throw std::runtime_error( "Unsupported programmable runtime API" );
+            descriptor.engine = r.at( "engine" );
+            descriptor.device = r.at( "device" );
+            descriptor.modules = r.at( "modules" ).get<std::vector<std::string>>();
+            descriptor.clockParameter = r.at( "clock_parameter" );
+            descriptor.firmwareResource = r.at( "firmware_resource" );
+            descriptor.firmwareBytes = r.at( "firmware_bytes" );
+            descriptor.eepromResource = r.value( "eeprom_resource", "" );
+            descriptor.eepromBytes = r.value( "eeprom_bytes", std::size_t( 0 ) );
+            descriptor.optionsJson = r.value( "options", JSON::object() ).dump();
+            descriptor.vcc = r.at( "vcc" );
+            descriptor.ground = r.at( "gnd" );
+            descriptor.minimumSupply = r.value( "min_supply", 1.8 );
+            descriptor.maximumSupply = r.value( "max_supply", 5.5 );
+            if( descriptor.engine != "javascript" || !Identifier( descriptor.device )
+                || descriptor.modules.empty() || descriptor.modules.size() > 8
+                || !parameters.contains( descriptor.clockParameter )
+                || !resourceIds.contains( descriptor.firmwareResource )
+                || !descriptor.firmwareBytes || descriptor.firmwareBytes > MAX_MEMORY_BYTES
+                || descriptor.eepromBytes > MAX_MEMORY_BYTES
+                || ( descriptor.eepromBytes && !resourceIds.contains( descriptor.eepromResource ) )
+                || !ports.contains( descriptor.vcc ) || !ports.contains( descriptor.ground )
+                || descriptor.vcc == descriptor.ground || !r.value( "options", JSON::object() ).is_object()
+                || descriptor.optionsJson.size() > 64 * 1024
+                || !std::isfinite( descriptor.minimumSupply ) || !std::isfinite( descriptor.maximumSupply )
+                || descriptor.minimumSupply <= 0 || descriptor.maximumSupply < descriptor.minimumSupply )
+                throw std::runtime_error( "Invalid programmable runtime descriptor" );
+            const auto firmware = std::find_if( m.resources.begin(), m.resources.end(),
+                [&]( const auto& resource ) { return resource.id == descriptor.firmwareResource; } );
+            if( !firmware->required ) throw std::runtime_error( "Programmable firmware resource must be required" );
+            for( const auto& module : descriptor.modules )
+                if( module.empty() || module.size() > 4096 || module.find_first_of( "\r\n" ) != std::string::npos )
+                    throw std::runtime_error( "Invalid programmable runtime module path" );
+            std::set<std::string> signalIds, mappedPorts;
+            for( const auto& p : r.at( "pins" ) )
+            {
+                MODEL_RUNTIME_PIN pin{ p.at( "id" ), p.at( "port" ), p.value( "drive", false ) };
+                if( !Identifier( pin.id ) || !ports.contains( pin.port )
+                    || !signalIds.insert( pin.id ).second || !mappedPorts.insert( pin.port ).second )
+                    throw std::runtime_error( "Invalid programmable runtime pin mapping" );
+                descriptor.pins.push_back( std::move( pin ) );
+            }
+            if( descriptor.pins.empty() || descriptor.pins.size() > 256 )
+                throw std::runtime_error( "Invalid programmable runtime pin count" );
+            m.runtime = std::move( descriptor );
         }
         const auto spice = j.value( "spice", JSON::object() );
         m.instance = spice.value( "instance", std::vector<std::string>{} );
@@ -391,6 +443,19 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
         m.voltageConstraint = j.value( "voltage_constraint_parameter", "" );
         m.frequencyParameter = j.value( "frequency_parameter", "" );
         m.maxStepParameter = j.value( "max_step_parameter", "" );
+        if( j.contains( "timing_rc" ) )
+        {
+            const auto& timing = j.at( "timing_rc" );
+            m.timingRcPorts = timing.at( "ports" ).get<std::vector<std::string>>();
+            m.timingRcFallback = timing.value( "fallback", 10e-6 );
+            if( m.timingRcPorts.empty() || m.timingRcPorts.size() > m.pins.size()
+                || !std::isfinite( m.timingRcFallback ) || m.timingRcFallback < 1e-12
+                || m.timingRcFallback > 1 )
+                throw std::runtime_error( "Invalid RC timing limits" );
+            for( const auto& port : m.timingRcPorts )
+                if( std::none_of( m.pins.begin(), m.pins.end(), [&]( const auto& pin ) { return pin.id == port; } ) )
+                    throw std::runtime_error( "Unknown RC timing port" );
+        }
         if( !m.maxStepParameter.empty() && !parameters.contains( m.maxStepParameter ) )
             throw std::runtime_error( "Unknown maximum step parameter" );
         if( !m.frequencyParameter.empty() && !parameters.contains( m.frequencyParameter ) )
@@ -460,8 +525,8 @@ SIMULATION_MODEL MODEL_REPOSITORY::SelectModel( const CIRCUIT_COMPONENT& c ) con
     SIMULATION_MODEL selected;
     if( !c.modelFile.empty() && !c.modelFile.starts_with( "builtin:" ) )
     {
-        fs::path path( c.modelFile );
-        if( path.is_relative() ) path = fs::path( c.projectDirectory ) / path;
+        auto path = fs::u8path( c.modelFile );
+        if( path.is_relative() ) path = fs::u8path( c.projectDirectory ) / path;
         selected = Load( path );
     }
     else
@@ -533,9 +598,9 @@ RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
         if( selection.format != "auto" &&
             std::find( spec.formats.begin(), spec.formats.end(), selection.format ) == spec.formats.end() )
             throw std::runtime_error( "Unsupported file format for " + spec.label );
-        auto path = fs::path( selection.path );
+        auto path = fs::u8path( selection.path );
         if( path.is_relative() )
-            path = fs::path( c.projectDirectory ) / path;
+            path = fs::u8path( c.projectDirectory ) / path;
         std::error_code error;
         const auto size = fs::file_size( path, error );
         if( error || size > spec.maxBytes )
@@ -680,13 +745,75 @@ std::vector<MEMORY_REGION_CONFIG> InitialModelMemories( const CIRCUIT_COMPONENT&
         auto it = c.resources.find( spec.resource );
         if( it != c.resources.end() && !it->second.path.empty() )
         {
-            auto path = fs::path( it->second.path );
+            auto path = fs::u8path( it->second.path );
             if( path.is_relative() )
-                path = fs::path( c.projectDirectory ) / path;
+                path = fs::u8path( c.projectDirectory ) / path;
             LoadMemoryImage( region.initial, path, it->second.format, it->second.address );
         }
         regions.push_back( std::move( region ) );
     }
     return regions;
+}
+
+PROGRAMMABLE_DEVICE_CONFIG InitialModelRuntime( const CIRCUIT_COMPONENT& component, const RESOLVED_MODEL& model )
+{
+    if( !model.model.runtime ) throw std::runtime_error( "Model has no programmable runtime" );
+    const auto& descriptor = *model.model.runtime;
+    PROGRAMMABLE_DEVICE_CONFIG config;
+    config.id = component.reference;
+    config.engine = descriptor.engine;
+    config.device = descriptor.device;
+    config.clockHz = model.parameters.at( descriptor.clockParameter );
+    if( config.clockHz <= 0 ) throw std::runtime_error( "Runtime clock must be positive" );
+    auto options = JSON::parse( descriptor.optionsJson );
+    options["supplyMin"] = descriptor.minimumSupply;
+    options["supplyMax"] = descriptor.maximumSupply;
+    options["hasEepromImage"] = component.resources.contains( descriptor.eepromResource )
+        && !component.resources.at( descriptor.eepromResource ).path.empty();
+    if( model.parameters.contains( "sample_period" ) )
+        config.quantumSeconds = model.parameters.at( "sample_period" );
+    if( config.quantumSeconds < 1e-9 || config.quantumSeconds > 1e-3 )
+        throw std::runtime_error( "Runtime input sampling period must be between 1 ns and 1 ms" );
+    config.optionsJson = options.dump();
+    for( const auto& pin : descriptor.pins ) config.pins.push_back( pin.id );
+    for( const auto& module : descriptor.modules )
+    {
+        auto path = fs::u8path( module );
+        if( path.is_relative() ) path = model.model.file.parent_path() / path;
+        std::error_code error;
+        const auto size = fs::file_size( path, error );
+        if( error || size > 4 * 1024 * 1024 || config.source.size() + size > 4 * 1024 * 1024 )
+            throw std::runtime_error( "Missing or oversized programmable module: " + path.string() );
+        std::ifstream stream( path, std::ios::binary );
+        if( !stream ) throw std::runtime_error( "Cannot read programmable module: " + path.string() );
+        config.source.append( std::istreambuf_iterator<char>( stream ), {} );
+        config.source += "\n;\n";
+    }
+    auto image = [&]( const std::string& resource, std::size_t bytes, bool required )
+    {
+        auto contents = EmptyMemory( bytes, 255 );
+        const auto selection = component.resources.find( resource );
+        if( selection == component.resources.end() || selection->second.path.empty() )
+        {
+            if( required ) throw std::runtime_error( "Choose a firmware file before simulating " + component.reference );
+            return contents.data;
+        }
+        auto path = fs::u8path( selection->second.path );
+        if( path.is_relative() ) path = fs::u8path( component.projectDirectory ) / path;
+        auto data = EmptyMemory( bytes, -1 );
+        LoadMemoryImage( data, path, selection->second.format, selection->second.address );
+        bool loaded = false;
+        for( std::size_t i = 0; i < data.data.size(); ++i )
+        {
+            if( data.known[i] != 0 && data.known[i] != 255 )
+                throw std::runtime_error( "Firmware and EEPROM images require fully known bytes" );
+            if( data.known[i] ) { contents.data[i] = data.data[i]; loaded = true; }
+        }
+        if( required && !loaded ) throw std::runtime_error( "Firmware image contains no data" );
+        return contents.data;
+    };
+    config.firmware = image( descriptor.firmwareResource, descriptor.firmwareBytes, true );
+    if( descriptor.eepromBytes ) config.eeprom = image( descriptor.eepromResource, descriptor.eepromBytes, false );
+    return config;
 }
 } // namespace CIRCUITALIVE

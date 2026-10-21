@@ -124,14 +124,18 @@ if( TARGET circuitalive_sim_session )
         test_interactive_models.cpp test_interactive_measurements.cpp test_interactive_devices.cpp
         test_interactive_complex.cpp test_interactive_power.cpp test_model_design.cpp
         test_interactive_discretes.cpp test_scope_acquisition.cpp test_model_catalog.cpp
-        test_analog_model_catalog.cpp test_live_controls.cpp test_digital_pipeline.cpp test_memory_resources.cpp test_visual_signals.cpp )
+        test_analog_model_catalog.cpp test_live_controls.cpp test_digital_pipeline.cpp test_memory_resources.cpp test_visual_signals.cpp
+        test_programmable_devices.cpp test_compiled_expressions.cpp )
     target_link_libraries( qa_interactive_sim PRIVATE
-        circuitalive_interactive circuitalive_sim_session Boost::unit_test_framework )
+        circuitalive_interactive circuitalive_sim_session circuitalive_programmable_runtime
+        Boost::unit_test_framework )
     target_include_directories( qa_interactive_sim SYSTEM PRIVATE
         ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann_json )
     target_compile_definitions( qa_interactive_sim PRIVATE
         BOOST_TEST_DYN_LINK
         CIRCUITALIVE_TEST_WORKER="$<TARGET_FILE:circuitalive-sim-worker>"
+        CIRCUITALIVE_TEST_AVR_RUNTIME="${PROJECT_SOURCE_DIR}/simulation/runtime/avr8js.js"
+        CIRCUITALIVE_TEST_PIC_RUNTIME="${PROJECT_SOURCE_DIR}/simulation/runtime/pic16.js"
         CIRCUITALIVE_TEST_DEMO="${PROJECT_SOURCE_DIR}/demos/simulation/circuitalive/rc_switch_led.cir" )
     add_dependencies( qa_interactive_sim circuitalive-sim-worker )
     add_test( NAME qa_interactive_sim COMMAND qa_interactive_sim --log_level=test_suite )

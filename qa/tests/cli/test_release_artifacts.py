@@ -5,11 +5,13 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / 'tools/circuitalive/release'))
 SPEC = importlib.util.spec_from_file_location('publish_release', ROOT / 'tools/circuitalive/release/publish-release.py')
 release = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(release)

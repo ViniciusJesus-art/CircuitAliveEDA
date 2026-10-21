@@ -6,6 +6,8 @@
 #include <cmath>
 #include <set>
 #include <sstream>
+#include <fstream>
+#include <sim/platform_runtime.h>
 using namespace CIRCUITALIVE;
 namespace
 {
@@ -82,6 +84,13 @@ bool Truth( const std::string& kind, unsigned bits, unsigned width )
 
 BOOST_AUTO_TEST_CASE( BundledCatalogResolvesAllDeclaredAssociationsWithoutAmbiguity )
 {
+    struct FIRMWARE_FILE
+    {
+        std::filesystem::path path = std::filesystem::temp_directory_path()
+            / ( "ca-catalog-" + std::to_string( ProcessId() ) + ".bin" );
+        FIRMWARE_FILE() { std::ofstream( path, std::ios::binary ).put( 0 ); }
+        ~FIRMWARE_FILE() { std::error_code error; std::filesystem::remove( path, error ); }
+    } firmware;
     MODEL_REPOSITORY repository;
     BOOST_REQUIRE( !repository.List().empty() );
     for( const auto& model : repository.List() ) BOOST_TEST_CONTEXT( model.id )
@@ -89,6 +98,11 @@ BOOST_AUTO_TEST_CASE( BundledCatalogResolvesAllDeclaredAssociationsWithoutAmbigu
         CIRCUIT_COMPONENT c{ "U1", "Custom:Explicit", "1", {} };
         for( const auto& pin : model.pins ) c.pins[pin.defaultPin] = "";
         c.modelFile = "builtin:" + model.id;
+        if( model.runtime )
+        {
+            BOOST_CHECK_THROW( repository.Resolve( c ), std::runtime_error );
+            c.resources[model.runtime->firmwareResource] = { PathUtf8( firmware.path ), "bin", 0 };
+        }
         BOOST_CHECK_EQUAL( repository.Resolve( c ).model.id, model.id );
         c.modelFile.clear();
         for( const auto& identity : model.libraryIds )

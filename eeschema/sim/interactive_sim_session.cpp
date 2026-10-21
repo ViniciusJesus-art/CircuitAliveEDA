@@ -7,6 +7,7 @@
 
 #include <cerrno>
 #include <cstring>
+#include <limits>
 #include <mutex>
 #include <thread>
 #ifdef _WIN32
@@ -243,6 +244,10 @@ void INTERACTIVE_SIM_SESSION::Configure( const std::string& aNetlist,
                       { "step", aConfig.step }, { "horizon", aConfig.horizon },
                       { "max_step", aConfig.maxStep }, { "uic", aConfig.useInitialConditions },
                       { "capacity", aConfig.historyCapacity }, { "signals", aConfig.signals } };
+    request["accelerate_expressions"] = aConfig.accelerateExpressions;
+    request["mutable_elements"] = aConfig.mutableElements;
+    if( aConfig.historySignals )
+        request["history_signals"] = *aConfig.historySignals;
     request["activity_monitors"] = JSON::array();
     for( const auto& monitor : aConfig.activityMonitors )
         request["activity_monitors"].push_back( {
@@ -253,6 +258,9 @@ void INTERACTIVE_SIM_SESSION::Configure( const std::string& aNetlist,
     request["memories"]=JSON::array();
     for(const auto& region:aConfig.memories)request["memories"].push_back({{"id",region.id},{"label",region.label},
         {"word_bits",region.wordBits},{"writable",region.writable},{"data",MemoryHex(region.initial.data)},{"known",MemoryHex(region.initial.known)}});
+    request["programmable_devices"]=JSON::array();
+    for( const auto& device : aConfig.programmableDevices )
+        request["programmable_devices"].push_back(SerializeProgrammableDevice(device));
     m_impl->Request( request );
     m_impl->configuration = std::move( request );
 }
@@ -347,8 +355,47 @@ SIM_SESSION_SNAPSHOT INTERACTIVE_SIM_SESSION::Snapshot( bool aDrainHistory )
             result.activity.push_back( { activity.at( "period" ), activity.at( "last_transition" ),
                                          activity.at( "high_value" ) } );
 
+    std::optional<std::vector<std::size_t>> historySignals;
+    if( response.contains( "history_signals" ) )
+    {
+        const auto& indices = response.at( "history_signals" );
+        const auto width = m_impl->configuration.at( "signals" ).size();
+        if( !indices.is_array() )
+            throw std::runtime_error( "Invalid simulation history signal indices" );
+        historySignals.emplace();
+        std::vector<bool> seen( width );
+        for( const auto& entry : indices )
+        {
+            if( !entry.is_number_integer() || entry.get<double>() < 0
+                || entry.get<double>() >= static_cast<double>( width ) )
+                throw std::runtime_error( "Invalid simulation history signal index" );
+            const auto index = entry.get<std::size_t>();
+            if( seen[index] )
+                throw std::runtime_error( "Repeated simulation history signal index" );
+            seen[index] = true;
+            historySignals->push_back( index );
+        }
+    }
     for( const auto& sample : response.at( "history" ) )
-        result.history.push_back( { sample.at( "time" ), sample.at( "values" ).get<std::vector<double>>() } );
+    {
+        auto values = sample.at( "values" ).get<std::vector<double>>();
+        if( historySignals )
+        {
+            if( values.size() != historySignals->size() )
+                throw std::runtime_error( "Invalid simulation history sample width" );
+            std::vector<double> expanded( result.latest.values.size(),
+                                          std::numeric_limits<double>::quiet_NaN() );
+            for( std::size_t i = 0; i < historySignals->size(); ++i )
+            {
+                const auto index = ( *historySignals )[i];
+                if( index >= expanded.size() )
+                    throw std::runtime_error( "Invalid simulation history signal index" );
+                expanded[index] = values[i];
+            }
+            values = std::move( expanded );
+        }
+        result.history.push_back( { sample.at( "time" ), std::move( values ) } );
+    }
 
     return result;
 }

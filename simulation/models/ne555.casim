@@ -155,7 +155,7 @@
     {
       "id": "max_step",
       "label": "Max step",
-      "default": "10u",
+      "default": "100u",
       "unit": "s",
       "min": 1e-09,
       "max": 0.01
@@ -181,6 +181,7 @@
   },
   "ignore_legacy_spice_fields": true,
   "max_step_parameter": "max_step",
+  "timing_rc": { "ports": ["trig", "thresh"], "fallback": 0.00001 },
   "spice": {
     "instance": [
       "Rtop_${id} ${pin:vcc} ${pin:ctrl} ${param:divider}",

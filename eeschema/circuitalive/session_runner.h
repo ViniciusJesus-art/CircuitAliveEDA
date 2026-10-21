@@ -23,6 +23,9 @@ struct EDITOR_SESSION_VIEW
     std::vector<double> adjustments;
     std::vector<double> ledCurrents;
     std::vector<double> measurements;
+    // Scope history contains only these measured values, independently of the
+    // worker's complete electrical vectors used for circuit/logic state.
+    std::vector<MEASUREMENT_CHANNEL> scopeChannels;
     std::shared_ptr<const SCOPE_HISTORY> scopeHistory;
     std::vector<std::string> warnings;
     std::vector<LOGIC_LEVEL> logicLevels;

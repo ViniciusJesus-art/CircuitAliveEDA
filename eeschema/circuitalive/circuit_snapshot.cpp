@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cctype>
 #include <cmath>
 #include <set>
 #include <sstream>
@@ -84,6 +85,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                                      const SIMULATION_PREFERENCES& aPreferences )
 {
     CIRCUIT_SNAPSHOT result;
+    result.config.accelerateExpressions = true;
     auto preferences = aPreferences;
     preferences.Normalize();
     result.config.step = result.config.maxStep = preferences.maxTimeStepUs * 1e-6;
@@ -206,6 +208,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         { return node == "0" ? NO_SIGNAL : signal( "v(" + node + ")" ); };
     std::vector<std::pair<std::string, CURRENT_WARNING>> warnings;
     VOLTAGE_CONSTRAINTS supplies;
+    int programmableDriverSlot = 0;
     for( std::size_t i = 0; i < aComponents.size(); ++i )
     {
         const auto& m = models[i];
@@ -231,11 +234,37 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 result.config.step = result.config.maxStep = std::min( result.config.maxStep, step );
                 result.config.horizon = std::min( result.config.horizon, result.config.maxStep * 9e7 );
             }
+            for( const auto& port : model.model.timingRcPorts )
+            {
+                const auto& node = topology.nodes[i].at( model.pins.at( port ) );
+                double capacitance = 0, conductance = 0;
+                for( std::size_t part = 0; part < models.size(); ++part )
+                {
+                    const auto& passive = models[part];
+                    const bool resistor = passive.model.id == "resistor";
+                    if( !resistor && passive.model.id != "capacitor" ) continue;
+                    const auto& a = topology.nodes[part].at( passive.pins.at( "p" ) );
+                    const auto& b = topology.nodes[part].at( passive.pins.at( "n" ) );
+                    if( a == b || ( a != node && b != node ) ) continue;
+                    if( resistor ) conductance += 1 / passive.parameters.at( "resistance" );
+                    else capacitance += passive.parameters.at( "capacitance" );
+                }
+                // A local RC bound scales with the timer instead of forcing
+                // the entire project to use a fast timer's fixed step. Unknown
+                // or actively driven timing networks retain the conservative cap.
+                const double step = capacitance > 0 && conductance > 0
+                        ? capacitance / conductance / 32 : model.model.timingRcFallback;
+                result.config.step = result.config.maxStep = std::min( result.config.maxStep, step );
+                result.config.horizon = std::min( result.config.horizon, result.config.maxStep * 9e7 );
+            }
             if( !model.model.frequencyParameter.empty() )
             {
                 const double frequency = model.parameters.at( model.model.frequencyParameter );
                 if( frequency <= 0 ) throw std::runtime_error( "Frequency must be positive" );
-                result.config.step = result.config.maxStep = std::min( result.config.maxStep, 1 / ( frequency * 100 ) );
+                // This caps smooth-source sampling; ngspice's truncation error
+                // still shortens the step as needed. Pulse and firmware edges
+                // have their own breakpoints and do not wait for this interval.
+                result.config.step = result.config.maxStep = std::min( result.config.maxStep, 1 / ( frequency * 24 ) );
                 result.config.horizon = std::min( result.config.horizon, result.config.maxStep * 9e7 );
             }
             auto modelNodes = topology.nodes.at( i );
@@ -274,10 +303,47 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 { return ExpandModelTemplate( text, model, modelNodes, i ); };
             for( const auto& line : model.model.instance ) deck << expand( line ) << '\n';
             for( const auto& line : model.model.definitions ) deck << expand( line ) << '\n';
+            if( model.model.runtime )
+            {
+                auto runtime = InitialModelRuntime( c, model );
+                const auto& descriptor = *model.model.runtime;
+                const auto ground = modelNodes.at( model.pins.at( descriptor.ground ) );
+                const auto vcc = modelNodes.at( model.pins.at( descriptor.vcc ) );
+                const auto prefix = "ca" + std::to_string( i + 1 );
+                for( const auto& pin : descriptor.pins )
+                {
+                    PROGRAMMABLE_PIN_BINDING binding;
+                    binding.id = pin.id;
+                    const auto node = modelNodes.at( model.pins.at( pin.port ) );
+                    auto stem = prefix + "_" + pin.id;
+                    std::transform( stem.begin(), stem.end(), stem.begin(),
+                        []( unsigned char character ) { return std::tolower( character ); } );
+                    // Read existing nodes directly. The backend subtracts its
+                    // GND input, avoiding one extra voltage source per pin.
+                    if( node != "0" ) { binding.signal = "v(" + node + ")"; signal( binding.signal ); }
+                    if( pin.drive )
+                    {
+                        binding.driverSlot = programmableDriverSlot++;
+                        deck << ".model " << stem << " ca_programmable_pin(slot=" << binding.driverSlot << ")\n";
+                        deck << 'A' << stem << " %gd " << node << ' ' << ground
+                             << " %gd " << node << ' ' << vcc << ' ' << stem << '\n';
+                    }
+                    else if( pin.id == "RESET" )
+                        deck << "R" << stem << "_pullup " << node << ' ' << vcc << " 30000\n";
+                    else if( pin.id == "AREF" )
+                        deck << "R" << stem << "_default " << node << ' ' << vcc << " 1Meg\n";
+                    deck << "R" << stem << "_input " << node << ' ' << ground << " 1e12\n";
+                    runtime.bindings.push_back( std::move( binding ) );
+                }
+                if( result.config.programmableDevices.size() >= 32 )
+                    throw std::runtime_error( "Circuit supports at most 32 programmable devices" );
+                result.config.programmableDevices.push_back( std::move( runtime ) );
+            }
             for( const auto& update : model.model.liveUpdates )
             {
                 CIRCUIT_SNAPSHOT::LIVE_UPDATE u; u.change=update.change;
                 u.change.reference=expand(u.change.reference);
+                result.config.mutableElements.push_back(u.change.reference);
                 for(auto& expression:u.change.expressions)expression=expand(expression);
                 for(const auto& source:update.sources)u.sources.push_back(expand(source));
                 for(const auto& value:update.initials)u.initials.push_back(ParseComponentValue(expand(value)));
@@ -362,6 +428,31 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             warnings.push_back( { "i(" + source + ")", { rail.name, NO_SIGNAL, 10 } } );
         }
     }
+    for( auto& runtime : result.config.programmableDevices )
+    {
+        const auto component = std::find_if( aComponents.begin(), aComponents.end(),
+                [&]( const auto& item ) { return item.reference == runtime.id; } );
+        const auto index = std::size_t( component - aComponents.begin() );
+        const auto& model = models.at( index );
+        const auto& descriptor = *model.model.runtime;
+        const auto& nodes = topology.nodes.at( index );
+        const auto& ground = nodes.at( model.pins.at( descriptor.ground ) );
+        const auto& vcc = nodes.at( model.pins.at( descriptor.vcc ) );
+        bool fixed = supplies.Difference( vcc, ground ).has_value();
+        const auto reset = std::find_if( descriptor.pins.begin(), descriptor.pins.end(),
+                []( const auto& pin ) { return pin.id == "RESET"; } );
+        if( reset != descriptor.pins.end() )
+        {
+            const auto& physical = model.pins.at( reset->port );
+            const auto connection = component->pins.find( physical );
+            fixed = fixed && ( connection == component->pins.end() || connection->second.empty()
+                || supplies.Difference( nodes.at( physical ), ground ).has_value() );
+        }
+        if( fixed && result.config.programmableDevices.size() == 1 ) runtime.autonomousWindowSeconds = .001;
+        const auto window = std::max( runtime.quantumSeconds, runtime.autonomousWindowSeconds );
+        result.config.step = result.config.maxStep = std::min( result.config.maxStep, window );
+        result.config.horizon = std::min( result.config.horizon, result.config.maxStep * 9e7 );
+    }
     if( !errors.empty() )
     {
         std::string message;
@@ -382,8 +473,19 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 LOGIC_PIN channel;
                 channel.component = i; channel.pin = model.pins.at( pin.id ); channel.reference = aComponents[i].reference;
                 channel.voltage = voltage( topology.nodes[i].at( channel.pin ) );
-                channel.digital = !model.model.logicVcc.empty();
-                if( channel.digital )
+                channel.digital = model.model.runtime.has_value() || !model.model.logicVcc.empty();
+                if( model.model.runtime )
+                {
+                    // Firmware models declare their power ports in the runtime
+                    // descriptor rather than the SPICE logic-driver metadata.
+                    // Their indicators must follow that same local supply.
+                    const auto& runtime = *model.model.runtime;
+                    channel.vcc = voltage( topology.nodes[i].at( model.pins.at( runtime.vcc ) ) );
+                    channel.ground = voltage( topology.nodes[i].at( model.pins.at( runtime.ground ) ) );
+                    channel.minSupply = runtime.minimumSupply;
+                    channel.maxSupply = runtime.maximumSupply;
+                }
+                else if( channel.digital )
                 {
                     channel.vcc = voltage( topology.nodes[i].at( model.pins.at( model.model.logicVcc ) ) );
                     channel.ground = voltage( topology.nodes[i].at( model.pins.at( model.model.logicGround ) ) );

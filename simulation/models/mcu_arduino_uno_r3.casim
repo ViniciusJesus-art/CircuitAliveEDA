@@ -1,0 +1,407 @@
+{
+  "schema_version": 2,
+  "backend": "ngspice+runtime",
+  "id": "mcu_arduino_uno_r3",
+  "name": "Arduino UNO R3 firmware",
+  "description": "ATmega328P firmware on Arduino UNO R3 connectors. Power the +5V pin and GND; 16 MHz default. D0-D13 and A0-A5, including SDA/SCL aliases, follow the firmware. VIN regulator, 3V3 regulator, USB interface and exact board current consumption are not simulated.",
+  "license": "GPL-3.0-or-later",
+  "category": "Microcontrollers",
+  "family": "AVR8",
+  "pins": [
+    {
+      "id": "nc",
+      "label": "NC",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "ioref",
+      "label": "IOREF",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "reset",
+      "label": "~{RESET}",
+      "role": "input",
+      "default_pin": "3"
+    },
+    {
+      "id": "v3v3",
+      "label": "3V3",
+      "role": "passive",
+      "default_pin": "4"
+    },
+    {
+      "id": "vcc",
+      "label": "+5V",
+      "role": "power",
+      "default_pin": "5"
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "6"
+    },
+    {
+      "id": "gnd_7",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "7"
+    },
+    {
+      "id": "vin",
+      "label": "VIN",
+      "role": "passive",
+      "default_pin": "8"
+    },
+    {
+      "id": "pc0",
+      "label": "A0",
+      "role": "bidirectional",
+      "default_pin": "9"
+    },
+    {
+      "id": "pc1",
+      "label": "A1",
+      "role": "bidirectional",
+      "default_pin": "10"
+    },
+    {
+      "id": "pc2",
+      "label": "A2",
+      "role": "bidirectional",
+      "default_pin": "11"
+    },
+    {
+      "id": "pc3",
+      "label": "A3",
+      "role": "bidirectional",
+      "default_pin": "12"
+    },
+    {
+      "id": "pc4",
+      "label": "SDA/A4",
+      "role": "bidirectional",
+      "default_pin": "13"
+    },
+    {
+      "id": "pc5",
+      "label": "SCL/A5",
+      "role": "bidirectional",
+      "default_pin": "14"
+    },
+    {
+      "id": "pd0",
+      "label": "D0/RX",
+      "role": "bidirectional",
+      "default_pin": "15"
+    },
+    {
+      "id": "pd1",
+      "label": "D1/TX",
+      "role": "bidirectional",
+      "default_pin": "16"
+    },
+    {
+      "id": "pd2",
+      "label": "D2",
+      "role": "bidirectional",
+      "default_pin": "17"
+    },
+    {
+      "id": "pd3",
+      "label": "D3",
+      "role": "bidirectional",
+      "default_pin": "18"
+    },
+    {
+      "id": "pd4",
+      "label": "D4",
+      "role": "bidirectional",
+      "default_pin": "19"
+    },
+    {
+      "id": "pd5",
+      "label": "D5",
+      "role": "bidirectional",
+      "default_pin": "20"
+    },
+    {
+      "id": "pd6",
+      "label": "D6",
+      "role": "bidirectional",
+      "default_pin": "21"
+    },
+    {
+      "id": "pd7",
+      "label": "D7",
+      "role": "bidirectional",
+      "default_pin": "22"
+    },
+    {
+      "id": "pb0",
+      "label": "D8",
+      "role": "bidirectional",
+      "default_pin": "23"
+    },
+    {
+      "id": "pb1",
+      "label": "D9",
+      "role": "bidirectional",
+      "default_pin": "24"
+    },
+    {
+      "id": "pb2",
+      "label": "D10",
+      "role": "bidirectional",
+      "default_pin": "25"
+    },
+    {
+      "id": "pb3",
+      "label": "D11",
+      "role": "bidirectional",
+      "default_pin": "26"
+    },
+    {
+      "id": "pb4",
+      "label": "D12",
+      "role": "bidirectional",
+      "default_pin": "27"
+    },
+    {
+      "id": "pb5",
+      "label": "D13",
+      "role": "bidirectional",
+      "default_pin": "28"
+    },
+    {
+      "id": "gnd_29",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "29"
+    },
+    {
+      "id": "aref",
+      "label": "AREF",
+      "role": "input",
+      "default_pin": "30"
+    },
+    {
+      "id": "sda",
+      "label": "SDA/A4",
+      "role": "bidirectional",
+      "default_pin": "31"
+    },
+    {
+      "id": "scl",
+      "label": "SCL/A5",
+      "role": "bidirectional",
+      "default_pin": "32"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "clock_hz",
+      "label": "CPU clock",
+      "unit": "Hz",
+      "default": "16Meg",
+      "min": 1000,
+      "max": 20000000.0
+    },
+    {
+      "id": "sample_period",
+      "label": "Electrical input sampling period",
+      "unit": "s",
+      "default": "1u",
+      "min": 1e-09,
+      "max": 0.001
+    }
+  ],
+  "resources": [
+    {
+      "id": "firmware",
+      "label": "Firmware (Flash)",
+      "kind": "firmware",
+      "formats": [
+        "ihex",
+        "bin"
+      ],
+      "required": true,
+      "max_bytes": 196608
+    },
+    {
+      "id": "eeprom",
+      "label": "Initial EEPROM image",
+      "kind": "eeprom",
+      "formats": [
+        "ihex",
+        "bin"
+      ],
+      "required": false,
+      "max_bytes": 69632
+    }
+  ],
+  "runtime": {
+    "api_version": 1,
+    "engine": "javascript",
+    "device": "atmega328p",
+    "modules": [
+      "../runtime/avr8js.js"
+    ],
+    "clock_parameter": "clock_hz",
+    "firmware_resource": "firmware",
+    "firmware_bytes": 32768,
+    "eeprom_resource": "eeprom",
+    "eeprom_bytes": 1024,
+    "vcc": "vcc",
+    "gnd": "gnd",
+    "min_supply": 1.8,
+    "max_supply": 5.5,
+    "options": {
+      "sramBytes": 2048
+    },
+    "pins": [
+      {
+        "id": "RESET",
+        "port": "reset",
+        "drive": false
+      },
+      {
+        "id": "VCC",
+        "port": "vcc",
+        "drive": false
+      },
+      {
+        "id": "GND",
+        "port": "gnd",
+        "drive": false
+      },
+      {
+        "id": "PC0",
+        "port": "pc0",
+        "drive": true
+      },
+      {
+        "id": "PC1",
+        "port": "pc1",
+        "drive": true
+      },
+      {
+        "id": "PC2",
+        "port": "pc2",
+        "drive": true
+      },
+      {
+        "id": "PC3",
+        "port": "pc3",
+        "drive": true
+      },
+      {
+        "id": "PC4",
+        "port": "pc4",
+        "drive": true
+      },
+      {
+        "id": "PC5",
+        "port": "pc5",
+        "drive": true
+      },
+      {
+        "id": "PD0",
+        "port": "pd0",
+        "drive": true
+      },
+      {
+        "id": "PD1",
+        "port": "pd1",
+        "drive": true
+      },
+      {
+        "id": "PD2",
+        "port": "pd2",
+        "drive": true
+      },
+      {
+        "id": "PD3",
+        "port": "pd3",
+        "drive": true
+      },
+      {
+        "id": "PD4",
+        "port": "pd4",
+        "drive": true
+      },
+      {
+        "id": "PD5",
+        "port": "pd5",
+        "drive": true
+      },
+      {
+        "id": "PD6",
+        "port": "pd6",
+        "drive": true
+      },
+      {
+        "id": "PD7",
+        "port": "pd7",
+        "drive": true
+      },
+      {
+        "id": "PB0",
+        "port": "pb0",
+        "drive": true
+      },
+      {
+        "id": "PB1",
+        "port": "pb1",
+        "drive": true
+      },
+      {
+        "id": "PB2",
+        "port": "pb2",
+        "drive": true
+      },
+      {
+        "id": "PB3",
+        "port": "pb3",
+        "drive": true
+      },
+      {
+        "id": "PB4",
+        "port": "pb4",
+        "drive": true
+      },
+      {
+        "id": "PB5",
+        "port": "pb5",
+        "drive": true
+      },
+      {
+        "id": "AREF",
+        "port": "aref",
+        "drive": false
+      }
+    ]
+  },
+  "spice": {
+    "instance": [
+      "Rsupply_${id} ${pin:vcc} ${pin:gnd} 1e12",
+      "Runused_nc_${id} ${pin:nc} ${pin:gnd} 1e12",
+      "Runused_ioref_${id} ${pin:ioref} ${pin:vcc} 1m",
+      "Runused_v3v3_${id} ${pin:v3v3} ${pin:gnd} 1e12",
+      "Ralias_gnd_7_${id} ${pin:gnd_7} ${pin:gnd} 1m",
+      "Runused_vin_${id} ${pin:vin} ${pin:gnd} 1e12",
+      "Ralias_gnd_29_${id} ${pin:gnd_29} ${pin:gnd} 1m",
+      "Ralias_sda_${id} ${pin:sda} ${pin:pc4} 1m",
+      "Ralias_scl_${id} ${pin:scl} ${pin:pc5} 1m"
+    ],
+    "definitions": []
+  },
+  "matches": {
+    "library_ids": [
+      "MCU_Module:Arduino_UNO_R3"
+    ]
+  }
+}

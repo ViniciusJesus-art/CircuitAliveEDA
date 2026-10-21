@@ -206,6 +206,36 @@ BOOST_AUTO_TEST_CASE( ScopeHistorySharesImmutableBlocksAndBoundsIncrementalReads
     scope.Configure( { .002, .5, 0 }, trigger, channel() ); scope.Feed( builder );
     const auto serial = scope.Frame().serial; scope.Feed( builder ); BOOST_CHECK_EQUAL( scope.Frame().serial, serial );
 }
+BOOST_AUTO_TEST_CASE( DenseScopeHistoryRetainsSlowBlinkAcrossCompactionAndReopening )
+{
+    SCOPE_HISTORY builder( 256, { channel() } );
+    std::vector<SIM_SAMPLE> block;
+    for( int i = 0; i <= 450000; ++i )
+    {
+        const double time = i * 1e-5;
+        block.push_back( { time, { int( time ) % 2 ? 5. : 0. } } );
+        if( block.size() == 500 || i == 450000 )
+        {
+            builder.Append( std::move( block ) );
+            block.clear();
+        }
+    }
+    BOOST_REQUIRE_LE( builder.size(), 256 );
+    BOOST_CHECK_SMALL( builder.front().time, 1e-12 );
+    BOOST_CHECK_CLOSE( builder.back().time, 4.5, 1e-8 );
+    const auto points = builder.Copy();
+    for( std::size_t i = 1; i < points.size(); ++i ) BOOST_CHECK_GT( points[i].time, points[i-1].time );
+    const auto frozen = builder;
+    builder.Append( { { 4.6, { 0. } } } );
+    BOOST_CHECK_CLOSE( frozen.back().time, 4.5, 1e-8 );
+    SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::ROLL;
+    SCOPE_ACQUISITION scope; scope.Configure( { .4, .5, 0 }, trigger, channel(), 256 );
+    scope.Feed( frozen );
+    BOOST_CHECK( scope.Frame().decimated );
+    const auto stats = ScopeStatistics( scope.Frame(), channel() );
+    BOOST_CHECK_EQUAL( stats.minimum, 0 ); BOOST_CHECK_EQUAL( stats.maximum, 5 );
+    BOOST_CHECK_CLOSE( stats.period, 2, 5 );
+}
 BOOST_AUTO_TEST_CASE( DenseTriggerCapturesKeepBothHalvesAndBothChannelPeaks )
 {
     auto other = channel(); other.name = "Other"; other.positive = 1;

@@ -100,6 +100,9 @@ private:
 
     wxTimer m_timer;
     std::chrono::steady_clock::time_point m_lastHud{}, m_lastToolbar{};
+    std::chrono::steady_clock::time_point m_rateStarted{};
+    double m_rateTime = 0, m_realSpeed = 0;
+    bool m_rateValid = false;
     bool m_installed = false;
     wxString m_status;
     bool m_statusPending = false;
@@ -617,6 +620,18 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     const auto oldPreferences = m_session.preferences;
     m_session = m_runner->View();
     const auto state = m_session.state;
+    bool rateChanged = false;
+    if( state != EDITOR_SESSION_STATE::RUNNING || oldState != state || oldSpeed != m_session.speed )
+    {
+        m_rateStarted = now; m_rateTime = m_session.sample.latest.time; m_rateValid = false;
+    }
+    else if( now - m_rateStarted >= std::chrono::milliseconds( 500 ) )
+    {
+        const auto seconds = std::chrono::duration<double>( now - m_rateStarted ).count();
+        m_realSpeed = std::max( 0.0, ( m_session.sample.latest.time - m_rateTime ) / seconds );
+        m_rateStarted = now; m_rateTime = m_session.sample.latest.time;
+        m_rateValid = true; rateChanged = true;
+    }
     if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, m_active );
     if( m_active && m_preferences.autoOpenInstruments
         && !m_circuit.circuit.measurements.empty() && !m_resultOpened )
@@ -628,7 +643,7 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     }
     if( state == oldState && m_session.sample.latest.time == oldTime
         && m_session.sample.eventsApplied == oldEvents && m_session.speed == oldSpeed
-        && m_session.preferences == oldPreferences ) { publishStatus(); return; }
+        && m_session.preferences == oldPreferences && !rateChanged ) { publishStatus(); return; }
     // Refresh electrical visuals at the timer rate; only status text is throttled.
     redraw( false );
     if( state == oldState && state == EDITOR_SESSION_STATE::RUNNING
@@ -638,6 +653,8 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
                               _( "Paused" ), _( "Completed" ), _( "Error" ) };
     wxString status = wxString::Format( "%s — t = %.6f s   %.3g×", names[static_cast<int>( state )],
                                        m_session.sample.latest.time, m_session.speed );
+    if( state == EDITOR_SESSION_STATE::RUNNING && m_rateValid )
+        status += wxString::Format( _( "   actual %.2g×" ), m_realSpeed );
     for( std::size_t i = 0; i < std::min<std::size_t>( 2, m_session.warnings.size() ); ++i )
         status += "   " + DiagnosticText( m_session.warnings[i] );
     if( m_session.warnings.size() > 2 ) status += wxString::Format( _( "   +%zu warnings" ), m_session.warnings.size() - 2 );

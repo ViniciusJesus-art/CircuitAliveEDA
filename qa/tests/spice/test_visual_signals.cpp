@@ -1,13 +1,30 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include <boost/test/unit_test.hpp>
+#include <circuitalive/simulation_model.h>
 #include <circuitalive/visual_signals.h>
+#include <sim/platform_runtime.h>
+#include <algorithm>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <thread>
 
 using namespace CIRCUITALIVE;
 
 namespace
 {
+struct PROGRAMMABLE_VISUAL_FILES
+{
+    std::filesystem::path directory = std::filesystem::temp_directory_path()
+            / ( "ca-visual-mcu-" + std::to_string( ProcessId() ) );
+    PROGRAMMABLE_VISUAL_FILES() { std::filesystem::create_directories( directory ); }
+    ~PROGRAMMABLE_VISUAL_FILES()
+    {
+        std::error_code error;
+        std::filesystem::remove_all( directory, error );
+    }
+};
+
 CIRCUIT_SNAPSHOT PulseCircuit( bool fast )
 {
     CIRCUIT_SNAPSHOT circuit;
@@ -40,6 +57,69 @@ EDITOR_SESSION_VIEW AwaitVisual( SESSION_RUNNER& runner, Predicate predicate )
         std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
     }
 }
+}
+
+BOOST_FIXTURE_TEST_CASE( VisualProgrammablePinsUseLocalSupplyAndItsValidRange,
+                         PROGRAMMABLE_VISUAL_FILES )
+{
+    const auto firmware = directory / "idle.bin";
+    {
+        // AVR RJMP -1: a valid firmware image; this test checks the snapshot's
+        // electrical-to-visual mapping independently of firmware execution.
+        std::ofstream output( firmware, std::ios::binary );
+        const char bytes[] = { char( 0xff ), char( 0xcf ) };
+        output.write( bytes, sizeof bytes );
+    }
+    for( const auto& [modelId, outputPin] : {
+            std::pair{ "mcu_atmega328p_p", "19" },
+            std::pair{ "mcu_arduino_uno_r3", "28" } } )
+    {
+        CIRCUIT_COMPONENT mcu;
+        mcu.reference = "U1";
+        mcu.modelFile = std::string( "builtin:" ) + modelId;
+        mcu.resources["firmware"] = { PathUtf8( firmware ), "bin", 0 };
+        const auto model = MODEL_REPOSITORY().SelectModel( mcu );
+        for( const auto& pin : model.pins )
+            mcu.pins[pin.defaultPin] = pin.role == "power" ? "vcc"
+                                       : pin.role == "reference" ? "local_ground" : "";
+        mcu.pins[outputPin] = "output";
+        const auto circuit = BuildCircuitSnapshot( {
+                { "VCC", "Simulation_SPICE:VDC", "3.3",
+                  { { "1", "vcc" }, { "2", "local_ground" } } },
+                { "VBIAS", "Simulation_SPICE:VDC", "10",
+                  { { "1", "local_ground" }, { "2", "0" } } }, mcu }, {}, true );
+        auto it = std::find_if( circuit.logicPins.begin(), circuit.logicPins.end(),
+                [&]( const auto& pin ) { return pin.reference == "U1" && pin.pin == outputPin; } );
+        BOOST_REQUIRE( it != circuit.logicPins.end() );
+        BOOST_CHECK( it->digital );
+        BOOST_REQUIRE( it->ground != NO_SIGNAL );
+        BOOST_REQUIRE( it->vcc != NO_SIGNAL );
+        BOOST_CHECK_EQUAL( it->minSupply, 1.8 );
+        BOOST_CHECK_EQUAL( it->maxSupply, 5.5 );
+        const auto visualIndex = static_cast<std::size_t>( it - circuit.logicPins.begin() );
+        EDITOR_SESSION_VIEW view;
+        view.state = EDITOR_SESSION_STATE::RUNNING;
+        view.sample.latest.values.resize( circuit.config.signals.size() );
+        for( double ground : { 0.0, 10.0 } )
+            for( double supply : { 1.8, 3.3, 5.5 } )
+                for( bool high : { false, true } )
+                {
+                    view.sample.latest.values[it->voltage] = ground + ( high ? supply : 0 );
+                    view.sample.latest.values[it->ground] = ground;
+                    view.sample.latest.values[it->vcc] = ground + supply;
+                    UpdateVisualSignals( circuit, view, 1 );
+                    BOOST_CHECK( view.logicLevels.at( visualIndex )
+                                 == ( high ? LOGIC_LEVEL::HIGH : LOGIC_LEVEL::LOW ) );
+                }
+        for( double supply : { 0.0, 1.7, 5.6 } )
+        {
+            view.sample.latest.values[it->voltage] = supply;
+            view.sample.latest.values[it->ground] = 0;
+            view.sample.latest.values[it->vcc] = supply;
+            UpdateVisualSignals( circuit, view, 1 );
+            BOOST_CHECK( view.logicLevels.at( visualIndex ) == LOGIC_LEVEL::UNKNOWN );
+        }
+    }
 }
 
 BOOST_AUTO_TEST_CASE( VisualActivityRequiresRepeatedCyclesAndExpires )

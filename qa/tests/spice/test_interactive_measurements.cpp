@@ -2,6 +2,7 @@
 #include <boost/test/unit_test.hpp>
 #include <circuitalive/circuit_snapshot.h>
 #include <circuitalive/session_runner.h>
+#include <circuitalive/scope_acquisition.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -125,7 +126,7 @@ BOOST_AUTO_TEST_CASE( ScopeHistoryIsBoundedOrderedAndFreezesDuringPause )
     auto view = WaitFor( runner, []( const auto& v ) { return v.sample.latest.time > 1.; } );
     BOOST_REQUIRE( view.scopeHistory );
     BOOST_REQUIRE( !view.scopeHistory->empty() );
-    BOOST_CHECK_LE( view.scopeHistory->size() * circuit.config.signals.size(), 65536 );
+    BOOST_CHECK_LE( view.scopeHistory->size() * view.scopeChannels.size(), 65536 );
     BOOST_CHECK_LE( view.scopeHistory->size(), 8192 );
     const auto points = view.scopeHistory->Copy();
     for( std::size_t i = 1; i < points.size(); ++i ) BOOST_CHECK_GT( points[i].time, points[i-1].time );
@@ -137,6 +138,69 @@ BOOST_AUTO_TEST_CASE( ScopeHistoryIsBoundedOrderedAndFreezesDuringPause )
     BOOST_CHECK_EQUAL( runner.View().scopeHistory->front().time, first );
     runner.Resume(); WaitFor( runner, [&]( const auto& v ) { return v.sample.latest.time > time; } );
     runner.Stop(); view = runner.View(); BOOST_CHECK( !view.scopeHistory ); BOOST_CHECK( view.measurements.empty() );
+}
+
+BOOST_AUTO_TEST_CASE( ScopeRunnerKeepsSlowWaveformWithoutCopyingUnmeasuredCircuitSignals )
+{
+    auto components = Load();
+    components[0].libraryId = "Simulation_SPICE:VPULSE";
+    components[0].value = "VPULSE";
+    components[0].modelParameters = { { "low", "0" }, { "high", "5" }, { "delay", "1" },
+        { "rise", "1u" }, { "fall", "1u" }, { "width", "1" }, { "period", "2" } };
+    SIMULATION_PREFERENCES preferences;
+    preferences.maxTimeStepUs = 200;
+    auto circuit = BuildCircuitSnapshot( components,
+        { { PROBE_KIND::OSCILLOSCOPE, "Blink", "", { { "1", "supply" } }, 1 } }, true, {}, preferences );
+    // The MCU electrical bridge and pin indicators save many internal vectors.
+    // The scope must retain only its own measured channels even in such a deck.
+    const auto end = circuit.netlist.rfind( ".end" );
+    std::string extra;
+    for( int i = 0; i < 190; ++i )
+    {
+        const auto node = "scope_extra_" + std::to_string( i );
+        extra += "R" + node + " " + circuit.pinNodes.front().at( "1" ) + " " + node + " 1k\n";
+        circuit.config.signals.push_back( "v(" + node + ")" );
+    }
+    circuit.netlist.insert( end, extra );
+    circuit.config.historyCapacity = 65536 / circuit.config.signals.size();
+    circuit.config.horizon = 4.2;
+    preferences.playbackSpeed = 5;
+    SESSION_RUNNER runner( CIRCUITALIVE_TEST_WORKER ); runner.SetPreferences( preferences ); runner.Start( circuit );
+    const auto view = WaitFor( runner, []( const auto& v ) { return v.state == EDITOR_SESSION_STATE::COMPLETED; } );
+    BOOST_REQUIRE( view.scopeHistory ); BOOST_REQUIRE_EQUAL( view.scopeChannels.size(), 1 );
+    BOOST_CHECK_LE( view.scopeHistory->size(), 8192 );
+    BOOST_CHECK_LT( view.scopeHistory->front().time, .01 );
+    BOOST_CHECK_CLOSE( view.scopeHistory->back().time, 4.2, .01 );
+    for( const auto& point : view.scopeHistory->Copy() ) BOOST_REQUIRE_EQUAL( point.values.size(), 1 );
+    SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::ROLL;
+    SCOPE_ACQUISITION scope; scope.Configure( { .5, .5, 0 }, trigger, view.scopeChannels.front() );
+    scope.Feed( *view.scopeHistory );
+    const auto stats = ScopeStatistics( scope.Frame(), view.scopeChannels.front() );
+    BOOST_CHECK_SMALL( stats.minimum, 1e-6 ); BOOST_CHECK_CLOSE( stats.maximum, 5, .01 );
+    BOOST_CHECK_CLOSE( stats.period, 2, 2 );
+}
+
+BOOST_AUTO_TEST_CASE( ScopeProjectionPreservesVoltageCurrentAndPowerValuesAndUnits )
+{
+    auto components = Load();
+    components[1].measurements = { true, true, true };
+    auto circuit = BuildCircuitSnapshot( components );
+    BOOST_REQUIRE_EQUAL( circuit.measurements.size(), 3 );
+    for( auto& channel : circuit.measurements ) channel.scope = true;
+    SESSION_RUNNER runner( CIRCUITALIVE_TEST_WORKER ); runner.Start( circuit );
+    const auto view = WaitFor( runner, []( const auto& v ) { return v.sample.latest.time > .02; } );
+    BOOST_REQUIRE( view.scopeHistory ); BOOST_REQUIRE_EQUAL( view.scopeChannels.size(), 3 );
+    const char* units[] = { "V", "A", "W" };
+    const double values[] = { 5, .005, .025 };
+    for( std::size_t i = 0; i < view.scopeChannels.size(); ++i )
+    {
+        const auto& channel = view.scopeChannels[i];
+        BOOST_CHECK( channel.directSample );
+        BOOST_CHECK( channel.quantity == circuit.measurements[i].quantity );
+        BOOST_CHECK_EQUAL( QuantityUnit( channel.quantity ), units[i] );
+        BOOST_CHECK_CLOSE( MeasurementValue( channel, view.scopeHistory->back() ), values[i], .001 );
+    }
+    BOOST_CHECK_LE( view.scopeHistory->size() * view.scopeChannels.size(), 65536 );
 }
 
 BOOST_AUTO_TEST_CASE( OvercurrentWarningIsLatchedUntilStop )
@@ -153,4 +217,41 @@ BOOST_AUTO_TEST_CASE( OvercurrentWarningIsLatchedUntilStop )
     runner.Stop(); BOOST_CHECK( runner.View().warnings.empty() );
     components[0].modelParameters["current_warning"] = "0";
     BOOST_CHECK( BuildCircuitSnapshot( components ).currentWarnings.empty() );
+}
+
+BOOST_AUTO_TEST_CASE( ProjectedHistoryKeepsOvercurrentPeaksBetweenNormalEndpoints )
+{
+    for( const bool led : { false, true } )
+    {
+        BOOST_TEST_CONTEXT( "overcurrent pulse, LED=" << led )
+        {
+            auto components = Load();
+            components[0].libraryId = "Simulation_SPICE:VPULSE";
+            components[0].value = "VPULSE";
+            components[0].modelParameters = { { "low", "0" }, { "high", "5" }, { "delay", "2m" },
+                { "rise", "1u" }, { "fall", "1u" }, { "width", "1m" }, { "period", "1" },
+                { "current_warning", led ? "0" : "10m" } };
+            components[1].value = "50";
+            if( led )
+            {
+                components[1].pins["2"] = "led_anode";
+                components.push_back( { "D1", "Device:LED", "LED", { { "1", "return" }, { "2", "led_anode" } } } );
+            }
+            auto circuit = BuildCircuitSnapshot( components );
+            circuit.config.horizon = .1;
+            const auto signal = led ? circuit.leds.at( 0 ).signal : circuit.currentWarnings.at( 0 ).signal;
+            SESSION_RUNNER runner( CIRCUITALIVE_TEST_WORKER ); runner.Start( circuit );
+            auto view = WaitFor( runner, []( const auto& v ) { return v.sample.latest.time > .008; } );
+            // The 2..3 ms pulse lies wholly inside the first 8 ms GUI batch.
+            // Current is already normal at its endpoint, so latest alone loses it.
+            BOOST_CHECK_SMALL( view.sample.latest.values.at( signal ), 1e-6 );
+            BOOST_REQUIRE_EQUAL( view.warnings.size(), 1 );
+            BOOST_CHECK( view.warnings.front().find( led ? "D1" : "V1" ) != std::string::npos );
+            runner.Pause();
+            view = WaitFor( runner, []( const auto& v )
+                { return v.state == EDITOR_SESSION_STATE::PAUSED || v.state == EDITOR_SESSION_STATE::COMPLETED; } );
+            BOOST_CHECK_EQUAL( view.warnings.size(), 1 );
+            runner.Stop(); BOOST_CHECK( runner.View().warnings.empty() );
+        }
+    }
 }

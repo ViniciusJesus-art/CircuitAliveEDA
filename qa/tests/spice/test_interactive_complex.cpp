@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE( Ne555AstableOscillatesBetweenSupplyRelativeThresholdsAndRe
         { "RB", "Device:R", "10k", { { "1", "dis" }, { "2", "timing" } } },
         { "CT", "Device:C", "1u", { { "1", "timing" }, { "2", "0" } } },
         { "RL", "Device:R", "10k", { { "1", "out" }, { "2", "0" } } } } );
-    BOOST_CHECK_LE( c.config.maxStep, 1e-5 );
+    BOOST_CHECK_LE( c.config.maxStep, 100e-6 );
     c.config.signals = { "v(" + c.pinNodes[2].at( "3" ) + ")", "v(" + c.pinNodes[2].at( "2" ) + ")" };
     INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER ); session.Configure( c.netlist, c.config );
     bool high = false, low = false; int rising = 0; double lastRise = 0, period = 0;
@@ -112,6 +112,52 @@ BOOST_AUTO_TEST_CASE( Ne555AstableOscillatesBetweenSupplyRelativeThresholdsAndRe
     session.SetSourceValue( "Vca2", 0 ); session.AdvanceTo( .101 );
     BOOST_CHECK_LT( session.Snapshot().latest.values[0], .2 );
 }
+BOOST_AUTO_TEST_CASE( Ne555AdaptiveStepsPreserveSlowAndFastOscillationAndExplicitLimits )
+{
+    for( const auto& [capacitance,value] : std::vector<std::pair<double,std::string>>{
+            { 1e-6, "1u" }, { 10e-9, "10n" }, { 1e-9, "1n" } } )
+    {
+        auto timer = Part( "Timer:NE555P" );
+        timer.pins = { { "1", "0" }, { "2", "timing" }, { "3", "out" }, { "4", "vcc" },
+            { "5", "ctrl" }, { "6", "timing" }, { "7", "dis" }, { "8", "vcc" } };
+        const std::vector<CIRCUIT_COMPONENT> parts = { Source( "VCC", "vcc", "9" ), timer,
+            { "RA", "Device:R", "10k", { { "1", "vcc" }, { "2", "dis" } } },
+            { "RB", "Device:R", "10k", { { "1", "dis" }, { "2", "timing" } } },
+            { "CT", "Device:C", value, { { "1", "timing" }, { "2", "0" } } },
+            { "RL", "Device:R", "10k", { { "1", "out" }, { "2", "0" } } } };
+        auto circuit = BuildCircuitSnapshot( parts );
+        const double expected = std::log( 2. ) * 30000 * capacitance;
+        circuit.config.signals = { "v(" + circuit.pinNodes[1].at( "3" ) + ")" };
+        circuit.config.historyCapacity = 4096;
+        std::vector<double> periods;
+        for( const bool reference : { false, true } )
+        {
+            auto config = circuit.config;
+            if( reference ) config.step = config.maxStep = expected / 200;
+            config.horizon = expected * 10;
+            INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+            session.Configure( circuit.netlist, config ); session.AdvanceTo( expected * 6 );
+            const auto snapshot = session.Snapshot( true );
+            std::vector<double> rises;
+            bool high = false;
+            for( const auto& sample : snapshot.history )
+            {
+                const bool nowHigh = sample.values[0] > 4;
+                if( nowHigh && !high ) rises.push_back( sample.time );
+                high = nowHigh;
+            }
+            BOOST_REQUIRE_GE( rises.size(), 4 );
+            periods.push_back( ( rises.back() - rises[1] ) / ( rises.size() - 2 ) );
+            BOOST_CHECK_CLOSE( periods.back(), expected, 5 );
+        }
+        BOOST_CHECK_CLOSE( periods[0], periods[1], 3 );
+        auto explicitParts = parts;
+        explicitParts[1].modelParameters["max_step"] = "2u";
+        BOOST_CHECK_CLOSE( BuildCircuitSnapshot( explicitParts ).config.maxStep,
+                           std::min( circuit.config.maxStep, 2e-6 ), 1e-8 );
+    }
+}
+
 BOOST_AUTO_TEST_CASE( SramStoresIndependentWordsAndTristatesItsDataBus )
 {
     auto u = Part( "Memory_RAM:CY62256-70PC" ); auto m = MODEL_REPOSITORY().SelectModel( u );

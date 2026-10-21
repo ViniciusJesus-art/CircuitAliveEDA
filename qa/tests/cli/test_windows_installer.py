@@ -4,11 +4,14 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / 'tools/circuitalive/release'))
 SPEC = importlib.util.spec_from_file_location('windows_package', ROOT / 'tools/circuitalive/release/package-windows.py')
 package = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(package)
@@ -24,6 +27,16 @@ class WindowsInstallerTests(unittest.TestCase):
         self.stage = self.root / 'stage/windows-msvc'
         (self.stage / 'bin').mkdir(parents=True)
         (self.stage / 'bin/CircuitAliveEDA.exe').write_bytes(b'MZ desktop fixture')
+        assets = self.stage / 'share/circuitalive'
+        (assets / 'models').mkdir(parents=True)
+        for name in ('mcu_arduino_uno_r3', 'mcu_atmega48p_p', 'mcu_atmega88p_p',
+                     'mcu_atmega168p_p', 'mcu_atmega328p_p', 'mcu_pic16f84a_p'):
+            shutil.copy2(ROOT / 'simulation/models' / (name + '.casim'), assets / 'models')
+        shutil.copytree(ROOT / 'simulation/runtime', assets / 'runtime')
+        for name in ('quickjs-ng', 'avr8js'):
+            target = assets / 'licenses' / name
+            target.mkdir(parents=True)
+            shutil.copy2(ROOT / 'thirdparty' / name / 'LICENSE', target)
         (self.stage / 'PACKAGE-INFO.json').write_text(json.dumps({
             'version': self.version, 'commit': 'a' * 40}), encoding='utf-8')
         self.libraries = self.root / '.circuitalive/libraries'
@@ -58,6 +71,16 @@ class WindowsInstallerTests(unittest.TestCase):
     def test_different_version_cannot_relabel_an_existing_runtime(self):
         with self.assertRaisesRegex(ValueError, 'version differs'):
             package.validate_runtime(self.stage, '10.0.7-alpha.2')
+
+    def test_installer_requires_bundled_firmware_engines(self):
+        for name in ('avr8js.js', 'pic16.js'):
+            with self.subTest(module=name):
+                path = self.stage / 'share/circuitalive/runtime' / name
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaisesRegex(FileNotFoundError, 'Missing bundled runtime'):
+                    package.validate_runtime(self.stage, self.version)
+                path.write_bytes(original)
 
     def test_missing_component_library_fails_before_running_the_compiler(self):
         (self.libraries / 'share/kicad/3dmodels/data.txt').unlink()
@@ -125,6 +148,7 @@ class WindowsInstallerTests(unittest.TestCase):
                 self.assertEqual((installed / 'data.txt').read_text(), 'library data')
                 self.assertFalse((installed / '.git').exists())
             self.assertFalse((destination / package.CHECKPOINT).exists())
+            self.assertEqual(package.validate_programmable_assets(destination), 6)
         finally:
             subprocess.run([str(destination / 'unins000.exe'), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'],
                            check=True, timeout=120)

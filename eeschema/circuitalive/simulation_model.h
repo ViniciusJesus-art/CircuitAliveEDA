@@ -7,6 +7,7 @@
 #include <vector>
 #include <sim/memory_image.h>
 #include <sim/interactive_sim_session.h>
+#include <sim/programmable_device.h>
 #include "led_appearance.h"
 #include "control_visual.h"
 
@@ -74,6 +75,24 @@ struct MODEL_LIVE_TEXT
     bool slider = false;
 };
 
+// Versioned execution descriptor. The electrical adapter is independent of the
+// CPU architecture; module code and images are frozen before starting a worker.
+struct MODEL_RUNTIME_PIN
+{
+    std::string id, port;
+    bool drive = false;
+};
+struct MODEL_RUNTIME
+{
+    std::string engine, device, clockParameter, firmwareResource, eepromResource;
+    std::vector<std::string> modules;
+    std::size_t firmwareBytes = 0, eepromBytes = 0;
+    std::string optionsJson = "{}";
+    std::vector<MODEL_RUNTIME_PIN> pins;
+    std::string vcc, ground;
+    double minimumSupply = 1.8, maximumSupply = 5.5;
+};
+
 struct SIMULATION_MODEL
 {
     std::filesystem::path file;
@@ -105,6 +124,7 @@ struct SIMULATION_MODEL
     std::vector<MODEL_MEMORY> memories;
     std::vector<MODEL_LIVE_UPDATE> liveUpdates;
     std::vector<MODEL_LIVE_TEXT> liveTexts;
+    std::optional<MODEL_RUNTIME> runtime;
     bool ignoreLegacyFields = false;
     std::map<std::string, std::string> legacyFields;
     std::string measurePositive, measureNegative;
@@ -112,6 +132,9 @@ struct SIMULATION_MODEL
     std::string voltageConstraint;
     std::string frequencyParameter;
     std::string maxStepParameter;
+    /// Optional timing nodes: bound integration by the attached passive RC network.
+    std::vector<std::string> timingRcPorts;
+    double timingRcFallback = 10e-6;
     // Mixed-signal behavior remains in the file's SPICE/XSPICE templates.
     std::string logicVcc, logicGround, logicLow, logicHigh, logicMinSupply, logicMaxSupply;
     std::map<std::string, std::string> driverEnable;
@@ -150,4 +173,5 @@ private:
 std::string ExpandModelTemplate( const std::string& aText, const RESOLVED_MODEL& aModel,
         const std::map<std::string, std::string>& aPhysicalNodes, std::size_t aIndex );
 std::vector<MEMORY_REGION_CONFIG> InitialModelMemories( const CIRCUIT_COMPONENT&, const SIMULATION_MODEL& );
+PROGRAMMABLE_DEVICE_CONFIG InitialModelRuntime( const CIRCUIT_COMPONENT&, const RESOLVED_MODEL& );
 }

@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from programmable_assets import validate_programmable_assets
 
 ROOT = Path(__file__).resolve().parents[3]
 CHECKPOINT = 'RUNTIME-CHECKPOINT.json'
@@ -35,6 +36,7 @@ def preserve_runtime(stage, version):
 
 
 def validate_runtime(stage, version):
+    validate_programmable_assets(stage)
     checkpoint = json.loads((stage / CHECKPOINT).read_text(encoding='utf-8'))
     if checkpoint['version'] != version:
         raise ValueError('Runtime checkpoint version differs from the requested installer')
@@ -98,6 +100,7 @@ def prepare_runtime(stage, prefix, version, root=ROOT):
         'platform': 'windows-x86_64', 'toolchain': 'MSVC-v143', 'dependencies': 'vcpkg.json',
     }, indent=2) + '\n', encoding='utf-8')
     shutil.copy2(prefix.parent / 'vcpkg/status', stage / 'DEPENDENCIES.txt')
+    validate_programmable_assets(stage)
     preserve_runtime(stage, version)
 
 

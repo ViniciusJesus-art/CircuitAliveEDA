@@ -87,6 +87,7 @@ std::vector<TEMPLATE> Templates( const std::string& project )
         for( const auto& file : fs::directory_iterator( dir ) ) if( file.is_regular_file() && file.path().extension() == ".casim" )
         {
             auto text = Read( file.path() ); auto model = MODEL_REPOSITORY::LoadText( text );
+            if( model.runtime ) continue;
             if( ids.insert( model.id ).second ) result.push_back( { model.name, std::move( text ), file.path() } );
         }
     }

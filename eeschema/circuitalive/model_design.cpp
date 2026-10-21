@@ -65,6 +65,8 @@ std::string ModelBehaviorSummary( const std::string& text )
 MODEL_DESIGN MODEL_DESIGN::Open( const std::string& text )
 {
     auto model = MODEL_REPOSITORY::LoadText( text );
+    if( model.runtime )
+        throw std::runtime_error( "Programmable models use external runtime modules. Edit their .casim/module files; block composition cannot preserve runtime behavior yet." );
     const auto json = JSON::parse( text ); MODEL_DESIGN d;
     d.id = model.id; d.name = model.name; d.description = model.description;
     d.pins = model.pins; d.parameters = model.parameters;
@@ -261,6 +263,8 @@ std::string MODEL_DESIGN::Export() const
     if( !Identifier( id ) || name.empty() || pins.empty() ) throw std::runtime_error( "Set a model ID, name and component pins" );
     if( blocks.size() > 128 ) throw std::runtime_error( "Model design supports up to 128 blocks" );
     JSON j = baseJson.empty() ? JSON::object() : JSON::parse( baseJson );
+    if( j.contains( "runtime" ) )
+        throw std::runtime_error( "Programmable runtime models cannot be composed as electrical blocks yet" );
     j.erase( "authoring" );
     if( !blocks.empty() ) { j.erase( "live_updates" ); j.erase( "live_texts" ); }
     if( interactionsConfigured )
@@ -297,7 +301,13 @@ std::string MODEL_DESIGN::Export() const
     if( !j.contains( "spice" ) ) j["spice"] = { { "instance", JSON::array() }, { "definitions", JSON::array() } };
     if( !j["spice"].contains( "definitions" ) ) j["spice"]["definitions"] = JSON::array();
     std::vector<SIMULATION_MODEL> models;
-    for( const auto& block : blocks ) models.push_back( MODEL_REPOSITORY::LoadText( block.modelJson ) );
+    for( const auto& block : blocks )
+    {
+        auto model = MODEL_REPOSITORY::LoadText( block.modelJson );
+        if( model.runtime )
+            throw std::runtime_error( block.id + ": programmable runtime models cannot be composed as electrical blocks yet" );
+        models.push_back( std::move( model ) );
+    }
     CONTROL_REFERENCE_COMPILER references( *this, models );
     std::vector<std::map<std::string, std::string>> tokens;
     std::vector<std::map<std::string, std::string>> nets;

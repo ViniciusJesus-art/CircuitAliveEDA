@@ -27,6 +27,7 @@ class VOLTAGE_CONSTRAINTS
 public:
     bool Add( const std::string& aPositive, const std::string& aNegative, double aVoltage,
               const std::string& aOrigin );
+    std::optional<double> Difference( const std::string& aPositive, const std::string& aNegative );
 private:
     struct NODE { std::size_t parent; double offset = 0; std::string origin; };
     std::map<std::string, std::size_t> m_ids;

@@ -31,4 +31,10 @@ if( TARGET circuitalive_sim_session )
              DESTINATION share/circuitalive/models FILES_MATCHING PATTERN "*.casim" )
     install( DIRECTORY ${PROJECT_SOURCE_DIR}/simulation/blocks/
              DESTINATION share/circuitalive/blocks FILES_MATCHING PATTERN "*.casim" )
+    install( DIRECTORY ${PROJECT_SOURCE_DIR}/simulation/runtime/
+             DESTINATION share/circuitalive/runtime FILES_MATCHING PATTERN "*.js" PATTERN "*.md" )
+    install( FILES ${PROJECT_SOURCE_DIR}/thirdparty/quickjs-ng/LICENSE
+             DESTINATION share/circuitalive/licenses/quickjs-ng )
+    install( FILES ${PROJECT_SOURCE_DIR}/thirdparty/avr8js/LICENSE
+             DESTINATION share/circuitalive/licenses/avr8js )
 endif()

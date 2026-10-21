@@ -40,7 +40,7 @@ BOOST_AUTO_TEST_CASE( AcSourceProducesConfiguredSineAndPhase )
     BOOST_CHECK_CLOSE( MeasurementValue( c.measurements[0], RunDevice( c, .015 ) ), -5, .01 );
     parts[0].modelParameters = { { "amplitude", "2V" }, { "offset", "1V" }, { "frequency", "1kHz" }, { "phase", "90deg" } };
     c = BuildCircuitSnapshot( parts );
-    BOOST_CHECK_LE( c.config.maxStep, 1e-5 );
+    BOOST_CHECK_CLOSE( c.config.maxStep, 1. / ( 1000 * 24 ), 1e-8 );
     BOOST_CHECK_CLOSE( MeasurementValue( c.measurements[0], RunDevice( c, .001 ) ), 3, .01 );
 }
 BOOST_AUTO_TEST_CASE( CommonDiodesRectifyWithoutLedBehavior )

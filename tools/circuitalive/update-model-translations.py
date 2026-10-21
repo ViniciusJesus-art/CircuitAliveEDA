@@ -44,7 +44,7 @@ def main():
     diagnostics = {"Overcurrent: ", "Logic supply out of range: "}
     sources = list((ROOT / "eeschema/circuitalive").glob("*.cpp"))
     sources += [ROOT / "eeschema/sim" / name for name in
-                ("interactive_sim_session.cpp", "interactive_sim_worker.cpp", "memory_image.cpp", "runtime_memory.cpp")]
+                ("interactive_sim_session.cpp", "interactive_sim_worker.cpp", "memory_image.cpp", "runtime_memory.cpp", "programmable_runtime.cpp")]
     for source in sources:
         for expression in re.finditer(
                 r'(?:throw std::(?:runtime_error|invalid_argument)|(?:m_error|message)\s*=)\s*([^;]+);', source.read_text()):

@@ -23,6 +23,8 @@
 #include "ngspice/inpdefs.h"
 #include "ngspice/inertial.h"
 extern SPICEdev cm_ca_memory_info;
+extern SPICEdev cm_ca_programmable_pin_info;
+extern SPICEdev cm_ca_expression_info;
 
 
 
@@ -34,6 +36,8 @@ extern SPICEdev cm_ca_memory_info;
 
 SPICEdev *cmDEVices[] = {
 &cm_ca_memory_info,
+&cm_ca_programmable_pin_info,
+&cm_ca_expression_info,
 	NULL
 };
 

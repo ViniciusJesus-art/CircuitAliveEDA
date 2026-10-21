@@ -126,6 +126,13 @@ não se força um passo analógico de nanossegundos durante toda a simulação.
 | `74hc74` | Dois flip-flops D, preset/clear assíncronos e saídas complementares |
 | `sram_62256` | `Memory_RAM:CY62256-70PC`: 32K×8, endereços, CS/OE/WE, barramento bidirecional, estado inicial X e atraso de leitura |
 
+O limite padrão de passo do 555 é 100 µs, reduzido para RC/32 nas redes passivas
+ligadas a TRIG/THRESH. Quando não é possível identificar uma rede RC, aplica-se
+o limite conservador de 10 µs. O campo Max step e o limite geral do simulador
+continuam impondo limites menores; o integrador também pode reduzir cada passo
+por precisão. Modelos podem declarar `timing_rc: {"ports": ["trig", "thresh"],
+"fallback": 0.00001}` para usar essa seleção automática.
+
 Continuam disponíveis os modelos analógicos básicos, HC00 NAND e HC125 tri-state.
 A pinagem física foi conferida na biblioteca padrão instalada. Unidades diferentes
 do mesmo CI compartilham uma única instância de simulação.

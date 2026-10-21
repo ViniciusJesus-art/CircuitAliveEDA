@@ -4,6 +4,7 @@
 #include "resource_dialog.h"
 #include "simulation_model.h"
 #include "model_profiles.h"
+#include <sim/platform_runtime.h>
 #include "panel_led_appearance.h"
 #include <dialog_shim.h>
 #include <wx/button.h>
@@ -149,7 +150,7 @@ public:
             if( picker.ShowModal() != wxID_OK ) return;
             try
             {
-                m_selected = addModel( MODEL_REPOSITORY::Load( picker.GetPath().ToStdString(wxConvUTF8) ) );
+                m_selected = addModel( MODEL_REPOSITORY::Load( std::filesystem::u8path( picker.GetPath().ToStdString(wxConvUTF8) ) ) );
                 load( false );
             }
             catch( const std::exception& e ) { showError( e.what() ); }
@@ -177,6 +178,7 @@ public:
                 collect();
                 const auto resolved = m_repository.Resolve( m_component );
                 InitialModelMemories(m_component,resolved.model);
+                if( resolved.model.runtime ) InitialModelRuntime( m_component, resolved );
                 std::map<std::string, std::string> nodes;
                 for( const auto& [pin, net] : m_component.pins ) nodes[pin] = "n" + std::to_string( nodes.size() + 1 );
                 for( const auto& line : resolved.model.instance ) ExpandModelTemplate( line, resolved, nodes, 0 );
@@ -207,8 +209,8 @@ private:
         if( m_component.modelFile.empty() || m_component.modelFile.starts_with( "builtin:" ) ) return;
         try
         {
-            auto path = std::filesystem::path( m_component.modelFile );
-            if( path.is_relative() ) path = std::filesystem::path( m_component.projectDirectory ) / path;
+            auto path = std::filesystem::u8path( m_component.modelFile );
+            if( path.is_relative() ) path = std::filesystem::u8path( m_component.projectDirectory ) / path;
             m_selected = addModel( MODEL_REPOSITORY::Load( path ) );
         }
         catch( const std::exception& e ) { showError( e.what() ); }
@@ -255,13 +257,13 @@ private:
                 if( !builtin )
                 {
                     std::error_code error;
-                    auto relative = std::filesystem::relative( m_model->file, m_component.projectDirectory, error );
+                    auto relative = std::filesystem::relative( m_model->file, std::filesystem::u8path( m_component.projectDirectory ), error );
                     m_component.modelFile = !error && !relative.empty() && *relative.begin() != ".."
-                            ? relative.string() : m_model->file.string();
+                            ? PathUtf8( relative ) : PathUtf8( m_model->file );
                 }
             }
             m_choice->ChangeValue( ( m_selected == 0 ? _( "Automatic: " ) : wxString() ) + ModelText( m_model->name ) );
-            m_details->SetLabel( wxString::FromUTF8( m_model->file.string() ) + "\n" + ModelText( m_model->description ) );
+            m_details->SetLabel( wxString::FromUTF8( PathUtf8( m_model->file ) ) + "\n" + ModelText( m_model->description ) );
         }
         catch( const std::exception& e ) { m_choice->ChangeValue( _( "No model selected" ) ); m_details->SetLabel( DiagnosticText( e.what() ) ); }
         if( m_pins->GetNumberRows() ) m_pins->DeleteRows( 0, m_pins->GetNumberRows() );

@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from programmable_assets import validate_programmable_assets
 
 
 def debian_version(version):
@@ -74,6 +75,7 @@ def package(stage, libraries, ngspice, version, commit, output):
     root = Path(__file__).resolve().parents[3]
     stage, libraries, ngspice, output = (Path(p).resolve() for p in (stage, libraries, ngspice, output))
     app = stage / 'opt/circuitaliveeda'
+    validate_programmable_assets(app)
     for name in ('kicad', 'kicad-cli', 'eeschema', 'pcbnew', 'circuitalive-sim-worker'):
         if not (app / 'bin' / name).is_file():
             raise FileNotFoundError(app / 'bin' / name)

@@ -232,6 +232,71 @@ BOOST_AUTO_TEST_CASE( ExplicitHorizonCompletesWithoutSilentRestart )
     BOOST_CHECK_SMALL( session.Snapshot().latest.values[0] - end.latest.values[0], 1e-9 );
 }
 
+BOOST_AUTO_TEST_CASE( SelectedHistorySignalsKeepFullLatestValuesAndSurviveStop )
+{
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    auto cfg = Config();
+    cfg.signals.push_back( "v(in)" );
+    // Transfer a reordered subset, preserving the public configured indices.
+    cfg.historySignals = std::vector<std::size_t>{ 2, 0 };
+    session.Configure( RC, cfg );
+    auto check = [&]
+    {
+        session.AdvanceTo( .0005 );
+        const auto snapshot = session.Snapshot( true );
+        BOOST_REQUIRE_EQUAL( snapshot.latest.values.size(), 3 );
+        BOOST_CHECK_SMALL( snapshot.latest.values[0] - Charge( snapshot.latest.time ), 2e-5 );
+        BOOST_CHECK_SMALL( snapshot.latest.values[1]
+                           + ( 1 - snapshot.latest.values[0] ) / 1000, 1e-9 );
+        BOOST_CHECK_SMALL( snapshot.latest.values[2] - 1, 1e-12 );
+        BOOST_REQUIRE( !snapshot.history.empty() );
+        for( const auto& sample : snapshot.history )
+        {
+            BOOST_REQUIRE_EQUAL( sample.values.size(), 3 );
+            BOOST_CHECK_SMALL( sample.values[0] - Charge( sample.time ), 2e-5 );
+            BOOST_CHECK( std::isnan( sample.values[1] ) );
+            BOOST_CHECK_SMALL( sample.values[2] - 1, 1e-12 );
+        }
+        BOOST_CHECK( session.Snapshot().history.empty() );
+        return snapshot;
+    };
+    const auto first = check();
+    session.Stop();
+    const auto stopped = session.Snapshot();
+    BOOST_CHECK( stopped.latest.values.empty() );
+    BOOST_CHECK( stopped.history.empty() );
+    const auto restarted = check();
+    BOOST_CHECK_GT( restarted.generation, first.generation );
+    BOOST_CHECK_SMALL( restarted.latest.values[0] - first.latest.values[0], 1e-12 );
+}
+
+BOOST_AUTO_TEST_CASE( EmptyHistorySignalSelectionKeepsTimestampsAndDefaultKeepsEveryValue )
+{
+    for( const bool timestampsOnly : { false, true } )
+    {
+        BOOST_TEST_CONTEXT( "timestamps only=" << timestampsOnly )
+        {
+            INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+            auto cfg = Config();
+            if( timestampsOnly ) cfg.historySignals.emplace();
+            session.Configure( RC, cfg );
+            session.AdvanceTo( .0005 );
+            const auto snapshot = session.Snapshot();
+            BOOST_REQUIRE_EQUAL( snapshot.latest.values.size(), 2 );
+            for( const auto value : snapshot.latest.values ) BOOST_CHECK( std::isfinite( value ) );
+            BOOST_REQUIRE( !snapshot.history.empty() );
+            for( std::size_t i = 0; i < snapshot.history.size(); ++i )
+            {
+                const auto& sample = snapshot.history[i];
+                BOOST_REQUIRE_EQUAL( sample.values.size(), 2 );
+                if( i ) BOOST_CHECK_GT( sample.time, snapshot.history[i-1].time );
+                for( const auto value : sample.values )
+                    BOOST_CHECK( timestampsOnly ? std::isnan( value ) : std::isfinite( value ) );
+            }
+        }
+    }
+}
+
 BOOST_AUTO_TEST_CASE( InvalidRequestsDoNotMutateActiveCircuit )
 {
     INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );

@@ -10,10 +10,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 #include "memory_image.h"
 #include "signal_activity.h"
+#include "programmable_device.h"
 
 namespace CIRCUITALIVE
 {
@@ -37,12 +39,18 @@ struct SIM_SESSION_CONFIG
     std::vector<std::string> signals;
     std::vector<MEMORY_REGION_CONFIG> memories;
     std::vector<SIM_ACTIVITY_MONITOR> activityMonitors;
+    std::vector<PROGRAMMABLE_DEVICE_CONFIG> programmableDevices;
+    /// nullopt retains every signal; an empty list transfers timestamps only.
+    std::optional<std::vector<std::size_t>> historySignals;
+    /// Compile supported immutable behavioral sources once instead of walking their syntax per iteration.
+    bool accelerateExpressions = false;
+    std::vector<std::string> mutableElements;
 };
 
 struct SIM_SAMPLE
 {
     double              time = 0.0;
-    std::vector<double> values;  ///< Same order as SIM_SESSION_CONFIG::signals.
+    std::vector<double> values;  ///< Configured signal order; unrequested history values are NaN.
 };
 
 struct SIM_SESSION_SNAPSHOT

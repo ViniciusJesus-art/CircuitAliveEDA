@@ -4,6 +4,7 @@
 #include "circuit_snapshot.h"
 #include "simulation_model.h"
 #include "choice_controls.h"
+#include <sim/platform_runtime.h>
 #include <dialog_shim.h>
 #include <wx/button.h>
 #include <wx/filedlg.h>
@@ -27,6 +28,12 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
                     _( "Files belong to this instance. Paths inside the project are saved relative to it.\nLoading a "
                        "file initializes the next simulation; it does not overwrite a paused session." ) ),
             0, wxLEFT | wxRIGHT | wxBOTTOM, 10 );
+    if( model.runtime )
+        layout->Add( new wxStaticText( &dialog, wxID_ANY,
+                         wxString::FromUTF8( model.runtime->device ) + " — "
+                         + wxString::Format( _( "Firmware address space: %zu bytes; EEPROM: %zu bytes" ),
+                             model.runtime->firmwareBytes, model.runtime->eepromBytes ) ),
+                     0, wxLEFT | wxRIGHT | wxBOTTOM, 10 );
     struct ROW
     {
         MODEL_RESOURCE resource;
@@ -112,17 +119,17 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
                         unsigned long long offset = 0;
                         if( !row.offset->GetValue().ToULongLong( &offset, 16 ) )
                             throw std::runtime_error( "Invalid hexadecimal load address" );
-                        std::filesystem::path path( text );
+                        auto path = std::filesystem::u8path( text );
                         if( path.is_absolute() )
                         {
                             std::error_code error;
-                            auto relative = std::filesystem::relative( path, component.projectDirectory, error );
+                            auto relative = std::filesystem::relative( path, std::filesystem::u8path( component.projectDirectory ), error );
                             if( !error && !relative.empty() && *relative.begin() != ".." )
-                                text = relative.string();
+                                text = PathUtf8( relative );
                         }
-                        auto file = std::filesystem::path( text );
+                        auto file = std::filesystem::u8path( text );
                         if( file.is_relative() )
-                            file = std::filesystem::path( component.projectDirectory ) / file;
+                            file = std::filesystem::u8path( component.projectDirectory ) / file;
                         if( !std::filesystem::is_regular_file( file ) ||
                             std::filesystem::file_size( file ) > row.resource.maxBytes )
                             throw std::runtime_error( "Missing or oversized file: " + file.string() );
@@ -131,6 +138,19 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
                                 text, index > 0 ? row.resource.formats.at( index - 1 ) : "auto", offset };
                     }
                     InitialModelMemories( copy, model );
+                    if( model.runtime )
+                    {
+                        RESOLVED_MODEL resolved;
+                        resolved.model = model;
+                        for( const auto& parameter : model.parameters )
+                        {
+                            auto text = copy.modelParameters.contains( parameter.id )
+                                ? copy.modelParameters.at( parameter.id ) : parameter.defaultValue;
+                            if( text.empty() ) text = parameter.defaultValue;
+                            resolved.parameters[parameter.id] = ParseComponentValue( text == "$value" ? copy.value : text );
+                        }
+                        InitialModelRuntime( copy, resolved );
+                    }
                     component.resources = std::move( copy.resources );
                     dialog.EndQuasiModal( wxID_OK );
                 }

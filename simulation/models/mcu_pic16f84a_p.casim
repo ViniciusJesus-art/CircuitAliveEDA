@@ -1,0 +1,279 @@
+{
+  "schema_version": 2,
+  "backend": "ngspice+runtime",
+  "id": "mcu_pic16f84a_p",
+  "name": "PIC16F84A-XXP firmware",
+  "description": "PIC16F84A firmware interpreter: 1K x 14-bit Flash, 68-byte SRAM, 64-byte EEPROM reads, GPIO with RA4 open-drain, Timer0, RB0/RB4-RB7 interrupts and 8-level return stack. Configure oscillator frequency (instruction rate Fosc/4). Load Intel HEX/BIN, including configuration word and EEPROM regions. WDT must be disabled; SLEEP and EEPROM writes report unsupported-operation errors.",
+  "license": "GPL-3.0-or-later",
+  "category": "Microcontrollers",
+  "family": "PIC16 mid-range",
+  "pins": [
+    {
+      "id": "ra2",
+      "label": "RA2",
+      "role": "bidirectional",
+      "default_pin": "1"
+    },
+    {
+      "id": "ra3",
+      "label": "RA3",
+      "role": "bidirectional",
+      "default_pin": "2"
+    },
+    {
+      "id": "ra4",
+      "label": "TOCKI/RA4",
+      "role": "bidirectional",
+      "default_pin": "3"
+    },
+    {
+      "id": "reset",
+      "label": "~{MCLR}",
+      "role": "input",
+      "default_pin": "4"
+    },
+    {
+      "id": "gnd",
+      "label": "VSS",
+      "role": "reference",
+      "default_pin": "5"
+    },
+    {
+      "id": "rb0",
+      "label": "INT/RB0",
+      "role": "bidirectional",
+      "default_pin": "6"
+    },
+    {
+      "id": "rb1",
+      "label": "RB1",
+      "role": "bidirectional",
+      "default_pin": "7"
+    },
+    {
+      "id": "rb2",
+      "label": "RB2",
+      "role": "bidirectional",
+      "default_pin": "8"
+    },
+    {
+      "id": "rb3",
+      "label": "RB3",
+      "role": "bidirectional",
+      "default_pin": "9"
+    },
+    {
+      "id": "rb4",
+      "label": "RB4",
+      "role": "bidirectional",
+      "default_pin": "10"
+    },
+    {
+      "id": "rb5",
+      "label": "RB5",
+      "role": "bidirectional",
+      "default_pin": "11"
+    },
+    {
+      "id": "rb6",
+      "label": "RB6",
+      "role": "bidirectional",
+      "default_pin": "12"
+    },
+    {
+      "id": "rb7",
+      "label": "RB7",
+      "role": "bidirectional",
+      "default_pin": "13"
+    },
+    {
+      "id": "vcc",
+      "label": "VDD",
+      "role": "power",
+      "default_pin": "14"
+    },
+    {
+      "id": "clock_15",
+      "label": "OSC2/CLKOUT",
+      "role": "input",
+      "default_pin": "15"
+    },
+    {
+      "id": "clock_16",
+      "label": "OSC1/CLKIN",
+      "role": "input",
+      "default_pin": "16"
+    },
+    {
+      "id": "ra0",
+      "label": "RA0",
+      "role": "bidirectional",
+      "default_pin": "17"
+    },
+    {
+      "id": "ra1",
+      "label": "RA1",
+      "role": "bidirectional",
+      "default_pin": "18"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "clock_hz",
+      "label": "CPU clock",
+      "unit": "Hz",
+      "default": "4Meg",
+      "min": 1000,
+      "max": 20000000.0
+    },
+    {
+      "id": "sample_period",
+      "label": "Electrical input sampling period",
+      "unit": "s",
+      "default": "1u",
+      "min": 1e-09,
+      "max": 0.001
+    }
+  ],
+  "resources": [
+    {
+      "id": "firmware",
+      "label": "Firmware (PIC Flash/configuration/EEPROM)",
+      "kind": "firmware",
+      "formats": [
+        "ihex",
+        "bin"
+      ],
+      "required": true,
+      "max_bytes": 133632
+    },
+    {
+      "id": "eeprom",
+      "label": "Initial EEPROM image",
+      "kind": "eeprom",
+      "formats": [
+        "ihex",
+        "bin"
+      ],
+      "required": false,
+      "max_bytes": 65792
+    }
+  ],
+  "runtime": {
+    "api_version": 1,
+    "engine": "javascript",
+    "device": "pic16f84a",
+    "modules": [
+      "../runtime/pic16.js"
+    ],
+    "clock_parameter": "clock_hz",
+    "firmware_resource": "firmware",
+    "firmware_bytes": 17024,
+    "eeprom_resource": "eeprom",
+    "eeprom_bytes": 64,
+    "vcc": "vcc",
+    "gnd": "gnd",
+    "min_supply": 4,
+    "max_supply": 5.5,
+    "options": {
+      "programWords": 1024,
+      "sramBytes": 68,
+      "eepromBytes": 64
+    },
+    "pins": [
+      {
+        "id": "RA2",
+        "port": "ra2",
+        "drive": true
+      },
+      {
+        "id": "RA3",
+        "port": "ra3",
+        "drive": true
+      },
+      {
+        "id": "RA4",
+        "port": "ra4",
+        "drive": true
+      },
+      {
+        "id": "RESET",
+        "port": "reset",
+        "drive": false
+      },
+      {
+        "id": "GND",
+        "port": "gnd",
+        "drive": false
+      },
+      {
+        "id": "RB0",
+        "port": "rb0",
+        "drive": true
+      },
+      {
+        "id": "RB1",
+        "port": "rb1",
+        "drive": true
+      },
+      {
+        "id": "RB2",
+        "port": "rb2",
+        "drive": true
+      },
+      {
+        "id": "RB3",
+        "port": "rb3",
+        "drive": true
+      },
+      {
+        "id": "RB4",
+        "port": "rb4",
+        "drive": true
+      },
+      {
+        "id": "RB5",
+        "port": "rb5",
+        "drive": true
+      },
+      {
+        "id": "RB6",
+        "port": "rb6",
+        "drive": true
+      },
+      {
+        "id": "RB7",
+        "port": "rb7",
+        "drive": true
+      },
+      {
+        "id": "VCC",
+        "port": "vcc",
+        "drive": false
+      },
+      {
+        "id": "RA0",
+        "port": "ra0",
+        "drive": true
+      },
+      {
+        "id": "RA1",
+        "port": "ra1",
+        "drive": true
+      }
+    ]
+  },
+  "spice": {
+    "instance": [
+      "Rsupply_${id} ${pin:vcc} ${pin:gnd} 1e12",
+      "Rclock_15_${id} ${pin:clock_15} ${pin:gnd} 1e12",
+      "Rclock_16_${id} ${pin:clock_16} ${pin:gnd} 1e12"
+    ],
+    "definitions": []
+  },
+  "matches": {
+    "library_ids": [
+      "MCU_Microchip_PIC16:PIC16F84A-XXP"
+    ]
+  }
+}

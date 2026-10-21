@@ -359,19 +359,23 @@ void SCOPE_PANEL::ResetSession()
 
 void SCOPE_PANEL::UpdateSession( const CIRCUIT_SNAPSHOT& circuit, const EDITOR_SESSION_VIEW& session )
 {
+    if( !m_channels.empty() && !session.scopeChannels.empty() && !m_channels.front().directSample )
+        ResetSession();
     const bool changed = m_history != session.scopeHistory;
     m_latest = session.sample.latest.time; m_maxStep = circuit.config.maxStep;
     m_history = session.scopeHistory;
     if( m_channels.empty() )
     {
-        for( const auto& c : circuit.measurements ) if( c.scope )
+        const auto& channels = session.scopeChannels.empty() ? circuit.measurements : session.scopeChannels;
+        for( const auto& c : channels ) if( c.scope )
         {
             m_channels.push_back( c ); m_source->Append( utf8( c.name ) ); m_channel->Append( utf8( c.name ) );
             m_cursorSource->Append( utf8( c.name ) );
             m_readings->InsertItem( m_channels.size() - 1, utf8( c.name ) );
             m_readings->SetItemTextColour( m_channels.size() - 1, color( m_channels.size() - 1 ) );
         }
-        m_capacity = std::min<std::size_t>( 8192, 65536 / std::max<std::size_t>( 1, circuit.config.signals.size() ) );
+        const auto valuesPerPoint = session.scopeChannels.empty() ? circuit.config.signals.size() : m_channels.size();
+        m_capacity = std::min<std::size_t>( 8192, 65536 / std::max<std::size_t>( 1, valuesPerPoint ) );
         configure();
     }
     else if( changed ) m_acquisition.Feed( history() );

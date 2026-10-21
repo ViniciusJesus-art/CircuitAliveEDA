@@ -32,6 +32,7 @@ double MeasurementValue( const MEASUREMENT_CHANNEL& channel, const SIM_SAMPLE& s
 {
     if( !channel.connected ) return std::numeric_limits<double>::quiet_NaN();
     auto value = [&]( std::size_t index ) { return index == NO_SIGNAL ? 0.0 : sample.values.at( index ); };
+    if( channel.directSample ) return value( channel.positive );
     const double voltage = value( channel.positive ) - value( channel.negative );
     if( channel.quantity == MEASURE_QUANTITY::VOLTAGE ) return voltage;
     if( channel.quantity == MEASURE_QUANTITY::CURRENT ) return value( channel.current );

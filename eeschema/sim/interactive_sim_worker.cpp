@@ -6,6 +6,10 @@
 
 #include "interactive_sim_protocol.h"
 #include "runtime_memory.h"
+#include "programmable_pipeline.h"
+#include "programmable_pin_backend.h"
+#include "compiled_expression.h"
+#include "expression_backend.h"
 #include <filesystem>
 #include "platform_runtime.h"
 #ifdef _WIN32
@@ -36,6 +40,7 @@
 #include <iomanip>
 #include <iostream>
 #include <locale>
+#include <map>
 #include <mutex>
 #include <set>
 #include <signal.h>
@@ -73,6 +78,7 @@ public:
     ENGINE()
     {
         ngSpice_Init( &OnMessage, &OnStatus, &OnExit, &OnData, &OnInit, &OnBackground, this );
+        ngSpice_Init_Sync( &OnVoltage, nullptr, &OnSync, &m_engineId, this );
         // The solver's preflight assumes every time point is retained. Our
         // .save none streaming policy retains one solver point plus a bounded
         // ring, whose limits are checked in Configure and Snapshot instead.
@@ -115,8 +121,10 @@ public:
 
     void Stop()
     {
+        m_programPlaying = false;
         if( !Finished() )
             Halt();
+        m_programmable.Cancel();
 
         Command( "delete all" );
         Command( "destroy all" );
@@ -142,6 +150,18 @@ private:
         cfg.useInitialConditions = aRequest.at( "uic" );
         cfg.historyCapacity = aRequest.at( "capacity" );
         cfg.signals = aRequest.at( "signals" ).get<std::vector<std::string>>();
+        cfg.accelerateExpressions = aRequest.value( "accelerate_expressions", false );
+        cfg.mutableElements = aRequest.value( "mutable_elements", std::vector<std::string>{} );
+        if( cfg.mutableElements.size() > 4096 )
+            throw std::runtime_error( "Too many mutable elements" );
+        for( const auto& element : cfg.mutableElements )
+            if( !Token( element ) )
+                throw std::runtime_error( "Invalid mutable element token" );
+        const auto& devices = aRequest.value("programmable_devices",JSON::array());
+        if( !devices.is_array() || devices.size()>32 )
+            throw std::runtime_error("Too many programmable devices");
+        for( const auto& device : devices )
+            cfg.programmableDevices.push_back(DeserializeProgrammableDevice(device));
 
         if( !std::isfinite( cfg.step ) || !std::isfinite( cfg.maxStep )
                 || !std::isfinite( cfg.horizon ) || cfg.step <= 0 || cfg.maxStep <= 0
@@ -151,6 +171,24 @@ private:
                 || cfg.signals.empty() || cfg.signals.size() > 256
                 || cfg.signals.size() * cfg.historyCapacity > 65536 )
             throw std::runtime_error( "Invalid simulation timing, signals or history capacity" );
+
+        if( aRequest.contains( "history_signals" ) )
+        {
+            const auto& selection = aRequest.at( "history_signals" );
+            if( !selection.is_array() || selection.size() > cfg.signals.size() )
+                throw std::runtime_error( "Invalid history signal selection" );
+            std::set<std::size_t> selected;
+            cfg.historySignals.emplace();
+            for( const auto& item : selection )
+            {
+                if( !item.is_number_integer() || item < 0 || item >= cfg.signals.size() )
+                    throw std::runtime_error( "Invalid history signal selection" );
+                const auto index = item.get<std::size_t>();
+                if( !selected.insert( index ).second )
+                    throw std::runtime_error( "Invalid history signal selection" );
+                cfg.historySignals->push_back( index );
+            }
+        }
 
         if( aRequest.contains( "activity_monitors" ) )
         {
@@ -196,7 +234,7 @@ private:
 
         std::istringstream input( netlist );
         std::string line, deck;
-        bool title = true, end = false;
+        bool title = true, end = false, mixedSignal = false;
         const std::set<std::string> allowed = { ".model", ".subckt", ".ends", ".param",
                                                 ".func", ".ic", ".options", ".option",
                                                 ".global", ".temp" };
@@ -213,6 +251,7 @@ private:
             words >> first;
             if( first.empty() || first[0] == '*' )
                 continue;
+            if( first[0] == 'a' ) mixedSignal = true;
             if( end )
                 throw std::runtime_error( "Unexpected data after .end" );
             if( first == ".end" )
@@ -229,10 +268,20 @@ private:
         if( title || !end )
             throw std::runtime_error( "A component deck with a title and .end is required" );
 
+        COMPILED_EXPRESSIONS expressions;
+        if( cfg.accelerateExpressions )
+            deck = expressions.Configure( deck, cfg.signals, cfg.mutableElements );
+
         deck += ".save none";
         for( const auto& signal : cfg.signals )
             deck += " " + signal;
-        deck += "\n.tran " + Number( cfg.step ) + " " + Number( cfg.horizon ) + " 0 "
+        // XSPICE freezes time while converging its first point. A large first
+        // point can strand a hard limiter at its startup kink, even with the
+        // stock adc_bridge. Start conservatively, then retain the configured
+        // adaptive maximum; firmware sampling and display timing are unchanged.
+        const double initialStep = mixedSignal || !expressions.Empty()
+                ? std::min( cfg.step, 1e-6 ) : cfg.step;
+        deck += "\n.tran " + Number( initialStep ) + " " + Number( cfg.horizon ) + " 0 "
                 + Number( cfg.maxStep ) + ( cfg.useInitialConditions ? " uic\n" : "\n" ) + ".end\n";
 
         if( aRequest.contains( "memories" ) )
@@ -244,6 +293,8 @@ private:
                           region.at( "writable" ),
                           { MemoryUnhex( region.at( "data" ) ), MemoryUnhex( region.at( "known" ) ) } } );
         m_memory.Reset( cfg.memories );
+        ConfigureProgrammable(cfg);
+        m_expressions = std::move( expressions );
         m_config = std::move( cfg );
         m_names = std::move( names );
         m_deck = std::move( deck );
@@ -308,7 +359,9 @@ private:
             ++m_generation;
         }
         m_memory.Reset( m_config.memories );
-        if( !m_config.memories.empty() && !m_memoryModule )
+        m_programmable.Reset();
+        ResetProgrammableSources();
+        if( (!m_config.memories.empty() || !m_programDrivers.empty() || !m_expressions.Empty()) && !m_memoryModule )
         {
             const auto file = ExecutablePath().parent_path() / "circuitalive-memory.cm";
             const auto path = PathUtf8(file);
@@ -333,6 +386,37 @@ private:
             if(!bind)throw std::runtime_error("Invalid memory engine");
             auto backend=m_memory.Backend();bind(&backend);Command("codemodel "+modulePath);
 #endif
+            auto bindPins = reinterpret_cast<void (*)(const CA_PROGRAMMABLE_PIN_BACKEND*)>(
+#ifdef _WIN32
+                GetProcAddress(reinterpret_cast<HMODULE>(m_memoryModule),"CircuitAliveProgrammablePinSetBackend")
+#else
+                dlsym(m_memoryModule,"CircuitAliveProgrammablePinSetBackend")
+#endif
+            );
+            if(!bindPins)throw std::runtime_error("Invalid programmable pin engine");
+            const CA_PROGRAMMABLE_PIN_BACKEND pinBackend{1,this,[](void* user,unsigned slot,double time)->int {
+                const auto& drivers=static_cast<ENGINE*>(user)->m_programDrivers;
+                if(slot>=drivers.size()||drivers[slot].empty())return 0;
+                const auto& history=drivers[slot];
+                if(time>=history.back().time)return int(history.back().value);
+                const auto next=std::upper_bound(history.begin(),history.end(),time,
+                    [](double t,const EXTERNAL_VALUE& value){return t<value.time;});
+                return next==history.begin()?0:int(std::prev(next)->value);
+            }};
+            bindPins(&pinBackend);
+            auto bindExpressions = reinterpret_cast<void (*)(const CA_EXPRESSION_BACKEND*)>(
+#ifdef _WIN32
+                GetProcAddress(reinterpret_cast<HMODULE>(m_memoryModule),"CircuitAliveExpressionSetBackend")
+#else
+                dlsym(m_memoryModule,"CircuitAliveExpressionSetBackend")
+#endif
+            );
+            if(!bindExpressions)throw std::runtime_error("Invalid expression engine");
+            const CA_EXPRESSION_BACKEND expressionBackend{1,this,
+                [](void* user,unsigned slot,const double* inputs,unsigned count,double time,double* value,const double** partials)->int {
+                    return static_cast<ENGINE*>(user)->m_expressions.Evaluate(slot,inputs,count,time,*value,*partials);
+                }};
+            bindExpressions(&expressionBackend);
             CheckError();
         }
         std::istringstream stream( m_deck );
@@ -374,6 +458,16 @@ private:
 
     void Play()
     {
+        if( !m_config.programmableDevices.empty() )
+        {
+            if( m_programPlaying ) return;
+            if( m_state!=SIM_SESSION_STATE::STOPPED && m_state!=SIM_SESSION_STATE::PAUSED )
+                throw std::runtime_error("Stop the completed/failed session before restarting");
+            AdvanceProgrammable(ProgrammablePollDeadline());
+            m_programPlaying=m_state!=SIM_SESSION_STATE::COMPLETED;
+            if(m_programPlaying)m_state=SIM_SESSION_STATE::RUNNING;
+            return;
+        }
         if( m_state == SIM_SESSION_STATE::RUNNING )
             return;
         const bool fresh = m_state == SIM_SESSION_STATE::STOPPED;
@@ -401,6 +495,7 @@ private:
 
     void Refresh()
     {
+        if(m_programPlaying)return; // Cooperative runtime Play advances on snapshot requests.
         bool finished, failed;
         {
             std::lock_guard lock( m_mutex );
@@ -428,6 +523,10 @@ private:
 
     void Pause()
     {
+        if(m_programPlaying)
+        {
+            m_programPlaying=false;m_state=SIM_SESSION_STATE::PAUSED;CheckError();return;
+        }
         if( m_state == SIM_SESSION_STATE::STOPPED )
             throw std::runtime_error( "No active simulation to pause" );
         if( m_state == SIM_SESSION_STATE::RUNNING )
@@ -437,6 +536,16 @@ private:
     }
 
     void Advance( double aTime )
+    {
+        if( !m_config.programmableDevices.empty() )
+        {
+            if(m_programPlaying)Pause();
+            AdvanceProgrammable(aTime);return;
+        }
+        AdvanceAnalog(aTime);
+    }
+
+    void AdvanceAnalog( double aTime, bool exact = false )
     {
         if( !m_configured || !std::isfinite( aTime ) || aTime <= 0 || aTime > m_config.horizon )
             throw std::runtime_error( "Target must be positive and within the configured horizon" );
@@ -457,13 +566,241 @@ private:
             Command( "delete all" );
         // Before the first run, "delete all" would also remove the .save policy.
         // On resume the current plot already owns its storage and selected vectors.
-        Command( "stop when time >= " + Number( aTime ) );
+        if( exact && !fresh )
+        {
+            // Resume from the last accepted point before the solver takes its
+            // next step. There is no second data callback at this same time.
+            std::lock_guard lock( m_mutex );
+            ScheduleProgrammable();
+        }
+        // OnSync already bounds the next step at the requested runtime time.
+        // Do not add a second permanent breakpoint here: a rounded stop just
+        // before it would leave a femtosecond remainder to solve on resume.
+        // Only actual pin transitions need permanent breakpoints.
+        // ngspice's expression parser may round the decimal threshold a few
+        // ULPs above the breakpoint double. Stop at that breakpoint instead of
+        // missing it and advancing an entire additional solver step.
+        const double threshold = exact ? aTime - std::min(aTime * 1e-9,m_programQuantum * 1e-8) : aTime;
+        Command( "stop when time >= " + Number( threshold ) );
         Run( fresh );
         Wait();
         Refresh();
         CheckError();
         if( m_state == SIM_SESSION_STATE::FAILED )
             throw std::runtime_error( "Simulation produced no data" );
+    }
+
+    // The runtime advances on confirmed electrical boundaries. It predicts output
+    // transitions while inputs are held for one configurable sampling window.
+    // The solver only reads that immutable event history; rejected analog steps
+    // never execute firmware twice or mutate CPU/peripheral state.
+    void ConfigureProgrammable( const SIM_SESSION_CONFIG& config )
+    {
+        m_programInputs.clear();m_programOutputs.clear();m_external.clear();m_externalCache.clear();m_programDrivers.clear();
+        m_programPlaying=false;m_programReady=false;m_programBoundary=0;m_programQuantum=1e-3;
+        for( const auto& device : config.programmableDevices )
+        {
+            if(!std::isfinite(device.quantumSeconds)||device.quantumSeconds<1e-9||device.quantumSeconds>1e-3)
+                throw std::runtime_error("Programmable input sampling period must be between 1 ns and 1 ms");
+            m_programQuantum=std::min(m_programQuantum,device.quantumSeconds);
+            if(device.bindings.size()>512)throw std::runtime_error("Too many programmable pin bindings");
+            std::set<std::string> ids;
+            for( const auto& binding : device.bindings )
+            {
+                if(!ids.insert(binding.id).second)
+                    throw std::runtime_error("Duplicate programmable pin binding");
+                const auto signal=std::find(config.signals.begin(),config.signals.end(),binding.signal);
+                if(!binding.signal.empty()&&signal==config.signals.end())throw std::runtime_error("Programmable pin input signal is missing");
+                m_programInputs.push_back({device.id,binding.id,binding.signal.empty()
+                    ? std::numeric_limits<std::size_t>::max() : std::size_t(signal-config.signals.begin())});
+                if(binding.driverSlot < -1 || binding.driverSlot >= 16384)throw std::runtime_error("Invalid programmable driver slot");
+                if(binding.driverSlot>=0) {
+                    if(m_programDrivers.size()<=std::size_t(binding.driverSlot))m_programDrivers.resize(binding.driverSlot+1);
+                    auto& history=m_programDrivers[binding.driverSlot];
+                    if(!history.empty())throw std::runtime_error("Duplicate programmable driver slot");
+                    history={{0,0}};
+                    m_programOutputs[{device.id,binding.id}]={"","","",binding.driverSlot};
+                    continue;
+                }
+                if(binding.highSource.empty()&&binding.lowSource.empty()&&binding.pullupSource.empty())continue;
+                OUTPUT_BINDING output{Lower(binding.highSource),Lower(binding.lowSource),Lower(binding.pullupSource),-1};
+                for(const auto& source:{output.high,output.low,output.pullup})
+                {
+                    if(source.empty()||source.front()!='v'||source.size()>240||source.find_first_not_of(
+                        "abcdefghijklmnopqrstuvwxyz0123456789_")!=std::string::npos||m_external.contains(source))
+                        throw std::runtime_error("Invalid or duplicate programmable driver source");
+                    m_external[source]={{0,0}};
+                }
+                m_programOutputs[{device.id,binding.id}]=std::move(output);
+            }
+        }
+        m_programmable.Configure(config.programmableDevices);
+    }
+
+    void ResetProgrammableSources()
+    {
+        m_programReady=false;m_programBoundary=0;
+        m_externalCache.clear();
+        for(auto& [source,history]:m_external)history={{0,0}};
+        for(auto& history:m_programDrivers)if(!history.empty())history={{0,0}};
+    }
+
+    void ProgrammableEvents( const std::vector<PROGRAMMABLE_PIN_STATE>& events, double from, double until )
+    {
+        if(events.size()>100000)throw std::runtime_error("Too many programmable events in one sampling window");
+        std::set<double> breaks;
+        for(const auto& event:events)
+        {
+            const auto output=m_programOutputs.find({event.device,event.pin});
+            if(output==m_programOutputs.end())continue; // Input-only/backend-internal state.
+            if(!std::isfinite(event.time)||event.time>until+1e-12)
+                throw std::runtime_error("Programmable event lies beyond the sampling boundary");
+            const auto time=std::max(event.time,from);
+            const auto& pin=output->second;
+            if(pin.slot>=0) {
+                auto& history=m_programDrivers.at(pin.slot);
+                if(history.back().value!=int(event.drive)) {
+                    if(time<history.back().time)throw std::runtime_error("Programmable events are not chronological");
+                    history.push_back({time,double(int(event.drive))});
+                    if(time>from)breaks.insert(time);
+                }
+                continue;
+            }
+            const std::pair<std::string,double> values[]={{pin.high,event.drive==PROGRAMMABLE_DRIVE::HIGH?1.:0.},
+                {pin.low,event.drive==PROGRAMMABLE_DRIVE::LOW?1.:0.},
+                {pin.pullup,event.drive==PROGRAMMABLE_DRIVE::PULL_UP?1.:0.}};
+            for(const auto& [source,value]:values)
+            {
+                auto& history=m_external.at(source);
+                if(history.back().value!=value)
+                {
+                    if(time<history.back().time)throw std::runtime_error("Programmable events are not chronological");
+                    history.push_back({time,value});
+                    if(time>from)breaks.insert(time);
+                }
+            }
+        }
+        for(double time:breaks)
+            if(!ngSpice_SetBkpt(time))throw std::runtime_error("Cannot schedule programmable pin transition");
+        m_events+=events.size();
+    }
+
+    void AdvanceProgrammable( double target )
+    {
+        if(!m_configured||!std::isfinite(target)||target<=0||target>m_config.horizon)
+            throw std::runtime_error("Target must be positive and within the configured horizon");
+        if(m_state!=SIM_SESSION_STATE::STOPPED&&m_state!=SIM_SESSION_STATE::PAUSED)
+            throw std::runtime_error("Cannot advance a completed/failed session");
+        if(target<=m_latest.time)throw std::runtime_error("Simulation time must advance monotonically");
+        m_programTarget=target;
+        AdvanceAnalog(target,true);
+        if(std::abs(m_latest.time-target)>ProgrammableTolerance())
+            throw std::runtime_error("Analog solver did not stop on the programmable sampling boundary: "
+                + Number(m_latest.time) + " instead of " + Number(target));
+    }
+
+    // Called after an accepted analog point, or while paused before resuming,
+    // with m_mutex held. Solver retries never recompute a pending runtime window.
+    void ScheduleProgrammable()
+    {
+        const double now=m_latest.time;
+        const double tolerance=ProgrammableTolerance();
+        if(now>=m_programTarget-tolerance)return;
+        if(m_programReady&&now<m_programBoundary-tolerance)return;
+        if(m_programReady&&now>m_programBoundary+tolerance)
+            throw std::runtime_error("Analog solver skipped a programmable input boundary: "
+                + Number(now) + " instead of " + Number(m_programBoundary));
+        for(auto& [source,history]:m_external)
+        {
+            const auto next=std::upper_bound(history.begin(),history.end(),now,
+                [](double time,const EXTERNAL_VALUE& entry){return time<entry.time;});
+            if(next!=history.begin())history.erase(history.begin(),std::prev(next));
+        }
+        for(auto& history:m_programDrivers) {
+            const auto next=std::upper_bound(history.begin(),history.end(),now,
+                [](double time,const EXTERNAL_VALUE& entry){return time<entry.time;});
+            if(next!=history.begin())history.erase(history.begin(),std::prev(next));
+        }
+        std::vector<PROGRAMMABLE_PIN_INPUT> inputs;
+        for(const auto& binding:m_programInputs)
+            inputs.push_back({binding.device,binding.pin,binding.signal==std::numeric_limits<std::size_t>::max()
+                ? 0. : m_latest.values.at(binding.signal)});
+        const double window=m_config.programmableDevices.size()==1
+            ? std::max(m_programQuantum,m_config.programmableDevices.front().autonomousWindowSeconds) : m_programQuantum;
+        double boundary=std::min(m_programTarget,m_programmable.Time()+window);
+        // Do not let accumulated floating point additions create a second
+        // breakpoint just below the exact stop-condition value.
+        if(m_programTarget-boundary<tolerance)boundary=m_programTarget;
+        if(boundary<=now+tolerance)
+            throw std::runtime_error("Programmable device clock did not advance");
+        const auto events=m_programmable.AdvanceTo(boundary,inputs,m_programTarget);
+        boundary=m_programmable.Time();
+        ProgrammableEvents(events,now,boundary);
+        m_programBoundary=boundary;m_programReady=true;
+    }
+
+    double ProgrammablePollDeadline() const
+    {
+        return std::min(m_config.horizon,m_latest.time+128*m_programQuantum);
+    }
+
+    double ProgrammableTolerance() const
+    {
+        // XSPICE event times can differ from an analog breakpoint by sub-ns
+        // rounding. Bound acceptance to 0.1% of the input sampling interval.
+        return std::max(1e-12,m_programQuantum*1e-3);
+    }
+
+    static int LimitProgrammableStep( double time, double* delta, void* user )
+    {
+        auto& self=*static_cast<ENGINE*>(user);
+        if(self.m_config.programmableDevices.empty())return 0;
+        const double boundary=std::min(self.m_programTarget,
+            self.m_programReady?self.m_programBoundary:self.m_programQuantum);
+        const double remaining=boundary-time;
+        // Use the same acceptance tolerance as ScheduleProgrammable. A stop
+        // condition may lie slightly before its sampling boundary. Limiting
+        // the next step to that negligible remainder before the data callback
+        // poisons the solver's saved timestep on resume (especially with AC
+        // sources and capacitors), causing "Timestep too small".
+        if(remaining>self.ProgrammableTolerance()&&*delta>remaining)
+            *delta=remaining;
+        return 0;
+    }
+
+    // Both ngspice callback declarations are selected by the installed header:
+    // versions with a call-location argument and older versions without it.
+    // Limit the next trial step without marking every input sample as a physical
+    // discontinuity. Permanent breakpoints still preserve actual output edges.
+    static int OnSync( double time, double* delta, double, int, int, int, void* user )
+    { return LimitProgrammableStep(time,delta,user); }
+    static int OnSync( double time, double* delta, double, int, int, void* user )
+    { return LimitProgrammableStep(time,delta,user); }
+
+    static int OnVoltage( double* value, double time, char* source, int, void* user )
+    {
+        auto& self=*static_cast<ENGINE*>(user);
+        auto cached=self.m_externalCache.find(source);
+        if(cached==self.m_externalCache.end())
+        {
+            const auto found=self.m_external.find(Lower(source));
+            if(found==self.m_external.end())
+            {
+                *value=0;
+                std::lock_guard lock(self.m_mutex);
+                if(self.m_error.empty())self.m_error="Unknown external voltage source: "+std::string(source);
+                return 1;
+            }
+            // Ngspice passes the instance's interned VSRCname, stable for the
+            // loaded deck. Reset clears the cache before another deck is loaded.
+            cached=self.m_externalCache.emplace(source,&found->second).first;
+        }
+        const auto& history=*cached->second;
+        if(time>=history.back().time){*value=history.back().value;return 0;}
+        auto next=std::upper_bound(history.begin(),history.end(),time,
+            [](double t,const EXTERNAL_VALUE& entry){return t<entry.time;});
+        *value=next==history.begin()?0:std::prev(next)->value;
+        return 0;
     }
 
     void Source( const std::string& aReference, double aValue, const JSON& changes )
@@ -524,6 +861,13 @@ private:
 
     JSON Snapshot( bool aDrain )
     {
+        if(m_programPlaying)
+        {
+            m_programPlaying=false;m_state=SIM_SESSION_STATE::PAUSED;
+            AdvanceProgrammable(ProgrammablePollDeadline());
+            m_programPlaying=m_state!=SIM_SESSION_STATE::COMPLETED;
+            if(m_programPlaying)m_state=SIM_SESSION_STATE::RUNNING;
+        }
         // Never read a live ngspice vector. vecindex is an accepted-step counter,
         // not a portable measure of retained storage (ngspice versions differ).
         std::size_t retained = 0;
@@ -543,7 +887,16 @@ private:
         for( std::size_t i = 0; i < m_size; ++i )
         {
             const auto& sample = m_ring[( m_head + i ) % m_ring.size()];
-            history.push_back( { { "time", sample.time }, { "values", sample.values } } );
+            if( m_config.historySignals )
+            {
+                std::vector<double> values;
+                values.reserve( m_config.historySignals->size() );
+                for( const auto index : *m_config.historySignals )
+                    values.push_back( sample.values[index] );
+                history.push_back( { { "time", sample.time }, { "values", std::move( values ) } } );
+            }
+            else
+                history.push_back( { { "time", sample.time }, { "values", sample.values } } );
         }
         JSON result = { { "state", StateName( m_state ) }, { "generation", m_generation },
                         { "time", m_latest.time }, { "values", m_latest.values },
@@ -551,6 +904,8 @@ private:
                         { "overwritten", m_overwritten }, { "events", m_events },
                         { "event_time", m_eventTime }, { "retained", retained },
                         { "resident_bytes", resident }, { "error", m_error } };
+        if( m_config.historySignals )
+            result["history_signals"] = *m_config.historySignals;
         result["activity"] = JSON::array();
         for( const auto& tracker : m_activity )
         {
@@ -637,7 +992,12 @@ private:
             }
             self.m_latest.values[i] = value->creal;
         }
-        try { self.m_memory.Commit(self.m_latest.time); }
+        try
+        {
+            if(!self.m_config.programmableDevices.empty())self.ScheduleProgrammable();
+            if(!self.m_expressions.Error().empty())throw std::runtime_error(self.m_expressions.Error());
+            self.m_memory.Commit(self.m_latest.time);
+        }
         catch( const std::exception& e ) { self.m_error=e.what(); return 0; }
         if( !self.m_memory.Error().empty() ) { self.m_error=self.m_memory.Error(); return 0; }
         ++self.m_samples;
@@ -657,6 +1017,19 @@ private:
     }
 
     SIM_SESSION_STATE       m_state = SIM_SESSION_STATE::STOPPED; // Control thread only.
+    struct INPUT_BINDING { std::string device,pin;std::size_t signal; };
+    struct OUTPUT_BINDING { std::string high,low,pullup; int slot=-1; };
+    struct EXTERNAL_VALUE { double time,value; };
+    std::vector<std::vector<EXTERNAL_VALUE>> m_programDrivers;
+    PROGRAMMABLE_PIPELINE m_programmable;
+    COMPILED_EXPRESSIONS m_expressions;
+    std::vector<INPUT_BINDING> m_programInputs;
+    std::map<std::pair<std::string,std::string>,OUTPUT_BINDING> m_programOutputs;
+    std::map<std::string,std::vector<EXTERNAL_VALUE>> m_external;
+    std::map<const char*,const std::vector<EXTERNAL_VALUE>*> m_externalCache;
+    double m_programQuantum=1e-6,m_programBoundary=0,m_programTarget=0;
+    bool m_programPlaying=false,m_programReady=false;
+    int m_engineId=0;
     RUNTIME_MEMORY m_memory;
     void* m_memoryModule = nullptr; // Kept loaded for the physical worker lifetime.
     SIM_SESSION_CONFIG      m_config;

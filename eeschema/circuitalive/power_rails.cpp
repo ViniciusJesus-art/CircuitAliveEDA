@@ -71,6 +71,13 @@ std::pair<std::size_t, double> VOLTAGE_CONSTRAINTS::Find( std::size_t node )
     }
     return { node, voltage };
 }
+std::optional<double> VOLTAGE_CONSTRAINTS::Difference( const std::string& positive, const std::string& negative )
+{
+    const auto [p, vp] = Find( Node( positive ) );
+    const auto [n, vn] = Find( Node( negative ) );
+    if( p == n ) return vp - vn;
+    return {};
+}
 bool VOLTAGE_CONSTRAINTS::Add( const std::string& positive, const std::string& negative,
                               double voltage, const std::string& origin )
 {

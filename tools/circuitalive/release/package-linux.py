@@ -2,6 +2,7 @@
 """Bundle the Fedora 44 x86_64 build, component libraries, Python and runtime dependencies."""
 import argparse,hashlib,importlib.util,json,os,re,shutil,subprocess,sys
 from pathlib import Path
+from programmable_assets import validate_programmable_assets
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--prefix',type=Path,required=True);p.add_argument('--libraries',type=Path,required=True)
 p.add_argument('--version',default='10.0.7-alpha.1');p.add_argument('--commit',required=True)
@@ -21,6 +22,7 @@ if args.reuse:
     copied=set(json.loads((app/'PACKAGE-INFO.json').read_text())['bundled_shared_libraries'])
     for binary in (args.prefix/'bin').iterdir():
         if binary.is_file():shutil.copy2(binary,app/'bin'/binary.name)
+    shutil.copytree(args.prefix/'share/circuitalive',app/'share/circuitalive',dirs_exist_ok=True)
 else:
     shutil.copytree(args.prefix,app,dirs_exist_ok=True,symlinks=False,ignore=ignore)
     for folder in ('symbols','footprints','3dmodels','template'):
@@ -71,6 +73,7 @@ else:
       directory=Path('/usr/share')/base/package
       if directory.exists():shutil.copytree(directory,app/'share'/base/package,dirs_exist_ok=True,ignore=ignore)
     (app/'DEPENDENCIES.txt').write_text(subprocess.check_output(['rpm','-q','--qf','%{NAME} %{VERSION}-%{RELEASE} source=%{SOURCERPM}\n',*sorted(packages)],text=True))
+validate_programmable_assets(app)
 # The upstream APPDIR integration expects usr/bin and the Debian plugin layout.
 for alias,target in ((app/'usr/bin',app/'bin'),(app/'usr/share',app/'share'),
                      (app/'usr/lib64',app/'lib64'),(app/'usr/lib/x86_64-linux-gnu',app/'lib64')):

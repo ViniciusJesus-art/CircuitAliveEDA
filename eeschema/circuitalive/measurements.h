@@ -35,6 +35,9 @@ struct MEASUREMENT_CHANNEL
     std::size_t positive = NO_SIGNAL, negative = NO_SIGNAL, current = NO_SIGNAL;
     std::size_t probe = NO_SIGNAL;
     bool connected = true;
+    // Scope projection stores a measured voltage/current/power directly in
+    // positive while preserving its physical quantity and display unit.
+    bool directSample = false;
 };
 
 struct CURRENT_WARNING

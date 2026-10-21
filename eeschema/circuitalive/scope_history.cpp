@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "scope_history.h"
+#include "scope_waveform.h"
 #include <algorithm>
 #include <limits>
 
@@ -15,6 +16,18 @@ void SCOPE_HISTORY::Append( std::vector<SIM_SAMPLE> samples )
     if( offset == samples.size() ) return;
     m_size += samples.size() - offset;
     m_blocks.push_back( { std::make_shared<const std::vector<SIM_SAMPLE>>( std::move( samples ) ), offset } );
+    if( m_size > m_capacity && !m_channels.empty() )
+    {
+        // Dense electrical sampling must not reduce a seconds-long waveform
+        // to the last few microseconds. Retain the measured-channel envelope
+        // across elapsed time within the same bounded point budget.
+        auto compact = Copy();
+        ScopeCompact( compact, m_capacity, m_channels );
+        m_reducedUntil = compact.back().time;
+        m_size = compact.size();
+        m_blocks.clear();
+        m_blocks.push_back( { std::make_shared<const std::vector<SIM_SAMPLE>>( std::move( compact ) ), 0 } );
+    }
     while( m_size > m_capacity )
     {
         auto& block = m_blocks.front();

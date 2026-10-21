@@ -130,6 +130,7 @@ void SCOPE_ACQUISITION::Feed( const SCOPE_HISTORY& history )
     if( m_hold || m_singleDone || history.empty() ) return;
     if( history.back().time < m_lastTime ) Configure( m_timebase, m_trigger, m_source, m_capacity, m_channels );
     if( history.back().time <= m_lastTime ) return;
+    m_reducedUntil = std::max( m_reducedUntil, history.ReducedUntil() );
     history.ForEachAfter( m_lastTime, [this]( const auto& sample ) { return consume( sample ); } );
     finishFeed();
 }

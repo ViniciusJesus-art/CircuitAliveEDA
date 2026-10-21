@@ -181,13 +181,39 @@ void SESSION_RUNNER::run()
                     for(const auto& c:circuit.adjustments)controlValues[c.source]=c.initial;
                     ConfigureVisualSignals( circuit );
                     hasScope = std::any_of( circuit.measurements.begin(), circuit.measurements.end(), []( const auto& c ) { return c.scope; } );
-                    scopeHistory = SCOPE_HISTORY( std::min<std::size_t>( preferences.scopeHistorySamples,
-                            65536 / std::max<std::size_t>( 1, circuit.config.signals.size() ) ) );
+                    // Latest values drive every indicator. Historical values
+                    // only serve scope traces and peak-current warnings; sending
+                    // every internal MCU/pin vector in every batch overwhelms IPC.
+                    {
+                        std::set<std::size_t> selected;
+                        auto retain = [&]( std::size_t signal )
+                        {
+                            if( signal != NO_SIGNAL ) selected.insert( signal );
+                        };
+                        for( const auto& channel : circuit.measurements ) if( channel.scope )
+                        {
+                            retain( channel.positive ); retain( channel.negative ); retain( channel.current );
+                        }
+                        for( const auto& warning : circuit.currentWarnings ) retain( warning.signal );
+                        for( const auto& led : circuit.leds )
+                            if( led.ratedCurrent > 0 ) retain( led.signal );
+                        circuit.config.historySignals = std::vector<std::size_t>( selected.begin(), selected.end() );
+                    }
                     session = std::make_unique<INTERACTIVE_SIM_SESSION>( m_worker,
                             std::chrono::milliseconds( std::lround( preferences.workerTimeoutSeconds * 1000 ) ) );
                     session->Configure( circuit.netlist, circuit.config );
                     session->AdvanceTo( circuit.config.step );
                     view = {};
+                    for( const auto& channel : circuit.measurements ) if( channel.scope )
+                    {
+                        auto projected = channel;
+                        projected.positive = view.scopeChannels.size();
+                        projected.negative = projected.current = NO_SIGNAL;
+                        projected.directSample = true;
+                        view.scopeChannels.push_back( std::move( projected ) );
+                    }
+                    scopeHistory = SCOPE_HISTORY( std::min<std::size_t>( preferences.scopeHistorySamples,
+                            65536 / std::max<std::size_t>( 1, view.scopeChannels.size() ) ), view.scopeChannels );
                     latchedWarnings.clear();
                     view.sample = session->Snapshot( true );
                     for( const auto& control : circuit.switches )
@@ -246,6 +272,7 @@ void SESSION_RUNNER::run()
                     break;
                 case COMMAND_TYPE::SPEED:
                     speed = command.value;
+                    next = std::chrono::steady_clock::now();
                     break;
                 case COMMAND_TYPE::PREFERENCES:
                     if( preferences.playbackSpeed != command.preferences.playbackSpeed )
@@ -297,17 +324,31 @@ void SESSION_RUNNER::run()
             }
             if( session && running && std::chrono::steady_clock::now() >= next )
             {
-                const auto frameStart = std::chrono::steady_clock::now();
+                double advance = std::chrono::duration<double>( preferences.FrameInterval() ).count() * speed;
+                if( !circuit.config.programmableDevices.empty() )
+                {
+                    double quantum = 1e-3;
+                    for( const auto& device : circuit.config.programmableDevices )
+                        quantum = std::min( quantum, device.quantumSeconds );
+                    // Bound firmware work per request so input, Pause and Stop
+                    // are processed between batches even on a slow computer.
+                    double batch = quantum * 512 / circuit.config.programmableDevices.size();
+                    if( circuit.config.programmableDevices.size() == 1 )
+                        batch = std::max( batch, circuit.config.programmableDevices.front().autonomousWindowSeconds * 8 );
+                    advance = std::min( advance, batch );
+                }
                 session->AdvanceTo( std::min( view.sample.latest.time
-                                             + std::chrono::duration<double>( preferences.FrameInterval() ).count() * speed,
+                                             + advance,
                                              circuit.config.horizon ) );
                 view.sample = session->Snapshot( true );
                 if( view.sample.state == SIM_SESSION_STATE::FAILED )
                     throw std::runtime_error( view.sample.error );
                 running = view.sample.state != SIM_SESSION_STATE::COMPLETED;
-                // Solver work belongs inside the frame budget. Adding a fresh
-                // full frame sleep after every solve makes even slow clocks drift.
-                next = frameStart + preferences.FrameInterval();
+                // Keep an absolute schedule: solver work, publication and OS wake
+                // latency all belong inside the budget. Catch up without skipping
+                // simulated time if a frame finishes late.
+                next += std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                        std::chrono::duration<double>( advance / speed ) );
             }
             if( session )
             {
@@ -342,6 +383,14 @@ void SESSION_RUNNER::run()
                     }
                 if( hasScope && !view.sample.history.empty() )
                 {
+                    for( auto& sample : view.sample.history )
+                    {
+                        std::vector<double> measured;
+                        measured.reserve( view.scopeChannels.size() );
+                        for( const auto& channel : circuit.measurements ) if( channel.scope )
+                            measured.push_back( MeasurementValue( channel, sample ) );
+                        sample.values = std::move( measured );
+                    }
                     scopeHistory.Append( std::move( view.sample.history ) );
                     view.scopeHistory = std::make_shared<const SCOPE_HISTORY>( scopeHistory );
                 }

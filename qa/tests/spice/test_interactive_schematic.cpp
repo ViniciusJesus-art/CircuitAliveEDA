@@ -1,6 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include <boost/test/unit_test.hpp>
 #include <eeschema_test_utils.h>
+#include <eeschema_helpers.h>
 #include <circuitalive/schematic_adapter.h>
 #include <circuitalive/simulation_overlay.h>
 #include <circuitalive/control_geometry.h>
@@ -20,15 +21,39 @@
 #include <eeschema_settings.h>
 #include <filesystem>
 #include <fstream>
+#include <chrono>
 #include <cmath>
 #include <algorithm>
 #include <cstdlib>
 #include <sim/platform_runtime.h>
+#include <sim/interactive_sim_protocol.h>
 #include <connection_graph.h>
 #include <sch_pin.h>
 #include <base_units.h>
 
 using namespace CIRCUITALIVE;
+
+BOOST_FIXTURE_TEST_CASE( NativeUnoFirmwareDemoReadsThePotentiometerAndDrivesItsProbe,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    const auto file = std::filesystem::path( CIRCUITALIVE_TEST_SCHEMATIC ).parent_path()
+        / "programmable_devices/uno_adc/uno_adc.kicad_sch";
+    LoadSchematic( wxFileName( wxString::FromUTF8( PathUtf8( file ) ) ) );
+    auto circuit = CaptureSchematic( *m_schematic ).circuit;
+    BOOST_REQUIRE_EQUAL( circuit.config.programmableDevices.size(), 1 );
+    BOOST_CHECK_EQUAL( circuit.config.programmableDevices[0].device, "atmega328p" );
+    BOOST_REQUIRE_EQUAL( circuit.adjustments.size(), 1 );
+    BOOST_REQUIRE_EQUAL( circuit.measurements.size(), 1 );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 10e-6 );
+    session.SetSourceValue( circuit.adjustments[0].source, .2 );
+    session.AdvanceTo( .0005 );
+    BOOST_CHECK_LT( MeasurementValue( circuit.measurements[0], session.Snapshot().latest ), .1 );
+    session.SetSourceValue( circuit.adjustments[0].source, .8 );
+    session.AdvanceTo( .001 );
+    BOOST_CHECK_GT( MeasurementValue( circuit.measurements[0], session.Snapshot().latest ), 4.8 );
+}
 
 BOOST_AUTO_TEST_CASE( PositionedModelControlsUseTheirOwnRectanglesAndCurrentPage )
 {
@@ -695,6 +720,118 @@ BOOST_FIXTURE_TEST_CASE( AuditUserClockVisuals, KI_TEST::SCHEMATIC_TEST_FIXTURE,
     }
     BOOST_CHECK_EQUAL( clocks, 4u );
     BOOST_CHECK_EQUAL( leds, 4u );
+}
+
+BOOST_FIXTURE_TEST_CASE( AuditSavedProgrammableDeviceElectricalAndVisualPins,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE, *boost::unit_test::disabled() )
+{
+    const char* path = std::getenv( "CIRCUITALIVE_MCU_AUDIT_SCHEMATIC" );
+    BOOST_REQUIRE( path );
+    const std::string reference = std::getenv( "CIRCUITALIVE_MCU_AUDIT_REFERENCE" )
+            ? std::getenv( "CIRCUITALIVE_MCU_AUDIT_REFERENCE" ) : "U5";
+    LoadSchematic( wxFileName( wxString::FromUTF8( path ) ) );
+    SCH_IO_KICAD_SEXPR plugin;
+    EESCHEMA_HELPERS::LoadProjectSheets( plugin, *m_schematic, wxString::FromUTF8( path ) );
+    for( auto& sheet : m_schematic->Hierarchy() )
+    {
+        sheet.LastScreen()->UpdateLocalLibSymbolLinks();
+        sheet.UpdateAllScreenReferences();
+    }
+    m_schematic->ConnectionGraph()->Recalculate( m_schematic->Hierarchy(), true );
+    auto snapshot = CaptureSchematic( *m_schematic, true );
+    auto& circuit = snapshot.circuit;
+    ConfigureVisualSignals( circuit );
+    const auto location = std::find_if( snapshot.locations.begin(), snapshot.locations.end(),
+            [&]( const auto& item ) { return item.reference == wxString::FromUTF8( reference ); } );
+    BOOST_REQUIRE( location != snapshot.locations.end() );
+    const auto component = static_cast<std::size_t>( location - snapshot.locations.begin() );
+    BOOST_REQUIRE( !circuit.config.programmableDevices.empty() );
+    using JSON = nlohmann::json;
+    JSON report = { { "schematic", path }, { "reference", reference },
+            { "component", component }, { "sheet", location->sheet.ToStdString() },
+            { "netlist", circuit.netlist }, { "signals", circuit.config.signals },
+            { "step", circuit.config.step }, { "max_step", circuit.config.maxStep },
+            { "accelerate_expressions", circuit.config.accelerateExpressions },
+            { "mutable_elements", circuit.config.mutableElements },
+            { "horizon", circuit.config.horizon },
+            { "history_capacity", circuit.config.historyCapacity },
+            { "devices", JSON::array() }, { "pins", JSON::array() },
+            { "measurements", JSON::array() }, { "samples", JSON::array() } };
+    for( const auto& device : circuit.config.programmableDevices )
+    {
+        report["devices"].push_back( PROTOCOL::SerializeProgrammableDevice( device ) );
+        BOOST_TEST_MESSAGE( "MCU " << device.id << " device=" << device.device
+                            << " clock=" << device.clockHz << " quantum=" << device.quantumSeconds );
+    }
+    for( const auto& pin : circuit.logicPins )
+        if( pin.component == component )
+            report["pins"].push_back( { { "physical", pin.pin },
+                    { "node", circuit.pinNodes.at( component ).at( pin.pin ) },
+                    { "signal", pin.voltage }, { "vcc", pin.vcc }, { "ground", pin.ground },
+                    { "digital", pin.digital } } );
+    for( const auto& channel : circuit.measurements )
+        report["measurements"].push_back( { { "name", channel.name }, { "scope", channel.scope },
+                { "connected", channel.connected }, { "positive", channel.positive },
+                { "negative", channel.negative }, { "current", channel.current } } );
+    auto save = [&]
+    {
+        if( const char* destination = std::getenv( "CIRCUITALIVE_MCU_AUDIT_REPORT" ) )
+        {
+            std::ofstream output( std::filesystem::u8path( destination ) );
+            BOOST_REQUIRE( output );
+            output << report.dump( 2 ) << '\n';
+        }
+    };
+    save(); // Preserve the exact captured configuration even if the solver fails.
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    const double until = std::getenv( "CIRCUITALIVE_MCU_AUDIT_UNTIL" )
+            ? std::stod( std::getenv( "CIRCUITALIVE_MCU_AUDIT_UNTIL" ) ) : .005;
+    BOOST_REQUIRE_GE( until, circuit.config.step );
+    BOOST_REQUIRE_LE( until, circuit.config.horizon );
+    double quantum = 1e-3;
+    for( const auto& device : circuit.config.programmableDevices )
+        quantum = std::min( quantum, device.quantumSeconds );
+    const auto started = std::chrono::steady_clock::now();
+    for( double target = circuit.config.step; ; )
+    {
+        session.AdvanceTo( target );
+        EDITOR_SESSION_VIEW view;
+        view.state = EDITOR_SESSION_STATE::RUNNING;
+        view.sample = session.Snapshot( true );
+        UpdateVisualSignals( circuit, view, 1 );
+        JSON sample = { { "target", target }, { "time", view.sample.latest.time },
+                { "values", view.sample.latest.values }, { "pins", JSON::array() },
+                { "measurements", JSON::array() } };
+        BOOST_TEST_MESSAGE( "MCU audit target=" << target << " actual=" << view.sample.latest.time );
+        for( std::size_t i = 0; i < circuit.logicPins.size(); ++i )
+        {
+            const auto& pin = circuit.logicPins[i];
+            if( pin.component != component ) continue;
+            const double voltage = pin.voltage == NO_SIGNAL ? 0 : view.sample.latest.values.at( pin.voltage );
+            sample["pins"].push_back( { { "physical", pin.pin }, { "voltage", voltage },
+                    { "level", static_cast<int>( view.logicLevels.at( i ) ) } } );
+            if( pin.pin == "1" || pin.pin == "7" || pin.pin == "8" || pin.pin == "19"
+                || pin.pin == "20" || pin.pin == "22" )
+                BOOST_TEST_MESSAGE( reference << '.' << pin.pin << " node="
+                                    << circuit.pinNodes.at( component ).at( pin.pin )
+                                    << " voltage=" << voltage << " level="
+                                    << static_cast<int>( view.logicLevels.at( i ) ) );
+        }
+        for( const auto& channel : circuit.measurements )
+        {
+            const double value = MeasurementValue( channel, view.sample.latest );
+            sample["measurements"].push_back( { { "name", channel.name }, { "value", value } } );
+            BOOST_TEST_MESSAGE( "Probe " << channel.name << " scope=" << channel.scope << " value=" << value );
+        }
+        report["samples"].push_back( std::move( sample ) );
+        save();
+        if( target >= until ) break;
+        target = std::min( until, view.sample.latest.time
+                + std::min( .008, quantum * 512 / circuit.config.programmableDevices.size() ) );
+    }
+    report["wall_seconds"] = std::chrono::duration<double>( std::chrono::steady_clock::now() - started ).count();
+    save();
 }
 
 BOOST_FIXTURE_TEST_CASE( NativeTitlesAndTextBoxesAreAnnotationsDuringInteractiveSimulation,
