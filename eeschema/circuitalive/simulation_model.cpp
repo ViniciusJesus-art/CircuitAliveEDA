@@ -434,6 +434,13 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
             if( !ports.contains( m.measurePositive ) || !ports.contains( m.measureNegative )
                 || m.measurePositive == m.measureNegative ) throw std::runtime_error( "Invalid measurement ports" );
         }
+        else if( m.runtime )
+        {
+            // Runtime pin order follows the package, not the supply terminals.
+            // Use the declared supply for both the dialog and circuit measurements.
+            m.measurePositive = m.runtime->vcc;
+            m.measureNegative = m.runtime->ground;
+        }
         if( j.contains( "current_warning" ) )
         {
             m.warningSignal = j.at( "current_warning" ).at( "signal" );

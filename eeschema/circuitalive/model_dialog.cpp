@@ -264,6 +264,9 @@ private:
             }
             m_choice->ChangeValue( ( m_selected == 0 ? _( "Automatic: " ) : wxString() ) + ModelText( m_model->name ) );
             m_details->SetLabel( wxString::FromUTF8( PathUtf8( m_model->file ) ) + "\n" + ModelText( m_model->description ) );
+            if( m_model->runtime )
+                m_details->SetLabel( m_details->GetLabel() + "\n"
+                    + _( "Set CPU clock to the frequency used when compiling the firmware. Changing it changes firmware timing, including delays and timers." ) );
         }
         catch( const std::exception& e ) { m_choice->ChangeValue( _( "No model selected" ) ); m_details->SetLabel( DiagnosticText( e.what() ) ); }
         if( m_pins->GetNumberRows() ) m_pins->DeleteRows( 0, m_pins->GetNumberRows() );

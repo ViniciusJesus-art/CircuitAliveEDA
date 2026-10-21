@@ -518,6 +518,68 @@ BOOST_FIXTURE_TEST_CASE( ProgrammableAvrBlinkEventsKeepFirmwareCycleTimestamps, 
     }
 }
 
+BOOST_FIXTURE_TEST_CASE( ProgrammableFirmwareTimingScalesWithTheConfiguredHardwareClock, PROGRAM_FILES )
+{
+    const auto firmware = Firmware( "timer-clock", TimerInterruptOutput() );
+    for( double clock : { 8e6, 16e6, 20e6 } )
+    {
+        auto config = AvrConfig( firmware );
+        config.clockHz = clock;
+        PROGRAMMABLE_RUNTIME runtime;
+        runtime.Configure( { config } );
+        std::vector<PROGRAMMABLE_PIN_STATE> edges;
+        for( const auto& event : runtime.AdvanceTo( .005, AvrInputs() ) )
+            if( event.pin == "PB5" && event.time > 1e-5 ) edges.push_back( event );
+        BOOST_REQUIRE_GE( edges.size(), 2 );
+        for( std::size_t i = 1; i < edges.size(); ++i )
+        {
+            BOOST_CHECK( edges[i].drive != edges[i-1].drive );
+            BOOST_CHECK_CLOSE( edges[i].time - edges[i-1].time, 256 * 64 / clock, .02 );
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE( ProgrammableMeasurementDefaultsFollowTheDeclaredSupplyAndKeepExplicitPorts )
+{
+    const MODEL_REPOSITORY repository;
+    std::size_t tested = 0;
+    for( const auto& model : repository.List() )
+    {
+        if( !model.runtime ) continue;
+        ++tested;
+        auto json = nlohmann::json::parse( Text( model.file ) );
+        json.erase( "measurement_ports" );
+        const auto defaults = MODEL_REPOSITORY::LoadText( json.dump() );
+        BOOST_CHECK_EQUAL( defaults.measurePositive, model.runtime->vcc );
+        BOOST_CHECK_EQUAL( defaults.measureNegative, model.runtime->ground );
+        const auto& first = model.pins.front().id;
+        const auto& second = model.pins[1].id;
+        json["measurement_ports"] = { { "positive", first }, { "negative", second } };
+        const auto explicitPorts = MODEL_REPOSITORY::LoadText( json.dump() );
+        BOOST_CHECK_EQUAL( explicitPorts.measurePositive, first );
+        BOOST_CHECK_EQUAL( explicitPorts.measureNegative, second );
+    }
+    BOOST_CHECK_GE( tested, 17 );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableSupplyMeasurementUsesVccAndGroundWithoutAnExplicitPair, PROGRAM_FILES )
+{
+    auto u = AvrSymbol( Firmware( "supply-measurement", DigitalOutput( true ) ) );
+    u.measurements.voltage = true;
+    auto circuit = BuildCircuitSnapshot( { Supply( "VCC", "vcc", "5" ),
+                                           Supply( "VRESET", "reset", "5" ), u } );
+    circuit.config.step = circuit.config.maxStep = 1e-6;
+    circuit.config.horizon = .001;
+    BOOST_REQUIRE_EQUAL( circuit.measurements.size(), 1 );
+    const auto& measurement = circuit.measurements.front();
+    BOOST_CHECK_EQUAL( circuit.config.signals.at( measurement.positive ),
+                       "v(" + circuit.pinNodes[2].at( "7" ) + ")" );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 20e-6 );
+    BOOST_CHECK_CLOSE( MeasurementValue( measurement, session.Snapshot().latest ), 5, .001 );
+}
+
 BOOST_FIXTURE_TEST_CASE( ProgrammableAvrInputPullupResetAndPowerDoNotForceInputPinsLow, PROGRAM_FILES )
 {
     PROGRAMMABLE_RUNTIME runtime;
