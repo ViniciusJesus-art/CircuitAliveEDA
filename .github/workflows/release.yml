@@ -41,14 +41,14 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Identify dependency profile
         id: profile
         run: |
           . ./tools/circuitalive/release/windows-dependencies-data.ps1
           "value=$(Get-WindowsDependencyProfile (Get-Location).Path)" | Add-Content $env:GITHUB_OUTPUT
       - name: Restore compiler-tracked vcpkg cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: D:/ca-tools/binary-cache
           key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-installer
@@ -84,7 +84,7 @@ jobs:
       - name: Stage application and dependencies without building an installer
         run: ./tools/circuitalive/release/build-windows.ps1 -Phase stage -Version $env:RELEASE_VERSION
       - name: Preserve verified runtime before packaging
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-runtime-x86_64
           path: stage/windows-msvc/
@@ -94,7 +94,7 @@ jobs:
           retention-days: 14
       - name: Keep validation logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-msvc-diagnostics
           path: |
@@ -118,9 +118,9 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Restore preserved application without a C++ build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-runtime-x86_64
           path: stage/windows-msvc
@@ -138,18 +138,21 @@ jobs:
         run: ./tools/circuitalive/release/prepare-windows-libraries.ps1
       - name: Package and test a clean installed runtime
         run: python tools/circuitalive/release/package-windows.py stage/windows-msvc --version $env:RELEASE_VERSION
-      - name: Keep verified installer available for download
-        uses: actions/upload-artifact@v4
+      - name: Downloadable Windows EXE installer
+        uses: actions/upload-artifact@v7
         with:
-          name: windows-x86_64
-          path: |
-            dist/*-windows-x86_64-setup.exe
-            dist/*-windows-x86_64-setup.exe.sha256
+          path: dist/CircuitAliveEDA-${{ env.RELEASE_VERSION }}-windows-x86_64-setup.exe
+          archive: false
           if-no-files-found: error
-          compression-level: 0
+      - name: Preserve Windows installer checksum
+        uses: actions/upload-artifact@v7
+        with:
+          name: CircuitAliveEDA-${{ env.RELEASE_VERSION }}-windows-SHA256
+          path: dist/*-windows-x86_64-setup.exe.sha256
+          if-no-files-found: error
       - name: Preserve installer diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-installer-diagnostics
           path: |

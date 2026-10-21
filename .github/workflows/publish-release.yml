@@ -46,10 +46,10 @@ jobs:
       formats: ${{ steps.release.outputs.formats }}
       fedora_formats: ${{ steps.release.outputs.fedora_formats }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check release publication guard
         run: python3 qa/tests/cli/test_release_artifacts.py
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@v8
         id: release
         env:
           RELEASE_VERSION: ${{ inputs.version }}
@@ -110,7 +110,7 @@ jobs:
       RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
       RELEASE_FORMATS: ${{ needs.prepare.outputs.fedora_formats }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.commit }}
       - name: Free hosted runner disk for builds and component libraries
@@ -118,7 +118,7 @@ jobs:
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
           df -h .
       - name: Restore Linux compiler cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .circuitalive/ccache
           key: linux-fedora44-release-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -129,20 +129,31 @@ jobs:
             -e RELEASE_VERSION -e RELEASE_COMMIT -e RELEASE_FORMATS -e CIRCUITALIVE_JOBS=2 \
             -v "$GITHUB_WORKSPACE:/work" -w /work \
             fedora:44 bash tools/circuitalive/release/build-linux.sh
-      - name: Preserve verified Linux packages
-        uses: actions/upload-artifact@v4
+      - name: Downloadable Fedora RPM
+        if: contains(needs.prepare.outputs.formats, 'rpm')
+        uses: actions/upload-artifact@v7
         with:
-          name: fedora-x86_64
+          path: dist/CircuitAliveEDA-${{ env.RELEASE_VERSION }}-fedora44-x86_64.rpm
+          archive: false
+          if-no-files-found: error
+      - name: Downloadable Linux AppImage
+        if: contains(needs.prepare.outputs.formats, 'appimage')
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/CircuitAliveEDA-${{ env.RELEASE_VERSION }}-linux-x86_64.AppImage
+          archive: false
+          if-no-files-found: error
+      - name: Preserve Linux package checksums
+        uses: actions/upload-artifact@v7
+        with:
+          name: CircuitAliveEDA-${{ env.RELEASE_VERSION }}-linux-SHA256
           path: |
-            dist/*-fedora44-x86_64.rpm
             dist/*-fedora44-x86_64.rpm.sha256
-            dist/*-linux-x86_64.AppImage
             dist/*-linux-x86_64.AppImage.sha256
           if-no-files-found: error
-          compression-level: 0
       - name: Preserve Linux diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-release-diagnostics
           path: |
@@ -163,7 +174,7 @@ jobs:
       RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
       RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.commit }}
       - name: Free hosted runner disk for the native Ubuntu build
@@ -171,25 +182,28 @@ jobs:
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
           df -h .
       - name: Restore Ubuntu compiler cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .circuitalive/ccache-deb
           key: linux-ubuntu2404-deb-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: linux-ubuntu2404-deb-v1-
       - name: Compile and test natively on Ubuntu 24.04, then package and verify DEB
         run: bash tools/circuitalive/release/build-deb.sh
-      - name: Preserve verified DEB package
-        uses: actions/upload-artifact@v4
+      - name: Downloadable Ubuntu DEB
+        uses: actions/upload-artifact@v7
         with:
-          name: deb-x86_64
-          path: |
-            dist/*-ubuntu24.04-amd64.deb
-            dist/*-ubuntu24.04-amd64.deb.sha256
+          path: dist/CircuitAliveEDA-${{ env.RELEASE_VERSION }}-ubuntu24.04-amd64.deb
+          archive: false
           if-no-files-found: error
-          compression-level: 0
+      - name: Preserve Ubuntu package checksum
+        uses: actions/upload-artifact@v7
+        with:
+          name: CircuitAliveEDA-${{ env.RELEASE_VERSION }}-ubuntu24.04-SHA256
+          path: dist/*-ubuntu24.04-amd64.deb.sha256
+          if-no-files-found: error
       - name: Preserve Ubuntu diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deb-release-diagnostics
           path: |
@@ -219,23 +233,14 @@ jobs:
       RELEASE_FORMATS: ${{ needs.prepare.outputs.formats }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.commit }}
-      - uses: actions/download-artifact@v4
-        if: needs.windows.result == 'success'
+      - name: Collect installers and checksums for this version
+        uses: actions/download-artifact@v8
         with:
-          name: windows-x86_64
-          path: dist
-      - uses: actions/download-artifact@v4
-        if: needs.linux.result == 'success'
-        with:
-          name: fedora-x86_64
-          path: dist
-      - uses: actions/download-artifact@v4
-        if: needs.deb.result == 'success'
-        with:
-          name: deb-x86_64
+          pattern: CircuitAliveEDA-${{ env.RELEASE_VERSION }}-*
+          merge-multiple: true
           path: dist
       - name: Verify formats and checksums, then publish the release
         run: |

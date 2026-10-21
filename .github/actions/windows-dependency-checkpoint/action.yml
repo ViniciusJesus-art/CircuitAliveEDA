@@ -16,15 +16,15 @@ runs:
       run: ./tools/circuitalive/release/audit-windows.ps1 -Phase collect -OutputDirectory build/windows-dependencies
     - name: Preserve logs and resource samples
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
-        name: windows-dependencies-${{ inputs.name }}
+        name: windows-dependencies-${{ inputs.name }}-diagnostics
         path: build/windows-dependencies/
         if-no-files-found: warn
         retention-days: 14
     - name: Save completed compatible packages, including partial preparations
       if: always() && steps.inventory.outputs.cached-packages != '' && steps.inventory.outputs.cached-packages != '0'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: D:/ca-tools/binary-cache
         key: ${{ inputs.cache-key }}

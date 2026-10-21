@@ -19,11 +19,11 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Record actual public runner resources
         run: ./tools/circuitalive/release/audit-windows.ps1 -Phase inventory
       - name: Preserve initial hardware checkpoint
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-audit-inventory
           path: |
@@ -37,7 +37,7 @@ jobs:
           "value=$(Get-WindowsDependencyProfile (Get-Location).Path)" | Add-Content $env:GITHUB_OUTPUT
       - name: Restore compatible MSVC binary cache
         id: cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: D:/ca-tools/binary-cache
           key: windows-msvc-v143-${{ steps.profile.outputs.value }}-audit-${{ github.run_id }}-${{ github.run_attempt }}
@@ -62,7 +62,7 @@ jobs:
         timeout-minutes: 10
         run: ./tools/circuitalive/release/audit-windows.ps1 -Phase plan
       - name: Preserve plan before binary probes
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-audit-plan
           path: |
@@ -86,13 +86,13 @@ jobs:
         run: ./tools/circuitalive/release/audit-windows.ps1 -Phase collect
       - name: Save any compatible packages obtained during the audit
         if: always() && steps.collect.outputs.cached-packages != '' && steps.collect.outputs.cached-packages != '0'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: D:/ca-tools/binary-cache
           key: ${{ steps.cache.outputs.cache-primary-key }}
       - name: Preserve all available audit diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-audit-diagnostics
           path: build/windows-audit/

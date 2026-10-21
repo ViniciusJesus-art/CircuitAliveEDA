@@ -66,6 +66,20 @@ Para a versão de exemplo, com `target=all`, a release `v10.0.7-alpha.2` terá:
 - `CircuitAliveEDA-10.0.7-alpha.2-windows-x86_64-setup.exe`
 - Um arquivo `.sha256` para cada pacote e `release-manifest.json` com o commit e os hashes.
 
+Na lista **Artifacts** do Actions, cada instalador também aparece separadamente
+com esse nome e extensão. O download entrega o próprio `.rpm`, `.AppImage`,
+`.deb` ou `.exe`, sem um ZIP adicional. Os artefatos
+`CircuitAliveEDA-<versão>-linux-SHA256`, `-ubuntu24.04-SHA256` e
+`-windows-SHA256` guardam os checksums em ZIP. O job de publicação reúne os
+instaladores e esses checksums antes de validar e publicar os arquivos.
+
+Os artefatos terminados em `diagnostics` contêm logs de build, testes e
+dependências; não são instaladores. `windows-runtime-x86_64` é a instalação
+intermediária usada para reempacotar o EXE. Nas execuções antigas, anteriores
+à separação por formato, `fedora-x86_64` contém RPM, AppImage e checksums;
+`deb-x86_64` e `windows-x86_64` contêm seus instaladores e checksums em ZIP.
+Uma execução já iniciada mantém os nomes e as actions do commit original.
+
 O pacote para DNF é o **`.rpm`**; `.dnf` não é uma extensão de pacote.
 
 ```bash
@@ -100,7 +114,7 @@ continuam dependendo do sistema. O instalador Windows usa MSVC v143.
 A release pública só é criada após todos os builds selecionados e as verificações
 dos pacotes pedidos. Falha em qualquer um deles bloqueia a publicação; os jobs
 omitidos por escolha de formato não a bloqueiam. Os arquivos já concluídos ficam
-nos artefatos `fedora-x86_64`, `deb-x86_64` e/ou `windows-x86_64`; os logs de
+nos artefatos individuais com as extensões `.rpm`, `.AppImage`, `.deb` e/ou `.exe`; os logs de
 diagnóstico também ficam no Actions. Se o upload da
 release falhar, ela pode permanecer como rascunho para inspeção, sem publicação
 parcial. Antes de iniciar tudo novamente com a mesma versão, confira esse rascunho
@@ -137,6 +151,11 @@ Inno Setup; pacotes que ultrapassem isso exigirão outra forma de distribuição
 como partes externas. As bibliotecas 3D continuam incluídas.
 
 ## Verificação local da configuração
+
+Todos os workflows e a action composta de checkpoint usam actions com runtime
+Node.js 24: checkout v7, github-script v8, cache v5, upload-artifact v7 e
+download-artifact v8. O runner hospedado fornece esse runtime; não é necessário
+instalar Node.js nos pacotes do CircuitAliveEDA.
 
 ```bash
 actionlint

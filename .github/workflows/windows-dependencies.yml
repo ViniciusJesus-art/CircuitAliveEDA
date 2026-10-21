@@ -22,7 +22,7 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate dependency safety and toolchain initialization
         run: |
           ./qa/tests/cli/test_windows_toolchain.ps1
@@ -37,7 +37,7 @@ jobs:
           "value=$(Get-WindowsDependencyProfile (Get-Location).Path)" | Add-Content $env:GITHUB_OUTPUT
       - name: Restore compatible dependency cache
         id: cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: D:/ca-tools/binary-cache
           key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-final
@@ -59,7 +59,7 @@ jobs:
       - name: Verify actual MSBuild arguments before compiling any port
         run: ./qa/tests/cli/test_windows_dependencies.ps1 -HelperPath "$env:CA_WINDOWS_TOOLS/vcpkg/scripts/cmake/vcpkg_build_msbuild.cmake"
       - name: Preserve plan before compiling dependencies
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-dependencies-plan
           path: build/windows-dependencies/

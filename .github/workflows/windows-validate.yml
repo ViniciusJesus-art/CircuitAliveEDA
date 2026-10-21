@@ -17,7 +17,7 @@ jobs:
       run:
         shell: pwsh
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate dependency safety and toolchain initialization
         run: |
           ./qa/tests/cli/test_windows_toolchain.ps1
@@ -32,7 +32,7 @@ jobs:
           "value=$(Get-WindowsDependencyProfile (Get-Location).Path)" | Add-Content $env:GITHUB_OUTPUT
       - name: Restore compatible dependency cache
         id: cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: D:/ca-tools/binary-cache
           key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-validation
@@ -80,7 +80,7 @@ jobs:
             Stop-Transcript
           }
       - name: Preserve configuration before compiling affected sources
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-msvc-configure
           retention-days: 14
@@ -121,7 +121,7 @@ jobs:
             Tee-Object -FilePath build/windows-validation/memory-module.log
           if ($LASTEXITCODE -ne 0) { throw "XSPICE memory module failed ($LASTEXITCODE)." }
       - name: Preserve isolated memory module compilation log
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-msvc-memory-module
           retention-days: 14
@@ -144,7 +144,7 @@ jobs:
           }
       - name: Preserve configuration, compilation and test diagnostics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-msvc-validation
           retention-days: 14
