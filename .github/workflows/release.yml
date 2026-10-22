@@ -61,6 +61,7 @@ jobs:
         run: |
           ./qa/tests/cli/test_windows_toolchain.ps1
           python qa/tests/cli/test_windows_installer.py
+          python qa/tests/cli/test_component_libraries.py
       - name: Check real x64 installer before the expensive application build
         run: ./tools/circuitalive/release/prepare-inno.ps1
       - name: Test installer generation and extraction
@@ -129,6 +130,7 @@ jobs:
       - name: Verify runtime integrity and packaging regression tests
         run: |
           python qa/tests/cli/test_windows_installer.py
+          python qa/tests/cli/test_component_libraries.py
           python tools/circuitalive/release/package-windows.py stage/windows-msvc --version $env:RELEASE_VERSION --verify-only
       - name: Prepare pinned native x64 Inno Setup
         run: ./tools/circuitalive/release/prepare-inno.ps1

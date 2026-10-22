@@ -43,6 +43,11 @@ publicação usa o `GITHUB_TOKEN` do próprio Actions com `contents: write`.
 
 ## Etapas da execução
 
+EXE, RPM, DEB e AppImage incluem as bibliotecas completas e registram símbolos e
+footprints automaticamente na primeira abertura. Veja [bibliotecas prontas na
+primeira execução](BUNDLED_LIBRARIES.md), incluindo as verificações de caminhos e
+de recuperação das configurações de pacotes anteriores.
+
 | Job | O que faz |
 | --- | --- |
 | Validate version and release destination | Confere branch, versão e formatos. Se for publicar, recusa tag/release já existente. Fixa o commit de origem. |

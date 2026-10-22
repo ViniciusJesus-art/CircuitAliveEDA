@@ -41,6 +41,7 @@ using namespace std::chrono_literals;
 #include <settings/kicad_settings.h>
 #include <settings/settings_manager.h>
 #include <wx/dir.h>
+#include <wx/ffile.h>
 #include <wx/log.h>
 
 struct LIBRARY_MANAGER_INTERNALS
@@ -453,6 +454,14 @@ wxString LIBRARY_MANAGER::StockTablePath( LIBRARY_TABLE_TYPE aType )
 {
     wxString basePath = PATHS::GetStockTemplatesPath();
 
+    if( COMMON_SETTINGS* common = Pgm().GetCommonSettings() )
+    {
+        const auto it = common->m_Env.vars.find( ENV_VAR::GetVersionedEnvVarName( wxS( "TEMPLATE_DIR" ) ) );
+
+        if( it != common->m_Env.vars.end() && !it->second.GetValue().IsEmpty() )
+            basePath = it->second.GetValue();
+    }
+
     wxFileName fn( basePath, tableFileName( aType ) );
     fn.Normalize( FN_NORMALIZE_FLAGS | wxPATH_NORM_ENV_VARS );
 
@@ -470,21 +479,7 @@ wxString LIBRARY_MANAGER::StockTableTokenizedURI( LIBRARY_TABLE_TYPE aType )
 
 wxString LIBRARY_MANAGER::StockTableReferenceURI( LIBRARY_TABLE_TYPE aType )
 {
-    const wxString templateDirVar = ENV_VAR::GetVersionedEnvVarName( wxS( "TEMPLATE_DIR" ) );
-
-    // Only relocatable installs (AppImage, Nix) export the template-dir variable so the stock
-    // path follows the remounted prefix. There we store the unresolved token, which re-resolves
-    // each launch instead of dangling. A standard install leaves the variable at its built-in
-    // default, so we keep the historical resolved absolute path.
-    if( COMMON_SETTINGS* common = Pgm().GetCommonSettings() )
-    {
-        auto it = common->m_Env.vars.find( templateDirVar );
-
-        if( it != common->m_Env.vars.end() && it->second.GetDefinedExternally() )
-            return StockTableTokenizedURI( aType );
-    }
-
-    return StockTablePath( aType );
+    return StockTableTokenizedURI( aType );
 }
 
 
@@ -527,15 +522,14 @@ std::vector<LIBRARY_TABLE_TYPE> LIBRARY_MANAGER::InvalidGlobalTables()
 }
 
 
-bool LIBRARY_MANAGER::CreateGlobalTable( LIBRARY_TABLE_TYPE aType, bool aPopulateDefaultLibraries )
+static bool createGlobalTable( const wxFileName& fn, LIBRARY_TABLE_TYPE aType,
+                               bool aPopulateDefaultLibraries )
 {
-    wxFileName fn( DefaultGlobalTablePath( aType ) );
-
     LIBRARY_TABLE table( fn, LIBRARY_TABLE_SCOPE::GLOBAL );
     table.SetType( aType );
     table.Rows().clear();
 
-    wxFileName defaultLib( StockTablePath( aType ) );
+    wxFileName defaultLib( LIBRARY_MANAGER::StockTablePath( aType ) );
 
     if( !defaultLib.IsFileReadable() )
     {
@@ -549,7 +543,7 @@ bool LIBRARY_MANAGER::CreateGlobalTable( LIBRARY_TABLE_TYPE aType, bool aPopulat
         chained.SetType( LIBRARY_TABLE_ROW::TABLE_TYPE_NAME );
         chained.SetNickname( wxT( "CircuitAliveEDA" ) );
         chained.SetDescription( _( "CircuitAliveEDA Default Libraries" ) );
-        chained.SetURI( StockTableReferenceURI( aType ) );
+        chained.SetURI( LIBRARY_MANAGER::StockTableReferenceURI( aType ) );
     }
 
     try
@@ -565,6 +559,98 @@ bool LIBRARY_MANAGER::CreateGlobalTable( LIBRARY_TABLE_TYPE aType, bool aPopulat
     }
 
     return true;
+}
+
+
+bool LIBRARY_MANAGER::CreateGlobalTable( LIBRARY_TABLE_TYPE aType, bool aPopulateDefaultLibraries )
+{
+    return createGlobalTable( wxFileName( DefaultGlobalTablePath( aType ) ), aType,
+                              aPopulateDefaultLibraries );
+}
+
+
+void LIBRARY_MANAGER::InitializeGlobalTables( const wxString& aSettingsPath )
+{
+    const wxString settingsPath = aSettingsPath.IsEmpty() ? PATHS::GetUserSettingsPath() : aSettingsPath;
+
+    if( !PATHS::EnsurePathExists( settingsPath ) )
+        return;
+
+    const wxFileName marker( settingsPath, wxS( "circuitalive-library-setup" ) );
+    const bool firstSetup = !marker.FileExists();
+    bool ready = true;
+
+    for( LIBRARY_TABLE_TYPE type : { LIBRARY_TABLE_TYPE::SYMBOL, LIBRARY_TABLE_TYPE::FOOTPRINT,
+                                     LIBRARY_TABLE_TYPE::DESIGN_BLOCK } )
+    {
+        const wxFileName fn( settingsPath, tableFileName( type ) );
+        const bool stockValid = IsTableValid( StockTablePath( type ) );
+
+        if( !stockValid && type != LIBRARY_TABLE_TYPE::DESIGN_BLOCK )
+            ready = false;
+
+        if( !fn.FileExists() )
+        {
+            if( stockValid || type == LIBRARY_TABLE_TYPE::DESIGN_BLOCK )
+                ready = createGlobalTable( fn, type, stockValid ) && ready;
+
+            continue;
+        }
+
+        // Older packages persisted absolute paths, which break after moving or reinstalling.
+        // Custom rows survive. Empty tables from packages that lacked the stock tables are
+        // populated once; after setup the user can deliberately leave a table empty.
+        LIBRARY_TABLE table( fn, LIBRARY_TABLE_SCOPE::GLOBAL, type );
+
+        if( !table.IsOk() )
+        {
+            ready = false;
+            continue;
+        }
+
+        if( !stockValid )
+            continue;
+
+        if( firstSetup && table.Rows().empty() && type != LIBRARY_TABLE_TYPE::DESIGN_BLOCK )
+        {
+            ready = createGlobalTable( fn, type, true ) && ready;
+            continue;
+        }
+
+        bool changed = false;
+
+        for( LIBRARY_TABLE_ROW& row : table.Rows() )
+        {
+            if( row.Type() == LIBRARY_TABLE_ROW::TABLE_TYPE_NAME
+                && ( row.Nickname() == wxT( "CircuitAliveEDA" ) || row.Nickname() == wxT( "KiCad" ) )
+                && row.URI() != StockTableReferenceURI( type ) )
+            {
+                row.SetURI( StockTableReferenceURI( type ) );
+                changed = true;
+            }
+        }
+
+        if( changed )
+        {
+            try
+            {
+                ready = table.Save().has_value() && ready;
+            }
+            catch( const IO_ERROR& e )
+            {
+                wxLogTrace( traceLibraries, "Could not update installed library paths: %s", e.What() );
+                ready = false;
+            }
+        }
+    }
+
+    if( firstSetup && ready )
+    {
+        wxFFile file( marker.GetFullPath(), wxS( "w" ) );
+
+        if( file.IsOpened() )
+            file.Write( wxS( "1\n" ) );
+    }
 }
 
 

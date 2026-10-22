@@ -15,7 +15,7 @@ O triplet próprio mantém a verificação do compilador no hash de ABI do vcpkg
 
 ## Execução local
 
-Instale o Visual Studio 2022 com **Desktop development with C++**, Windows SDK e ferramentas CMake/Ninja. Instale Git, PowerShell 7 e NSIS. Use caminhos curtos e habilite caminhos longos no Windows se necessário.
+Instale o Visual Studio 2022 com **Desktop development with C++**, Windows SDK e ferramentas CMake/Ninja. Instale Git, Python e PowerShell 7. O script `prepare-inno.ps1` prepara o Inno Setup x64 fixado. Use caminhos curtos e habilite caminhos longos no Windows se necessário.
 
 Em PowerShell nativo, na raiz do checkout:
 
@@ -32,7 +32,7 @@ A fase `build` primeiro compila o worker, controlador, módulo de memória, test
 
 A compilação preserva API IPC, wxPython/SWIG, OpenCascade, editor esquemático, editor PCB, simulador clássico, worker interativo, módulo de memória, modelos, blocos, traduções e demos. `SIM_SESSION_STATE::FAILED` e `EDITOR_SESSION_STATE::FAILED` coexistem com a macro Win32 `ERROR`; no protocolo, o estado continua sendo `"error"`, versão 2. `NOMINMAX` vale para todos os builds Windows.
 
-O instalador NSIS inclui Python/wxPython, DLLs MSVC redistribuíveis, code models correspondentes e bibliotecas de componentes. O empacotamento verifica a instalação silenciosa em caminho com espaços, CLI, importação de `wx`/`pcbnew` e simulação analógica, digital e memória. O executável final fica em `dist/`, acompanhado de SHA-256.
+O instalador Inno Setup x64 inclui Python/wxPython, DLLs MSVC redistribuíveis, code models correspondentes e bibliotecas de componentes. O empacotamento verifica a instalação silenciosa em caminho com espaços, CLI, registro automático das bibliotecas em perfil limpo, importação de `wx`/`pcbnew` e simulação analógica, digital e memória. O executável final fica em `dist/`, acompanhado de SHA-256. Veja [bibliotecas prontas na primeira execução](BUNDLED_LIBRARIES.md) para o comportamento comum a EXE, RPM, DEB e AppImage.
 
 ## Compilação remota sem publicação
 

@@ -3,6 +3,7 @@
 import argparse,hashlib,importlib.util,json,os,re,shutil,subprocess,sys
 from pathlib import Path
 from programmable_assets import validate_programmable_assets
+from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--prefix',type=Path,required=True);p.add_argument('--libraries',type=Path,required=True)
 p.add_argument('--version',default='10.0.7-alpha.1');p.add_argument('--commit',required=True)
@@ -25,9 +26,10 @@ if args.reuse:
     shutil.copytree(args.prefix/'share/circuitalive',app/'share/circuitalive',dirs_exist_ok=True)
 else:
     shutil.copytree(args.prefix,app,dirs_exist_ok=True,symlinks=False,ignore=ignore)
-    for folder in ('symbols','footprints','3dmodels','template'):
+    validate_component_libraries(args.libraries)
+    for folder in LIBRARIES:
      source=args.libraries/folder
-     if source.exists():shutil.copytree(source,app/'share/kicad'/folder,dirs_exist_ok=True,symlinks=False,ignore=ignore)
+     shutil.copytree(source,app/'share/kicad'/folder,dirs_exist_ok=True,symlinks=False,ignore=ignore)
     python_version=f'python{sys.version_info.major}.{sys.version_info.minor}'
     for directory in (Path('/usr/lib')/python_version,Path('/usr/lib64')/python_version):
      if directory.exists():shutil.copytree(directory,app/'lib'/python_version,dirs_exist_ok=True,ignore=shutil.ignore_patterns('site-packages','test','__pycache__','*.pyc'))
@@ -74,6 +76,7 @@ else:
       if directory.exists():shutil.copytree(directory,app/'share'/base/package,dirs_exist_ok=True,ignore=ignore)
     (app/'DEPENDENCIES.txt').write_text(subprocess.check_output(['rpm','-q','--qf','%{NAME} %{VERSION}-%{RELEASE} source=%{SOURCERPM}\n',*sorted(packages)],text=True))
 validate_programmable_assets(app)
+validate_installed_assets(app)
 # The upstream APPDIR integration expects usr/bin and the Debian plugin layout.
 for alias,target in ((app/'usr/bin',app/'bin'),(app/'usr/share',app/'share'),
                      (app/'usr/lib64',app/'lib64'),(app/'usr/lib/x86_64-linux-gnu',app/'lib64')):
@@ -146,6 +149,10 @@ smoke_env=dict(os.environ)
 for name in ('LD_LIBRARY_PATH','PYTHONPATH','PYTHONHOME','KICAD_RUN_FROM_BUILD_DIR'):smoke_env.pop(name,None)
 smoke_env.update(XDG_CACHE_HOME=str(work/'smoke/cache'),XDG_DATA_HOME=str(work/'smoke/data'),KICAD_CONFIG_HOME=str(work/'smoke/config'),KICAD_CACHE_HOME=str(work/'smoke/cache'),KICAD_DOCUMENTS_HOME=str(work/'smoke/documents'),PATH='/usr/bin:/bin')
 subprocess.run([str(launcher),'cli','version'],check=True,timeout=60,env=smoke_env)
+verify_first_start(work/'smoke/config')
+subprocess.run([str(launcher),'cli','sym','export','svg','--symbol','R',
+               '--output',str(work/'smoke/symbols'),str(app/'share/kicad/symbols/Device.kicad_sym')],
+               check=True,timeout=60,env=smoke_env)
 smoke_env['LD_LIBRARY_PATH']=str(app/'lib64')
 subprocess.run([sys.executable,str(root/'tools/circuitalive/release/smoke-worker.py'),
                str(app/'bin/circuitalive-sim-worker'),'--scripts',str(work/'smoke/cache/circuitaliveeda/ngspice')],

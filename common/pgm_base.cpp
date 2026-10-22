@@ -508,6 +508,9 @@ bool PGM_BASE::InitPgm( bool aHeadless, bool aSkipPyInit, bool aIsUnitTest )
 
     loadCommonSettings();
 
+    // Every entry point (manager, standalone editors and CLI) starts with the installed libraries.
+    LIBRARY_MANAGER::InitializeGlobalTables();
+
     ReadPdfBrowserInfos();      // needs GetCommonSettings()
 
     GetNotificationsManager().Load();

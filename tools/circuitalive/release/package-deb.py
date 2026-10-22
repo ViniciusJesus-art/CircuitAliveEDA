@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 from programmable_assets import validate_programmable_assets
+from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start
 
 
 def debian_version(version):
@@ -59,6 +60,11 @@ def smoke(app, root):
         for key in ('LD_LIBRARY_PATH', 'PYTHONPATH', 'PYTHONHOME', 'KICAD_RUN_FROM_BUILD_DIR', 'SPICE_SCRIPTS'):
             env.pop(key, None)
         subprocess.run([str(app / 'CircuitAliveEDA'), 'cli', 'version'], check=True, env=env, timeout=60)
+        validate_installed_assets(app)
+        verify_first_start(temporary + '/config')
+        subprocess.run([str(app / 'CircuitAliveEDA'), 'cli', 'sym', 'export', 'svg', '--symbol', 'R',
+                        '--output', temporary + '/symbols', str(app / 'share/kicad/symbols/Device.kicad_sym')],
+                       check=True, env=env, timeout=60)
         env['LD_LIBRARY_PATH'] = str(app / 'lib')
         env['PYTHONPATH'] = str(app / 'lib/python3/dist-packages')
         subprocess.run(['python3', '-c', 'import wx, pcbnew; print(wx.version())'],
@@ -80,10 +86,14 @@ def package(stage, libraries, ngspice, version, commit, output):
         if not (app / 'bin' / name).is_file():
             raise FileNotFoundError(app / 'bin' / name)
     ignore = shutil.ignore_patterns('.git', '__pycache__', '*.pyc', '.history')
-    for folder in ('symbols', 'footprints', '3dmodels', 'template'):
+    validate_component_libraries(libraries)
+    for folder in LIBRARIES:
         if not (libraries / folder).is_dir():
             raise FileNotFoundError(libraries / folder)
         shutil.copytree(libraries / folder, app / 'share/kicad' / folder, dirs_exist_ok=True, ignore=ignore)
+    if (libraries / 'licenses').is_dir():
+        shutil.copytree(libraries / 'licenses', app / 'share/licenses/component-libraries', dirs_exist_ok=True)
+    validate_installed_assets(app)
     for pattern in ('libngspice.so*', 'libnng.so*'):
         sources = list((ngspice / 'lib').glob(pattern))
         if not sources:

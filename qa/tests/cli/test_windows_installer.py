@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from test_component_libraries import create_library_fixture
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools/circuitalive/release'))
@@ -33,6 +34,7 @@ class WindowsInstallerTests(unittest.TestCase):
                      'mcu_atmega168p_p', 'mcu_atmega328p_p', 'mcu_pic16f84a_p'):
             shutil.copy2(ROOT / 'simulation/models' / (name + '.casim'), assets / 'models')
         shutil.copytree(ROOT / 'simulation/runtime', assets / 'runtime')
+        shutil.copytree(ROOT / 'simulation/blocks', assets / 'blocks')
         for name in ('quickjs-ng', 'avr8js'):
             target = assets / 'licenses' / name
             target.mkdir(parents=True)
@@ -44,6 +46,7 @@ class WindowsInstallerTests(unittest.TestCase):
             path = self.libraries / 'share/kicad' / folder
             path.mkdir(parents=True)
             (path / 'data.txt').write_text('library data', encoding='utf-8')
+        create_library_fixture(self.libraries / 'share/kicad')
         (self.root / 'LICENSE.GPLv3').write_text('fixture license', encoding='utf-8')
         self.dist = self.root / 'dist'
         self.dist.mkdir()
@@ -83,8 +86,7 @@ class WindowsInstallerTests(unittest.TestCase):
                 path.write_bytes(original)
 
     def test_missing_component_library_fails_before_running_the_compiler(self):
-        (self.libraries / 'share/kicad/3dmodels/data.txt').unlink()
-        (self.libraries / 'share/kicad/3dmodels').rmdir()
+        shutil.rmtree(self.libraries / 'share/kicad/3dmodels')
         with patch.object(package.subprocess, 'run') as run:
             with self.assertRaisesRegex(ValueError, 'Missing component library'):
                 package.package_runtime(self.stage, self.version, 'ISCC.exe', self.root)
@@ -115,15 +117,19 @@ class WindowsInstallerTests(unittest.TestCase):
 
     def test_runtime_checks_use_installed_python_and_no_build_path(self):
         with patch.dict(os.environ, {'SystemRoot': 'C:/Windows', 'PATH': 'D:/vcpkg/bin'}), \
-                patch.object(package.subprocess, 'run') as run:
+                patch.object(package.subprocess, 'run') as run, \
+                patch.object(package, 'validate_installed_assets'), \
+                patch.object(package, 'validate_programmable_assets'), \
+                patch.object(package, 'verify_first_start') as first_start:
             package.verify_installer(self.dist / 'setup.exe', self.root)
+        first_start.assert_called_once()
         install = run.call_args_list[0].args[0]
         self.assertIn('/VERYSILENT', install)
         self.assertIn(f'/DIR={self.root / "installer smoke"}', install)
         for call in run.call_args_list[1:]:
             self.assertNotIn('vcpkg', call.kwargs['env']['PATH'])
             self.assertEqual(call.kwargs['env']['PYTHONHOME'], str(self.root / 'installer smoke/bin'))
-        self.assertEqual(run.call_args_list[2].args[0][0], str(self.root / 'installer smoke/bin/python.exe'))
+        self.assertEqual(run.call_args_list[3].args[0][0], str(self.root / 'installer smoke/bin/python.exe'))
 
     @unittest.skipUnless(os.name == 'nt' and os.environ.get('INNO_ISCC'), 'Native Inno Setup integration')
     def test_real_installer_extracts_libraries_and_excludes_git_metadata(self):

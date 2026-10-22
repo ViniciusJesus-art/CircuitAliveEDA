@@ -6,10 +6,12 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+from component_libraries import validate_installed_assets, verify_first_start
 
 
 def create_appimage(appdir, output, version, tool, runtime):
     appdir, output, tool, runtime = (Path(p).resolve() for p in (appdir, output, tool, runtime))
+    validate_installed_assets(appdir)
     for required in (appdir / 'CircuitAliveEDA',
                      appdir / 'share/icons/hicolor/128x128/apps/circuitaliveeda.png', tool, runtime):
         if not required.is_file():
@@ -40,6 +42,7 @@ def create_appimage(appdir, output, version, tool, runtime):
         for key in ('LD_LIBRARY_PATH', 'PYTHONHOME', 'PYTHONPATH', 'KICAD_RUN_FROM_BUILD_DIR'):
             smoke_env.pop(key, None)
         subprocess.run([str(output), 'cli', 'version'], check=True, env=smoke_env, timeout=180)
+        verify_first_start(smoke + '/config')
     return output
 
 

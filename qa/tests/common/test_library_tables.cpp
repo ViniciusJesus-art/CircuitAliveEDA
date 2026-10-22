@@ -37,6 +37,7 @@
 
 #include <env_vars.h>
 #include <pgm_base.h>
+#include <paths.h>
 #include <settings/common_settings.h>
 #include <libraries/library_manager.h>
 #include <libraries/library_table.h>
@@ -569,13 +570,7 @@ BOOST_AUTO_TEST_CASE( LibOverrideSettings )
 }
 
 
-/**
- * The stock-table reference URI written into a freshly created global table must only use the
- * env-var token when the template-dir variable is defined externally (the relocatable-install
- * case from https://gitlab.com/kicad/code/kicad/-/issues/23081). When the variable is at its
- * built-in default the standard, resolved absolute path is preserved.
- */
-BOOST_AUTO_TEST_CASE( StockTableReferenceURIHonorsExternalDefinition )
+BOOST_AUTO_TEST_CASE( StockTableReferencesFollowInstallationOnEveryPlatform )
 {
     const wxString templateVar = ENV_VAR::GetVersionedEnvVarName( wxS( "TEMPLATE_DIR" ) );
 
@@ -589,12 +584,75 @@ BOOST_AUTO_TEST_CASE( StockTableReferenceURIHonorsExternalDefinition )
 
         entry.SetDefinedExternally( false );
         BOOST_CHECK_EQUAL( LIBRARY_MANAGER::StockTableReferenceURI( type ),
-                           LIBRARY_MANAGER::StockTablePath( type ) );
+                           LIBRARY_MANAGER::StockTableTokenizedURI( type ) );
 
         entry.SetDefinedExternally( true );
         BOOST_CHECK_EQUAL( LIBRARY_MANAGER::StockTableReferenceURI( type ),
                            LIBRARY_MANAGER::StockTableTokenizedURI( type ) );
     }
+}
+
+
+BOOST_AUTO_TEST_CASE( InstalledLibrariesAreRegisteredBeforeFirstEditorStart )
+{
+    KI_TEST::SCOPED_TEMP_DIR temporary( wxS( "bundled-libraries" ) );
+    const auto stock = temporary.Path() / "stock templates with spaces";
+    const auto profile = temporary.Path() / "fresh profile";
+    std::filesystem::create_directories( stock );
+
+    std::ofstream( stock / "sym-lib-table" ) <<
+            "(sym_lib_table (version 7) (lib (name Device) (type KiCad) "
+            "(uri ${KICAD10_SYMBOL_DIR}/Device.kicad_sym) (options \"\") (descr \"\")))";
+    std::ofstream( stock / "fp-lib-table" ) <<
+            "(fp_lib_table (version 7) (lib (name Resistor_SMD) (type KiCad) "
+            "(uri ${KICAD10_FOOTPRINT_DIR}/Resistor_SMD.pretty) (options \"\") (descr \"\")))";
+
+    KI_TEST::SCOPED_PGM_ENV_VAR templates( ENV_VAR::GetVersionedEnvVarName( wxS( "TEMPLATE_DIR" ) ),
+                                          wxString::FromUTF8( stock.string() ) );
+    const wxString settings = wxString::FromUTF8( profile.string() );
+    std::filesystem::create_directories( profile );
+    // The broken installer could leave an empty symbol table; it also needs first-time setup.
+    std::ofstream( profile / "sym-lib-table" ) << "(sym_lib_table (version 7))";
+    LIBRARY_MANAGER::InitializeGlobalTables( settings );
+
+    for( const auto& [filename, type] : std::vector<std::pair<std::string, LIBRARY_TABLE_TYPE>>{
+                 { "sym-lib-table", LIBRARY_TABLE_TYPE::SYMBOL },
+                 { "fp-lib-table", LIBRARY_TABLE_TYPE::FOOTPRINT } } )
+    {
+        wxFileName fn( settings, wxString::FromUTF8( filename ) );
+        LIBRARY_TABLE table( fn, LIBRARY_TABLE_SCOPE::GLOBAL, type );
+        BOOST_REQUIRE( table.IsOk() );
+        BOOST_REQUIRE_EQUAL( table.Rows().size(), 1 );
+        BOOST_CHECK_EQUAL( table.Rows().front().URI(), LIBRARY_MANAGER::StockTableTokenizedURI( type ) );
+        BOOST_CHECK_EQUAL( LIBRARY_MANAGER::StockTablePath( type ),
+                           wxString::FromUTF8( ( stock / filename ).string() ) );
+    }
+
+    // Simulate an older install, with a broken stock link and a custom library beside it.
+    const wxFileName fn( settings, wxS( "sym-lib-table" ) );
+    LIBRARY_TABLE table( fn, LIBRARY_TABLE_SCOPE::GLOBAL );
+    table.Rows().front().SetURI( wxS( "/removed/installation/template/sym-lib-table" ) );
+    LIBRARY_TABLE_ROW& user = table.InsertRow();
+    user.SetNickname( wxS( "MyParts" ) );
+    user.SetType( wxS( "KiCad" ) );
+    user.SetURI( wxS( "${MY_LIBRARY}/parts.kicad_sym" ) );
+    BOOST_REQUIRE( table.Save().has_value() );
+
+    LIBRARY_MANAGER::InitializeGlobalTables( settings );
+    LIBRARY_MANAGER::InitializeGlobalTables( settings );
+    LIBRARY_TABLE repaired( fn, LIBRARY_TABLE_SCOPE::GLOBAL );
+    BOOST_REQUIRE( repaired.IsOk() );
+    BOOST_REQUIRE_EQUAL( repaired.Rows().size(), 2 );
+    BOOST_CHECK_EQUAL( repaired.Rows().front().URI(),
+                       LIBRARY_MANAGER::StockTableTokenizedURI( LIBRARY_TABLE_TYPE::SYMBOL ) );
+    BOOST_CHECK_EQUAL( repaired.Rows().back().URI(), wxS( "${MY_LIBRARY}/parts.kicad_sym" ) );
+
+    // A deliberately empty user table must stay empty on subsequent launches.
+    repaired.Rows().clear();
+    BOOST_REQUIRE( repaired.Save().has_value() );
+    LIBRARY_MANAGER::InitializeGlobalTables( settings );
+    LIBRARY_TABLE empty( fn, LIBRARY_TABLE_SCOPE::GLOBAL );
+    BOOST_CHECK( empty.Rows().empty() );
 }
 
 

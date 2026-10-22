@@ -260,7 +260,18 @@ wxString PATHS::GetStockDataPath( bool aRespectRunFromBuildDir )
 #elif defined( __WXMSW__ )
         path = getWindowsKiCadRoot() + wxT( "share/kicad" );
 #else
-        path = wxString::FromUTF8Unchecked( KICAD_DATA );
+        // Follow relocated packages instead of retaining the build machine's install prefix.
+        wxFileName installed( wxStandardPaths::Get().GetExecutablePath() );
+        WX_FILENAME::ResolvePossibleSymlinks( installed );
+        installed.SetFullName( wxEmptyString );
+        installed.RemoveLastDir();
+        installed.AppendDir( wxT( "share" ) );
+        installed.AppendDir( wxT( "kicad" ) );
+
+        if( installed.DirExists() )
+            path = installed.GetPath();
+        else
+            path = wxString::FromUTF8Unchecked( KICAD_DATA );
 #endif
     }
 
@@ -290,7 +301,12 @@ wxString PATHS::GetStockEDALibraryPath()
     if( wxGetEnv( wxT( "APPDIR" ), &path ) )
         path += wxT( "/share/kicad" );
     else
-        path = wxString::FromUTF8Unchecked( KICAD_LIBRARY_DATA );
+    {
+        path = GetStockDataPath( false );
+
+        if( !wxDirExists( path + wxT( "/symbols" ) ) )
+            path = wxString::FromUTF8Unchecked( KICAD_LIBRARY_DATA );
+    }
 #endif
 
     return path;

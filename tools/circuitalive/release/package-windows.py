@@ -9,10 +9,10 @@ import shutil
 import subprocess
 import tempfile
 from programmable_assets import validate_programmable_assets
+from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start
 
 ROOT = Path(__file__).resolve().parents[3]
 CHECKPOINT = 'RUNTIME-CHECKPOINT.json'
-LIBRARIES = ('symbols', 'footprints', '3dmodels', 'template')
 
 
 def digest(path):
@@ -109,6 +109,8 @@ def inno_quote(value):
 
 
 def installer_script(stage, libraries, version, dist, root=ROOT):
+    data = libraries / 'share/kicad'
+    validate_component_libraries(data)
     extra = []
     for folder in LIBRARIES:
         source = libraries / 'share/kicad' / folder
@@ -118,6 +120,13 @@ def installer_script(stage, libraries, version, dist, root=ROOT):
                      'Excludes: ".git,.git\\*,.history,*-backups"; Flags: ignoreversion recursesubdirs createallsubdirs')
     for manifest in sorted(libraries.glob('*-commit.txt')):
         extra.append(f'Source: "{inno_quote(manifest)}"; DestDir: "{{app}}"; Flags: ignoreversion')
+    if (data / 'licenses').is_dir():
+        extra.append(f'Source: "{inno_quote(data / "licenses")}\\*"; '
+                     'DestDir: "{app}\\share\\licenses\\component-libraries"; '
+                     'Flags: ignoreversion recursesubdirs createallsubdirs')
+    if (data / 'component-commits.json').is_file():
+        extra.append(f'Source: "{inno_quote(data / "component-commits.json")}"; '
+                     'DestDir: "{app}"; Flags: ignoreversion')
     return f'''[Setup]
 AppId=CircuitAliveEDA
 AppName=CircuitAliveEDA
@@ -161,17 +170,28 @@ def verify_installer(installer, root=ROOT):
     with tempfile.TemporaryDirectory(prefix='ca-installed-profile-') as temporary:
         profile = Path(temporary)
         env = dict(os.environ, APPDATA=str(profile / 'Roaming'), LOCALAPPDATA=str(profile / 'Local'),
+                   KICAD_CONFIG_HOME=str(profile / 'config'), KICAD_DOCUMENTS_HOME=str(profile / 'documents'),
+                   KICAD_CACHE_HOME=str(profile / 'cache'),
                    USERPROFILE=str(profile), PYTHONHOME=str(smoke / 'bin'),
                    PYTHONPATH=str(smoke / 'bin/Lib/site-packages'),
                    PATH=os.pathsep.join((str(smoke / 'bin'), str(Path(os.environ['SystemRoot']) / 'System32'),
                                          os.environ['SystemRoot'])))
         for path in (profile / 'Roaming', profile / 'Local'):
             path.mkdir()
+        for key in list(env):
+            if key.startswith('KICAD10_') or key in ('APPDIR', 'KICAD_STOCK_DATA_HOME', 'KICAD_RUN_FROM_BUILD_DIR'):
+                env.pop(key)
         subprocess.run([str(installer), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
                         '/SP-', f'/DIR={smoke}', f'/LOG={root / "dist/installer-smoke.log"}'],
                        check=True, timeout=1800)
+        validate_installed_assets(smoke)
+        validate_programmable_assets(smoke)
         subprocess.run([str(smoke / 'bin/kicad-cli.exe'), 'version'], check=True, timeout=60,
                        env=env, cwd=profile)
+        verify_first_start(profile / 'config')
+        subprocess.run([str(smoke / 'bin/kicad-cli.exe'), 'sym', 'export', 'svg', '--symbol', 'R',
+                        '--output', str(profile / 'symbols'), str(smoke / 'share/kicad/symbols/Device.kicad_sym')],
+                       check=True, timeout=60, env=env, cwd=profile)
         python = str(smoke / 'bin/python.exe')
         subprocess.run([python, '-c', 'import wx, pcbnew; print("Installed Python/wx:", wx.version())'],
                        check=True, timeout=60, env=env, cwd=profile)

@@ -286,11 +286,8 @@ public:
      * @return the URI to use when referencing the stock table from a freshly created global
      *         table.
      *
-     * When the versioned template-dir env var is defined externally to the process -- as
-     * relocatable installs (AppImage, Nix) do at launch -- this returns the unresolved
-     * StockTableTokenizedURI() so the reference re-resolves on every launch. Otherwise the
-     * variable is at its built-in default and this returns the resolved StockTablePath(),
-     * preserving the historical absolute-path behavior of standard installs.
+     * Always uses the versioned template-dir token, so the reference follows the current
+     * installation on every platform, including after relocation or an upgrade.
      */
     static wxString StockTableReferenceURI( LIBRARY_TABLE_TYPE aType );
 
@@ -303,6 +300,10 @@ public:
     static std::vector<LIBRARY_TABLE_TYPE> InvalidGlobalTables();
 
     static bool CreateGlobalTable( LIBRARY_TABLE_TYPE aType, bool aPopulateDefaultLibraries );
+
+    /// Create missing tables and update managed stock references, preserving user libraries.
+    /// An empty path selects PATHS::GetUserSettingsPath().
+    static void InitializeGlobalTables( const wxString& aSettingsPath = wxEmptyString );
 
     /// (Re)loads the global library tables in the given list, or all tables if no list is given
     void LoadGlobalTables( std::initializer_list<LIBRARY_TABLE_TYPE> aTablesToLoad = {} );
