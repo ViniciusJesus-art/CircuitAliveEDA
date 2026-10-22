@@ -2,166 +2,161 @@
 
 # CircuitAliveEDA
 
-<img src="./resources/bitmaps_png/icons/icon_kicad.png" alt="Logo do CircuitAliveEDA" width="160" />
+<img src="./resources/bitmaps_png/icons/icon_kicad.png" alt="CircuitAliveEDA logo" width="160" />
 
-**Desenhar, simular e desenvolver circuitos eletrônicos no mesmo lugar.**
+**Design, simulate, and develop electronic circuits in one place.**
 
-*Projeto pessoal baseado no [KiCad](https://www.kicad.org/).*
+*An independent personal project based on [KiCad](https://www.kicad.org/).*
 
-
-
----
-
-
-
-
-## O que é o CircuitAliveEDA?
-
-O CircuitAliveEDA é um **ambiente de desenvolvimento eletrônico baseado no KiCad**, com modificações próprias focadas principalmente na simulação interativa.
-
-A intenção é que a simulação não seja uma etapa separada do desenho. Você monta o circuito usando símbolos eletrônicos, inicia a execução e acompanha o comportamento dos componentes diretamente no esquemático. Também pode interagir com determinados elementos, fazer medições e analisar sinais enquanto trabalha.
-
-Por utilizar o KiCad como base, o projeto também mantém o caminho para o desenvolvimento de placas de circuito impresso, incluindo bibliotecas, edição de PCB e geração dos arquivos necessários para fabricação. Quero preservar o máximo possível dessa compatibilidade, tanto com o KiCad quanto com as bibliotecas e ferramentas criadas por sua comunidade.
-
-**O CA ainda está em desenvolvimento.** Algumas funcionalidades já estão implementadas, outras têm suporte inicial e várias fazem parte dos objetivos futuros. Não é uma versão oficial do KiCad nem tem qualquer afiliação com sua equipe.
+**Veja a versão em Português 🇧🇷 [aqui](/README-PT_BR.md)**
 
 ---
 
-#### **O CircuitAliveEDA é um projeto estritamente pessoal, desenvolvido e moldado de acordo com o que eu gostaria de encontrar em um software de desenvolvimento eletrônico: uma ferramenta intuitiva, prática e, ao mesmo tempo, profissional, que me permita desenvolver meus projetos desde os primeiros testes até a criação da PCB.**
+## What is CircuitAliveEDA?
 
-#### **O projeto continuará evoluindo conforme minhas necessidades e ideias. Contudo, se mais alguém se identificar com essa proposta ou encontrar utilidade no programa, fique à vontade para utilizá-lo também!**
+CircuitAliveEDA is a **KiCad-based electronics development environment**, with custom modifications focused primarily on interactive simulation.
+
+The idea is to make simulation a natural part of circuit design rather than a separate step. You build a circuit using electronic symbols, start the simulation, and watch the components behave directly on the schematic. You can also interact with certain elements, take measurements, and analyze signals as you work.
+
+Because the project is based on KiCad, it also retains the tools needed for printed circuit board development, including libraries, PCB editing, and generating the files required for manufacturing. I want to preserve as much compatibility as possible with KiCad itself, as well as the libraries and tools created by its community.
+
+**CA is still under development.** Some features are already implemented, others have initial support, and many remain future goals. This is not an official version of KiCad and is not affiliated with the KiCad team.
+
+---
+
+#### **CircuitAliveEDA is a strictly personal project, developed and shaped around what I would like to see in electronics design software: an intuitive, practical, yet professional tool that lets me take my projects from the first experiments all the way to PCB design.**
+
+#### **The project will continue to evolve according to my needs and ideas. That said, if anyone else shares this vision or finds the software useful, they are more than welcome to use it too!**
 
 </div>
 
+## Table of Contents
 
-
-## Sumário
-
-- [O que é o CircuitAliveEDA?](#o-que-é-o-circuitaliveeda)
-- [O que já funciona](#o-que-já-funciona)
-- [Imagens do projeto](#imagens-do-projeto)
-- [O que ainda quero desenvolver](#o-que-ainda-quero-desenvolver)
-- [Como funciona por dentro](#como-funciona-por-dentro)
-- [Especificações rápidas](#especificações-rápidas)
-- [Documentação](#documentação)
-- [Compilação e execução](#compilação-e-execução)
-- [Créditos e agradecimentos](#créditos-e-agradecimentos)
-- [Licenciamento](#licenciamento)
+- [What is CircuitAliveEDA?](#what-is-circuitaliveeda)
+- [What already works](#what-already-works)
+- [Project screenshots](#project-screenshots)
+- [What I still want to develop](#what-i-still-want-to-develop)
+- [How it works internally](#how-it-works-internally)
+- [Quick specifications](#quick-specifications)
+- [Documentation](#documentation)
+- [Building and running](#building-and-running)
+- [Credits and acknowledgments](#credits-and-acknowledgments)
+- [Licensing](#licensing)
 
 ---
 
-## O que já funciona
+## What already works
 
-### Simulação no próprio esquemático
+### Simulation directly on the schematic
 
-O CA já conta com uma implementação inicial de simulação interativa usando **ngspice**, com suporte inicial a circuitos digitais por meio do **XSPICE**.
+CA already has an initial implementation of interactive simulation using **ngspice**, with early support for digital circuits through **XSPICE**.
 
-Entre as funções que já foram desenvolvidas estão:
+Features developed so far include:
 
-- Controles para iniciar, pausar, continuar e interromper a simulação.
-- Integração com o editor de esquemáticos.
-- Interação com chaves durante a simulação.
-- Representação visual do funcionamento de LEDs.
-- Medições de tensão, corrente e potência.
-- Osciloscópio com cursores, *trigger* e exportação CSV.
-- Indicação dos estados lógicos `0`, `1`, `Z` e `X`.
-- Testes com circuitos analógicos e digitais.
+- Controls to start, pause, resume, and stop simulations.
+- Integration with the schematic editor.
+- Interaction with switches while a simulation is running.
+- Visual representation of LED behavior.
+- Voltage, current, and power measurements.
+- An oscilloscope with cursors, triggering, and CSV export.
+- Display of logic states `0`, `1`, `Z`, and `X`.
+- Tests with analog and digital circuits.
 
-Quero que testar um circuito seja algo tão natural quanto desenhá-lo: mudar uma ligação, apertar *Play* e ver o resultado.
+I want testing a circuit to feel as natural as drawing it: change a connection, press **Play**, and see what happens.
 
-### Modelos de componentes
+### Component models
 
-Uma parte importante do projeto é facilitar o uso de modelos de simulação. Não adianta ter uma boa interface se cada novo componente exigir uma sequência complicada de configurações.
+An important part of the project is making simulation models easier to use. A good interface is not very helpful if every new component requires a complicated setup process.
 
-O CA já possui suporte e documentação para modelos de componentes discretos e digitais, além da associação desses modelos aos símbolos. Também comecei um **editor visual de modelos**, para tornar esse processo mais acessível.
+CA already includes support and documentation for discrete and digital component models, as well as assigning those models to symbols. I have also started working on a **visual model editor** to make this process more accessible.
 
-O [catálogo de modelos](docs/circuitalive/MODEL_CATALOG.md) reúne informações sobre os arquivos `.casim`, modelos disponíveis, testes e cobertura da biblioteca padrão.
+The [model catalog](docs/circuitalive/MODEL_CATALOG.md) contains information about `.casim` files, available models, tests, and coverage of the standard library.
 
-### Pequenas mudanças no editor
+### Small editor improvements
 
-Além do simulador, comecei a adaptar algumas interações do editor para deixar o trabalho mais rápido. Entre elas estão ajustes na colocação contínua de símbolos e a possibilidade de **excluir elementos com dois cliques no botão direito**.
+Beyond the simulator, I have started adapting some editor interactions to make everyday work faster. These include improvements to continuous symbol placement and the ability to **delete elements by double-right-clicking**.
 
-São detalhes pequenos, mas que fazem diferença quando se passa bastante tempo montando e modificando circuitos.
+These may be small details, but they make a difference when you spend a lot of time building and modifying circuits.
 
-## Imagens do projeto
+## Project screenshots
 
-As imagens abaixo mostram o CircuitAliveEDA durante o desenvolvimento:
+The images below show CircuitAliveEDA during development:
 
-![CircuitAliveEDA — captura do projeto 1](./resources/screenshot/Screenshot_20261017_163020.png)
+![CircuitAliveEDA — project screenshot 1](./resources/screenshot/Screenshot_20261017_163020.png)
 
-![CircuitAliveEDA — captura do projeto 2](./resources/screenshot/Screenshot_20261017_165517.png)
+![CircuitAliveEDA — project screenshot 2](./resources/screenshot/Screenshot_20261017_165517.png)
 
-![CircuitAliveEDA — captura do projeto 3](./resources/screenshot/Screenshot_20261017_165613.png)
+![CircuitAliveEDA — project screenshot 3](./resources/screenshot/Screenshot_20261017_165613.png)
 
-![CircuitAliveEDA — captura do projeto 4](./resources/screenshot/Screenshot_20261017_165649.png)
-
----
-
-## O que ainda quero desenvolver
-
-Não quero que o CA fique limitado a circuitos pequenos ou exemplos didáticos. Minha intenção é que ele também sirva para projetos maiores, com centenas ou milhares de elementos, circuitos analógicos e digitais, memórias, processadores e outros sistemas eletrônicos.
-
-Algumas das ideias que quero explorar:
-
-- Ampliar a biblioteca de componentes que podem ser simulados sem configurações complicadas.
-- Permitir a criação e reutilização de modelos personalizados de maneira modular.
-- Melhorar os instrumentos virtuais e a interação com os circuitos durante a execução.
-- Investigar formas de aproveitar melhor os vários núcleos do processador em simulações complexas.
-- Manter um fluxo contínuo entre a ideia, os testes no esquemático e a fabricação da PCB.
-
-Esses são **objetivos de desenvolvimento**, não uma lista de funcionalidades já concluídas. Prefiro registrar o caminho que quero seguir e ir documentando os resultados conforme forem aparecendo.
+![CircuitAliveEDA — project screenshot 4](./resources/screenshot/Screenshot_20261017_165649.png)
 
 ---
 
-## Como funciona por dentro
+## What I still want to develop
 
-O CircuitAliveEDA é um projeto derivado do **KiCad 10.0.7**, desenvolvido principalmente em **C++**. A interface e as ferramentas de esquemático e PCB partem da infraestrutura do KiCad, enquanto as funcionalidades de simulação interativa são integradas por módulos próprios.
+I do not want CA to be limited to small circuits or educational examples. My goal is for it to support larger projects as well, with hundreds or thousands of elements, analog and digital circuits, memories, processors, and other electronic systems.
 
-### Motor de simulação
+Some ideas I want to explore include:
 
-O projeto utiliza o **ngspice** como motor de simulação de circuitos e o **XSPICE** para funcionalidades de simulação digital. Sobre essa base, foi desenvolvida uma camada de controle para gerenciar sessões interativas e conectar a simulação às ferramentas do editor.
+- Expanding the library of components that can be simulated without complicated configuration.
+- Allowing custom models to be created and reused in a modular way.
+- Improving virtual instruments and interaction with circuits during simulation.
+- Investigating ways to make better use of multiple CPU cores in complex simulations.
+- Maintaining a seamless workflow from an initial idea through schematic testing to PCB manufacturing.
 
-Isso permite trabalhar com controles de execução, acompanhamento de sinais e interação com os componentes, sem depender exclusivamente de gráficos separados do esquemático.
+These are **development goals**, not a list of completed features. I prefer to document the direction I want to take and record the results as the work progresses.
 
-### Modelos e bibliotecas
+---
 
-A proposta é manter os símbolos e bibliotecas do ecossistema KiCad e associá-los aos modelos necessários para simulação. A estrutura de modelos do CA, incluindo arquivos `.casim`, está documentada no repositório.
+## How it works internally
 
-O objetivo de longo prazo é que novos modelos possam ser adicionados sem exigir alterações extensas no núcleo do programa.
+CircuitAliveEDA is derived from **KiCad 10.0.7** and is developed primarily in **C++**. Its interface, schematic tools, and PCB tools build on KiCad's infrastructure, while the interactive simulation features are integrated through custom modules.
 
-### Especificações rápidas
+### Simulation engine
 
-| Item | Especificação |
+The project uses **ngspice** as its circuit simulation engine and **XSPICE** for digital simulation features. On top of this foundation, I have developed a control layer to manage interactive sessions and connect simulation to the editor's tools.
+
+This makes it possible to control simulation execution, monitor signals, and interact with components without relying solely on plots displayed separately from the schematic.
+
+### Models and libraries
+
+The goal is to retain symbols and libraries from the KiCad ecosystem and associate them with the models needed for simulation. CA's model structure, including `.casim` files, is documented in the repository.
+
+In the long term, I want new models to be added without requiring extensive changes to the application's core.
+
+### Quick specifications
+
+| Item | Specification |
 |---|---|
-| Projeto base | KiCad 10.0.7 |
-| Linguagem principal | C++ |
-| Motores de simulação | ngspice / XSPICE |
-| Edição de esquemático e PCB | Infraestrutura do KiCad, com modificações do CA |
-| Modelos de simulação | Associação aos símbolos e arquivos `.casim` |
-| Ambiente inicial de desenvolvimento | Fedora Linux |
-| Compilação Windows | Documentação para MSVC |
-| Situação | Projeto em desenvolvimento |
-| Licenciamento | Conforme as licenças do código derivado e das dependências, incluindo GPL |
+| Base project | KiCad 10.0.7 |
+| Primary language | C++ |
+| Simulation engines | ngspice / XSPICE |
+| Schematic and PCB editing | KiCad infrastructure with CA modifications |
+| Simulation models | Symbol associations and `.casim` files |
+| Initial development environment | Fedora Linux |
+| Windows builds | MSVC build documentation |
+| Status | Under development |
+| Licensing | Subject to the licenses of the derived code and dependencies, including the GPL |
 
-## Documentação
+## Documentation
 
-Para quem quiser entender melhor o funcionamento ou estudar a implementação, mantenho documentos mais técnicos em [`docs/circuitalive/`](docs/circuitalive/).
+For anyone interested in understanding the software in greater detail or studying its implementation, I keep more technical documentation in [`docs/circuitalive/`](docs/circuitalive/).
 
-- [Compilação no Fedora](docs/circuitalive/BUILD_FEDORA.md)
-- [Release manual: RPM, AppImage, DEB e EXE — juntos ou individualmente](docs/circuitalive/RELEASE_WORKFLOW.md)
-- [Compilação no Windows / MSVC](docs/circuitalive/BUILD_WINDOWS.md)
-- [Arquitetura da simulação interativa](docs/circuitalive/INTERACTIVE_SESSION.md)
-- [Integração com o editor](docs/circuitalive/EDITOR_SIMULATION.md)
-- [Medições e osciloscópio](docs/circuitalive/MEASUREMENTS.md)
-- [Modelos analógicos e digitais](docs/circuitalive/BASIC_AND_DIGITAL_MODELS.md)
-- [Editor visual de modelos](docs/circuitalive/MODEL_AUTHOR.md)
-- [Associação de modelos](docs/circuitalive/MODEL_FILES.md)
-- [Catálogo de modelos](docs/circuitalive/MODEL_CATALOG.md)
-- [Mapa geral do desenvolvimento](docs/circuitalive/Mapa_KiCad_Simulacao_Interativa.md)
+- [Building on Fedora](docs/circuitalive/BUILD_FEDORA.md)
+- [Manual releases: RPM, AppImage, DEB, and EXE — together or individually](docs/circuitalive/RELEASE_WORKFLOW.md)
+- [Building on Windows / MSVC](docs/circuitalive/BUILD_WINDOWS.md)
+- [Interactive simulation architecture](docs/circuitalive/INTERACTIVE_SESSION.md)
+- [Editor integration](docs/circuitalive/EDITOR_SIMULATION.md)
+- [Measurements and oscilloscope](docs/circuitalive/MEASUREMENTS.md)
+- [Analog and digital models](docs/circuitalive/BASIC_AND_DIGITAL_MODELS.md)
+- [Visual model editor](docs/circuitalive/MODEL_AUTHOR.md)
+- [Model associations](docs/circuitalive/MODEL_FILES.md)
+- [Model catalog](docs/circuitalive/MODEL_CATALOG.md)
+- [Overall development map](docs/circuitalive/Mapa_KiCad_Simulacao_Interativa.md)
 
-## Compilação e execução
+## Building and running
 
-O desenvolvimento começou no Fedora, e os scripts de compilação para esse ambiente estão no repositório. Com as dependências instaladas, o processo básico é:
+Development started on Fedora, and the repository includes build scripts for that environment. Once the dependencies are installed, the basic process is:
 
 ```bash
 tools/circuitalive/configure.sh
@@ -169,42 +164,42 @@ tools/circuitalive/build.sh
 tools/circuitalive/install.sh
 ```
 
-Para iniciar a aplicação, conforme a instalação:
+To launch the application, depending on your installation:
 
 ```bash
 ./circuitalive
 ```
 
-Consulte os guias de [Fedora](docs/circuitalive/BUILD_FEDORA.md) e [Windows/MSVC](docs/circuitalive/BUILD_WINDOWS.md) para os requisitos e instruções completas. Como o projeto ainda está em desenvolvimento, builds e recursos podem apresentar limitações ou falhas.
+See the [Fedora](docs/circuitalive/BUILD_FEDORA.md) and [Windows/MSVC](docs/circuitalive/BUILD_WINDOWS.md) guides for complete requirements and instructions. As the project is still under development, builds and features may have limitations or issues.
 
 ---
 
-## Créditos e agradecimentos
+## Credits and acknowledgments
 
 ### KiCad
 
-O CircuitAliveEDA só é possível porque existe o **[KiCad](https://www.kicad.org/)** e porque sua equipe e comunidade construíram e mantêm uma ferramenta tão completa de desenvolvimento eletrônico.
+CircuitAliveEDA would not be possible without **[KiCad](https://www.kicad.org/)** and the team and community who have built and maintained such a comprehensive electronics design tool.
 
-O editor de esquemáticos, o editor de PCB, a estrutura de bibliotecas, os recursos de fabricação e grande parte da infraestrutura do CA vêm do KiCad. **Todo o crédito por esse trabalho original pertence aos desenvolvedores e colaboradores do projeto.**
+The schematic editor, PCB editor, library system, manufacturing tools, and much of CA's underlying infrastructure come from KiCad. **Full credit for that original work belongs to the project's developers and contributors.**
 
-- [Código-fonte do KiCad](https://gitlab.com/kicad/code/kicad)
-- [Documentação de desenvolvimento](https://dev-docs.kicad.org/)
+- [KiCad source code](https://gitlab.com/kicad/code/kicad)
+- [Developer documentation](https://dev-docs.kicad.org/)
 
-### ngspice e XSPICE
+### ngspice and XSPICE
 
-Também agradeço aos desenvolvedores do **[ngspice](https://ngspice.sourceforge.io/)** e do **XSPICE**, que fornecem uma parte essencial da tecnologia de simulação utilizada pelo CircuitAliveEDA.
+I would also like to thank the developers of **[ngspice](https://ngspice.sourceforge.io/)** and **XSPICE**, whose work provides an essential part of the simulation technology used by CircuitAliveEDA.
 
 ### CircuitAliveEDA
 
-As adaptações de interface, a integração da simulação interativa e as demais extensões próprias são desenvolvidas como parte deste projeto.
+The interface adaptations, interactive simulation integration, and other custom extensions are being developed as part of this project.
 
-**Desenvolvimento: Vinicius Dias de Jesus — DMEE Technology**
+**Developed by: Vinicius Dias de Jesus — DMEE Technology**
 
-## Licenciamento
+## Licensing
 
-Por ser derivado do KiCad, o CircuitAliveEDA deve respeitar as licenças do código original e de suas dependências, incluindo as obrigações aplicáveis da **GNU General Public License (GPL)**. Os avisos de copyright e créditos dos autores originais devem ser preservados.
+As a derivative of KiCad, CircuitAliveEDA must comply with the licenses of the original code and its dependencies, including the applicable requirements of the **GNU General Public License (GPL)**. Copyright notices and credits to the original authors must be preserved.
 
-O CircuitAliveEDA **não é afiliado oficialmente ao projeto KiCad**.
+CircuitAliveEDA **is not officially affiliated with the KiCad project**.
 
 ---
 
@@ -212,6 +207,6 @@ O CircuitAliveEDA **não é afiliado oficialmente ao projeto KiCad**.
 
 **CircuitAliveEDA — DMEE Technology**
 
-*Um projeto que comecei para os meus próprios circuitos e que quero continuar desenvolvendo e compartilhando.*
+*A project I started for my own circuits, and one I want to keep developing and sharing.*
 
 </div>
