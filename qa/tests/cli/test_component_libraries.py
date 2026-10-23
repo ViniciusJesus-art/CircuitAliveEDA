@@ -96,8 +96,9 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Device.kicad_sym"
  COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/unpacked.symbol"
  "${CMAKE_CURRENT_BINARY_DIR}/Device.kicad_sym")
 add_custom_target(pack_symbols ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/Device.kicad_sym")
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Device.kicad_sym" DESTINATION share/kicad/symbols)
-install(FILES sym-lib-table DESTINATION share/kicad/template)
+get_filename_component(KICAD_DATA "${KICAD_DATA}" ABSOLUTE)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Device.kicad_sym" DESTINATION "${KICAD_DATA}/symbols")
+install(FILES sym-lib-table DESTINATION "${KICAD_DATA}/template")
 ''')
         (source / 'unpacked.symbol').write_text('(kicad_symbol_lib)')
         shutil.copy2(self.data / 'template/sym-lib-table', source / 'sym-lib-table')
@@ -105,6 +106,7 @@ install(FILES sym-lib-table DESTINATION share/kicad/template)
         prepare.install_repository(source, self.root / 'build with spaces', prefix)
         self.assertEqual((prefix / 'share/kicad/symbols/Device.kicad_sym').read_text(), '(kicad_symbol_lib)')
         self.assertTrue((prefix / 'share/kicad/template/sym-lib-table').is_file())
+        self.assertFalse((source / 'share/kicad').exists())
 
 
 if __name__ == '__main__':

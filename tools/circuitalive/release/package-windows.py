@@ -135,6 +135,7 @@ VersionInfoVersion={version.split('-')[0]}
 SetupArchitecture=x64
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+SetupIconFile="{inno_quote(root / 'resources/bitmaps_png/icons/icon_kicad.ico')}"
 MinVersion=10.0
 DefaultDirName={{localappdata}}\\Programs\\CircuitAliveEDA
 DefaultGroupName=CircuitAliveEDA

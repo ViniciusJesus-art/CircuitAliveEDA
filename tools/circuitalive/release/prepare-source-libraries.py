@@ -16,9 +16,10 @@ REPOSITORIES = ('kicad-symbols', 'kicad-footprints', 'kicad-packages3D', 'kicad-
 def install_repository(checkout, build, prefix):
     # Install rules pack symbols and place their tables into template/. A checkout is not
     # an installed library tree, even when the component files are already present.
+    data_directory = (prefix / 'share/kicad').resolve()
     subprocess.run(['cmake', '-S', str(checkout), '-B', str(build), '-G', 'Ninja',
                     '-DCMAKE_BUILD_TYPE=Release', f'-DCMAKE_INSTALL_PREFIX={prefix}',
-                    '-DKICAD_DATA=share/kicad', '-DKICAD_PACK_SYM_LIBRARIES=ON',
+                    f'-DKICAD_DATA={data_directory}', '-DKICAD_PACK_SYM_LIBRARIES=ON',
                     f'-DPython3_EXECUTABLE={sys.executable}'], check=True)
     subprocess.run(['cmake', '--build', str(build), '--parallel', '2'], check=True,
                    env=dict(os.environ, PYTHONUTF8='1'))

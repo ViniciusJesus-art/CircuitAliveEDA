@@ -92,6 +92,11 @@ class WindowsInstallerTests(unittest.TestCase):
                 package.package_runtime(self.stage, self.version, 'ISCC.exe', self.root)
             run.assert_not_called()
 
+    def test_setup_icon_uses_repository_icon_path(self):
+        script = package.installer_script(self.stage, self.libraries, self.version, self.dist, self.root)
+        icon = package.inno_quote(self.root / 'resources/bitmaps_png/icons/icon_kicad.ico')
+        self.assertIn(f'SetupIconFile="{icon}"', script)
+
     def test_failed_compilation_and_failed_installation_do_not_get_a_checksum(self):
         installer = self.dist / f'CircuitAliveEDA-{self.version}-windows-x86_64-setup.exe'
         installer.write_bytes(b'MZ partial installer')
