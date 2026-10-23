@@ -48,6 +48,9 @@ class WindowsInstallerTests(unittest.TestCase):
             (path / 'data.txt').write_text('library data', encoding='utf-8')
         create_library_fixture(self.libraries / 'share/kicad')
         (self.root / 'LICENSE.GPLv3').write_text('fixture license', encoding='utf-8')
+        icon = self.root / 'resources/bitmaps_png/icons/icon_kicad.ico'
+        icon.parent.mkdir(parents=True)
+        shutil.copy2(ROOT / 'resources/bitmaps_png/icons/icon_kicad.ico', icon)
         self.dist = self.root / 'dist'
         self.dist.mkdir()
         package.preserve_runtime(self.stage, self.version)
