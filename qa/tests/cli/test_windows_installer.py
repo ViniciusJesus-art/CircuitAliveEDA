@@ -97,6 +97,13 @@ class WindowsInstallerTests(unittest.TestCase):
         icon = package.inno_quote(self.root / 'resources/bitmaps_png/icons/icon_kicad.ico')
         self.assertIn(f'SetupIconFile="{icon}"', script)
 
+    def test_inno_setup_paths_are_quoted_when_root_or_output_have_spaces(self):
+        root = self.root / 'ci runner path with spaces'
+        dist = self.root / 'dist path with spaces'
+        script = package.installer_script(self.stage, self.libraries, self.version, dist, root)
+        self.assertIn(f'LicenseFile="{package.inno_quote(root / "LICENSE.GPLv3")}"', script)
+        self.assertIn(f'OutputDir="{package.inno_quote(dist)}"', script)
+
     def test_failed_compilation_and_failed_installation_do_not_get_a_checksum(self):
         installer = self.dist / f'CircuitAliveEDA-{self.version}-windows-x86_64-setup.exe'
         installer.write_bytes(b'MZ partial installer')
