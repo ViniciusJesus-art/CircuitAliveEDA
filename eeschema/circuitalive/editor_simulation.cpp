@@ -329,8 +329,11 @@ void EDITOR_SIMULATION_TOOL::rememberInstruments()
     if( !m_instruments || !m_instrumentsVisible )
         return;
     auto* manager = wxAuiManager::GetManager( m_frame );
+    // Opening/updating the PCB temporarily blocks schematic events. AUI finds
+    // its manager through an event, so timer callbacks cannot query it then.
+    if( !manager ) return;
     wxAuiPaneInfo pane = manager->GetPane( m_instruments.get() );
-    if( !pane.IsShown() )
+    if( !pane.IsOk() || !pane.IsShown() )
         return;
     // AUI stores dock widths on the dock, not on the pane's best_size. Keep the actual
     // size as well, so recreating a dock after Hide does not restore the original width.

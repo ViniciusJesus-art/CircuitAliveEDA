@@ -2,11 +2,56 @@
 #include "scope_waveform.h"
 #include "scope_acquisition.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <numeric>
 
 namespace CIRCUITALIVE
 {
+std::vector<SCOPE_TRACE_POINT> ScopeTrace( const SCOPE_FRAME& frame,
+                                          const MEASUREMENT_CHANNEL& channel, std::size_t pixels )
+{
+    std::vector<SCOPE_TRACE_POINT> result;
+    if( !pixels || frame.end <= frame.begin || frame.samples.empty() ) return result;
+    std::array<SCOPE_TRACE_POINT, 4> bucket; // First, minimum, maximum, last.
+    std::size_t column = 0;
+    bool populated = false;
+    auto flush = [&]
+    {
+        if( !populated ) return;
+        auto ordered = bucket;
+        std::sort( ordered.begin(), ordered.end(), []( const auto& a, const auto& b ) { return a.time < b.time; } );
+        for( const auto& point : ordered )
+            if( result.empty() || point.time > result.back().time ) result.push_back( point );
+    };
+    auto add = [&]( double time, double value )
+    {
+        if( !std::isfinite( value ) || time < frame.begin || time > frame.end ) return;
+        const auto next = std::min( pixels, std::size_t( ( time - frame.begin ) / ( frame.end - frame.begin ) * pixels ) );
+        if( !populated || next != column )
+        {
+            flush();
+            bucket.fill( { time, value } );
+            populated = true; column = next;
+        }
+        else
+        {
+            if( value < bucket[1].value ) bucket[1] = { time, value };
+            if( value > bucket[2].value ) bucket[2] = { time, value };
+            bucket[3] = { time, value };
+        }
+    };
+    add( frame.begin, ScopeValueAt( frame, channel, frame.begin ) );
+    for( const auto& sample : frame.samples )
+    {
+        try { add( sample.time, MeasurementValue( channel, sample ) ); }
+        catch( const std::out_of_range& ) {}
+    }
+    add( frame.end, ScopeValueAt( frame, channel, frame.end ) );
+    flush();
+    return result;
+}
+
 double ScopeVerticalFraction( double v, const SCOPE_CHANNEL_STYLE& c )
 { return .5 - ( v - c.center ) / ( 8 * c.perDivision ) * ( c.inverted ? -1 : 1 ); }
 double ScopeVerticalValue( double f, const SCOPE_CHANNEL_STYLE& c )

@@ -205,13 +205,27 @@ BOOST_FIXTURE_TEST_CASE( DeleteHierarchicalPageRetargetsParentAndExcludesFile, P
     schematic->RefreshHierarchy();
     Save();
     schematic->SetCurrentSheet( childPath );
-    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, childPath ) );
+    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, childPath, true ) );
     BOOST_CHECK( schematic->CurrentSheet().Last() == first );
     BOOST_CHECK_EQUAL( schematic->Hierarchy().size(), 2u );
     BOOST_CHECK( CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "child.kicad_sch" ) ) );
+    BOOST_CHECK( !wxFileExists( Path( "child.kicad_sch" ) ) );
     Save();
     Open( "second.kicad_sch" );
     BOOST_CHECK_EQUAL( schematic->Hierarchy().size(), 2u );
+}
+
+BOOST_FIXTURE_TEST_CASE( ConfirmedPageDeletionRemovesItsSchematicFile, PROJECT_PAGES_FIXTURE )
+{
+    Save();
+    SCH_SHEET_PATH removed;
+    removed.push_back( second );
+    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, removed, true ) );
+    BOOST_CHECK( !wxFileExists( Path( "second.kicad_sch" ) ) );
+    BOOST_CHECK( wxFileExists( Path( "first.kicad_sch" ) ) );
+    Save();
+    Open( "first.kicad_sch" );
+    BOOST_CHECK_EQUAL( schematic->Hierarchy().size(), 1u );
 }
 
 BOOST_FIXTURE_TEST_CASE( DeleteFirstPageKeepsSharedChildInSurvivingHierarchy, PROJECT_PAGES_FIXTURE )
@@ -226,14 +240,18 @@ BOOST_FIXTURE_TEST_CASE( DeleteFirstPageKeepsSharedChildInSurvivingHierarchy, PR
     shared->SetScreen( child->GetScreen() );
     second->GetScreen()->Append( shared );
     schematic->RefreshHierarchy();
+    Save();
     SCH_SHEET_PATH removed;
     removed.push_back( first );
     schematic->SetCurrentSheet( removed );
-    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, removed ) );
+    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, removed, true ) );
     BOOST_CHECK( schematic->CurrentSheet().Last() == second );
     BOOST_CHECK_EQUAL( schematic->Hierarchy().size(), 2u );
     BOOST_CHECK( CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "first.kicad_sch" ) ) );
     BOOST_CHECK( !CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "child.kicad_sch" ) ) );
+    BOOST_CHECK( !wxFileExists( Path( "first.kicad_sch" ) ) );
+    BOOST_CHECK( wxFileExists( Path( "child.kicad_sch" ) ) );
+    BOOST_CHECK( wxFileExists( Path( "second.kicad_sch" ) ) );
 }
 
 BOOST_FIXTURE_TEST_CASE( UsedComponentsReflectCurrentPageAndType, PROJECT_PAGES_FIXTURE )

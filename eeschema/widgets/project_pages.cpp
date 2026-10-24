@@ -2,6 +2,7 @@
 #include "project_pages.h"
 #include <circuitalive/editor_simulation.h>
 #include <connection_graph.h>
+#include <ki_exception.h>
 #include <project.h>
 #include <project/project_file.h>
 #include <sch_commit.h>
@@ -23,6 +24,39 @@ namespace CIRCUITALIVE
 {
 namespace
 {
+class PAGE_FILE_DELETION
+{
+public:
+    ~PAGE_FILE_DELETION()
+    {
+        for( const auto& [original, staged] : m_files )
+            if( wxFileExists( staged ) ) wxRenameFile( staged, original );
+    }
+
+    void Stage( const wxString& file )
+    {
+        if( !wxFileExists( file ) ) return; // An unsaved page has no file yet.
+        const wxString staged = file + ".deleted-" + KIID().AsString();
+        if( !wxRenameFile( file, staged ) )
+            THROW_IO_ERROR( wxString::Format( _( "Unable to delete schematic file '%s'." ), file ) );
+        m_files.emplace_back( file, staged );
+    }
+
+    void Commit()
+    {
+        for( const auto& [original, staged] : m_files )
+            if( !wxRemoveFile( staged ) )
+            {
+                wxRenameFile( staged, original );
+                wxLogError( _( "Unable to delete schematic file '%s'." ), original );
+            }
+        m_files.clear();
+    }
+
+private:
+    std::vector<std::pair<wxString, wxString>> m_files;
+};
+
 wxFileName absolutePage( PROJECT& project, const wxString& name )
 {
     wxFileName file( name );
@@ -84,7 +118,7 @@ bool CanDeleteProjectPage( const SCHEMATIC& schematic, const SCH_SHEET_PATH& pag
             && ( page.size() > 1 || schematic.GetTopLevelSheets().size() > 1 );
 }
 
-bool RemoveProjectPage( SCHEMATIC& schematic, const SCH_SHEET_PATH& page )
+bool RemoveProjectPage( SCHEMATIC& schematic, const SCH_SHEET_PATH& page, bool deleteFiles )
 {
     if( !CanDeleteProjectPage( schematic, page ) )
         return false;
@@ -93,6 +127,33 @@ bool RemoveProjectPage( SCHEMATIC& schematic, const SCH_SHEET_PATH& page )
     std::vector<wxString> before;
     for( const auto& path : schematic.Hierarchy() )
         before.push_back( path.LastScreen()->GetFileName() );
+
+    PAGE_FILE_DELETION files;
+    if( deleteFiles )
+    {
+        std::vector<wxFileName> removedFiles, retainedFiles;
+        for( const auto& path : schematic.Hierarchy() )
+        {
+            const auto name = path.LastScreen()->GetFileName();
+            if( name.IsEmpty() ) continue;
+            const auto file = absolutePage( schematic.Project(), name );
+            bool descendant = path.size() >= page.size();
+            for( std::size_t i = 0; descendant && i < page.size(); ++i )
+                descendant = path.at( i ) == page.at( i );
+            ( descendant ? removedFiles : retainedFiles ).push_back( file );
+        }
+        std::vector<wxFileName> staged;
+        for( const auto& file : removedFiles )
+        {
+            const auto same = [&]( const wxFileName& other ) { return file.SameAs( other ); };
+            if( std::none_of( retainedFiles.begin(), retainedFiles.end(), same )
+                && std::none_of( staged.begin(), staged.end(), same ) )
+            {
+                files.Stage( file.GetFullPath() );
+                staged.push_back( file );
+            }
+        }
+    }
 
     SCH_SHEET_PATH fallback = removedPath;
     fallback.pop_back();
@@ -142,6 +203,7 @@ bool RemoveProjectPage( SCHEMATIC& schematic, const SCH_SHEET_PATH& page )
         file.MakeRelativeTo( project.GetProjectPath() );
         manifest.emplace_back( sheet->m_Uuid, sheet->GetName(), file.GetFullPath( wxPATH_UNIX ) );
     }
+    files.Commit();
     return true;
 }
 
@@ -152,7 +214,8 @@ void DeleteCurrentPage( SCH_EDIT_FRAME& frame )
         return;
     wxMessageDialog dialog( &frame, wxString::Format(
             _( "Delete page '%s' from this project?\n\nIts child pages will also be removed. "
-               "The schematic files will be kept on disk. Save the project to keep this change." ),
+               "The corresponding schematic files will be deleted from disk, except files still used by other pages. "
+               "This cannot be undone. Save the project to keep the updated page list." ),
             page.Last()->GetShownName( false ) ), _( "Delete Page" ),
             wxYES_NO | wxNO_DEFAULT | wxICON_WARNING );
     dialog.SetYesNoLabels( _( "Delete Page" ), _( "Cancel" ) );
@@ -170,7 +233,11 @@ void DeleteCurrentPage( SCH_EDIT_FRAME& frame )
     frame.GetCanvas()->GetView()->Clear();
     frame.ClearUndoRedoList();
     frame.ClearRepeatItemsList();
-    if( RemoveProjectPage( frame.Schematic(), page ) )
+    bool removed = false;
+    try { removed = RemoveProjectPage( frame.Schematic(), page, true ); }
+    catch( const IO_ERROR& error )
+    { wxMessageBox( error.What(), _( "Delete Page" ), wxOK | wxICON_ERROR, &frame ); }
+    if( removed )
     {
         SCH_COMMIT rebuild( &frame );
         frame.RecalculateConnections( &rebuild, NO_CLEANUP );
@@ -178,5 +245,6 @@ void DeleteCurrentPage( SCH_EDIT_FRAME& frame )
         frame.DisplayCurrentSheet();
         frame.OnModify();
     }
+    else frame.DisplayCurrentSheet();
 }
 }

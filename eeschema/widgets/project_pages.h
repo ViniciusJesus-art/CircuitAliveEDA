@@ -12,8 +12,9 @@ namespace CIRCUITALIVE
 bool IsExcludedProjectPage( PROJECT& aProject, const wxString& aFileName );
 void IncludeProjectPage( PROJECT& aProject, const wxString& aFileName );
 bool CanDeleteProjectPage( const SCHEMATIC& aSchematic, const SCH_SHEET_PATH& aPage );
-// Detach the sheet and exclude unreferenced files from sibling discovery. The files stay
-// on disk; the caller must release canvas/undo references before calling this function.
-bool RemoveProjectPage( SCHEMATIC& aSchematic, const SCH_SHEET_PATH& aPage );
+// Release canvas/undo references first. Optional file deletion affects only sheets
+// no longer referenced by any surviving page; failed staging leaves the hierarchy intact.
+bool RemoveProjectPage( SCHEMATIC& aSchematic, const SCH_SHEET_PATH& aPage,
+                        bool aDeleteFiles = false );
 void DeleteCurrentPage( SCH_EDIT_FRAME& aFrame );
 }

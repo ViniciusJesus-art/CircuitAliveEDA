@@ -236,6 +236,68 @@ BOOST_AUTO_TEST_CASE( DenseScopeHistoryRetainsSlowBlinkAcrossCompactionAndReopen
     BOOST_CHECK_EQUAL( stats.minimum, 0 ); BOOST_CHECK_EQUAL( stats.maximum, 5 );
     BOOST_CHECK_CLOSE( stats.period, 2, 5 );
 }
+BOOST_AUTO_TEST_CASE( RecentHighFrequencyCapturesRetainRawSamplesAfterLongHistory )
+{
+    auto square = channel(); square.name = "Square"; square.positive = 1;
+    const std::vector<MEASUREMENT_CHANNEL> channels = { channel(), square };
+    SCOPE_HISTORY history( 1024, channels );
+    SCOPE_ACQUISITION scope;
+    SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::NORMAL; trigger.level = 0;
+    scope.Configure( { 20e-6, .5, 0 }, trigger, channel(), 1024, channels );
+    for( int block = 0; block < 300; ++block )
+    {
+        std::vector<SIM_SAMPLE> data;
+        for( int i = 0; i < 100; ++i )
+        {
+            const double t = ( block * 100 + i ) * 1e-6;
+            const double v = std::sin( 2 * M_PI * 20000 * t );
+            data.push_back( { t, { v, v >= 0 ? 5. : 0. } } );
+        }
+        history.Append( std::move( data ) );
+        scope.Feed( history );
+    }
+    // A fast solver can deliver more than the whole history budget in one poll.
+    // Keep the latest capture at its original resolution when compacting that batch.
+    std::vector<SIM_SAMPLE> burst;
+    for( int i = 0; i < 4096; ++i )
+    {
+        const double t = ( 30000 + i ) * 1e-6;
+        const double v = std::sin( 2 * M_PI * 20000 * t );
+        burst.push_back( { t, { v, v >= 0 ? 5. : 0. } } );
+    }
+    history.Append( std::move( burst ) );
+    scope.Feed( history );
+    BOOST_CHECK_LE( history.size(), 1024 );
+    const auto check = [&]( const SCOPE_FRAME& frame )
+    {
+        BOOST_CHECK_GT( frame.end, .029 );
+        const auto stats = ScopeStatistics( frame, channel() );
+        BOOST_CHECK_CLOSE( stats.frequency, 20000, .1 );
+        BOOST_CHECK_LE( stats.maxGap, 1.01e-6 );
+        BOOST_CHECK_CLOSE( stats.rms, 1 / std::sqrt( 2. ), 1 );
+    };
+    check( scope.Frame() );
+    SCOPE_TRIGGER roll; roll.mode = SCOPE_TRIGGER_MODE::ROLL;
+    SCOPE_ACQUISITION reopened;
+    reopened.Configure( { 20e-6, .5, 0 }, roll, channel(), 1024, channels );
+    reopened.Feed( history );
+    check( reopened.Frame() );
+}
+BOOST_AUTO_TEST_CASE( PlotReductionKeepsPeakOrderWithoutInventingVoltageLevels )
+{
+    const auto f = frame( { { 0, { 0 } }, { .2, { 10 } }, { .4, { -5 } },
+                            { .9, { 1 } }, { 1, { 1 } } } );
+    const auto trace = ScopeTrace( f, channel(), 1 );
+    BOOST_REQUIRE_EQUAL( trace.size(), 5 );
+    BOOST_CHECK_EQUAL( trace[1].time, .2 );
+    BOOST_CHECK_EQUAL( trace[1].value, 10 );
+    BOOST_CHECK_EQUAL( trace[2].time, .4 );
+    BOOST_CHECK_EQUAL( trace[2].value, -5 );
+    const auto pulse = frame( { { 0, { 5 } }, { .3, { 5 } }, { .4, { 0 } },
+                                { .7, { 0 } }, { .8, { 5 } }, { 1, { 5 } } } );
+    for( const auto& point : ScopeTrace( pulse, channel(), 2 ) )
+        BOOST_CHECK( point.value == 0 || point.value == 5 );
+}
 BOOST_AUTO_TEST_CASE( DenseTriggerCapturesKeepBothHalvesAndBothChannelPeaks )
 {
     auto other = channel(); other.name = "Other"; other.positive = 1;

@@ -5,6 +5,12 @@
 
 namespace CIRCUITALIVE
 {
+struct SCOPE_FRAME;
+struct SCOPE_TRACE_POINT { double time, value; };
+/// Per-pixel first/min/max/last points in time order, with no synthetic midpoints.
+std::vector<SCOPE_TRACE_POINT> ScopeTrace( const SCOPE_FRAME&, const MEASUREMENT_CHANNEL&,
+                                          std::size_t aPixels );
+
 struct SCOPE_CHANNEL_STYLE
 {
     bool visible = true, automatic = true, inverted = false;

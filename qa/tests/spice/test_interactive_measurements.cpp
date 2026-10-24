@@ -140,6 +140,43 @@ BOOST_AUTO_TEST_CASE( ScopeHistoryIsBoundedOrderedAndFreezesDuringPause )
     runner.Stop(); view = runner.View(); BOOST_CHECK( !view.scopeHistory ); BOOST_CHECK( view.measurements.empty() );
 }
 
+BOOST_AUTO_TEST_CASE( ScopeRunnerKeepsFastSineAndSquareCapturesAcrossLargeSolverBatches )
+{
+    CIRCUIT_SNAPSHOT circuit;
+    circuit.netlist = "Fast scope signals\nVsine sine 0 SIN(0 1 20000)\n"
+                      "Vsquare square 0 PULSE(0 5 0 100n 100n 24.9u 50u)\n"
+                      "R1 sine 0 1k\nR2 square 0 1k\n.end\n";
+    circuit.config.signals = { "v(sine)", "v(square)" };
+    circuit.config.step = circuit.config.maxStep = 1e-6;
+    circuit.config.horizon = .04;
+    circuit.config.historyCapacity = 4096;
+    for( std::size_t i = 0; i < 2; ++i )
+    {
+        MEASUREMENT_CHANNEL channel;
+        channel.name = i == 0 ? "Sine" : "Square";
+        channel.scope = true; channel.positive = i;
+        circuit.measurements.push_back( channel );
+    }
+    SIMULATION_PREFERENCES preferences;
+    preferences.scopeHistorySamples = 1024;
+    SESSION_RUNNER runner( CIRCUITALIVE_TEST_WORKER );
+    runner.SetPreferences( preferences ); runner.Start( circuit );
+    const auto view = WaitFor( runner, []( const auto& v ) { return v.state == EDITOR_SESSION_STATE::COMPLETED; } );
+    BOOST_REQUIRE( view.scopeHistory );
+    BOOST_REQUIRE_EQUAL( view.scopeChannels.size(), 2 );
+    SCOPE_TRIGGER trigger; trigger.mode = SCOPE_TRIGGER_MODE::ROLL;
+    SCOPE_ACQUISITION scope;
+    scope.Configure( { 20e-6, .5, 0 }, trigger, view.scopeChannels[0], 1024, view.scopeChannels );
+    scope.Feed( *view.scopeHistory );
+    for( const auto& channel : view.scopeChannels )
+    {
+        const auto stats = ScopeStatistics( scope.Frame(), channel );
+        BOOST_CHECK_CLOSE( stats.frequency, 20000, .2 );
+        BOOST_CHECK_LE( stats.maxGap, 1.01e-6 );
+        BOOST_CHECK( !stats.undersampled );
+    }
+}
+
 BOOST_AUTO_TEST_CASE( ScopeRunnerKeepsSlowWaveformWithoutCopyingUnmeasuredCircuitSignals )
 {
     auto components = Load();

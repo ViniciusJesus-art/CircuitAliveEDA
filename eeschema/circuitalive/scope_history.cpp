@@ -2,6 +2,7 @@
 #include "scope_history.h"
 #include "scope_waveform.h"
 #include <algorithm>
+#include <iterator>
 #include <limits>
 
 namespace CIRCUITALIVE
@@ -18,12 +19,18 @@ void SCOPE_HISTORY::Append( std::vector<SIM_SAMPLE> samples )
     m_blocks.push_back( { std::make_shared<const std::vector<SIM_SAMPLE>>( std::move( samples ) ), offset } );
     if( m_size > m_capacity && !m_channels.empty() )
     {
-        // Dense electrical sampling must not reduce a seconds-long waveform
-        // to the last few microseconds. Retain the measured-channel envelope
-        // across elapsed time within the same bounded point budget.
+        // Keep a long-term envelope for slow signals and an unmodified recent
+        // tail for fast captures. Reducing the newest solver batch together with
+        // the entire run can erase whole periods before the GUI ever reads it.
         auto compact = Copy();
-        ScopeCompact( compact, m_capacity, m_channels );
-        m_reducedUntil = compact.back().time;
+        const auto recent = m_capacity >= 8 ? m_capacity / 2 : 0;
+        std::vector<SIM_SAMPLE> older;
+        older.reserve( compact.size() - recent );
+        std::move( compact.begin(), compact.end() - recent, std::back_inserter( older ) );
+        ScopeCompact( older, m_capacity - recent, m_channels );
+        m_reducedUntil = older.back().time;
+        std::move( compact.end() - recent, compact.end(), std::back_inserter( older ) );
+        compact = std::move( older );
         m_size = compact.size();
         m_blocks.clear();
         m_blocks.push_back( { std::make_shared<const std::vector<SIM_SAMPLE>>( std::move( compact ) ), 0 } );

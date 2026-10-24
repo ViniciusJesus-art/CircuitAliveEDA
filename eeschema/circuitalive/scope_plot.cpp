@@ -174,30 +174,13 @@ void SCOPE_PLOT::rebuild()
     {
         const auto style = m_owner.style( c ); m_cachedStyles.push_back( style );
         if( !style.visible || frame.end <= frame.begin ) continue;
-        std::vector<double> lo( p.width + 1, INFINITY ), hi( p.width + 1, -INFINITY );
         const double xScale = p.width / ( frame.end - frame.begin );
-        auto point = [&]( double time, double v )
-        {
-            if( !std::isfinite( v ) || time < frame.begin || time > frame.end ) return;
-            const int bucket = std::clamp( int( ( time - frame.begin ) * xScale ), 0, p.width );
-            lo[bucket] = std::min( lo[bucket], v ); hi[bucket] = std::max( hi[bucket], v );
-        };
-        for( const auto& s : frame.samples )
-        {
-            if( s.time < frame.begin || s.time > frame.end ) continue;
-            try { point( s.time, MeasurementValue( m_owner.m_channels[c], s ) ); } catch( const std::out_of_range& ) {}
-        }
-        point( frame.begin, ScopeValueAt( frame, m_owner.m_channels[c], frame.begin ) );
-        point( frame.end, ScopeValueAt( frame, m_owner.m_channels[c], frame.end ) );
-        std::vector<wxPoint> path; path.reserve( 3 * ( p.width + 1 ) );
+        const auto trace = ScopeTrace( frame, m_owner.m_channels[c], p.width );
+        std::vector<wxPoint> path; path.reserve( trace.size() );
         const double gain = p.height / ( 8 * style.perDivision ) * ( style.inverted ? -1 : 1 );
         auto py = [&]( double v ) { return p.y + p.height / 2 - int( std::clamp( ( v - style.center ) * gain, -1000000., 1000000. ) ); };
-        for( int i = 0; i <= p.width; ++i ) if( std::isfinite( lo[i] ) )
-        {
-            path.emplace_back( p.x + i, py( lo[i] ) );
-            if( hi[i] != lo[i] ) path.emplace_back( p.x + i, py( hi[i] ) );
-            path.emplace_back( p.x + i, py( ( lo[i] + hi[i] ) / 2 ) );
-        }
+        for( const auto& point : trace )
+            path.emplace_back( p.x + std::clamp( int( ( point.time - frame.begin ) * xScale ), 0, p.width ), py( point.value ) );
         dc.SetClippingRegion( p ); dc.SetPen( wxPen( color( c ), 2 ) );
         // A single native polyline replaces thousands of separate Cairo stroke calls.
         if( path.size() > 1 ) dc.DrawLines( path.size(), path.data() );
