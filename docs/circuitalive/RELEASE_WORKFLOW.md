@@ -11,7 +11,8 @@ ainda não mudam os Actions do repositório.
 
 1. Abra **GitHub → Actions → Release packages (all or individual)**.
 2. Clique em **Run workflow** e selecione a branch **main**.
-3. Informe uma versão nova, por exemplo `10.0.7-alpha.2`, sem o prefixo `v`.
+3. No campo **version**, informe o nome público desejado, por exemplo
+   `10.0.7-alpha.3` ou `October Preview 2026`. Não precisa seguir o padrão alpha.
 4. Escolha **target** conforme a tabela abaixo.
 5. Marque **publish_release** para publicar, ou desmarque para gerar apenas artefatos de teste.
 6. Clique no botão verde **Run workflow**.
@@ -35,10 +36,21 @@ Com **publish_release** marcado, cada solicitação cria uma release nova conten
 somente os formatos selecionados. Não acrescenta arquivos a uma release existente:
 use uma versão ainda livre. Para distribuir todos juntos, use `all`.
 
-Essa única solicitação inicia todo o processo. O perfil atual aceita versões
-`X.Y.Z-alpha.N`, de acordo com a validação de versão existente no CMake e nos
-empacotadores. As releases ficam marcadas como **Pre-release**, adequadas à fase
-alpha. Não é preciso criar a tag ou cadastrar um token pessoal: o job de
+Essa única solicitação inicia todo o processo. O nome público aceita texto livre
+de até 100 caracteres imprimíveis. Para nomes de arquivos e tags, espaços e
+pontuação viram hífens, acentos latinos são removidos e apenas letras ASCII,
+números, pontos, sublinhados e hífens são mantidos. O nome precisa conter pelo
+menos uma letra ou número. Por exemplo, `October Preview 2026!` produz a tag
+`vOctober-Preview-2026`, o título `CircuitAliveEDA October Preview 2026!` e
+arquivos como `CircuitAliveEDA-October-Preview-2026.exe`.
+
+Não pode haver uma tag/release anterior com a mesma tag normalizada; confira
+possíveis colisões como `Test 1` e `Test-1`. Os empacotadores RPM/DEB e o CMake
+continuam usando uma versão técnica `X.Y.Z-alpha.N`: quando o nome público já
+segue esse formato, ela é reutilizada; caso contrário, o workflow gera
+`10.0.7-alpha.<número da execução>`. Essa diferença é registrada nas notas da
+release e nos metadados dos pacotes. As releases ficam marcadas como
+**Pre-release**. Não é preciso criar a tag ou cadastrar um token pessoal: o job de
 publicação usa o `GITHUB_TOKEN` do próprio Actions com `contents: write`.
 
 ## Etapas da execução
@@ -63,20 +75,31 @@ Uma compilação Windows em andamento pode fazer a nova aguardar sua vez.
 
 ## Arquivos disponíveis
 
-Para a versão de exemplo, com `target=all`, a release `v10.0.7-alpha.2` terá:
+Para a versão de exemplo, com `target=all`, a release `v10.0.7-alpha.3` terá:
 
-- `CircuitAliveEDA-10.0.7-alpha.2-fedora44-x86_64.rpm`
-- `CircuitAliveEDA-10.0.7-alpha.2-linux-x86_64.AppImage`
-- `CircuitAliveEDA-10.0.7-alpha.2-ubuntu24.04-amd64.deb`
-- `CircuitAliveEDA-10.0.7-alpha.2-windows-x86_64-setup.exe`
-- Um arquivo `.sha256` para cada pacote e `release-manifest.json` com o commit e os hashes.
+- `CircuitAliveEDA-10.0.7-alpha.3.rpm`
+- `CircuitAliveEDA-10.0.7-alpha.3.AppImage`
+- `CircuitAliveEDA-10.0.7-alpha.3.deb`
+- `CircuitAliveEDA-10.0.7-alpha.3.exe`
+- `SHA256SUMS.txt` com os hashes de todos os instaladores publicados.
 
-Na lista **Artifacts** do Actions, cada instalador também aparece separadamente
-com esse nome e extensão. O download entrega o próprio `.rpm`, `.AppImage`,
-`.deb` ou `.exe`, sem um ZIP adicional. Os artefatos
+Os `.sha256` individuais continuam sendo gerados e conferidos durante o build,
+mas não aparecem na lista de downloads da release. O `release-manifest.json`
+também é gerado durante a validação, com a relação entre os nomes internos e
+públicos, mas não é anexado à release. O nome é simplificado na publicação,
+sem alterar o conteúdo binário dos instaladores. Para conferir um pacote baixado junto ao TXT:
+
+```bash
+sha256sum --ignore-missing -c SHA256SUMS.txt
+```
+
+Na lista **Artifacts** do Actions, cada instalador aparece separadamente com
+seu nome **interno** (incluindo a distribuição/arquitetura e a versão técnica).
+O download entrega o próprio `.rpm`, `.AppImage`, `.deb` ou `.exe`, sem um ZIP
+adicional. Os artefatos
 `CircuitAliveEDA-<versão>-linux-SHA256`, `-ubuntu24.04-SHA256` e
 `-windows-SHA256` guardam os checksums em ZIP. O job de publicação reúne os
-instaladores e esses checksums antes de validar e publicar os arquivos.
+instaladores e esses checksums antes de validar e publicar os arquivos com nomes públicos simplificados.
 
 Os artefatos terminados em `diagnostics` contêm logs de build, testes e
 dependências; não são instaladores. `windows-runtime-x86_64` é a instalação
@@ -88,13 +111,13 @@ Uma execução já iniciada mantém os nomes e as actions do commit original.
 O pacote para DNF é o **`.rpm`**; `.dnf` não é uma extensão de pacote.
 
 ```bash
-sudo dnf install ./CircuitAliveEDA-10.0.7-alpha.2-fedora44-x86_64.rpm
+sudo dnf install ./CircuitAliveEDA-10.0.7-alpha.3.rpm
 ```
 
 No Ubuntu 24.04, instale o DEB com APT para resolver suas dependências:
 
 ```bash
-sudo apt install ./CircuitAliveEDA-10.0.7-alpha.2-ubuntu24.04-amd64.deb
+sudo apt install ./CircuitAliveEDA-10.0.7-alpha.3.deb
 ```
 
 O `.deb` usa bibliotecas e Python nativos do Ubuntu 24.04. Não é uma conversão do
@@ -105,8 +128,8 @@ posterior seja considerada mais nova pelo gerenciador de pacotes.
 Para executar a AppImage:
 
 ```bash
-chmod +x CircuitAliveEDA-10.0.7-alpha.2-linux-x86_64.AppImage
-./CircuitAliveEDA-10.0.7-alpha.2-linux-x86_64.AppImage
+chmod +x CircuitAliveEDA-10.0.7-alpha.3.AppImage
+./CircuitAliveEDA-10.0.7-alpha.3.AppImage
 ```
 
 Os pacotes são x86_64. A AppImage preserva a base Linux atual: **Fedora 44 / glibc

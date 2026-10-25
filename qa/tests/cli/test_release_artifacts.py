@@ -47,9 +47,19 @@ class ReleaseArtifactsTests(unittest.TestCase):
     def test_all_formats_and_checksums_are_recorded_with_source_commit(self):
         assets, notes = release.verify_packages(self.directory, self.version, self.commit)
         manifest = json.loads((self.directory / 'release-manifest.json').read_text())
-        self.assertEqual(len(assets), 9)
+        self.assertEqual(len(assets), 5)
         self.assertEqual(manifest['commit'], self.commit)
-        self.assertEqual(set(manifest['sha256']), {package.name for package in self.packages})
+        public_names = {f'CircuitAliveEDA-{self.version}.{ext}'
+                        for ext in ('rpm', 'AppImage', 'deb', 'exe')}
+        self.assertEqual(set(manifest['sha256']), public_names)
+        self.assertEqual({asset.name for asset in assets}, public_names | {'SHA256SUMS.txt'})
+        self.assertFalse(any(asset.name.endswith('.sha256') for asset in assets))
+        self.assertNotIn('release-manifest.json', [asset.name for asset in assets])
+        sums = (self.directory / 'SHA256SUMS.txt').read_text()
+        self.assertEqual(len(sums.splitlines()), 4)
+        for name, digest in manifest['sha256'].items():
+            self.assertIn(f'{digest}  {name}\n', sums)
+            self.assertEqual(hashlib.sha256((self.directory / name).read_bytes()).hexdigest(), digest)
         self.assertIn('glibc 2.43', notes.read_text())
         self.assertIn('Ubuntu 24.04', notes.read_text())
 
@@ -61,7 +71,8 @@ class ReleaseArtifactsTests(unittest.TestCase):
                 for source in (self.directory / name, self.directory / (name + '.sha256')):
                     (directory / source.name).write_bytes(source.read_bytes())
                 assets, notes = release.verify_packages(directory, self.version, self.commit, format)
-                self.assertEqual(len(assets), 3)
+                self.assertEqual(len(assets), 2)
+                self.assertEqual(assets[0].name, f'CircuitAliveEDA-{self.version}.{format if format != "appimage" else "AppImage"}')
                 self.assertEqual(json.loads((directory / 'release-manifest.json').read_text())['formats'], [format])
                 if format == 'exe':
                     self.assertNotIn('Fedora 44', notes.read_text())
@@ -69,7 +80,31 @@ class ReleaseArtifactsTests(unittest.TestCase):
     def test_linux_selection_does_not_require_windows(self):
         self.packages[-1].unlink()
         assets, _ = release.verify_packages(self.directory, self.version, self.commit, 'linux')
-        self.assertEqual(len(assets), 7)
+        self.assertEqual(len(assets), 4)
+
+    def test_friendly_release_name_changes_tags_and_public_files_only(self):
+        label = 'October Preview 2026!'
+        assets, notes = release.verify_packages(self.directory, self.version, self.commit, 'exe', label)
+        self.assertEqual([asset.name for asset in assets],
+                         ['CircuitAliveEDA-October-Preview-2026.exe', 'SHA256SUMS.txt'])
+        manifest = json.loads((self.directory / 'release-manifest.json').read_text())
+        self.assertEqual(manifest['tag'], 'vOctober-Preview-2026')
+        self.assertEqual(manifest['version'], self.version)
+        self.assertEqual(manifest['release_label'], label)
+        self.assertIn(label, notes.read_text())
+        with patch.object(release.subprocess, 'run') as remote:
+            release.publish(self.directory, self.version, self.commit, 'owner/repo', 'exe', label)
+        command = remote.call_args_list[0].args[0]
+        self.assertEqual(command[3], 'vOctober-Preview-2026')
+        self.assertEqual(command[command.index('--title') + 1], 'CircuitAliveEDA ' + label)
+        self.assertFalse(any(item.endswith('.sha256') for item in command))
+
+    def test_label_slug_normalization_and_invalid_names(self):
+        self.assertEqual(release.release_slug('Prévia do CircuitAlive!'), 'Previa-do-CircuitAlive')
+        self.assertEqual(release.release_tag('v10.0.7-alpha.2'), 'v10.0.7-alpha.2')
+        for label in ('', '  ', '!!!', '../', 'broken\nname', 'x' * 101):
+            with self.subTest(label=label), self.assertRaises(ValueError):
+                release.release_slug(label)
 
     def test_all_selection_requires_deb_before_any_publication(self):
         self.packages[2].unlink()
@@ -89,6 +124,7 @@ class ReleaseArtifactsTests(unittest.TestCase):
         command = remote.call_args_list[0].args[0]
         self.assertTrue(any(arg.endswith('.deb') for arg in command))
         self.assertFalse(any(arg.endswith(('.rpm', '.AppImage', '.exe')) for arg in command))
+        self.assertTrue(any(arg.endswith('SHA256SUMS.txt') for arg in command))
 
     def test_missing_installer_prevents_every_remote_action(self):
         self.packages[-1].unlink()
