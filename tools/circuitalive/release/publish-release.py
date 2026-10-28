@@ -120,10 +120,10 @@ def publish(directory, version, commit, repository, formats='all', release_label
     tag = release_tag(release_slug(label))
     # Remain a draft until every asset has been uploaded successfully.
     subprocess.run(['gh', 'release', 'create', tag, '--repo', repository, '--target', commit,
-                    '--title', 'CircuitAliveEDA ' + label, '--draft', '--prerelease',
+                    '--title', 'CircuitAliveEDA ' + label, '--draft',
                     '--notes-file', str(notes), *(str(asset) for asset in assets)], check=True)
     subprocess.run(['gh', 'release', 'edit', tag, '--repo', repository,
-                    '--draft=false', '--prerelease'], check=True)
+                    '--draft=false'], check=True)
 
 
 if __name__ == '__main__':
