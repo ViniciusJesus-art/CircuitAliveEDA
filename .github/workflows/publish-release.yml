@@ -23,7 +23,7 @@ on:
           - appimage
           - deb
       publish_release:
-        description: Publish selected packages as a new prerelease (uncheck for test artifacts only)
+        description: Publish selected packages as a stable GitHub release (uncheck for test artifacts only)
         type: boolean
         default: true
 
@@ -100,7 +100,7 @@ jobs:
             core.setOutput('fedora_formats', formats.filter(f => ['rpm', 'appimage'].includes(f)).join(','));
             await core.summary.addHeading(`CircuitAliveEDA ${label}`)
               .addRaw(`Building ${formats.join(', ')} using package version ${version} from commit ${context.sha}. ` +
-                (process.env.PUBLISH_RELEASE === 'true' ? 'A new prerelease will be published after all selected jobs pass.' : 'Artifacts only; no release or tag will be created.'))
+                (process.env.PUBLISH_RELEASE === 'true' ? 'A stable release will be published after all selected jobs pass.' : 'Artifacts only; no release or tag will be created.'))
               .write();
 
   windows:
