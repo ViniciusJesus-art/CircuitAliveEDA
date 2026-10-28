@@ -174,6 +174,8 @@ class ReleaseArtifactsTests(unittest.TestCase):
         self.assertEqual(create[create.index('--target') + 1], self.commit)
         self.assertEqual(publish[:4], ['gh', 'release', 'edit', 'v' + self.version])
         self.assertIn('--draft=false', publish)
+        self.assertNotIn('--prerelease', create)
+        self.assertNotIn('--prerelease', publish)
 
 
 class DebianLauncherTests(unittest.TestCase):
