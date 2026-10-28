@@ -8,6 +8,28 @@
 
 *An independent personal project based on [KiCad](https://www.kicad.org/).*
 
+<a href="https://github.com/ViniciusJesus-art/CircuitAliveEDA/releases">
+  <img height="24" src="https://img.shields.io/badge/Windows-EXE-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows EXE">
+</a>
+&nbsp;&nbsp;
+<a href="https://github.com/ViniciusJesus-art/CircuitAliveEDA/releases">
+  <img height="24" src="https://img.shields.io/badge/Linux-AppImage-1793D1?style=for-the-badge&logo=linux&logoColor=white" alt="Linux AppImage">
+</a>
+&nbsp;&nbsp;
+<a href="https://github.com/ViniciusJesus-art/CircuitAliveEDA/releases">
+  <img height="24" src="https://img.shields.io/badge/Fedora-RPM-294172?style=for-the-badge&logo=fedora&logoColor=white" alt="Fedora RPM">
+</a>
+&nbsp;&nbsp;
+<a href="https://github.com/ViniciusJesus-art/CircuitAliveEDA/releases">
+  <img height="24" src="https://img.shields.io/badge/Ubuntu-DEB-E95420?style=for-the-badge&logo=ubuntu&logoColor=white" alt="Ubuntu DEB">
+</a>
+&nbsp;&nbsp;
+<a href="https://github.com/ViniciusJesus-art/CircuitAliveEDA/releases">
+  <img height="24" src="https://img.shields.io/badge/All-Releases-24292e?style=for-the-badge&logo=github&logoColor=white" alt="All Releases">
+</a>
+
+<sub>Pre-release builds: open Releases and choose the desired download format.</sub>
+
 **Veja a versão em Português 🇧🇷 [aqui](/README-PT_BR.md)**
 
 ---
