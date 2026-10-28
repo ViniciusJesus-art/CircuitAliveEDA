@@ -49,8 +49,8 @@ class ReleaseArtifactsTests(unittest.TestCase):
         manifest = json.loads((self.directory / 'release-manifest.json').read_text())
         self.assertEqual(len(assets), 5)
         self.assertEqual(manifest['commit'], self.commit)
-        public_names = {f'CircuitAliveEDA-{self.version}.{ext}'
-                        for ext in ('rpm', 'AppImage', 'deb', 'exe')}
+        public_names = {f'CircuitAliveEDA-{suffix}'
+                        for suffix in release.PACKAGE_SUFFIXES.values()}
         self.assertEqual(set(manifest['sha256']), public_names)
         self.assertEqual({asset.name for asset in assets}, public_names | {'SHA256SUMS.txt'})
         self.assertFalse(any(asset.name.endswith('.sha256') for asset in assets))
@@ -72,7 +72,7 @@ class ReleaseArtifactsTests(unittest.TestCase):
                     (directory / source.name).write_bytes(source.read_bytes())
                 assets, notes = release.verify_packages(directory, self.version, self.commit, format)
                 self.assertEqual(len(assets), 2)
-                self.assertEqual(assets[0].name, f'CircuitAliveEDA-{self.version}.{format if format != "appimage" else "AppImage"}')
+                self.assertEqual(assets[0].name, f'CircuitAliveEDA-{suffix}')
                 self.assertEqual(json.loads((directory / 'release-manifest.json').read_text())['formats'], [format])
                 if format == 'exe':
                     self.assertNotIn('Fedora 44', notes.read_text())
@@ -82,11 +82,11 @@ class ReleaseArtifactsTests(unittest.TestCase):
         assets, _ = release.verify_packages(self.directory, self.version, self.commit, 'linux')
         self.assertEqual(len(assets), 4)
 
-    def test_friendly_release_name_changes_tags_and_public_files_only(self):
+    def test_friendly_release_name_changes_tag_but_not_public_filename(self):
         label = 'October Preview 2026!'
         assets, notes = release.verify_packages(self.directory, self.version, self.commit, 'exe', label)
         self.assertEqual([asset.name for asset in assets],
-                         ['CircuitAliveEDA-October-Preview-2026.exe', 'SHA256SUMS.txt'])
+                         ['CircuitAliveEDA-windows-x86_64-setup.exe', 'SHA256SUMS.txt'])
         manifest = json.loads((self.directory / 'release-manifest.json').read_text())
         self.assertEqual(manifest['tag'], 'vOctober-Preview-2026')
         self.assertEqual(manifest['version'], self.version)
