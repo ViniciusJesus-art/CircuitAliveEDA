@@ -74,7 +74,8 @@ def verify_packages(directory, version, commit, formats='all', release_label=Non
         fields = checksum.read_text().strip().split()
         if len(fields) != 2 or fields[0] != digest or fields[1].lstrip('*') != package.name:
             raise ValueError(f'Checksum mismatch: {package.name}')
-        public_name = f'CircuitAliveEDA-{slug}.{format if format != "appimage" else "AppImage"}'
+        # Release asset names stay constant across versions; version remains in package metadata.
+        public_name = f'CircuitAliveEDA-{suffix}'
         public_package = directory / public_name
         packages.append((package, public_package))
         checksums[public_name] = digest
