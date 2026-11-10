@@ -45,7 +45,7 @@ Because the project is based on KiCad, it also retains the tools needed for prin
 ## Table of Contents
 
 - [What is CircuitAliveEDA?](#what-is-circuitaliveeda)
-- [What already works](#what-already-works)
+- [Changes](#changes)
 - [Project screenshots](#project-screenshots)
 - [What I still want to develop](#what-i-still-want-to-develop)
 - [How it works internally](#how-it-works-internally)
@@ -57,38 +57,98 @@ Because the project is based on KiCad, it also retains the tools needed for prin
 
 ---
 
-## What already works
+## Changes
 
-### Simulation directly on the schematic
+These are the additions and workflow changes developed for CircuitAliveEDA on top of its KiCad base. The schematic editor, PCB editor, library system, and manufacturing tools still come from KiCad. The sections below explain what CA adds for someone opening the program for the first time.
 
-CA already has an initial implementation of interactive simulation using **ngspice**, with early support for digital circuits through **XSPICE**.
+### Interactive simulation on the schematic
 
-Features developed so far include:
+Build the circuit, press **Play**, and follow its behavior in the same editor where you draw it. CA integrates **ngspice** and **XSPICE** with controls to start, pause, resume, and stop the simulation, adjust its speed, or advance by a step while paused.
 
-- Controls to start, pause, resume, and stop simulations.
-- Integration with the schematic editor.
-- Interaction with switches while a simulation is running.
-- Visual representation of LED behavior.
-- Voltage, current, and power measurements.
-- An oscilloscope with cursors, triggering, and CSV export.
-- Display of logic states `0`, `1`, `Z`, and `X`.
-- Tests with analog and digital circuits.
+- Click supported switches to change their state during simulation.
+- Adjust supported potentiometers and trimmers without restarting the session or losing the circuit's stored state.
+- Watch LED brightness and logic indicators for `0`, `1`, `Z` (high impedance), and `X` (unknown).
+- Place voltage, current, power, and oscilloscope probes on wires, or enable measurements on a component.
+- Inspect waveforms with oscilloscope cursors and triggering, and export samples as CSV.
 
-I want testing a circuit to feel as natural as drawing it: change a connection, press **Play**, and see what happens.
+See [measurements and oscilloscope](docs/circuitalive/MEASUREMENTS.md) and [live controls](docs/circuitalive/LIVE_CONTROLS.md).
 
-### Component models
+### Component models and default symbol associations
 
-An important part of the project is making simulation models easier to use. A good interface is not very helpful if every new component requires a complicated setup process.
+CA supplies simulation behavior in **`.casim` files**, associated with standard library symbols. The catalog has been expanded with:
 
-CA already includes support and documentation for discrete and digital component models, as well as assigning those models to symbols. I have also started working on a **visual model editor** to make this process more accessible.
+- Resistors, capacitors, inductors, resistor networks, voltage dividers, potentiometers, switches, and DC-coil relays.
+- Diodes, Zeners, LEDs, rectifier bridges, diode arrays, bipolar transistors, MOSFETs, JFETs, and Darlington drivers.
+- Operational amplifiers, comparators, regulators, optocouplers, analog switches and multiplexers, logic gates, Schmitt triggers, flip-flops, registers, decoders, and counters.
 
-The [model catalog](docs/circuitalive/MODEL_CATALOG.md) contains information about `.casim` files, available models, tests, and coverage of the standard library.
+The associations are checked against physical pin numbers and component function. Compatible drawings of resistors, capacitors, diodes, and switches already receive their model from the files shipped with CA. Multi-contact switches, DIP banks, resistor packs, and Kelvin shunts use connections appropriate to their terminals, rather than being treated as simple two-terminal parts.
 
-### Small editor improvements
+These defaults are included in the installation; they do not depend on the developer's preferences or on configuring each symbol manually. A model explicitly selected for a component or saved in a personal profile retains priority. **Coverage is still partial:** the goal is to cover the standard electronic components, but having a symbol in the library does not mean it already has a simulation model. Connectors, mechanical items, and graphics are outside that model-coverage goal.
 
-Beyond the simulator, I have started adapting some editor interactions to make everyday work faster. These include improvements to continuous symbol placement and the ability to **delete elements by double-right-clicking**.
+See the [model catalog](docs/circuitalive/MODEL_CATALOG.md) and [reviewed standard library associations](docs/circuitalive/STANDARD_LIBRARY_ASSOCIATIONS.md).
 
-These may be small details, but they make a difference when you spend a lot of time building and modifying circuits.
+### Electrical behavior and model limits
+
+The models go beyond displaying ideal logic states. Depending on the component, they include supply voltage ranges, input thresholds, propagation delays, output resistance and voltage drops, input capacitance, quiescent consumption, leakage, and current limits or warnings. Load and fan-out affect the electrical response through the modeled inputs and outputs. Switching times and operating frequency depend on the parameters and behavior implemented for each model.
+
+These are nominal approximations, with different levels of detail between models. They do not guarantee every datasheet limit, and temperature, self-heating, and permanent damage are outside the current scope. The documentation records the supported behavior and remaining limitations.
+
+Diodes include forward conduction, reverse leakage, and breakdown where configured. A terminal connected only to an ideal voltage probe can float near the supply voltage even when load current is blocked; the [reverse-bias guide](docs/circuitalive/DIODE_REVERSE_BIAS.md) explains how to test this with a load and a return to GND.
+
+### Visual model editor and reusable settings
+
+The separate **Simulation Model Editor** lets you choose a library symbol, import its pins, assemble behavior from blocks, connect terminals, expose parameters, and save a reusable `.casim` file. Existing models can also be used as a starting point.
+
+In the schematic, **Simulation model...** (**Ctrl+Alt+M**) configures the model, pin mapping, parameters, and measurements. The model browser offers categories, families, and search. Settings can be saved as defaults for new instances of the same library symbol, while existing instances retain their configuration. Models expressible with the available blocks or SPICE can be added without recompiling the application.
+
+See the [visual model editor](docs/circuitalive/MODEL_AUTHOR.md) and [reusable settings](docs/circuitalive/COMPLEX_MODELS.md).
+
+### Memory images and firmware execution
+
+Supported ROM and RAM models can load initial data files. A memory viewer captures the paused simulation state, displays addresses, bytes, and unknown bits, and exports data as BIN, Intel HEX, or CA's `.camem` snapshots.
+
+For the supplied ATmega48P/88P/168P/328P, Arduino UNO R3, and PIC16F84A models, CA can execute HEX/BIN firmware through the included runtimes. Each instance has its own firmware, clock, memory, and electrical pin connections. Firmware is compiled with the device's usual external tools. Other microcontrollers, STM/ESP devices, and FPGAs still require their own implemented engines and models.
+
+See [memory images](docs/circuitalive/MEMORY_IMAGES.md) and [programmable models](docs/circuitalive/MICROCONTROLLER_MODELS.md).
+
+### Placing and reusing schematic items
+
+The placement workflow has been standardized for components, power symbols, labels, text, images, shapes, tables, and sheets:
+
+1. Use the shortcut or toolbar command, choose the item, and confirm.
+2. The item follows the cursor; click to place it, and the preview disappears.
+3. Click empty space to bring the same item back to the cursor.
+4. Click again to place another copy, without reopening the chooser.
+
+Invoking the shortcut or command again opens a new choice. Items attached directly to wires keep their direct placement behavior. Multi-unit components can continue through the available units, keeping references such as U1A/U1B together.
+
+The **Used Components** panel lists the component types already on the current page, with a symbol preview. Select a type and use the same pair of clicks to place another instance with a new reference. The panel can be docked, floated, and resized; its layout preferences are retained between projects.
+
+See the [placement workflow](docs/circuitalive/PLACEMENT_WORKFLOW.md) and [Used Components panel](docs/circuitalive/USED_COMPONENTS.md).
+
+### Applying properties by click, with automatic numbering
+
+The **Apply Properties by Click...** tool is available on the top toolbar and in **Tools**, with the default shortcut **Ctrl+Shift+P**. Choose an editable property and a replacement value, confirm, and click the objects to update them. It supports references, values, footprints, names/text, custom fields, and other applicable editor properties.
+
+Enable automatic numbering to replace `#` or `?` in a pattern. For example, `Digital_D#`, starting at `10` with a step of `2`, applies `Digital_D10`, `Digital_D12`, `Digital_D14`, and so on. A negative step counts down. Empty or rejected clicks do not consume a number, and the cursor shows the next value.
+
+With wire labeling enabled, clicking a wire creates a connected local, global, or hierarchical label using the generated name. Disable that option to edit properties of the wire itself. Common edits support undo/redo, component fields respect the active variant, and related units are kept in sync. **Esc** exits the tool.
+
+See [applying properties by click](docs/circuitalive/PROPERTY_STAMP.md).
+
+### Pages, navigation, and mouse gestures
+
+The **Pages** menu lets you create, rename, reorder, remove, and navigate schematic pages, including multiple top-level pages in one project. Page order is preserved when saving and reopening. Simulation indicators and controls belong to their full sheet path, so navigation keeps each page's controls associated with the correct circuit.
+
+A **double right-click** deletes the item under the pointer through the editor's normal delete action, with undo support. A single right-click still opens the context menu. For symbol fields, the normal delete behavior hides the field.
+
+See [schematic pages](docs/circuitalive/PAGES.md).
+
+### Libraries included with the installation
+
+CA packages include symbols, footprints, 3D models, project templates, simulation models, blocks, and runtimes. The application initializes the library tables on first use without requiring a separate KiCad installation or library downloads, while preserving personal libraries.
+
+See [bundled libraries](docs/circuitalive/BUNDLED_LIBRARIES.md).
 
 ## Project screenshots
 
@@ -164,6 +224,16 @@ For anyone interested in understanding the software in greater detail or studyin
 - [Visual model editor](docs/circuitalive/MODEL_AUTHOR.md)
 - [Model associations](docs/circuitalive/MODEL_FILES.md)
 - [Model catalog](docs/circuitalive/MODEL_CATALOG.md)
+- [Standard library model associations](docs/circuitalive/STANDARD_LIBRARY_ASSOCIATIONS.md)
+- [Electrical behavior and Schmitt models](docs/circuitalive/SCHMITT_ELECTRICAL_MODELS.md)
+- [Diode reverse-bias checks](docs/circuitalive/DIODE_REVERSE_BIAS.md)
+- [Memory images and inspection](docs/circuitalive/MEMORY_IMAGES.md)
+- [Programmable models and firmware](docs/circuitalive/MICROCONTROLLER_MODELS.md)
+- [Schematic placement workflow](docs/circuitalive/PLACEMENT_WORKFLOW.md)
+- [Used Components panel](docs/circuitalive/USED_COMPONENTS.md)
+- [Apply properties by click](docs/circuitalive/PROPERTY_STAMP.md)
+- [Schematic pages](docs/circuitalive/PAGES.md)
+- [Bundled libraries](docs/circuitalive/BUNDLED_LIBRARIES.md)
 - [Overall development map](docs/circuitalive/Mapa_KiCad_Simulacao_Interativa.md)
 
 ## Building and running

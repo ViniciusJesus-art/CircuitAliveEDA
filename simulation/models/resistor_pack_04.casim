@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "resistor_pack_04",
+  "name": "4 isolated resistors",
+  "description": "Independent ideal resistors sharing the configured resistance value; physical pairing follows this package drawing.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "terminal1",
+      "label": "Terminal 1",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "terminal2",
+      "label": "Terminal 2",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "terminal3",
+      "label": "Terminal 3",
+      "role": "passive",
+      "default_pin": "3"
+    },
+    {
+      "id": "terminal4",
+      "label": "Terminal 4",
+      "role": "passive",
+      "default_pin": "4"
+    },
+    {
+      "id": "terminal5",
+      "label": "Terminal 5",
+      "role": "passive",
+      "default_pin": "5"
+    },
+    {
+      "id": "terminal6",
+      "label": "Terminal 6",
+      "role": "passive",
+      "default_pin": "6"
+    },
+    {
+      "id": "terminal7",
+      "label": "Terminal 7",
+      "role": "passive",
+      "default_pin": "7"
+    },
+    {
+      "id": "terminal8",
+      "label": "Terminal 8",
+      "role": "passive",
+      "default_pin": "8"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "resistance",
+      "label": "Resistance",
+      "default": "$value",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "R1_${id} ${pin:terminal1} ${pin:terminal8} ${param:resistance}",
+      "R2_${id} ${pin:terminal2} ${pin:terminal7} ${param:resistance}",
+      "R3_${id} ${pin:terminal3} ${pin:terminal6} ${param:resistance}",
+      "R4_${id} ${pin:terminal4} ${pin:terminal5} ${param:resistance}"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "category": "Analog/Passive components",
+  "family": "Resistor arrays",
+  "model_notes": [
+    "Reuses the native resistor element; channels are isolated, not bussed. Value is the resistance of each element."
+  ],
+  "matches": {
+    "library_ids": [
+      "Device:R_Pack04",
+      "Device:R_Pack04_Split"
+    ],
+    "symbol_names": [
+      "R_Pack04",
+      "R_Pack04_Split"
+    ]
+  }
+}

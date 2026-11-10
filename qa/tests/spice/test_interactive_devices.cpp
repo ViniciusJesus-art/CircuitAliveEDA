@@ -169,10 +169,15 @@ BOOST_AUTO_TEST_CASE( LogicOutputLoadDrawsCurrentFromComponentVccPin )
     auto parts = LogicCircuit(); parts[1].pins["1"] = "gnd";
     parts[1].measurements.current = true;
     parts.push_back( { "R1", "Device:R", "1k", { { "1", "out" }, { "2", "gnd" } } } );
+    parts.back().measurements.current = true;
     const auto c = BuildCircuitSnapshot( parts ); const auto sample = RunDevice( c );
-    BOOST_REQUIRE_EQUAL( c.measurements.size(), 1 );
+    BOOST_REQUIRE_EQUAL( c.measurements.size(), 2 );
     const double current = MeasurementValue( c.measurements[0], sample );
-    BOOST_CHECK_GT( current, .0048 ); BOOST_CHECK_LT( current, .005 );
+    const double loadCurrent = MeasurementValue( c.measurements[1], sample );
+    // Calibrated HC drive drops voltage under load. Verify that VCC supplies
+    // the actual resistor current plus package IQ, rather than assuming 5 V out.
+    BOOST_CHECK_GT( loadCurrent, .0047 ); BOOST_CHECK_LT( loadCurrent, .005 );
+    BOOST_CHECK_SMALL( current - loadCurrent - 1e-6, 1e-8 );
 }
 
 BOOST_AUTO_TEST_CASE( InlineAmmeterPreservesDigitalDriverPresence )

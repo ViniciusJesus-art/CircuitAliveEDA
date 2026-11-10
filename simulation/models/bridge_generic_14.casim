@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "bridge_generic_14",
+  "name": "D_Bridge_+AA- full-wave bridge",
+  "description": "Own compact electrical model. See docs/circuitalive/PASSIVE_BRIDGE_RELAY_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "positive",
+      "label": "DC +",
+      "default_pin": "1",
+      "role": "passive"
+    },
+    {
+      "id": "negative",
+      "label": "DC -",
+      "default_pin": "4",
+      "role": "passive"
+    },
+    {
+      "id": "ac1",
+      "label": "AC 1",
+      "default_pin": "2",
+      "role": "passive"
+    },
+    {
+      "id": "ac2",
+      "label": "AC 2",
+      "default_pin": "3",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "saturation_current",
+      "label": "Per-diode saturation current",
+      "default": "20n",
+      "unit": "A",
+      "min": 1e-20,
+      "max": 1
+    },
+    {
+      "id": "emission",
+      "label": "Per-diode emission coefficient",
+      "default": "1.7",
+      "unit": "",
+      "min": 0.5,
+      "max": 5
+    },
+    {
+      "id": "series_resistance",
+      "label": "Per-diode series resistance",
+      "default": ".15",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "breakdown",
+      "label": "Per-diode approximate reverse breakdown",
+      "default": "100",
+      "unit": "V",
+      "min": 1,
+      "max": 1000000.0
+    },
+    {
+      "id": "junction_capacitance",
+      "label": "Per-diode zero-bias junction capacitance",
+      "default": "30p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "transit_time",
+      "label": "Per-diode transit time (not calibrated recovery time)",
+      "default": "0",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "current_warning",
+      "label": "Average output rating used as instantaneous warning",
+      "default": "1",
+      "unit": "A",
+      "min": 0,
+      "max": 1000
+    }
+  ],
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Device:D_Bridge_+AA-"
+    ],
+    "symbol_names": [
+      "D_Bridge_+AA-"
+    ]
+  },
+  "spice": {
+    "instance": [
+      "Vbridge_${id} ${pin:positive} rectified_${id} 0",
+      "D1_${id} ${pin:ac1} rectified_${id} diode_${id}",
+      "D2_${id} ${pin:ac2} rectified_${id} diode_${id}",
+      "D3_${id} ${pin:negative} ${pin:ac1} diode_${id}",
+      "D4_${id} ${pin:negative} ${pin:ac2} diode_${id}"
+    ],
+    "definitions": [
+      ".model diode_${id} D(Is=${param:saturation_current} N=${param:emission} Rs=${param:series_resistance} BV=${param:breakdown} Cjo=${param:junction_capacitance} Tt=${param:transit_time})",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "category": "Semiconductors/Diodes",
+  "family": "Bridge rectifiers",
+  "measurement_ports": {
+    "positive": "positive",
+    "negative": "negative"
+  },
+  "current_warning": {
+    "signal": "abs(i(Vbridge_${id}))",
+    "limit_parameter": "current_warning"
+  },
+  "sources": [
+    "https://ngspice.sourceforge.io/docs/ngspice-manual.pdf"
+  ],
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own four-diode native SPICE circuit; forward drop, leakage and capacitance are compact approximations, not copied vendor SPICE code.",
+    "Rated repetitive reverse voltage is used as an approximate avalanche knee, not a guaranteed breakdown curve. Zero-bias capacitance differs from the datasheet capacitance at 4 V reverse bias.",
+    "Transit time defaults to zero; reverse recovery and high-frequency switching losses are not calibrated. No self-heating, derating, surge-energy assessment or destructive failure.",
+    "The output average-current rating drives an instantaneous warning; it neither limits current nor qualifies capacitor charging pulses.",
+    "Connect the AC source between AC terminals. DC output may float; do not ground one AC terminal and DC minus together in a full-wave bench.",
+    "Displayed current enters DC plus, and is negative while the bridge delivers output power. The displayed port power is not total bridge dissipation.",
+    "Generic silicon defaults (100 V, 1 A) are configurable placeholders, not a manufacturer part rating.",
+    "Requests circuit-wide Gear order 2 to damp trapezoidal current ringing after abrupt live source changes; no fixed small global timestep."
+  ]
+}

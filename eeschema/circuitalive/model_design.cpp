@@ -125,6 +125,15 @@ void MODEL_DESIGN::MakeCoreVisible()
             { "min_supply_parameter", model.logicMinSupply }, { "max_supply_parameter", model.logicMaxSupply },
             { "driver_enable", model.driverEnable }, { "driver_value", model.driverValue },
             { "internal_drive", model.internalDrive } };
+    if( !model.logicThresholdReference.empty() )
+        core["logic"]["threshold_reference_parameter"] = model.logicThresholdReference;
+    if( !model.currentWarnings.empty() )
+    {
+        core["current_warnings"] = JSON::array();
+        for( const auto& warning : model.currentWarnings )
+            core["current_warnings"].push_back( { { "label", warning.label }, { "signal", warning.signal },
+                { "limit_parameter", warning.parameter } } );
+    }
     std::function<void( JSON& )> rename = [&]( JSON& item )
     {
         if( item.is_string() )
@@ -136,7 +145,7 @@ void MODEL_DESIGN::MakeCoreVisible()
         }
         else if( item.is_structured() ) for( auto& child : item ) rename( child );
     };
-    for( const auto* key : { "logic", "indicator", "control", "controls", "adjustments", "current_warning" } )
+    for( const auto* key : { "logic", "indicator", "control", "controls", "adjustments", "current_warning", "current_warnings" } )
         if( core.contains( key ) ) rename( core[key] );
     baseJson = core.dump(); coreBlock = block.id;
     // A native PN diode has a real series path followed by the nonlinear
@@ -160,6 +169,9 @@ void MODEL_DESIGN::MakeCoreVisible()
         auto& params = junction["parameters"];
         params.erase( std::remove_if( params.begin(), params.end(), []( const auto& p )
             { return p.at("id") == "series_resistance"; } ), params.end() );
+        // Legacy imports belong to the enclosing component, where Rs remains
+        // public. The internal junction no longer has that parameter.
+        junction.erase( "legacy_parameters" );
         block.values.erase("series_resistance"); block.connections["a"]="junction";
         block.modelJson=junction.dump(); block.x=800;
         // A sensed behavioral resistance also represents an exact zero-ohm
@@ -205,7 +217,7 @@ void MODEL_DESIGN::RemoveBlock( const std::string& blockId )
     if( coreBlock == blockId )
     {
         auto base = JSON::parse( baseJson );
-        for( const auto* key : { "logic", "indicator", "control", "controls", "adjustments", "current_warning", "memories", "resources" } ) base.erase(key);
+        for( const auto* key : { "logic", "indicator", "control", "controls", "adjustments", "current_warning", "current_warnings", "memories", "resources" } ) base.erase(key);
         baseJson = base.dump(); coreBlock.clear();
     }
 }
@@ -353,6 +365,8 @@ std::string MODEL_DESIGN::Export() const
                 if( p.id == model.maxStepParameter || p.id == model.frequencyParameter )
                     throw std::runtime_error( "Solver timing parameters cannot change during simulation" );
                 if( p.id == model.brightnessParameter || p.id == model.ratingParameter || p.id == model.warningParameter
+                    || p.id == model.logicThresholdReference
+                    || std::any_of( model.currentWarnings.begin(), model.currentWarnings.end(), [&]( const auto& w ) { return w.parameter == p.id; } )
                     || p.id == model.logicLow || p.id == model.logicHigh || p.id == model.logicMinSupply || p.id == model.logicMaxSupply
                     || std::find( model.ledAppearance.ids.begin(), model.ledAppearance.ids.end(), p.id ) != model.ledAppearance.ids.end() )
                     throw std::runtime_error( "This display or detection setting cannot change during simulation" );
@@ -515,8 +529,10 @@ std::string MODEL_DESIGN::Export() const
             }
             for( const auto& [key, childParameter] : std::vector<std::pair<std::string, std::string>>{
                 { "low_parameter", model.logicLow }, { "high_parameter", model.logicHigh },
-                { "min_supply_parameter", model.logicMinSupply }, { "max_supply_parameter", model.logicMaxSupply } } )
+                { "min_supply_parameter", model.logicMinSupply }, { "max_supply_parameter", model.logicMaxSupply },
+                { "threshold_reference_parameter", model.logicThresholdReference } } )
             {
+                if( childParameter.empty() ) continue;
                 const auto token = tokens[i].at( "param:" + childParameter );
                 if( token.starts_with( "${param:" ) ) logic[key] = token.substr( 8, token.size() - 9 );
                 else

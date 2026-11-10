@@ -2,8 +2,8 @@
   "schema_version": 1,
   "backend": "ngspice",
   "id": "zener_bzv55c5v1",
-  "name": "BZV55C5V1 Zener diode",
-  "description": "Room-temperature compact approximation calibrated against datasheet operating points. See docs/circuitalive/DISCRETE_MODELS.md.",
+  "name": "BZV55B/C5V1 Zener diode",
+  "description": "Nominal 25 C Zener behavior, shared by B/C tolerance grades. See docs/circuitalive/ROUTING_PROTECTION_MODELS.md.",
   "license": "GPL-3.0-or-later",
   "pins": [
     {
@@ -78,9 +78,11 @@
   },
   "matches": {
     "library_ids": [
+      "Diode:BZV55B5V1",
       "Diode:BZV55C5V1"
     ],
     "part_names": [
+      "BZV55B5V1",
       "BZV55C5V1"
     ],
     "pin_names": {
@@ -92,6 +94,7 @@
       ]
     },
     "symbol_names": [
+      "BZV55B5V1",
       "BZV55C5V1"
     ]
   },
@@ -106,12 +109,14 @@
   "model_notes": [
     "Separate forward and reverse branches keep the forward diode drop independent of Zener dynamic resistance.",
     "Nominal Vz is calibrated at 5mA; reverse dynamic resistance approximately 40/10 Ohm at that point.",
-    "Voltage tolerance, temperature coefficients and self-heating are not simulated."
+    "Voltage tolerance, temperature coefficients and self-heating are not simulated.",
+    "B and C grades share nominal behavior; production tolerance is not sampled. Existing electrical parameters are retained."
   ],
   "current_warning": {
     "signal": "i(Vanode_${id})",
     "limit_parameter": "current_warning"
   },
   "category": "Semiconductors/Diodes",
-  "family": "Zener"
+  "family": "Zener",
+  "nominal_temperature_c": 25
 }

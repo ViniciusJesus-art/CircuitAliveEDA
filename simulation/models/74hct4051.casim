@@ -1,0 +1,346 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "74hct4051",
+  "name": "74HCT4051 analog multiplexer",
+  "description": "Nominal 25 C bilateral analog routing; finite supply-dependent resistance and control delays. See docs/circuitalive/ROUTING_PROTECTION_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "Positive supply",
+      "default_pin": "16",
+      "role": "power"
+    },
+    {
+      "id": "gnd",
+      "label": "Logic reference / lower supply",
+      "default_pin": "8",
+      "role": "reference"
+    },
+    {
+      "id": "vee",
+      "label": "Negative analog supply",
+      "default_pin": "7",
+      "role": "power"
+    },
+    {
+      "id": "s0",
+      "label": "Address 0",
+      "default_pin": "11",
+      "role": "input"
+    },
+    {
+      "id": "s1",
+      "label": "Address 1",
+      "default_pin": "10",
+      "role": "input"
+    },
+    {
+      "id": "s2",
+      "label": "Address 2",
+      "default_pin": "9",
+      "role": "input"
+    },
+    {
+      "id": "inh",
+      "label": "Inhibit (HIGH disables)",
+      "default_pin": "6",
+      "role": "input"
+    },
+    {
+      "id": "com0",
+      "label": "Common 0",
+      "default_pin": "3",
+      "role": "passive"
+    },
+    {
+      "id": "ch0_0",
+      "label": "Channel 0.0",
+      "default_pin": "13",
+      "role": "passive"
+    },
+    {
+      "id": "ch0_1",
+      "label": "Channel 0.1",
+      "default_pin": "14",
+      "role": "passive"
+    },
+    {
+      "id": "ch0_2",
+      "label": "Channel 0.2",
+      "default_pin": "15",
+      "role": "passive"
+    },
+    {
+      "id": "ch0_3",
+      "label": "Channel 0.3",
+      "default_pin": "12",
+      "role": "passive"
+    },
+    {
+      "id": "ch0_4",
+      "label": "Channel 0.4",
+      "default_pin": "1",
+      "role": "passive"
+    },
+    {
+      "id": "ch0_5",
+      "label": "Channel 0.5",
+      "default_pin": "5",
+      "role": "passive"
+    },
+    {
+      "id": "ch0_6",
+      "label": "Channel 0.6",
+      "default_pin": "2",
+      "role": "passive"
+    },
+    {
+      "id": "ch0_7",
+      "label": "Channel 0.7",
+      "default_pin": "4",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "ron_low",
+      "label": "On resistance at 4.5 V",
+      "default": "100",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000.0
+    },
+    {
+      "id": "ron_mid",
+      "label": "On resistance at 6 V",
+      "default": "90",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000.0
+    },
+    {
+      "id": "ron_high",
+      "label": "On resistance at 9 V",
+      "default": "70",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000.0
+    },
+    {
+      "id": "roff",
+      "label": "Off resistance per channel",
+      "default": "1e12",
+      "unit": "Ohm",
+      "min": 1000.0,
+      "max": 1000000000000000.0
+    },
+    {
+      "id": "vil",
+      "label": "LOW threshold / logic supply",
+      "default": "0.16",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "HIGH threshold / logic supply",
+      "default": "0.4",
+      "unit": "",
+      "min": 0.2,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Minimum logic supply",
+      "default": "4.5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 30
+    },
+    {
+      "id": "vmax",
+      "label": "Maximum logic supply",
+      "default": "5.5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 30
+    },
+    {
+      "id": "analog_max",
+      "label": "Maximum total analog supply span",
+      "default": "10",
+      "unit": "V",
+      "min": 0.1,
+      "max": 30
+    },
+    {
+      "id": "turn_on",
+      "label": "Channel turn-on delay",
+      "default": "40n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "turn_off",
+      "label": "Channel turn-off delay",
+      "default": "20n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Control transition time",
+      "default": "2n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "cin",
+      "label": "Control pin capacitance",
+      "default": "5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1e-06
+    },
+    {
+      "id": "cport",
+      "label": "Analog port capacitance",
+      "default": "5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1e-06
+    },
+    {
+      "id": "iq",
+      "label": "Package quiescent current",
+      "default": "1u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "warning_current",
+      "label": "Channel current warning",
+      "default": "10m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "74xx:74HCT4051"
+    ],
+    "symbol_names": [
+      "74HCT4051"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Bpower_${id} power_${id} 0 V={v(${pin:vcc},${pin:gnd}) >= ${param:vmin} && v(${pin:vcc},${pin:gnd}) <= ${param:vmax} && v(${pin:vcc},${pin:vee}) <= ${param:analog_max} && v(${pin:gnd},${pin:vee}) >= 0}",
+      "Biq_${id} ${pin:vcc} ${pin:gnd} I={v(power_${id}) > .5 ? ${param:iq} : 0}",
+      "Rlo_s0_${id} ${pin:s0} ${pin:gnd} 1e12",
+      "Cin_s0_${id} ${pin:s0} ${pin:gnd} ${param:cin}",
+      "Rlo_s1_${id} ${pin:s1} ${pin:gnd} 1e12",
+      "Cin_s1_${id} ${pin:s1} ${pin:gnd} ${param:cin}",
+      "Rlo_s2_${id} ${pin:s2} ${pin:gnd} 1e12",
+      "Cin_s2_${id} ${pin:s2} ${pin:gnd} ${param:cin}",
+      "Rlo_inh_${id} ${pin:inh} ${pin:gnd} 1e12",
+      "Cin_inh_${id} ${pin:inh} ${pin:gnd} ${param:cin}",
+      "Cp_com0_${id} ${pin:com0} ${pin:vee} ${param:cport}",
+      "Cp_ch0_0_${id} ${pin:ch0_0} ${pin:vee} ${param:cport}",
+      "Cp_ch0_1_${id} ${pin:ch0_1} ${pin:vee} ${param:cport}",
+      "Cp_ch0_2_${id} ${pin:ch0_2} ${pin:vee} ${param:cport}",
+      "Cp_ch0_3_${id} ${pin:ch0_3} ${pin:vee} ${param:cport}",
+      "Cp_ch0_4_${id} ${pin:ch0_4} ${pin:vee} ${param:cport}",
+      "Cp_ch0_5_${id} ${pin:ch0_5} ${pin:vee} ${param:cport}",
+      "Cp_ch0_6_${id} ${pin:ch0_6} ${pin:vee} ${param:cport}",
+      "Cp_ch0_7_${id} ${pin:ch0_7} ${pin:vee} ${param:cport}",
+      "Bselect0_${id} select0_${id} 0 V={v(power_${id}) > .5 && ${drive:s0} > .5 && ${drive:s1} > .5 && ${drive:s2} > .5 && ${drive:inh} > .5 && v(${pin:inh},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s0},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s1},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s2},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) ? 1 : 0}",
+      "Aadc0_${id} [select0_${id}] [raw0_${id}] adc_${id}",
+      "Adelay0_${id} raw0_${id} delayed0_${id} delay_${id}",
+      "Adac0_${id} [delayed0_${id}] [state0_${id}] dac_${id}",
+      "Vsense0_${id} ${pin:com0} contact0_${id} 0",
+      "Bpath0_${id} contact0_${id} ${pin:ch0_0} I={v(contact0_${id},${pin:ch0_0})*(1/${param:roff}+(v(power_${id}) > .5 ? max(0,min(1,2*v(state0_${id})-1)) : 0)*(1/(v(${pin:vcc},${pin:vee}) <= 4.5 ? ${param:ron_low} : v(${pin:vcc},${pin:vee}) <= 6 ? ${param:ron_low}+(${param:ron_mid}-${param:ron_low})*(v(${pin:vcc},${pin:vee})-4.5)/1.5 : v(${pin:vcc},${pin:vee}) < 9 ? ${param:ron_mid}+(${param:ron_high}-${param:ron_mid})*(v(${pin:vcc},${pin:vee})-6)/3 : ${param:ron_high})-1/${param:roff}))}",
+      "Bselect1_${id} select1_${id} 0 V={v(power_${id}) > .5 && ${drive:s0} > .5 && ${drive:s1} > .5 && ${drive:s2} > .5 && ${drive:inh} > .5 && v(${pin:inh},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s0},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) && v(${pin:s1},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s2},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) ? 1 : 0}",
+      "Aadc1_${id} [select1_${id}] [raw1_${id}] adc_${id}",
+      "Adelay1_${id} raw1_${id} delayed1_${id} delay_${id}",
+      "Adac1_${id} [delayed1_${id}] [state1_${id}] dac_${id}",
+      "Vsense1_${id} ${pin:com0} contact1_${id} 0",
+      "Bpath1_${id} contact1_${id} ${pin:ch0_1} I={v(contact1_${id},${pin:ch0_1})*(1/${param:roff}+(v(power_${id}) > .5 ? max(0,min(1,2*v(state1_${id})-1)) : 0)*(1/(v(${pin:vcc},${pin:vee}) <= 4.5 ? ${param:ron_low} : v(${pin:vcc},${pin:vee}) <= 6 ? ${param:ron_low}+(${param:ron_mid}-${param:ron_low})*(v(${pin:vcc},${pin:vee})-4.5)/1.5 : v(${pin:vcc},${pin:vee}) < 9 ? ${param:ron_mid}+(${param:ron_high}-${param:ron_mid})*(v(${pin:vcc},${pin:vee})-6)/3 : ${param:ron_high})-1/${param:roff}))}",
+      "Bselect2_${id} select2_${id} 0 V={v(power_${id}) > .5 && ${drive:s0} > .5 && ${drive:s1} > .5 && ${drive:s2} > .5 && ${drive:inh} > .5 && v(${pin:inh},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s0},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s1},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) && v(${pin:s2},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) ? 1 : 0}",
+      "Aadc2_${id} [select2_${id}] [raw2_${id}] adc_${id}",
+      "Adelay2_${id} raw2_${id} delayed2_${id} delay_${id}",
+      "Adac2_${id} [delayed2_${id}] [state2_${id}] dac_${id}",
+      "Vsense2_${id} ${pin:com0} contact2_${id} 0",
+      "Bpath2_${id} contact2_${id} ${pin:ch0_2} I={v(contact2_${id},${pin:ch0_2})*(1/${param:roff}+(v(power_${id}) > .5 ? max(0,min(1,2*v(state2_${id})-1)) : 0)*(1/(v(${pin:vcc},${pin:vee}) <= 4.5 ? ${param:ron_low} : v(${pin:vcc},${pin:vee}) <= 6 ? ${param:ron_low}+(${param:ron_mid}-${param:ron_low})*(v(${pin:vcc},${pin:vee})-4.5)/1.5 : v(${pin:vcc},${pin:vee}) < 9 ? ${param:ron_mid}+(${param:ron_high}-${param:ron_mid})*(v(${pin:vcc},${pin:vee})-6)/3 : ${param:ron_high})-1/${param:roff}))}",
+      "Bselect3_${id} select3_${id} 0 V={v(power_${id}) > .5 && ${drive:s0} > .5 && ${drive:s1} > .5 && ${drive:s2} > .5 && ${drive:inh} > .5 && v(${pin:inh},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s0},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) && v(${pin:s1},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) && v(${pin:s2},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) ? 1 : 0}",
+      "Aadc3_${id} [select3_${id}] [raw3_${id}] adc_${id}",
+      "Adelay3_${id} raw3_${id} delayed3_${id} delay_${id}",
+      "Adac3_${id} [delayed3_${id}] [state3_${id}] dac_${id}",
+      "Vsense3_${id} ${pin:com0} contact3_${id} 0",
+      "Bpath3_${id} contact3_${id} ${pin:ch0_3} I={v(contact3_${id},${pin:ch0_3})*(1/${param:roff}+(v(power_${id}) > .5 ? max(0,min(1,2*v(state3_${id})-1)) : 0)*(1/(v(${pin:vcc},${pin:vee}) <= 4.5 ? ${param:ron_low} : v(${pin:vcc},${pin:vee}) <= 6 ? ${param:ron_low}+(${param:ron_mid}-${param:ron_low})*(v(${pin:vcc},${pin:vee})-4.5)/1.5 : v(${pin:vcc},${pin:vee}) < 9 ? ${param:ron_mid}+(${param:ron_high}-${param:ron_mid})*(v(${pin:vcc},${pin:vee})-6)/3 : ${param:ron_high})-1/${param:roff}))}",
+      "Bselect4_${id} select4_${id} 0 V={v(power_${id}) > .5 && ${drive:s0} > .5 && ${drive:s1} > .5 && ${drive:s2} > .5 && ${drive:inh} > .5 && v(${pin:inh},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s0},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s1},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s2},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) ? 1 : 0}",
+      "Aadc4_${id} [select4_${id}] [raw4_${id}] adc_${id}",
+      "Adelay4_${id} raw4_${id} delayed4_${id} delay_${id}",
+      "Adac4_${id} [delayed4_${id}] [state4_${id}] dac_${id}",
+      "Vsense4_${id} ${pin:com0} contact4_${id} 0",
+      "Bpath4_${id} contact4_${id} ${pin:ch0_4} I={v(contact4_${id},${pin:ch0_4})*(1/${param:roff}+(v(power_${id}) > .5 ? max(0,min(1,2*v(state4_${id})-1)) : 0)*(1/(v(${pin:vcc},${pin:vee}) <= 4.5 ? ${param:ron_low} : v(${pin:vcc},${pin:vee}) <= 6 ? ${param:ron_low}+(${param:ron_mid}-${param:ron_low})*(v(${pin:vcc},${pin:vee})-4.5)/1.5 : v(${pin:vcc},${pin:vee}) < 9 ? ${param:ron_mid}+(${param:ron_high}-${param:ron_mid})*(v(${pin:vcc},${pin:vee})-6)/3 : ${param:ron_high})-1/${param:roff}))}",
+      "Bselect5_${id} select5_${id} 0 V={v(power_${id}) > .5 && ${drive:s0} > .5 && ${drive:s1} > .5 && ${drive:s2} > .5 && ${drive:inh} > .5 && v(${pin:inh},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s0},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) && v(${pin:s1},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s2},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) ? 1 : 0}",
+      "Aadc5_${id} [select5_${id}] [raw5_${id}] adc_${id}",
+      "Adelay5_${id} raw5_${id} delayed5_${id} delay_${id}",
+      "Adac5_${id} [delayed5_${id}] [state5_${id}] dac_${id}",
+      "Vsense5_${id} ${pin:com0} contact5_${id} 0",
+      "Bpath5_${id} contact5_${id} ${pin:ch0_5} I={v(contact5_${id},${pin:ch0_5})*(1/${param:roff}+(v(power_${id}) > .5 ? max(0,min(1,2*v(state5_${id})-1)) : 0)*(1/(v(${pin:vcc},${pin:vee}) <= 4.5 ? ${param:ron_low} : v(${pin:vcc},${pin:vee}) <= 6 ? ${param:ron_low}+(${param:ron_mid}-${param:ron_low})*(v(${pin:vcc},${pin:vee})-4.5)/1.5 : v(${pin:vcc},${pin:vee}) < 9 ? ${param:ron_mid}+(${param:ron_high}-${param:ron_mid})*(v(${pin:vcc},${pin:vee})-6)/3 : ${param:ron_high})-1/${param:roff}))}",
+      "Bselect6_${id} select6_${id} 0 V={v(power_${id}) > .5 && ${drive:s0} > .5 && ${drive:s1} > .5 && ${drive:s2} > .5 && ${drive:inh} > .5 && v(${pin:inh},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s0},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s1},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) && v(${pin:s2},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) ? 1 : 0}",
+      "Aadc6_${id} [select6_${id}] [raw6_${id}] adc_${id}",
+      "Adelay6_${id} raw6_${id} delayed6_${id} delay_${id}",
+      "Adac6_${id} [delayed6_${id}] [state6_${id}] dac_${id}",
+      "Vsense6_${id} ${pin:com0} contact6_${id} 0",
+      "Bpath6_${id} contact6_${id} ${pin:ch0_6} I={v(contact6_${id},${pin:ch0_6})*(1/${param:roff}+(v(power_${id}) > .5 ? max(0,min(1,2*v(state6_${id})-1)) : 0)*(1/(v(${pin:vcc},${pin:vee}) <= 4.5 ? ${param:ron_low} : v(${pin:vcc},${pin:vee}) <= 6 ? ${param:ron_low}+(${param:ron_mid}-${param:ron_low})*(v(${pin:vcc},${pin:vee})-4.5)/1.5 : v(${pin:vcc},${pin:vee}) < 9 ? ${param:ron_mid}+(${param:ron_high}-${param:ron_mid})*(v(${pin:vcc},${pin:vee})-6)/3 : ${param:ron_high})-1/${param:roff}))}",
+      "Bselect7_${id} select7_${id} 0 V={v(power_${id}) > .5 && ${drive:s0} > .5 && ${drive:s1} > .5 && ${drive:s2} > .5 && ${drive:inh} > .5 && v(${pin:inh},${pin:gnd}) <= ${param:vil}*v(${pin:vcc},${pin:gnd}) && v(${pin:s0},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) && v(${pin:s1},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) && v(${pin:s2},${pin:gnd}) >= ${param:vih}*v(${pin:vcc},${pin:gnd}) ? 1 : 0}",
+      "Aadc7_${id} [select7_${id}] [raw7_${id}] adc_${id}",
+      "Adelay7_${id} raw7_${id} delayed7_${id} delay_${id}",
+      "Adac7_${id} [delayed7_${id}] [state7_${id}] dac_${id}",
+      "Vsense7_${id} ${pin:com0} contact7_${id} 0",
+      "Bpath7_${id} contact7_${id} ${pin:ch0_7} I={v(contact7_${id},${pin:ch0_7})*(1/${param:roff}+(v(power_${id}) > .5 ? max(0,min(1,2*v(state7_${id})-1)) : 0)*(1/(v(${pin:vcc},${pin:vee}) <= 4.5 ? ${param:ron_low} : v(${pin:vcc},${pin:vee}) <= 6 ? ${param:ron_low}+(${param:ron_mid}-${param:ron_low})*(v(${pin:vcc},${pin:vee})-4.5)/1.5 : v(${pin:vcc},${pin:vee}) < 9 ? ${param:ron_mid}+(${param:ron_high}-${param:ron_mid})*(v(${pin:vcc},${pin:vee})-6)/3 : ${param:ron_high})-1/${param:roff}))}"
+    ],
+    "definitions": [
+      ".model adc_${id} adc_bridge(in_low=.3 in_high=.7)",
+      ".model delay_${id} d_buffer(rise_delay=${param:turn_on} fall_delay=${param:turn_off})",
+      ".model dac_${id} dac_bridge(out_low=0 out_high=1 out_undef=.5 t_rise=${param:transition} t_fall=${param:transition})",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "nominal_temperature_c": 25,
+  "measurement_ports": {
+    "positive": "vcc",
+    "negative": "gnd"
+  },
+  "current_warning": {
+    "signal": "max(max(max(max(max(max(max(abs(i(Vsense0_${id})),abs(i(Vsense1_${id}))),abs(i(Vsense2_${id}))),abs(i(Vsense3_${id}))),abs(i(Vsense4_${id}))),abs(i(Vsense5_${id}))),abs(i(Vsense6_${id}))),abs(i(Vsense7_${id})))",
+    "limit_parameter": "warning_current"
+  },
+  "sources": [
+    "https://assets.nexperia.com/documents/data-sheet/74HC_HCT4051.pdf"
+  ],
+  "category": "Analog/Switches and multiplexers",
+  "family": "74HC/HCT",
+  "model_notes": [
+    "Own compact model; manufacturer datasheets provide pinout, truth table and nominal electrical reference points.",
+    "Analog paths are passive, bilateral conductances. They pass intermediate and negative voltages within the supply rails; they do not regenerate logic levels.",
+    "On resistance interpolates the documented supply points and is flat with signal voltage. Below the first point it stays fixed; low-voltage accuracy is limited.",
+    "Controls use logic-ground-referenced thresholds; floating or intermediate controls select no path. HCT thresholds are proportional values calibrated at 5 V.",
+    "Separate turn-on/off event delays approximate control timing; turn_on > turn_off provides a nominal break-before-make interval for multiplexers. Delays do not vary with supply or load.",
+    "Invalid or absent supply immediately opens all paths. No parasitic powering, clamp diodes, charge injection, exact crosstalk, thermal drift or damage is modeled.",
+    "Keep analog ports within VEE/VSS and VCC. Off-state leakage is a fixed resistance; port and control capacitances are lumped estimates.",
+    "Input-only ports do not drive their own nets; disconnected controls cannot select a path during startup. Requests circuit-wide Gear order 2 to damp abrupt contact changes, without a fixed small global timestep."
+  ]
+}

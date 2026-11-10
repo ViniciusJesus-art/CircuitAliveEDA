@@ -11,6 +11,10 @@ esquemático. Selecione esse arquivo e abra o Schematic Editor.
 
 As associações ficam nos próprios `.casim`, sem uma lista paralela no executável:
 
+A [revisão dos vínculos padrão](STANDARD_LIBRARY_ASSOCIATIONS.md) acrescenta
+chaves comuns, variantes de passivos e combinações com vários terminais. Esses
+vínculos são instalados junto dos modelos e funcionam sem um perfil pessoal.
+
 1. `CA.Model` escolhido explicitamente tem prioridade.
 2. `matches.part_names` reconhece **Value** ou **Sim.Name**. Todos os terminais
    são conferidos pelos nomes elétricos do desenho. Nomes contraditórios que
@@ -74,6 +78,6 @@ verifica explicitamente `rectifier` e `amplifier-ac`, incluindo os modelos e
 parâmetros da fonte. O relatório completo fica em `.circuitalive/logs/demo-audit.tsv`.
 
 `tools/circuitalive/model-catalog.py --fail-on-errors` confere a biblioteca padrão,
-incluindo nomes alternativos e a pinagem elétrica. Ela tem 228 entradas associadas
-entre as 21.007 entradas eletrônicas. Cópias em bibliotecas locais e associações
+incluindo nomes alternativos e a pinagem elétrica. Ela tem 617 entradas associadas
+entre as 21.029 entradas eletrônicas. Cópias em bibliotecas locais e associações
 por Value/Sim.Name não entram nessa contagem.

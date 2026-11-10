@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "resistor_shunt",
+  "name": "Four-terminal Kelvin shunt resistor",
+  "description": "One ideal resistor between force pins 1/4, with separate ideal sense pins 2/3. Value is the shunt resistance.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "force_p",
+      "label": "force p",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "sense_p",
+      "label": "sense p",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "sense_n",
+      "label": "sense n",
+      "role": "passive",
+      "default_pin": "3"
+    },
+    {
+      "id": "force_n",
+      "label": "force n",
+      "role": "passive",
+      "default_pin": "4"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "resistance",
+      "label": "Resistance",
+      "default": "$value",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "R${id} ${pin:force_p} ${pin:force_n} ${param:resistance}",
+      "Rsense_p_${id} ${pin:force_p} ${pin:sense_p} 1u",
+      "Rsense_n_${id} ${pin:force_n} ${pin:sense_n} 1u"
+    ]
+  },
+  "measurement_ports": {
+    "positive": "force_p",
+    "negative": "force_n"
+  },
+  "category": "Analog/Passive components",
+  "family": "Resistors",
+  "matches": {
+    "library_ids": [
+      "Device:R_Shunt",
+      "Device:R_Shunt_US"
+    ],
+    "symbol_names": [
+      "R_Shunt",
+      "R_Shunt_US"
+    ]
+  },
+  "model_notes": [
+    "Internally joined contact/sense terminals use 1 microohm straps, including when stacked pins are already on the same schematic net. This avoids indeterminate zero-voltage source loops."
+  ]
+}

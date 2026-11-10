@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "resistor_dividers_08",
+  "name": "8-channel dual-terminator resistor network",
+  "description": "Own compact electrical model. See docs/circuitalive/PASSIVE_BRIDGE_RELAY_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "upper",
+      "label": "COM1",
+      "default_pin": "1",
+      "role": "passive"
+    },
+    {
+      "id": "lower",
+      "label": "COM2",
+      "default_pin": "10",
+      "role": "passive"
+    },
+    {
+      "id": "tap1",
+      "label": "Divider tap 1",
+      "default_pin": "2",
+      "role": "passive"
+    },
+    {
+      "id": "tap2",
+      "label": "Divider tap 2",
+      "default_pin": "3",
+      "role": "passive"
+    },
+    {
+      "id": "tap3",
+      "label": "Divider tap 3",
+      "default_pin": "4",
+      "role": "passive"
+    },
+    {
+      "id": "tap4",
+      "label": "Divider tap 4",
+      "default_pin": "5",
+      "role": "passive"
+    },
+    {
+      "id": "tap5",
+      "label": "Divider tap 5",
+      "default_pin": "6",
+      "role": "passive"
+    },
+    {
+      "id": "tap6",
+      "label": "Divider tap 6",
+      "default_pin": "7",
+      "role": "passive"
+    },
+    {
+      "id": "tap7",
+      "label": "Divider tap 7",
+      "default_pin": "8",
+      "role": "passive"
+    },
+    {
+      "id": "tap8",
+      "label": "Divider tap 8",
+      "default_pin": "9",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "upper_resistance",
+      "label": "Resistance from COM1 to each tap",
+      "default": "10k",
+      "unit": "Ohm",
+      "min": 1e-06,
+      "max": 1000000000000.0
+    },
+    {
+      "id": "lower_resistance",
+      "label": "Resistance from each tap to COM2",
+      "default": "10k",
+      "unit": "Ohm",
+      "min": 1e-06,
+      "max": 1000000000000.0
+    }
+  ],
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Device:R_Network_Dividers_x08_SIP"
+    ],
+    "symbol_names": [
+      "R_Network_Dividers_x08_SIP"
+    ]
+  },
+  "spice": {
+    "instance": [
+      "Ru1_${id} ${pin:upper} ${pin:tap1} ${param:upper_resistance}",
+      "Rl1_${id} ${pin:tap1} ${pin:lower} ${param:lower_resistance}",
+      "Ru2_${id} ${pin:upper} ${pin:tap2} ${param:upper_resistance}",
+      "Rl2_${id} ${pin:tap2} ${pin:lower} ${param:lower_resistance}",
+      "Ru3_${id} ${pin:upper} ${pin:tap3} ${param:upper_resistance}",
+      "Rl3_${id} ${pin:tap3} ${pin:lower} ${param:lower_resistance}",
+      "Ru4_${id} ${pin:upper} ${pin:tap4} ${param:upper_resistance}",
+      "Rl4_${id} ${pin:tap4} ${pin:lower} ${param:lower_resistance}",
+      "Ru5_${id} ${pin:upper} ${pin:tap5} ${param:upper_resistance}",
+      "Rl5_${id} ${pin:tap5} ${pin:lower} ${param:lower_resistance}",
+      "Ru6_${id} ${pin:upper} ${pin:tap6} ${param:upper_resistance}",
+      "Rl6_${id} ${pin:tap6} ${pin:lower} ${param:lower_resistance}",
+      "Ru7_${id} ${pin:upper} ${pin:tap7} ${param:upper_resistance}",
+      "Rl7_${id} ${pin:tap7} ${pin:lower} ${param:lower_resistance}",
+      "Ru8_${id} ${pin:upper} ${pin:tap8} ${param:upper_resistance}",
+      "Rl8_${id} ${pin:tap8} ${pin:lower} ${param:lower_resistance}"
+    ],
+    "definitions": []
+  },
+  "category": "Analog/Passive components",
+  "family": "Resistor networks",
+  "measurement_ports": {
+    "positive": "upper",
+    "negative": "lower"
+  },
+  "sources": [
+    "https://www.vishay.com/docs/31509/csc.pdf",
+    "https://www.vishay.com/docs/50064/dualterm.pdf"
+  ],
+  "model_notes": [
+    "Independent divider taps between two shared buses; this is not a series resistor ladder.",
+    "Configure upper_resistance and lower_resistance separately; defaults are 10 kohm each. Symbol Value is not used.",
+    "Ideal resistors without production tolerance, thermal effects or damage. Displayed power uses COM1 current and COM1-COM2 voltage; external tap supplies may exchange additional power."
+  ]
+}

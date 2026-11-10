@@ -1,0 +1,370 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "74ls273",
+  "name": "74LS273 8-bit parallel register",
+  "description": "Nominal mixed-signal logic with package pinout, propagation delay and finite output impedance. See docs/circuitalive/REGISTER_COUNTER_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "Positive supply",
+      "role": "power",
+      "default_pin": "20"
+    },
+    {
+      "id": "gnd",
+      "label": "Supply reference",
+      "role": "reference",
+      "default_pin": "10"
+    },
+    {
+      "id": "mr",
+      "label": "mr",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "clk",
+      "label": "clk",
+      "role": "input",
+      "default_pin": "11"
+    },
+    {
+      "id": "d0",
+      "label": "d0",
+      "role": "input",
+      "default_pin": "3"
+    },
+    {
+      "id": "d1",
+      "label": "d1",
+      "role": "input",
+      "default_pin": "4"
+    },
+    {
+      "id": "d2",
+      "label": "d2",
+      "role": "input",
+      "default_pin": "7"
+    },
+    {
+      "id": "d3",
+      "label": "d3",
+      "role": "input",
+      "default_pin": "8"
+    },
+    {
+      "id": "d4",
+      "label": "d4",
+      "role": "input",
+      "default_pin": "13"
+    },
+    {
+      "id": "d5",
+      "label": "d5",
+      "role": "input",
+      "default_pin": "14"
+    },
+    {
+      "id": "d6",
+      "label": "d6",
+      "role": "input",
+      "default_pin": "17"
+    },
+    {
+      "id": "d7",
+      "label": "d7",
+      "role": "input",
+      "default_pin": "18"
+    },
+    {
+      "id": "q0",
+      "label": "q0",
+      "role": "output",
+      "default_pin": "2"
+    },
+    {
+      "id": "q1",
+      "label": "q1",
+      "role": "output",
+      "default_pin": "5"
+    },
+    {
+      "id": "q2",
+      "label": "q2",
+      "role": "output",
+      "default_pin": "6"
+    },
+    {
+      "id": "q3",
+      "label": "q3",
+      "role": "output",
+      "default_pin": "9"
+    },
+    {
+      "id": "q4",
+      "label": "q4",
+      "role": "output",
+      "default_pin": "12"
+    },
+    {
+      "id": "q5",
+      "label": "q5",
+      "role": "output",
+      "default_pin": "15"
+    },
+    {
+      "id": "q6",
+      "label": "q6",
+      "role": "output",
+      "default_pin": "16"
+    },
+    {
+      "id": "q7",
+      "label": "q7",
+      "role": "output",
+      "default_pin": "19"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Vil",
+      "default": ".16",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "Vih",
+      "default": ".4",
+      "unit": "",
+      "min": 0.1,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Vmin",
+      "default": "4.75",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Vmax",
+      "default": "5.25",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "rise_delay",
+      "label": "Rise delay",
+      "default": "15n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "fall_delay",
+      "label": "Fall delay",
+      "default": "15n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Transition",
+      "default": "2n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "25",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Cin",
+      "default": "3.5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Iq",
+      "default": "27m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "high_drop",
+      "label": "High drop",
+      "unit": "V",
+      "default": "1.6",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Low drop",
+      "unit": "V",
+      "default": ".2",
+      "min": 0,
+      "max": 5
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "74xx:74LS273"
+    ],
+    "symbol_names": [
+      "74LS273"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "behavioral": {
+    "version": 1,
+    "supply": {
+      "vcc": "vcc",
+      "gnd": "gnd"
+    },
+    "blocks": [
+      {
+        "type": "dff",
+        "data": "d0",
+        "clock": "clk",
+        "set": "0",
+        "reset": "!mr",
+        "q": "s0",
+        "nq": "n_s0",
+        "initial": 2
+      },
+      {
+        "type": "dff",
+        "data": "d1",
+        "clock": "clk",
+        "set": "0",
+        "reset": "!mr",
+        "q": "s1",
+        "nq": "n_s1",
+        "initial": 2
+      },
+      {
+        "type": "dff",
+        "data": "d2",
+        "clock": "clk",
+        "set": "0",
+        "reset": "!mr",
+        "q": "s2",
+        "nq": "n_s2",
+        "initial": 2
+      },
+      {
+        "type": "dff",
+        "data": "d3",
+        "clock": "clk",
+        "set": "0",
+        "reset": "!mr",
+        "q": "s3",
+        "nq": "n_s3",
+        "initial": 2
+      },
+      {
+        "type": "dff",
+        "data": "d4",
+        "clock": "clk",
+        "set": "0",
+        "reset": "!mr",
+        "q": "s4",
+        "nq": "n_s4",
+        "initial": 2
+      },
+      {
+        "type": "dff",
+        "data": "d5",
+        "clock": "clk",
+        "set": "0",
+        "reset": "!mr",
+        "q": "s5",
+        "nq": "n_s5",
+        "initial": 2
+      },
+      {
+        "type": "dff",
+        "data": "d6",
+        "clock": "clk",
+        "set": "0",
+        "reset": "!mr",
+        "q": "s6",
+        "nq": "n_s6",
+        "initial": 2
+      },
+      {
+        "type": "dff",
+        "data": "d7",
+        "clock": "clk",
+        "set": "0",
+        "reset": "!mr",
+        "q": "s7",
+        "nq": "n_s7",
+        "initial": 2
+      }
+    ],
+    "outputs": {
+      "q0": {
+        "signal": "s0"
+      },
+      "q1": {
+        "signal": "s1"
+      },
+      "q2": {
+        "signal": "s2"
+      },
+      "q3": {
+        "signal": "s3"
+      },
+      "q4": {
+        "signal": "s4"
+      },
+      "q5": {
+        "signal": "s5"
+      },
+      "q6": {
+        "signal": "s6"
+      },
+      "q7": {
+        "signal": "s7"
+      }
+    },
+    "clock_hysteresis": true
+  },
+  "sources": [
+    "https://www.ti.com/lit/ds/symlink/sn74ls273.pdf"
+  ],
+  "category": "Digital/Registers and latches",
+  "family": "74LS",
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own event-driven functional model; no vendor SPICE source copied. The .casim file contains all device-specific behavior.",
+    "Package pin numbers, control polarity, functional state and finite nominal delays are represented. Initial storage is unknown until reset, parallel load or enough valid clocks.",
+    "Delays are per logic block, not a complete timing-characterization matrix. Allow settling and obey setup/hold; metastability and timing violations are not modeled.",
+    "Input thresholds scale with local supply. LS/HCT/AHCT thresholds are calibrated to 0.8/2 V at 5 V; LS outputs approximate 3.4/0.2 V before loading.",
+    "Finite output resistance, input capacitance and package quiescent current are fixed approximate nominal parameters. No detailed fan-out, TTL input current, ESD, parasitic power, thermal drift or damage.",
+    "Outputs release outside the supply window. No retention through a power cycle is guaranteed.",
+    "Physical clock inputs use supply-relative Schmitt action; data and other controls retain 0/X/1 conversion. All-input Schmitt behavior of AHC/AHCT is not reproduced.",
+    "No fixed small global maximum timestep; XSPICE schedules internal events. Use circuit resolution appropriate to the electrical stimulus.",
+    "Common active-low asynchronous reset."
+  ]
+}

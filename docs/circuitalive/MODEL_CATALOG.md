@@ -5,9 +5,10 @@ contém comportamento, parâmetros, pinagem e suas associações em `matches`.
 O catálogo e o relatório abaixo são derivados desses arquivos: não há uma
 lista paralela de componentes autorizados na simulação.
 
-O catálogo atual tem **166 arquivos `.casim`** e **228 associações automáticas
-com pinagem compatível** nas 21.007 entradas eletrônicas da biblioteca local.
-Restam **20.779 entradas sem associação explícita**. As etapas abaixo registram
+O catálogo atual tem **396 arquivos `.casim`** e **617 associações automáticas
+com pinagem compatível** nas 21.029 entradas eletrônicas da biblioteca local.
+Restam **20.412 entradas sem associação explícita** (cobertura de **2,934%**).
+Conectores e outros itens não eletrônicos são excluídos. As etapas abaixo registram
 os lotes; os números incluem variantes de desenho e encapsulamento.
 
 As associações por Value/Sim.Name e cópias de bibliotecas locais são adicionais
@@ -58,6 +59,104 @@ As pinagens de encapsulamentos diferentes têm arquivos próprios quando
 necessário. Limites, parâmetros e condições de uso estão no
 [catálogo analógico](ANALOG_MODEL_CATALOG.md).
 
+## Terceiro lote: roteamento analógico e família Zener BZV55
+
+Este lote acrescenta **44 arquivos e 95 associações** sobre o estado anterior
+de 185 arquivos e 247 associações, que já incluía memórias e microcontroladores.
+
+| Grupo | Componentes | Arquivos novos | Associações novas |
+|---|---|---:|---:|
+| Chaves bilaterais | CD4016B e CD4066B, incluindo desenhos IEEE e encapsulamentos compatíveis | 2 | 8 |
+| Multiplexadores | CD4051B/52B/53B, 74HC4051, 74HCT4051, CD74HC4067 e HEF4067B | 7 | 15 |
+| Zeners | BZV55 de 2,4 a 75 V, graus B/C | 35 | 72 |
+
+Os 37 modelos de tensão da BZV55 agora cobrem todas as 74 entradas B/C dessa
+família na biblioteca instalada. Os arquivos anteriores de 5,1 e 12 V mantêm
+seus parâmetros elétricos e passam a atender também o grau B.
+Os limites, referências e bancadas estão em
+[Roteamento e proteção](ROUTING_PROTECTION_MODELS.md).
+
+A ferramenta de auditoria também reconhece os arquivos de schema 2 com
+`ngspice+runtime`, usando os mesmos pares de versão/backend do carregador.
+
+## Quarto lote: registradores, decodificadores e contadores
+
+Foram acrescentados **35 arquivos e 42 associações**, passando de 229 arquivos
+e 342 associações para 264 arquivos e 384 associações.
+
+| Grupo | Componentes | Arquivos |
+|---|---|---:|
+| Deslocamento serial | 164, 165 e 595 nas famílias presentes na biblioteca | 9 |
+| Registradores e latches paralelos | 273, 373 e 374 em HC/HCT/AHC/AHCT/LS; 174/175 em LS | 17 |
+| Decodificadores | 138 em HC/HCT/LS e 139 em LS | 4 |
+| Contadores síncronos e ripple | 74LS161, 74LS163, 74LS393, CD4020B e CD4040B | 5 |
+
+Os modelos representam os bancos físicos, clocks, resets, enables e estados
+internos específicos de cada CI, incluindo a separação entre deslocamento e
+armazenamento de saída no 595. Os contadores CD incluem todos os estágios,
+inclusive os dois sem pinos externos no 4020.
+Veja [Registradores e contadores](REGISTER_COUNTER_MODELS.md) para funcionamento,
+parâmetros, fontes oficiais, limitações e bancadas de referência.
+
+## Quinto lote: redes resistivas, pontes e relés
+
+Foram acrescentados **48 arquivos e 70 associações**:
+
+| Grupo | Componentes | Arquivos | Associações |
+|---|---|---:|---:|
+| Redes resistivas | R_Network03–13, incluindo Split/US; Dividers x02–x11 SIP | 21 | 43 |
+| Pontes retificadoras | Cinco pinagens genéricas, ABS2–10, MB2S/4S/6S/8S e W005G–W10G | 21 | 21 |
+| Relés DC não retentivos | SPST-NO/NC, SPDT, DPST-NO/NC e DPDT | 6 | 6 |
+
+As redes preservam barramentos e ramos físicos; as pontes têm quatro diodos
+e pinagens específicas por família. Os relés incluem bobina R/L, histerese,
+atrasos e contatos isolados com comutação sem sobreposição.
+Veja [Redes, pontes e relés](PASSIVE_BRIDGE_RELAY_MODELS.md) para parâmetros,
+referências, limites e bancadas. Os relés e pontes genéricas precisam ser
+configurados para a peça real; seus padrões não certificam uma peça comercial.
+
+## Sexto lote: JFETs, conjuntos de diodos e drivers
+
+Foram acrescentados **41 arquivos e 49 associações**:
+
+| Grupo | Componentes | Arquivos | Associações |
+|---|---|---:|---:|
+| JFETs | 2N3819, BF245A/B/C, MMBFJ111/112/113 e 12 desenhos genéricos N/P | 19 | 19 |
+| Conjuntos de diodos | BAT54A/C/S e variantes; BAV70/M/T/W/S; BAV99/S | 15 | 15 |
+| Drivers Darlington | ULN/ULQ2003/2004, ULN2803/2804, MC/NCV1413 e SN75468/69 | 7 | 15 |
+
+Os JFETs têm canal normalmente condutor e junções de gate; os conjuntos
+de diodos preservam cada junção e os pares isolados. Os drivers usam dois NPN
+por canal, com corrente de entrada, coletores abertos e diodos de retorno ao
+COM. Pinagens, referências, parâmetros e limites estão em
+[JFETs, diodos e drivers](JFET_DIODE_DRIVER_MODELS.md).
+
+## Sétima etapa: Schmitt e carga elétrica digital
+
+Foram acrescentados **3 arquivos e 4 associações**: 74HC14, 74LS14 e CD40106B,
+incluindo o desenho IEEE do 40106. O total passa de 353/503 para **356 arquivos
+e 507 associações**. LS00 e HC00 recebem correntes de entrada, resistências
+separadas de saída e avisos de corrente por pino/sentido. LS00 usa limiares
+absolutos; HC00/HC14 incluem consumo interno por frequência. As entradas Schmitt
+preservam o estado entre seus dois limiares.
+
+Parâmetros, referências e limites estão em
+[Portas Schmitt e parâmetros elétricos digitais](SCHMITT_ELECTRICAL_MODELS.md).
+Os demais digitais conservam seus modelos anteriores; esses recursos não
+significam que todo o catálogo já tenha fan-out e temporização calibrados.
+
+## Oitava etapa: vínculos da biblioteca padrão
+
+A revisão manual acrescenta **110 associações**: 64 em `Device` e 46 em `Switch`.
+Além de ampliar os vínculos de seis modelos básicos, há 40 combinações de
+primitivas existentes para pacotes resistivos, divisores e chaves com vários
+contatos. O total passa a **396 arquivos e 617 associações**. Todas as dez
+chaves de dois terminais em `Switch` estão vinculadas, com seus estados iniciais.
+
+Os vínculos são distribuídos nos `.casim`, sem exigir perfis pessoais ou
+configuração por instância. Pinagens, limites, exemplos e verificação estão em
+[Vínculos revisados com a biblioteca padrão](STANDARD_LIBRARY_ASSOCIATIONS.md).
+
 ## Uso e atualização
 
 Não é necessário recompilar o editor para usar ou editar esses modelos.
@@ -89,9 +188,11 @@ indefinidas; buffers desabilitados e saídas sem alimentação ficam em Z.
 Os parâmetros digitais representam pontos nominais próximos de **5 V e
 temperatura ambiente**, e podem ser editados. A resistência e o atraso são
 fixos: não reproduzem todas as curvas de alimentação, carga e temperatura.
-LS/HCT usam limiares proporcionais calibrados para 0,8/2 V a 5 V; eles variam
-um pouco com VCC. Correntes DC de entrada TTL, fan-out, ESD, alimentação
-parasitária e todas as violações de setup/hold não estão modelados.
+A maioria dos LS/HCT usa limiares proporcionais calibrados para 0,8/2 V a 5 V.
+LS00/LS14 já usam limiares absolutos e correntes DC de entrada, com avisos de
+fan-out. HC00/HC14 incluem consumo interno por comutação. Essa calibração ainda
+não foi aplicada aos demais arquivos. ESD, alimentação parasitária e todas as
+violações de setup/hold continuam fora desses modelos.
 A família LS mantém queda de nível alto diferente da HCT.
 O 4069 é utilizável como inversor digital; seu comportamento linear sem buffer,
 necessário em alguns amplificadores/osciladores, ainda não está representado.
@@ -195,9 +296,10 @@ A segunda etapa acrescenta 11 bancadas em
 **129 testes interativos, 68 testes SPICE nativos e 3 testes de catálogo**.
 
 A cobertura de toda a biblioteca continua em desenvolvimento. Os próximos
-grupos prioritários incluem proteções, chaves analógicas, contadores,
-registradores e memórias adicionais. Cada grupo deve ter
+grupos prioritários incluem outras proteções e chaves analógicas, outros contadores
+e registradores, sensores, relés e memórias adicionais. Cada grupo deve ter
 bancadas de referência, não somente associação de nomes.
-Microcontroladores precisarão também de um mecanismo de execução de firmware
-e periféricos; um arquivo com portas lógicas genéricas não representa esse
-comportamento. Essa parte ainda não é fornecida pelo catálogo atual.
+Os microcontroladores suportados já executam firmware por meio de backends
+próprios, com os periféricos e limitações descritos em
+[Modelos de microcontroladores](MICROCONTROLLER_MODELS.md). Outros alvos
+exigem implementação e validação específicas da CPU e dos periféricos.

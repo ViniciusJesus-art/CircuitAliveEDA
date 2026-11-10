@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "switch_tactile_four_pin",
+  "name": "Four-pin tactile switch with duplicated terminals",
+  "description": "Interactive contact topology; generic configurable contacts, not a manufacturer-certified model.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "terminal1",
+      "label": "Terminal1",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "terminal2",
+      "label": "Terminal2",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "terminal3",
+      "label": "Terminal3",
+      "role": "passive",
+      "default_pin": "3"
+    },
+    {
+      "id": "terminal4",
+      "label": "Terminal4",
+      "role": "passive",
+      "default_pin": "4"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "on_resistance",
+      "label": "Closed resistance",
+      "default": "0.01",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000.0
+    },
+    {
+      "id": "off_resistance",
+      "label": "Open resistance",
+      "default": "1e12",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vcontrol${id} control${id} 0 ${control:initial}",
+      "Rstrap_a_${id} ${pin:terminal1} ${pin:terminal2} 1u",
+      "Rstrap_b_${id} ${pin:terminal3} ${pin:terminal4} 1u",
+      "S${id} ${pin:terminal1} ${pin:terminal3} control${id} 0 m${id}"
+    ],
+    "definitions": [
+      ".model m${id} SW(Ron=${param:on_resistance} Roff=${param:off_resistance} Vt=2.5 Vh=0.1)"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "category": "Electromechanical/Switches",
+  "family": "Interactive switches",
+  "model_notes": [
+    "Generic contact combination using the existing switch primitive; finite Ron/Roff, no contact bounce or manufacturer-specific timing/current rating.",
+    "Pin pairs and common terminals were reviewed from the bundled standard symbol drawings. All physical pins are represented.",
+    "Pins 1/2 are permanently the same node; pins 3/4 are permanently the same node. This is not a pair of isolated DPST contacts.",
+    "Internally joined contact/sense terminals use 1 microohm straps, including when stacked pins are already on the same schematic net. This avoids indeterminate zero-voltage source loops."
+  ],
+  "matches": {
+    "library_ids": [
+      "Switch:SW_MEC_5G"
+    ],
+    "symbol_names": [
+      "SW_MEC_5G"
+    ]
+  },
+  "control": {
+    "source": "Vcontrol${id}",
+    "on": 5,
+    "off": 0,
+    "initially_closed": false
+  }
+}

@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "switch_dip_05",
+  "name": "5-position DIP switch",
+  "description": "Interactive contact topology; generic configurable contacts, not a manufacturer-certified model.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "terminal1",
+      "label": "Terminal1",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "terminal2",
+      "label": "Terminal2",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "terminal3",
+      "label": "Terminal3",
+      "role": "passive",
+      "default_pin": "3"
+    },
+    {
+      "id": "terminal4",
+      "label": "Terminal4",
+      "role": "passive",
+      "default_pin": "4"
+    },
+    {
+      "id": "terminal5",
+      "label": "Terminal5",
+      "role": "passive",
+      "default_pin": "5"
+    },
+    {
+      "id": "terminal6",
+      "label": "Terminal6",
+      "role": "passive",
+      "default_pin": "6"
+    },
+    {
+      "id": "terminal7",
+      "label": "Terminal7",
+      "role": "passive",
+      "default_pin": "7"
+    },
+    {
+      "id": "terminal8",
+      "label": "Terminal8",
+      "role": "passive",
+      "default_pin": "8"
+    },
+    {
+      "id": "terminal9",
+      "label": "Terminal9",
+      "role": "passive",
+      "default_pin": "9"
+    },
+    {
+      "id": "terminal10",
+      "label": "Terminal10",
+      "role": "passive",
+      "default_pin": "10"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "on_resistance",
+      "label": "Closed resistance",
+      "default": "0.01",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000.0
+    },
+    {
+      "id": "off_resistance",
+      "label": "Open resistance",
+      "default": "1e12",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vcontrol1_${id} control1_${id} 0 0",
+      "Schannel1_${id} ${pin:terminal1} ${pin:terminal10} control1_${id} 0 m${id}",
+      "Vcontrol2_${id} control2_${id} 0 0",
+      "Schannel2_${id} ${pin:terminal2} ${pin:terminal9} control2_${id} 0 m${id}",
+      "Vcontrol3_${id} control3_${id} 0 0",
+      "Schannel3_${id} ${pin:terminal3} ${pin:terminal8} control3_${id} 0 m${id}",
+      "Vcontrol4_${id} control4_${id} 0 0",
+      "Schannel4_${id} ${pin:terminal4} ${pin:terminal7} control4_${id} 0 m${id}",
+      "Vcontrol5_${id} control5_${id} 0 0",
+      "Schannel5_${id} ${pin:terminal5} ${pin:terminal6} control5_${id} 0 m${id}"
+    ],
+    "definitions": [
+      ".model m${id} SW(Ron=${param:on_resistance} Roff=${param:off_resistance} Vt=2.5 Vh=0.1)"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "category": "Electromechanical/Switches",
+  "family": "Interactive switches",
+  "model_notes": [
+    "Generic contact combination using the existing switch primitive; finite Ron/Roff, no contact bounce or manufacturer-specific timing/current rating.",
+    "Pin pairs and common terminals were reviewed from the bundled standard symbol drawings. All physical pins are represented.",
+    "Each pole has an independent interactive control. Contact i pairs with physical pin 2*N+1-i."
+  ],
+  "matches": {
+    "library_ids": [
+      "Switch:SW_DIP_x05"
+    ],
+    "symbol_names": [
+      "SW_DIP_x05"
+    ]
+  },
+  "controls": [
+    {
+      "id": "channel1",
+      "label": "1",
+      "source": "Vcontrol1_${id}",
+      "on": 5,
+      "off": 0,
+      "initially_closed": false,
+      "visual": {
+        "target": "rectangle",
+        "x": 0.05,
+        "y": 0.01,
+        "width": 0.9,
+        "height": 0.18
+      }
+    },
+    {
+      "id": "channel2",
+      "label": "2",
+      "source": "Vcontrol2_${id}",
+      "on": 5,
+      "off": 0,
+      "initially_closed": false,
+      "visual": {
+        "target": "rectangle",
+        "x": 0.05,
+        "y": 0.21000000000000002,
+        "width": 0.9,
+        "height": 0.18
+      }
+    },
+    {
+      "id": "channel3",
+      "label": "3",
+      "source": "Vcontrol3_${id}",
+      "on": 5,
+      "off": 0,
+      "initially_closed": false,
+      "visual": {
+        "target": "rectangle",
+        "x": 0.05,
+        "y": 0.41,
+        "width": 0.9,
+        "height": 0.18
+      }
+    },
+    {
+      "id": "channel4",
+      "label": "4",
+      "source": "Vcontrol4_${id}",
+      "on": 5,
+      "off": 0,
+      "initially_closed": false,
+      "visual": {
+        "target": "rectangle",
+        "x": 0.05,
+        "y": 0.61,
+        "width": 0.9,
+        "height": 0.18
+      }
+    },
+    {
+      "id": "channel5",
+      "label": "5",
+      "source": "Vcontrol5_${id}",
+      "on": 5,
+      "off": 0,
+      "initially_closed": false,
+      "visual": {
+        "target": "rectangle",
+        "x": 0.05,
+        "y": 0.8099999999999999,
+        "width": 0.9,
+        "height": 0.18
+      }
+    }
+  ]
+}

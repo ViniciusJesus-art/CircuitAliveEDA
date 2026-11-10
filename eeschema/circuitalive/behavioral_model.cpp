@@ -37,13 +37,49 @@ void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
     const auto vcc = "${pin:" + m.logicVcc + "}", gnd = "${pin:" + m.logicGround + "}";
     auto add = [&]( std::string line ) { m.instance.push_back( std::move( line ) ); };
     auto def = [&]( std::string line ) { m.definitions.push_back( std::move( line ) ); };
+    const auto electrical = b.value( "electrical", JSON::object() );
+    if( !electrical.is_object() ) throw std::runtime_error( "Behavioral electrical settings must be an object" );
+    const std::set<std::string> electricalKeys{ "threshold_reference", "input_low_current", "input_high_current",
+        "input_low_reference", "input_high_reference", "output_high_resistance", "output_low_resistance",
+        "quiescent_low", "switching_capacitance", "source_rating", "sink_rating", "current_rating_window" };
+    for( const auto& [key, value] : electrical.items() )
+    {
+        if( !electricalKeys.contains( key ) ) throw std::runtime_error( "Unknown electrical setting: " + key );
+        par( value.get<std::string>() );
+    }
+    auto ep = [&]( const std::string& key, const std::string& fallback )
+    {
+        return electrical.contains( key ) ? par( electrical.at( key ).get<std::string>() ) : fallback;
+    };
+    if( electrical.contains( "threshold_reference" ) )
+    {
+        m.logicThresholdReference = electrical.at( "threshold_reference" );
+        par( m.logicThresholdReference );
+    }
+    const auto thresholdSupply = ep( "threshold_reference", "max(v(" + vcc + "," + gnd + "),1u)" );
+    const auto highResistance = ep( "output_high_resistance", "${param:rout}" );
+    const auto lowResistance = ep( "output_low_resistance", "${param:rout}" );
     add( "Bbh_power_${id} bh_power_${id} 0 V={(v(" + vcc + "," + gnd + ") >= ${param:vmin} && v(" + vcc + "," + gnd + ") <= ${param:vmax})}" );
-    add( "Bbh_iq_${id} " + vcc + " " + gnd + " I={v(bh_power_${id}) > 0.5 ? ${param:iq} : 0}" );
+    std::string quiescent = "${param:iq}";
+    const auto& outputs = b.at( "outputs" );
+    if( electrical.contains( "quiescent_low" ) )
+    {
+        if( outputs.empty() ) throw std::runtime_error( "State-dependent supply current needs outputs" );
+        std::string lowStates;
+        for( const auto& [id, value] : outputs.items() )
+            lowStates += ( lowStates.empty() ? "" : "+" ) + std::string( "(1-v(bh_code_" ) + id + "_${id}))";
+        quiescent += "+(" + ep( "quiescent_low", "0" ) + "-${param:iq})*(" + lowStates + ")/" + std::to_string( outputs.size() );
+    }
+    add( "Bbh_iq_${id} " + vcc + " " + gnd + " I={v(bh_power_${id}) > 0.5 ? " + quiescent + " : 0}" );
     def( ".model bh_adc_${id} adc_bridge(in_low=${param:vil} in_high=${param:vih})" );
     const auto& blocks = b.at( "blocks" );
     if( !blocks.is_array() || blocks.empty() || blocks.size() > 1024 ) throw std::runtime_error( "Invalid behavioral block count" );
     std::set<std::string> clockInputs;
-    if( b.value( "clock_hysteresis", false ) )
+    const bool inputHysteresis = b.value( "input_hysteresis", false );
+    if( inputHysteresis )
+        for( const auto& p : m.pins )
+            if( p.role == "input" || p.role == "bidirectional" ) clockInputs.insert( p.id );
+    if( b.value( "clock_hysteresis", false ) || inputHysteresis )
     {
         for( const auto& block : blocks )
             if( block.at( "type" ) == "dff" )
@@ -81,18 +117,47 @@ void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
     for( const auto& p : m.pins ) if( p.role == "input" || p.role == "bidirectional" )
     {
         const auto d = output( p.id ), n = "bh_n_" + p.id + "_${id}", physical = "${pin:" + p.id + "}";
-        add( "Bbh_in_" + p.id + "_${id} " + n + " 0 V={(v(bh_power_${id}) > 0.5 && ${drive:" + p.id + "} > 0.5) ? v(" + physical + "," + gnd + ")/max(v(" + vcc + "," + gnd + "),1u) : 0.5}" );
+        const auto validInput = "v(bh_power_${id}) > 0.5 && ${drive:" + p.id + "} > 0.5";
+        add( "Bbh_in_" + p.id + "_${id} " + n + " 0 V={(" + validInput + ") ? v(" + physical + "," + gnd + ")/" + thresholdSupply + " : (${param:vil}+${param:vih})/2}" );
         add( "Cbh_in_" + p.id + "_${id} " + physical + " " + gnd + " ${param:cin}" );
+        if( electrical.contains( "input_low_current" ) || electrical.contains( "input_high_current" ) )
+        {
+            // A continuous signed I/V load, anchored at the datasheet IIL/IIH test voltages.
+            // Negative current at LOW is essential for TTL fan-out; a capacitor alone is insufficient.
+            const auto lowRef = ep( "input_low_reference", "0" );
+            const auto highRef = ep( "input_high_reference", "max(v(" + vcc + "," + gnd + "),1u)" );
+            const auto fraction = "min(1,max(0,(v(" + physical + "," + gnd + ")-" + lowRef + ")/max(" + highRef + "-" + lowRef + ",1u)))";
+            add( "Bbh_load_" + p.id + "_${id} " + physical + " " + gnd + " I={v(bh_power_${id}) > 0.5 ? "
+                + ep( "input_high_current", "0" ) + "*" + fraction + "-" + ep( "input_low_current", "0" ) + "*(1-" + fraction + ") : 0}" );
+        }
         if( clockInputs.contains( p.id ) )
         {
             const auto stem = "bh_clock_" + p.id + "_${id}";
-            add( "B" + stem + "_high " + stem + "_high 0 V={v(" + n + ") >= ${param:vih} ? 1 : 0}" );
-            add( "B" + stem + "_low " + stem + "_low 0 V={v(" + n + ") <= ${param:vil} ? 1 : 0}" );
+            const auto guard = inputHysteresis ? "(" + validInput + ") ? " : "";
+            const auto unknown = inputHysteresis ? " : 0.5" : "";
+            add( "B" + stem + "_high " + stem + "_high 0 V={" + guard + "(v(" + n + ") >= ${param:vih} ? 1 : 0)" + unknown + "}" );
+            add( "B" + stem + "_low " + stem + "_low 0 V={" + guard + "(v(" + n + ") <= ${param:vil} ? 1 : 0)" + unknown + "}" );
             add( "A" + stem + "_adc [" + stem + "_high " + stem + "_low] [" + stem + "_set " + stem + "_reset] bh_clock_adc_${id}" );
             add( "A" + stem + "_hold " + stem + "_set " + stem + "_reset bh_d_1_${id} bh_d_0_${id} bh_d_0_${id} " + d + " NULL bh_clock_hold_${id}" );
         }
         else
             add( "Abh_adc_" + p.id + "_${id} [" + n + "] [" + d + "] bh_adc_${id}" );
+        if( electrical.contains( "switching_capacitance" ) )
+        {
+            // Two unit-code edges per input cycle give ICC = CPD*VCC*f.
+            // External load charging already flows through the high-side driver.
+            const auto stem = "bh_cpd_" + p.id + "_${id}";
+            const auto capacitance = ep( "switching_capacitance", "0" );
+            add( "A" + stem + "_dac [" + d + "] [" + stem + "_code] bh_dac_${id}" );
+            // A finite RC avoids trapezoidal current ringing from an ideal
+            // voltage-source/capacitor pair; integrating |I| must count edges,
+            // not amplify numerical derivative oscillations.
+            add( "R" + stem + " " + stem + "_code " + stem + " {${param:transition}/max(" + capacitance + ",1e-24)}" );
+            add( "C" + stem + " " + stem + " 0 " + capacitance );
+            add( "B" + stem + "_supply " + vcc + " " + gnd
+                + " I={v(bh_power_${id}) > 0.5 ? max(v(" + vcc + "," + gnd + "),0)*" + capacitance
+                + "*abs(v(" + stem + "_code," + stem + "))/(2*${param:transition}) : 0}" );
+        }
     }
     std::size_t index = 0, memoryBits = 0;
     for( const auto& block : blocks )
@@ -201,7 +266,6 @@ void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
         else throw std::runtime_error( "Unsupported behavioral block: " + type );
         add( "A" + stem + " " + pins + " " + model ); def( ".model " + model + " " + spec );
     }
-    const auto& outputs = b.at( "outputs" );
     for( const auto& [id, value] : outputs.items() )
     {
         const auto& p = port( id );
@@ -213,8 +277,37 @@ void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
         add( "Bbh_en_" + id + "_${id} " + enable + " 0 V={v(bh_power_${id}) > 0.5 && v(" + enCode + ") > 0.75}" );
         const auto physical = "${pin:" + id + "}";
         const std::string known = "((v(" + code + ") > 0.75 || v(" + code + ") < 0.25) ? 1 : 1u)";
-        add( "Bbh_hi_" + id + "_${id} " + physical + " " + vcc + " I={v(" + enable + ") > 0.5 ? " + known + "*v(" + code + ")*(v(" + physical + "," + vcc + ")+${param:high_drop})/${param:rout} : 0}" );
-        add( "Bbh_lo_" + id + "_${id} " + physical + " " + gnd + " I={v(" + enable + ") > 0.5 ? " + known + "*(1-v(" + code + "))*(v(" + physical + "," + gnd + ")-${param:low_drop})/${param:rout} : 0}" );
+        if( electrical.contains( "output_high_resistance" ) || electrical.contains( "output_low_resistance" ) )
+        {
+            // Interpolate one target voltage and resistance, then route sourcing
+            // current through VCC and sinking current through GND. Two parallel
+            // partly-on drivers would add shoot-through on top of calibrated CPD.
+            const auto target = "(${param:low_drop}+(v(" + vcc + "," + gnd + ")-${param:high_drop}-${param:low_drop})*v(" + code + "))";
+            const auto resistance = "(" + highResistance + "*v(" + code + ")+" + lowResistance + "*(1-v(" + code + ")))";
+            const auto current = known + "*(v(" + physical + "," + gnd + ")-" + target + ")/" + resistance;
+            add( "Bbh_hi_" + id + "_${id} " + physical + " " + vcc + " I={v(" + enable + ") > 0.5 ? min(0," + current + ") : 0}" );
+            add( "Bbh_lo_" + id + "_${id} " + physical + " " + gnd + " I={v(" + enable + ") > 0.5 ? max(0," + current + ") : 0}" );
+        }
+        else
+        {
+            add( "Bbh_hi_" + id + "_${id} " + physical + " " + vcc + " I={v(" + enable + ") > 0.5 ? " + known + "*v(" + code + ")*(v(" + physical + "," + vcc + ")+${param:high_drop})/" + highResistance + " : 0}" );
+            add( "Bbh_lo_" + id + "_${id} " + physical + " " + gnd + " I={v(" + enable + ") > 0.5 ? " + known + "*(1-v(" + code + "))*(v(" + physical + "," + gnd + ")-${param:low_drop})/" + lowResistance + " : 0}" );
+        }
+        for( const auto& direction : { std::string( "source" ), std::string( "sink" ) } )
+            if( electrical.contains( direction + "_rating" ) )
+            {
+                const std::string parameter = electrical.at( direction + "_rating" );
+                par( parameter );
+                const auto branch = direction == "source" ? "hi_" : "lo_";
+                const auto node = "bh_rating_" + id + "_" + direction + "_${id}";
+                // IOH/IOL are DC operating ratings, not instantaneous charging
+                // limits. Average briefly so a normal capacitive edge does not
+                // latch a permanent overload warning in the editor.
+                add( "B" + node + " " + node + "_raw 0 V={abs(i(Bbh_" + std::string( branch ) + id + "_${id}))}" );
+                add( "R" + node + " " + node + "_raw " + node + " {" + ep( "current_rating_window", "1u" ) + "/1n}" );
+                add( "C" + node + " " + node + " 0 1n" );
+                m.currentWarnings.push_back( { id + " " + direction, "v(" + node + ")", parameter } );
+            }
         m.driverEnable[id] = "v(" + enable + ")"; m.driverValue[id] = "v(" + code + ")";
     }
     for( const auto& p : m.pins )

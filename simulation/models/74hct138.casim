@@ -1,0 +1,361 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "74hct138",
+  "name": "74HCT138 3-to-8 active-low decoder",
+  "description": "Nominal mixed-signal logic with package pinout, propagation delay and finite output impedance. See docs/circuitalive/REGISTER_COUNTER_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "Positive supply",
+      "role": "power",
+      "default_pin": "16"
+    },
+    {
+      "id": "gnd",
+      "label": "Supply reference",
+      "role": "reference",
+      "default_pin": "8"
+    },
+    {
+      "id": "a0",
+      "label": "a0",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "a1",
+      "label": "a1",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "a2",
+      "label": "a2",
+      "role": "input",
+      "default_pin": "3"
+    },
+    {
+      "id": "en0",
+      "label": "en0",
+      "role": "input",
+      "default_pin": "4"
+    },
+    {
+      "id": "en1",
+      "label": "en1",
+      "role": "input",
+      "default_pin": "5"
+    },
+    {
+      "id": "en2",
+      "label": "en2",
+      "role": "input",
+      "default_pin": "6"
+    },
+    {
+      "id": "y0",
+      "label": "y0",
+      "role": "output",
+      "default_pin": "15"
+    },
+    {
+      "id": "y1",
+      "label": "y1",
+      "role": "output",
+      "default_pin": "14"
+    },
+    {
+      "id": "y2",
+      "label": "y2",
+      "role": "output",
+      "default_pin": "13"
+    },
+    {
+      "id": "y3",
+      "label": "y3",
+      "role": "output",
+      "default_pin": "12"
+    },
+    {
+      "id": "y4",
+      "label": "y4",
+      "role": "output",
+      "default_pin": "11"
+    },
+    {
+      "id": "y5",
+      "label": "y5",
+      "role": "output",
+      "default_pin": "10"
+    },
+    {
+      "id": "y6",
+      "label": "y6",
+      "role": "output",
+      "default_pin": "9"
+    },
+    {
+      "id": "y7",
+      "label": "y7",
+      "role": "output",
+      "default_pin": "7"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Vil",
+      "default": ".16",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "Vih",
+      "default": ".4",
+      "unit": "",
+      "min": 0.1,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Vmin",
+      "default": "4.5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Vmax",
+      "default": "5.5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "rise_delay",
+      "label": "Rise delay",
+      "default": "18n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "fall_delay",
+      "label": "Fall delay",
+      "default": "18n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Transition",
+      "default": "2n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "35",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Cin",
+      "default": "3.5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Iq",
+      "default": "4u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "high_drop",
+      "label": "High drop",
+      "unit": "V",
+      "default": "0",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Low drop",
+      "unit": "V",
+      "default": "0",
+      "min": 0,
+      "max": 5
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "74xx:74HCT138"
+    ],
+    "symbol_names": [
+      "74HCT138"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "behavioral": {
+    "version": 1,
+    "supply": {
+      "vcc": "vcc",
+      "gnd": "gnd"
+    },
+    "blocks": [
+      {
+        "type": "nand",
+        "inputs": [
+          "!en0",
+          "!en1",
+          "en2",
+          "!a0",
+          "!a1",
+          "!a2"
+        ],
+        "out": "s0"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "!en0",
+          "!en1",
+          "en2",
+          "a0",
+          "!a1",
+          "!a2"
+        ],
+        "out": "s1"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "!en0",
+          "!en1",
+          "en2",
+          "!a0",
+          "a1",
+          "!a2"
+        ],
+        "out": "s2"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "!en0",
+          "!en1",
+          "en2",
+          "a0",
+          "a1",
+          "!a2"
+        ],
+        "out": "s3"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "!en0",
+          "!en1",
+          "en2",
+          "!a0",
+          "!a1",
+          "a2"
+        ],
+        "out": "s4"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "!en0",
+          "!en1",
+          "en2",
+          "a0",
+          "!a1",
+          "a2"
+        ],
+        "out": "s5"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "!en0",
+          "!en1",
+          "en2",
+          "!a0",
+          "a1",
+          "a2"
+        ],
+        "out": "s6"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "!en0",
+          "!en1",
+          "en2",
+          "a0",
+          "a1",
+          "a2"
+        ],
+        "out": "s7"
+      }
+    ],
+    "outputs": {
+      "y0": {
+        "signal": "s0"
+      },
+      "y1": {
+        "signal": "s1"
+      },
+      "y2": {
+        "signal": "s2"
+      },
+      "y3": {
+        "signal": "s3"
+      },
+      "y4": {
+        "signal": "s4"
+      },
+      "y5": {
+        "signal": "s5"
+      },
+      "y6": {
+        "signal": "s6"
+      },
+      "y7": {
+        "signal": "s7"
+      }
+    }
+  },
+  "sources": [
+    "https://assets.nexperia.com/documents/data-sheet/74HC_HCT138.pdf"
+  ],
+  "category": "Digital/Decoders",
+  "family": "74HCT",
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own event-driven functional model; no vendor SPICE source copied. The .casim file contains all device-specific behavior.",
+    "Package pin numbers, control polarity, functional state and finite nominal delays are represented. Initial storage is unknown until reset, parallel load or enough valid clocks.",
+    "Delays are per logic block, not a complete timing-characterization matrix. Allow settling and obey setup/hold; metastability and timing violations are not modeled.",
+    "Input thresholds scale with local supply. LS/HCT/AHCT thresholds are calibrated to 0.8/2 V at 5 V; LS outputs approximate 3.4/0.2 V before loading.",
+    "Finite output resistance, input capacitance and package quiescent current are fixed approximate nominal parameters. No detailed fan-out, TTL input current, ESD, parasitic power, thermal drift or damage.",
+    "Outputs release outside the supply window. No retention through a power cycle is guaranteed.",
+    "Physical clock inputs use supply-relative Schmitt action; data and other controls retain 0/X/1 conversion. All-input Schmitt behavior of AHC/AHCT is not reproduced.",
+    "No fixed small global maximum timestep; XSPICE schedules internal events. Use circuit resolution appropriate to the electrical stimulus.",
+    "Enabled only when pin 4 and pin 5 are LOW and pin 6 is HIGH. Inactive outputs drive HIGH."
+  ]
+}

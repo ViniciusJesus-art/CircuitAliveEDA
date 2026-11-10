@@ -208,7 +208,8 @@ private:
             {
                 SIM_ACTIVITY_MONITOR monitor{ item.at( "signal" ), item.at( "reference" ),
                     item.at( "supply" ), item.at( "low" ), item.at( "high" ),
-                    item.at( "default_supply" ), item.at( "min_supply" ), item.at( "max_supply" ) };
+                    item.at( "default_supply" ), item.at( "min_supply" ), item.at( "max_supply" ),
+                    item.value( "threshold_reference", 0.0 ) };
                 auto valid = [&]( std::size_t index )
                     { return index == ACTIVITY_NO_SIGNAL || index < cfg.signals.size(); };
                 if( !valid( monitor.signal ) || !valid( monitor.reference )
@@ -216,7 +217,8 @@ private:
                     || !std::isfinite( monitor.high ) || monitor.low >= monitor.high
                     || !std::isfinite( monitor.defaultSupply ) || monitor.defaultSupply <= 0
                     || !std::isfinite( monitor.minSupply ) || monitor.minSupply <= 0
-                    || !std::isfinite( monitor.maxSupply ) || monitor.maxSupply < monitor.minSupply )
+                    || !std::isfinite( monitor.maxSupply ) || monitor.maxSupply < monitor.minSupply
+                    || !std::isfinite( monitor.thresholdReference ) || monitor.thresholdReference < 0 )
                     throw std::runtime_error( "Invalid signal activity monitor" );
                 cfg.activityMonitors.push_back( monitor );
             }

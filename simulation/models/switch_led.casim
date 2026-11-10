@@ -1,0 +1,228 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "switch_led",
+  "name": "SPST switch with independent LED",
+  "description": "Generic interactive contact plus the existing configurable LED model on separate pins.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Contact 1",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Contact 2",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "led_k",
+      "label": "Cathode (K)",
+      "role": "passive",
+      "default_pin": "3"
+    },
+    {
+      "id": "led_a",
+      "label": "Anode (A)",
+      "role": "passive",
+      "default_pin": "4"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "forward_voltage",
+      "label": "Forward voltage at reference current",
+      "default": "2.194",
+      "unit": "V",
+      "min": 1.2,
+      "max": 6
+    },
+    {
+      "id": "reference_current",
+      "label": "Reference current",
+      "default": "10m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 0.1
+    },
+    {
+      "id": "emission",
+      "label": "Emission coefficient",
+      "default": "2",
+      "unit": "",
+      "min": 1,
+      "max": 4
+    },
+    {
+      "id": "series_resistance",
+      "label": "Series resistance",
+      "default": "5",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 10
+    },
+    {
+      "id": "brightness_current",
+      "label": "Current for full displayed brightness",
+      "default": "10m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 1
+    },
+    {
+      "id": "rated_current",
+      "label": "Current warning threshold",
+      "default": "20m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 1
+    },
+    {
+      "id": "color_red",
+      "label": "Display color — red",
+      "default": "255",
+      "unit": "",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "color_green",
+      "label": "Display color — green",
+      "default": "66",
+      "unit": "",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "color_blue",
+      "label": "Display color — blue",
+      "default": "5",
+      "unit": "",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "display_intensity",
+      "label": "Display intensity",
+      "default": "100",
+      "unit": "%",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "circle_diameter",
+      "label": "Overlay circle diameter",
+      "default": "3.4",
+      "unit": "mm",
+      "min": 0,
+      "max": 50
+    },
+    {
+      "id": "halo_diameter",
+      "label": "Overlay halo diameter",
+      "default": "4.6",
+      "unit": "mm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "display_opacity",
+      "label": "Overlay opacity",
+      "default": "80",
+      "unit": "%",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "on_resistance",
+      "label": "Closed resistance",
+      "default": "0.01",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000.0
+    },
+    {
+      "id": "off_resistance",
+      "label": "Open resistance",
+      "default": "1e12",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "D${id} ${pin:led_a} ${pin:led_k} led_m${id} area={area${id}}",
+      "Vcontrol${id} control${id} 0 ${control:initial}",
+      "S${id} ${pin:p} ${pin:n} control${id} 0 m${id}"
+    ],
+    "definitions": [
+      ".param area${id}={${param:reference_current}/(exp((${param:forward_voltage}-${param:reference_current}*${param:series_resistance})/(${param:emission}*0.0258649258))-1)/1e-12}",
+      ".model led_m${id} D(Is=1e-12 N=${param:emission} Rs={${param:series_resistance}*area${id}} Tnom=27)",
+      ".model m${id} SW(Ron=${param:on_resistance} Roff=${param:off_resistance} Vt=2.5 Vh=0.1)"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "Switch:SW_MEC_5E",
+      "Switch:SW_MEC_5G_LED",
+      "Switch:SW_Push_LED",
+      "Switch:SW_SPST_LED"
+    ],
+    "symbol_names": [
+      "SW_MEC_5E",
+      "SW_MEC_5G_LED",
+      "SW_Push_LED",
+      "SW_SPST_LED"
+    ]
+  },
+  "legacy_spice_fields": {
+    "Sim.Pins": "1=K 2=A"
+  },
+  "indicator": {
+    "type": "led",
+    "signal": "@d${id}[id]",
+    "brightness_parameter": "brightness_current",
+    "rating_parameter": "rated_current",
+    "appearance": {
+      "red_parameter": "color_red",
+      "green_parameter": "color_green",
+      "blue_parameter": "color_blue",
+      "intensity_parameter": "display_intensity",
+      "diameter_parameter": "circle_diameter",
+      "halo_diameter_parameter": "halo_diameter",
+      "opacity_parameter": "display_opacity"
+    }
+  },
+  "measurement_ports": {
+    "positive": "p",
+    "negative": "n"
+  },
+  "category": "Electromechanical/Switches",
+  "family": "Illuminated switches",
+  "equations": [
+    "Forward PN junction with series resistance; current is set by the connected circuit.",
+    "Forward voltage is calibrated at reference_current. Reverse current does not light the LED.",
+    "Brightness and warning currents control visualization and warnings; they do not limit current.",
+    "Display color, intensity, opacity and circle/halo diameters affect only the overlay; electrical current is unchanged. Diameters are in schematic millimeters. Zero diameter hides that circle."
+  ],
+  "control": {
+    "source": "Vcontrol${id}",
+    "on": 5,
+    "off": 0,
+    "initially_closed": true,
+    "initially_open_symbols": [
+      "SW_Push_LED",
+      "SW_MEC_5E",
+      "SW_MEC_5G_LED"
+    ]
+  },
+  "model_notes": [
+    "Generic contact combination using the existing switch primitive; finite Ron/Roff, no contact bounce or manufacturer-specific timing/current rating.",
+    "Pin pairs and common terminals were reviewed from the bundled standard symbol drawings. All physical pins are represented.",
+    "Pins 1/2 switch independently of LED pins 4(A)/3(K). LED parameters are generic/editable; no specific LED color/drop is inferred from a switch manufacturer."
+  ]
+}

@@ -1,0 +1,295 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "darlington_array_sn75468",
+  "name": "SN75468 low-side Darlington array",
+  "description": "Own nominal compact model. See docs/circuitalive/JFET_DIODE_DRIVER_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "gnd",
+      "label": "Common emitter / GND",
+      "default_pin": "8",
+      "role": "reference"
+    },
+    {
+      "id": "clamp",
+      "label": "Clamp diode COM",
+      "default_pin": "9",
+      "role": "passive"
+    },
+    {
+      "id": "in0",
+      "label": "Input 1",
+      "default_pin": "1",
+      "role": "input"
+    },
+    {
+      "id": "in1",
+      "label": "Input 2",
+      "default_pin": "2",
+      "role": "input"
+    },
+    {
+      "id": "in2",
+      "label": "Input 3",
+      "default_pin": "3",
+      "role": "input"
+    },
+    {
+      "id": "in3",
+      "label": "Input 4",
+      "default_pin": "4",
+      "role": "input"
+    },
+    {
+      "id": "in4",
+      "label": "Input 5",
+      "default_pin": "5",
+      "role": "input"
+    },
+    {
+      "id": "in5",
+      "label": "Input 6",
+      "default_pin": "6",
+      "role": "input"
+    },
+    {
+      "id": "in6",
+      "label": "Input 7",
+      "default_pin": "7",
+      "role": "input"
+    },
+    {
+      "id": "out0",
+      "label": "Collector 1",
+      "default_pin": "16",
+      "role": "passive"
+    },
+    {
+      "id": "out1",
+      "label": "Collector 2",
+      "default_pin": "15",
+      "role": "passive"
+    },
+    {
+      "id": "out2",
+      "label": "Collector 3",
+      "default_pin": "14",
+      "role": "passive"
+    },
+    {
+      "id": "out3",
+      "label": "Collector 4",
+      "default_pin": "13",
+      "role": "passive"
+    },
+    {
+      "id": "out4",
+      "label": "Collector 5",
+      "default_pin": "12",
+      "role": "passive"
+    },
+    {
+      "id": "out5",
+      "label": "Collector 6",
+      "default_pin": "11",
+      "role": "passive"
+    },
+    {
+      "id": "out6",
+      "label": "Collector 7",
+      "default_pin": "10",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "input_resistance",
+      "label": "Series input resistance",
+      "default": "2.7k",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000.0
+    },
+    {
+      "id": "input_bleed",
+      "label": "First-stage base-emitter resistor",
+      "default": "7.2k",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000.0
+    },
+    {
+      "id": "output_bleed",
+      "label": "Second-stage base-emitter resistor",
+      "default": "3k",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000.0
+    },
+    {
+      "id": "driver_gain",
+      "label": "Nominal driver transistor gain",
+      "default": "70",
+      "unit": "",
+      "min": 1,
+      "max": 1000
+    },
+    {
+      "id": "output_gain",
+      "label": "Nominal output transistor gain",
+      "default": "100",
+      "unit": "",
+      "min": 1,
+      "max": 1000
+    },
+    {
+      "id": "collector_resistance",
+      "label": "Output collector series resistance",
+      "default": ".5",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "output_knee",
+      "label": "Output gain rolloff current",
+      "default": ".15",
+      "unit": "A",
+      "min": 0.001,
+      "max": 100
+    },
+    {
+      "id": "clamp_breakdown",
+      "label": "Approximate clamp diode reverse breakdown",
+      "default": "100",
+      "unit": "V",
+      "min": 1,
+      "max": 10000.0
+    },
+    {
+      "id": "clamp_resistance",
+      "label": "Clamp diode series resistance",
+      "default": "2.4",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "id": "current_warning",
+      "label": "Single-channel current warning (not package rating)",
+      "default": ".5",
+      "unit": "A",
+      "min": 0,
+      "max": 100
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Transistor_Array:SN75468"
+    ],
+    "symbol_names": [
+      "SN75468"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Rin0_${id} ${pin:in0} base0_${id} ${param:input_resistance}",
+      "Rbe1_0_${id} base0_${id} middle0_${id} ${param:input_bleed}",
+      "Rbe2_0_${id} middle0_${id} ${pin:gnd} ${param:output_bleed}",
+      "Vsense0_${id} ${pin:out0} collector0_${id} 0",
+      "Qdriver0_${id} collector0_${id} base0_${id} middle0_${id} driver_${id}",
+      "Qoutput0_${id} collector0_${id} middle0_${id} ${pin:gnd} output_${id}",
+      "Dclamp0_${id} collector0_${id} ${pin:clamp} clamp_${id}",
+      "Dinput0_${id} ${pin:gnd} ${pin:in0} substrate_${id}",
+      "Dsubstrate0_${id} ${pin:gnd} collector0_${id} substrate_${id}",
+      "Rin1_${id} ${pin:in1} base1_${id} ${param:input_resistance}",
+      "Rbe1_1_${id} base1_${id} middle1_${id} ${param:input_bleed}",
+      "Rbe2_1_${id} middle1_${id} ${pin:gnd} ${param:output_bleed}",
+      "Vsense1_${id} ${pin:out1} collector1_${id} 0",
+      "Qdriver1_${id} collector1_${id} base1_${id} middle1_${id} driver_${id}",
+      "Qoutput1_${id} collector1_${id} middle1_${id} ${pin:gnd} output_${id}",
+      "Dclamp1_${id} collector1_${id} ${pin:clamp} clamp_${id}",
+      "Dinput1_${id} ${pin:gnd} ${pin:in1} substrate_${id}",
+      "Dsubstrate1_${id} ${pin:gnd} collector1_${id} substrate_${id}",
+      "Rin2_${id} ${pin:in2} base2_${id} ${param:input_resistance}",
+      "Rbe1_2_${id} base2_${id} middle2_${id} ${param:input_bleed}",
+      "Rbe2_2_${id} middle2_${id} ${pin:gnd} ${param:output_bleed}",
+      "Vsense2_${id} ${pin:out2} collector2_${id} 0",
+      "Qdriver2_${id} collector2_${id} base2_${id} middle2_${id} driver_${id}",
+      "Qoutput2_${id} collector2_${id} middle2_${id} ${pin:gnd} output_${id}",
+      "Dclamp2_${id} collector2_${id} ${pin:clamp} clamp_${id}",
+      "Dinput2_${id} ${pin:gnd} ${pin:in2} substrate_${id}",
+      "Dsubstrate2_${id} ${pin:gnd} collector2_${id} substrate_${id}",
+      "Rin3_${id} ${pin:in3} base3_${id} ${param:input_resistance}",
+      "Rbe1_3_${id} base3_${id} middle3_${id} ${param:input_bleed}",
+      "Rbe2_3_${id} middle3_${id} ${pin:gnd} ${param:output_bleed}",
+      "Vsense3_${id} ${pin:out3} collector3_${id} 0",
+      "Qdriver3_${id} collector3_${id} base3_${id} middle3_${id} driver_${id}",
+      "Qoutput3_${id} collector3_${id} middle3_${id} ${pin:gnd} output_${id}",
+      "Dclamp3_${id} collector3_${id} ${pin:clamp} clamp_${id}",
+      "Dinput3_${id} ${pin:gnd} ${pin:in3} substrate_${id}",
+      "Dsubstrate3_${id} ${pin:gnd} collector3_${id} substrate_${id}",
+      "Rin4_${id} ${pin:in4} base4_${id} ${param:input_resistance}",
+      "Rbe1_4_${id} base4_${id} middle4_${id} ${param:input_bleed}",
+      "Rbe2_4_${id} middle4_${id} ${pin:gnd} ${param:output_bleed}",
+      "Vsense4_${id} ${pin:out4} collector4_${id} 0",
+      "Qdriver4_${id} collector4_${id} base4_${id} middle4_${id} driver_${id}",
+      "Qoutput4_${id} collector4_${id} middle4_${id} ${pin:gnd} output_${id}",
+      "Dclamp4_${id} collector4_${id} ${pin:clamp} clamp_${id}",
+      "Dinput4_${id} ${pin:gnd} ${pin:in4} substrate_${id}",
+      "Dsubstrate4_${id} ${pin:gnd} collector4_${id} substrate_${id}",
+      "Rin5_${id} ${pin:in5} base5_${id} ${param:input_resistance}",
+      "Rbe1_5_${id} base5_${id} middle5_${id} ${param:input_bleed}",
+      "Rbe2_5_${id} middle5_${id} ${pin:gnd} ${param:output_bleed}",
+      "Vsense5_${id} ${pin:out5} collector5_${id} 0",
+      "Qdriver5_${id} collector5_${id} base5_${id} middle5_${id} driver_${id}",
+      "Qoutput5_${id} collector5_${id} middle5_${id} ${pin:gnd} output_${id}",
+      "Dclamp5_${id} collector5_${id} ${pin:clamp} clamp_${id}",
+      "Dinput5_${id} ${pin:gnd} ${pin:in5} substrate_${id}",
+      "Dsubstrate5_${id} ${pin:gnd} collector5_${id} substrate_${id}",
+      "Rin6_${id} ${pin:in6} base6_${id} ${param:input_resistance}",
+      "Rbe1_6_${id} base6_${id} middle6_${id} ${param:input_bleed}",
+      "Rbe2_6_${id} middle6_${id} ${pin:gnd} ${param:output_bleed}",
+      "Vsense6_${id} ${pin:out6} collector6_${id} 0",
+      "Qdriver6_${id} collector6_${id} base6_${id} middle6_${id} driver_${id}",
+      "Qoutput6_${id} collector6_${id} middle6_${id} ${pin:gnd} output_${id}",
+      "Dclamp6_${id} collector6_${id} ${pin:clamp} clamp_${id}",
+      "Dinput6_${id} ${pin:gnd} ${pin:in6} substrate_${id}",
+      "Dsubstrate6_${id} ${pin:gnd} collector6_${id} substrate_${id}"
+    ],
+    "definitions": [
+      ".model driver_${id} NPN(Is=50f Bf=${param:driver_gain} Ikf=.015 Vaf=80 Rb=10 Rc=1 Re=.1 Cje=8p Cjc=5p Tf=.3n Tr=20n Tnom=25)",
+      ".model output_${id} NPN(Is=5p Bf=${param:output_gain} Ikf=${param:output_knee} Vaf=80 Rb=1 Rc=${param:collector_resistance} Re=.05 Cje=40p Cjc=15p Tf=.7n Tr=100n Tnom=25)",
+      ".model clamp_${id} D(Is=1n N=1.7 Rs=${param:clamp_resistance} Bv=${param:clamp_breakdown} Cjo=15p Tt=100n Tnom=25)",
+      ".model substrate_${id} D(Is=1n N=1.5 Rs=1 Cjo=10p Tnom=25)",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "category": "Semiconductors/Transistor arrays",
+  "family": "Low-side Darlington drivers",
+  "nominal_temperature_c": 25,
+  "measurement_ports": {
+    "positive": "out0",
+    "negative": "gnd"
+  },
+  "current_warning": {
+    "signal": "max(max(max(max(max(max(abs(i(Vsense0_${id})),abs(i(Vsense1_${id}))),abs(i(Vsense2_${id}))),abs(i(Vsense3_${id}))),abs(i(Vsense4_${id}))),abs(i(Vsense5_${id}))),abs(i(Vsense6_${id})))",
+    "limit_parameter": "current_warning"
+  },
+  "sources": [
+    "https://www.ti.com/lit/ds/symlink/sn75468.pdf"
+  ],
+  "model_notes": [
+    "Own two-native-NPN circuit per physical channel, with input resistance, base-emitter bleeders and output-to-COM flyback diodes. Not copied vendor SPICE code.",
+    "Open-collector outputs only sink current; they need an external load/pull-up. COM is the clamp return, not a power supply or enable, and may float for resistive loads.",
+    "Input current and analog Darlington transfer remain present, including without a COM connection. Low inputs and internal bleeders turn the stages off; no arbitrary digital HIGH/LOW regeneration.",
+    "50 V versions and 100 V SN7546x use the respective clamp reverse ratings. Collector-emitter avalanche is not represented; do not use unclamped inductive breakdown as a design result.",
+    "Transistor gains, capacitances, storage and leakage are room-temperature compact approximations; no calibrated switching loss, thermal coupling, derating, SOA or damage.",
+    "The 0.5 A warning monitors the largest collector-port current, including clamp flow. It does not rate simultaneous channel/package dissipation or enforce current limiting.",
+    "Displayed voltage/current/power refer to channel 1 collector and GND, not the whole package. Substrate diodes approximate undershoot paths; they are not rated load-current paths.",
+    "Requests circuit-wide Gear order 2 without a fixed small global timestep."
+  ]
+}

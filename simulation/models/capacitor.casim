@@ -52,10 +52,27 @@
       "C_Polarized_US",
       "C_Small",
       "C_Small_US",
-      "C_US"
+      "C_Trim",
+      "C_Trim_Small",
+      "C_US",
+      "C_Variable"
     ],
     "device_hints": [
       "C"
+    ],
+    "library_ids": [
+      "Device:C",
+      "Device:C_45deg",
+      "Device:C_Polarized",
+      "Device:C_Polarized_Small",
+      "Device:C_Polarized_Small_US",
+      "Device:C_Polarized_US",
+      "Device:C_Small",
+      "Device:C_Small_US",
+      "Device:C_Trim",
+      "Device:C_Trim_Small",
+      "Device:C_US",
+      "Device:C_Variable"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -74,5 +91,8 @@
   "equations": [
     "I = C × d(V1 − V2)/dt.",
     "Charge Q = C × (V1 − V2)."
+  ],
+  "model_notes": [
+    "Trim/variable symbols use the configured capacitance; no mechanical actuator is simulated."
   ]
 }

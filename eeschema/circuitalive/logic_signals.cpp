@@ -18,8 +18,9 @@ LOGIC_LEVEL PinLogicLevel( const LOGIC_PIN& pin, const SIM_SAMPLE& sample )
     // Internal DAC codes use 0/0.5/1 independently of the physical input thresholds (e.g. TTL).
     if( pin.driverValue != NO_SIGNAL && value( pin.driverValue ) > .25 && value( pin.driverValue ) < .75 )
         return LOGIC_LEVEL::UNKNOWN;
-    const double ratio = ( value( pin.voltage ) - ground ) / supply;
-    if( !std::isfinite( ratio ) || ratio < -.1 || ratio > 1.1 ) return LOGIC_LEVEL::UNKNOWN;
+    const double railRatio = ( value( pin.voltage ) - ground ) / supply;
+    if( !std::isfinite( railRatio ) || railRatio < -.1 || railRatio > 1.1 ) return LOGIC_LEVEL::UNKNOWN;
+    const double ratio = ( value( pin.voltage ) - ground ) / ( pin.thresholdReference > 0 ? pin.thresholdReference : supply );
     if( ratio <= pin.low ) return LOGIC_LEVEL::LOW;
     if( ratio >= pin.high ) return LOGIC_LEVEL::HIGH;
     return LOGIC_LEVEL::UNKNOWN;

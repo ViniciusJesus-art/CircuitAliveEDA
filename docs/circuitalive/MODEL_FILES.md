@@ -13,6 +13,10 @@ O envelope `.casim` v1 atende modelos analógicos e digitais XSPICE no backend
 ngspice. O comportamento fica no arquivo, incluindo portas e atrasos. A seção `behavioral` permite compor portas, flip-flops, latch e RAM com interfaces
 elétricas. Veja [Perfis e componentes complexos](COMPLEX_MODELS.md).
 Veja [Componentes básicos e digital](BASIC_AND_DIGITAL_MODELS.md).
+Os [vínculos padrão revisados](STANDARD_LIBRARY_ASSOCIATIONS.md) já são
+distribuídos nos modelos, incluindo chaves e variantes de passivos.
+Histerese e os parâmetros opcionais de carga, drive, corrente e consumo estão
+em [Portas Schmitt e parâmetros elétricos digitais](SCHMITT_ELECTRICAL_MODELS.md).
 
 ## Configurar no editor
 
@@ -188,8 +192,12 @@ Um monitor opcional declara um sinal de corrente e um parâmetro de limite:
 ```
 
 `limit_parameter` precisa existir em `parameters`; valores positivos habilitam
-o aviso e 0 o desativa. O sinal usa os mesmos templates do netlist. O campo
-`voltage_constraint_parameter` é reservado a uma diferença de potencial ideal
+o aviso e 0 o desativa. O sinal usa os mesmos templates do netlist. Expressões
+como `abs(i(Vsense_${id}))` e `max(abs(i(Va_${id})),abs(i(Vb_${id})))` também
+são aceitas: o gerador as avalia em um monitor comportamental e salva seu
+valor numérico como sinal nativo. Isso permite avisos por maior corrente de
+canal, sem tentar salvar a expressão como nome de vetor no ngspice.
+O campo `voltage_constraint_parameter` é reservado a uma diferença de potencial ideal
 imposta entre os `measurement_ports`: se o parâmetro for diferente de zero,
 terminais na mesma rede geram erro de curto antes de iniciar a sessão.
 A fonte DC distribuída declara ambos; o primeiro não adiciona resistência

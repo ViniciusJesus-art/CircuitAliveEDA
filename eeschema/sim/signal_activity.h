@@ -16,6 +16,7 @@ struct SIM_ACTIVITY_MONITOR
 {
     std::size_t signal = 0, reference = ACTIVITY_NO_SIGNAL, supply = ACTIVITY_NO_SIGNAL;
     double low = 0, high = 1, defaultSupply = 1, minSupply = .1, maxSupply = 1e6;
+    double thresholdReference = 0; // Optional absolute reference, independent of supply validity.
 };
 
 struct SIM_SIGNAL_ACTIVITY
@@ -43,7 +44,7 @@ public:
         const double reference = value( aMonitor.reference );
         const double supply = value( aMonitor.supply, aMonitor.defaultSupply ) - reference;
         const double raw = value( aMonitor.signal );
-        const double ratio = ( raw - reference ) / supply;
+        const double ratio = ( raw - reference ) / ( aMonitor.thresholdReference > 0 ? aMonitor.thresholdReference : supply );
         if( !std::isfinite( ratio ) || !std::isfinite( supply )
             || supply < aMonitor.minSupply || supply > aMonitor.maxSupply )
         {

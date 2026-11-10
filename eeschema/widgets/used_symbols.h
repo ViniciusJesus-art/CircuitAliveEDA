@@ -11,6 +11,7 @@
 class SCH_EDIT_FRAME;
 class SCH_SHEET_PATH;
 class SCH_SYMBOL;
+class SCH_ITEM;
 class TOOL_MANAGER;
 
 namespace CIRCUITALIVE
@@ -25,6 +26,8 @@ struct USED_SYMBOL_ENTRY
 std::vector<USED_SYMBOL_ENTRY> BuildUsedSymbolList( SCH_SHEET_PATH& aSheet );
 std::unique_ptr<SCH_SYMBOL> CopyUsedSymbol( const SCH_SYMBOL& aSource,
                                            SCH_SHEET_PATH& aSheet, const VECTOR2I& aPosition );
+// Independent copies, including group members, suitable for a placement template or preview.
+std::vector<std::unique_ptr<SCH_ITEM>> CopyPlacementItems( const std::vector<SCH_ITEM*>& aItems );
 
 struct USED_SYMBOL_ACTIONS
 {
@@ -36,7 +39,13 @@ void InstallUsedSymbols( SCH_EDIT_FRAME* aFrame );
 void RestoreUsedSymbolsVisibility( SCH_EDIT_FRAME* aFrame );
 void ShutdownUsedSymbols( SCH_EDIT_FRAME* aFrame );
 void RebindUsedSymbols( SCH_EDIT_FRAME* aFrame );
-bool BeginUsedSymbolPlacement( SCH_EDIT_FRAME* aFrame, const VECTOR2I& aPosition );
+bool BeginUsedSymbolPlacement( SCH_EDIT_FRAME* aFrame, const VECTOR2I& aPosition,
+                               bool aOnWire = false );
+void RememberPlacement( SCH_EDIT_FRAME* aFrame, const std::vector<SCH_ITEM*>& aItems,
+                         bool aUpdateOnly = false, bool aContinueUnits = false );
+void QueuePlacementLabels( SCH_EDIT_FRAME* aFrame, const std::vector<SCH_ITEM*>& aLabels );
+void FinishItemPlacement( SCH_EDIT_FRAME* aFrame );
+std::vector<std::unique_ptr<SCH_ITEM>> CopyLastPlacement( SCH_EDIT_FRAME* aFrame );
 // Return true when cancelling our preview while retaining the palette choice.
 bool CancelUsedSymbolPlacement( SCH_EDIT_FRAME* aFrame, const SCH_SYMBOL* aPreview = nullptr );
 void FinishUsedSymbolPlacement( SCH_EDIT_FRAME* aFrame, const SCH_SYMBOL* aPreview );

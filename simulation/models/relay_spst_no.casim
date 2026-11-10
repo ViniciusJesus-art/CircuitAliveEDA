@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "relay_spst_no",
+  "name": "SPST-NO DC-coil relay",
+  "description": "Own compact electrical model. See docs/circuitalive/PASSIVE_BRIDGE_RELAY_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "coil1",
+      "label": "Coil A1",
+      "default_pin": "A1",
+      "role": "passive"
+    },
+    {
+      "id": "coil2",
+      "label": "Coil A2",
+      "default_pin": "A2",
+      "role": "passive"
+    },
+    {
+      "id": "common0",
+      "label": "Pole 1 common",
+      "default_pin": "13",
+      "role": "passive"
+    },
+    {
+      "id": "no0",
+      "label": "Pole 1 NO",
+      "default_pin": "14",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "rated_voltage",
+      "label": "Nominal DC coil voltage",
+      "default": "12",
+      "unit": "V",
+      "min": 0.1,
+      "max": 1000
+    },
+    {
+      "id": "coil_resistance",
+      "label": "Coil resistance",
+      "default": "400",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "coil_inductance",
+      "label": "Coil inductance",
+      "default": ".8",
+      "unit": "H",
+      "min": 1e-09,
+      "max": 1000
+    },
+    {
+      "id": "pickup_ratio",
+      "label": "Pickup current / nominal coil current",
+      "default": ".75",
+      "unit": "",
+      "min": 0.5,
+      "max": 1
+    },
+    {
+      "id": "dropout_ratio",
+      "label": "Dropout current / nominal coil current",
+      "default": ".1",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "operate_delay",
+      "label": "Delay after pickup threshold",
+      "default": "5m",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 100
+    },
+    {
+      "id": "release_delay",
+      "label": "Delay after dropout threshold",
+      "default": "3m",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 100
+    },
+    {
+      "id": "transition",
+      "label": "Armature travel interval",
+      "default": "200u",
+      "unit": "s",
+      "min": 1e-09,
+      "max": 1
+    },
+    {
+      "id": "contact_resistance",
+      "label": "Closed-contact resistance",
+      "default": ".05",
+      "unit": "Ohm",
+      "min": 1e-06,
+      "max": 1000000.0
+    },
+    {
+      "id": "off_resistance",
+      "label": "Open-contact resistance",
+      "default": "1e10",
+      "unit": "Ohm",
+      "min": 1000.0,
+      "max": 1000000000000000.0
+    },
+    {
+      "id": "coil_current_warning",
+      "label": "Coil overcurrent warning",
+      "default": ".06",
+      "unit": "A",
+      "min": 0,
+      "max": 1000
+    }
+  ],
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Relay:Relay_SPST-NO"
+    ],
+    "symbol_names": [
+      "Relay_SPST-NO"
+    ]
+  },
+  "spice": {
+    "instance": [
+      "Vcoil_${id} ${pin:coil1} coil_${id} 0",
+      "Rcoil_${id} coil_${id} inductive_${id} ${param:coil_resistance}",
+      "Lcoil_${id} inductive_${id} ${pin:coil2} ${param:coil_inductance} ic=0",
+      "Bdrive_${id} drive_${id} 0 V={abs(i(Vcoil_${id}))*${param:coil_resistance}/${param:rated_voltage}}",
+      "Vlogic_${id} logic_${id} 0 1",
+      "Sstate_${id} logic_${id} state_${id} drive_${id} 0 state_${id} OFF",
+      "Rstate_${id} state_${id} 0 1Meg",
+      "Aadc_${id} [state_${id}] [raw_${id}] adc_${id}",
+      "Adelay_${id} raw_${id} delayed_${id} delay_${id}",
+      "Adac_${id} [delayed_${id}] [position_${id}] dac_${id}",
+      "Bno0_${id} control_no0_${id} 0 V={v(position_${id}) > .75}",
+      "Sno0_${id} ${pin:common0} ${pin:no0} control_no0_${id} 0 contact_${id}"
+    ],
+    "definitions": [
+      ".model state_${id} SW(Ron=1 Roff=1e12 Vt={(${param:pickup_ratio}+${param:dropout_ratio})/2} Vh={(${param:pickup_ratio}-${param:dropout_ratio})/2})",
+      ".model adc_${id} adc_bridge(in_low=.3 in_high=.7)",
+      ".model delay_${id} d_buffer(rise_delay=${param:operate_delay} fall_delay=${param:release_delay})",
+      ".model dac_${id} dac_bridge(out_low=0 out_high=1 out_undef=.5 t_rise=${param:transition} t_fall=${param:transition})",
+      ".model contact_${id} SW(Ron=${param:contact_resistance} Roff=${param:off_resistance} Vt=.5 Vh=0)",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "category": "Electromechanical/Relays",
+  "family": "Nonlatching DC coil",
+  "electrical_groups": [
+    [
+      "coil1",
+      "coil2"
+    ],
+    [
+      "common0",
+      "no0"
+    ]
+  ],
+  "measurement_ports": {
+    "positive": "coil1",
+    "negative": "coil2"
+  },
+  "current_warning": {
+    "signal": "abs(i(Vcoil_${id}))",
+    "limit_parameter": "coil_current_warning"
+  },
+  "sources": [
+    "https://ngspice.sourceforge.io/docs/ngspice-manual.pdf"
+  ],
+  "model_notes": [
+    "Generic configurable nonlatching DC relay, not a fit to any manufacturer part. Defaults: 12 V, 400 ohm, 0.8 H; edit for the actual coil and contacts.",
+    "Coil current follows the series R/L circuit. Absolute current, normalized by rated_voltage/coil_resistance, drives pickup/dropout hysteresis; coil polarity may reverse.",
+    "Operate/release event delays start after their current thresholds are crossed; R/L rise/decay adds electrical delay. Unknown armature state opens both throws.",
+    "NC opens at 25% and NO closes at 75% of travel, giving break-before-make; this functional travel interval is not a mechanical bounce model.",
+    "Coil and each contact pole have independent galvanic groups. Contact paths are bilateral and have finite on/off resistance; no internal coil suppression diode.",
+    "No AC-coil mechanics, remanence, latching, bounce, arcing, welding, contact-life or thermal failure model. Coil-current warning does not assess contact ratings.",
+    "Displayed current and power refer only to the coil, not contact dissipation. Requests circuit-wide Gear order 2 for contact transitions."
+  ]
+}

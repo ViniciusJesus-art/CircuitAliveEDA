@@ -37,6 +37,7 @@
 #include <widgets/panel_remote_symbol.h>
 #include <widgets/pages_menu.h>
 #include <widgets/used_symbols.h>
+#include <tools/property_stamp.h>
 #include <widgets/editor_layout.h>
 #include <wx/srchctrl.h>
 #include <mail_type.h>
@@ -707,6 +708,7 @@ void SCH_EDIT_FRAME::setupTools()
     m_toolManager->RegisterTool( new EMBED_TOOL );
     CIRCUITALIVE::RegisterEditorSimulation( m_toolManager );
     CIRCUITALIVE::RegisterUsedSymbols( m_toolManager );
+    CIRCUITALIVE::RegisterPropertyStamp( m_toolManager );
     CIRCUITALIVE::RegisterEditorLayout( m_toolManager );
     m_toolManager->InitTools();
 
@@ -961,6 +963,7 @@ void SCH_EDIT_FRAME::setupUIConditions()
 
     CURRENT_TOOL( ACTIONS::deleteTool );
     CURRENT_TOOL( SCH_ACTIONS::highlightNetTool );
+    CURRENT_TOOL( SCH_ACTIONS::propertyStamp );
     CURRENT_TOOL( SCH_ACTIONS::placeSymbol );
     CURRENT_TOOL( SCH_ACTIONS::placePower );
     CURRENT_TOOL( SCH_ACTIONS::placeDesignBlock );

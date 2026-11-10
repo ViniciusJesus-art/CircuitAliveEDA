@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "diode_array_bat54a",
+  "name": "BAT54A diode network",
+  "description": "Own nominal compact model. See docs/circuitalive/JFET_DIODE_DRIVER_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "terminal1",
+      "label": "Physical terminal 1",
+      "default_pin": "1",
+      "role": "passive"
+    },
+    {
+      "id": "terminal2",
+      "label": "Physical terminal 2",
+      "default_pin": "2",
+      "role": "passive"
+    },
+    {
+      "id": "terminal3",
+      "label": "Physical terminal 3",
+      "default_pin": "3",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "saturation_current",
+      "label": "Per-diode saturation current",
+      "default": "100n",
+      "unit": "A",
+      "min": 1e-20,
+      "max": 1
+    },
+    {
+      "id": "emission",
+      "label": "Per-diode emission coefficient",
+      "default": "1.05",
+      "unit": "",
+      "min": 0.5,
+      "max": 5
+    },
+    {
+      "id": "series_resistance",
+      "label": "Per-diode series resistance",
+      "default": "1.5",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "breakdown",
+      "label": "Approximate per-diode reverse breakdown",
+      "default": "30",
+      "unit": "V",
+      "min": 1,
+      "max": 1000000.0
+    },
+    {
+      "id": "junction_capacitance",
+      "label": "Per-diode zero-bias junction capacitance",
+      "default": "14p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "transit_time",
+      "label": "Per-diode transit parameter (not guaranteed recovery time)",
+      "default": "0",
+      "unit": "s",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "current_warning",
+      "label": "Maximum branch-current warning",
+      "default": "0.2",
+      "unit": "A",
+      "min": 0,
+      "max": 100
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Diode:BAT54A"
+    ],
+    "symbol_names": [
+      "BAT54A"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Vsense0_${id} ${pin:terminal3} anode0_${id} 0",
+      "D0_${id} anode0_${id} ${pin:terminal1} junction_${id}",
+      "Vsense1_${id} ${pin:terminal3} anode1_${id} 0",
+      "D1_${id} anode1_${id} ${pin:terminal2} junction_${id}"
+    ],
+    "definitions": [
+      ".model junction_${id} D(Is=${param:saturation_current} N=${param:emission} Rs=${param:series_resistance} BV=${param:breakdown} Cjo=${param:junction_capacitance} Tt=${param:transit_time} Tnom=25)",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "category": "Semiconductors/Diodes",
+  "family": "Diode arrays",
+  "nominal_temperature_c": 25,
+  "electrical_groups": [
+    [
+      "terminal1",
+      "terminal2",
+      "terminal3"
+    ]
+  ],
+  "measurement_ports": {
+    "positive": "terminal3",
+    "negative": "terminal1"
+  },
+  "current_warning": {
+    "signal": "max(abs(i(Vsense0_${id})),abs(i(Vsense1_${id})))",
+    "limit_parameter": "current_warning"
+  },
+  "sources": [
+    "https://www.vishay.com/docs/86410/bat54_bat54a_bat54c_bat54s.pdf"
+  ],
+  "model_notes": [
+    "Own native diode network; each junction preserves its physical polarity, shared terminals and separate galvanic groups for independent pairs.",
+    "Compact room-temperature conduction, leakage, series resistance, junction capacitance and optional charge storage. Reverse rating approximates an avalanche knee, not a guaranteed breakdown curve.",
+    "Current warning uses the largest instantaneous branch current, not the sum. Simultaneous diode loading may require a lower limit; package power, derating and surge energy are not assessed.",
+    "Transit time is a compact storage parameter, not the guaranteed datasheet reverse recovery time. Schottky transit time is zero while capacitive current remains.",
+    "Displayed voltage/current/power refer to the first anode/cathode port pair and are not total package loss under arbitrary multi-terminal excitation.",
+    "No self-heating, production spread, calibrated RF behavior or destructive failure. Requests circuit-wide Gear order 2 without a fixed small global timestep."
+  ]
+}

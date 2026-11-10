@@ -14,6 +14,37 @@ spec.loader.exec_module(catalog)
 
 
 class SymbolPins(unittest.TestCase):
+    def test_catalog_accepts_runtime_models_and_rejects_mixed_schema_pairs(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'mcu.casim'
+            model = {'schema_version': 2, 'backend': 'ngspice+runtime', 'id': 'mcu',
+                     'runtime': {}, 'pins': [{'default_pin': '1'}]}
+            path.write_text(json.dumps(model))
+            self.assertEqual(catalog.load_models([path])[0][1]['id'], 'mcu')
+            for version, backend, runtime in [(1, 'ngspice+runtime', True),
+                                               (2, 'ngspice', True),
+                                               (2, 'ngspice+runtime', False),
+                                               (1, 'ngspice', True)]:
+                model.update(schema_version=version, backend=backend)
+                if runtime:
+                    model['runtime'] = {}
+                else:
+                    model.pop('runtime', None)
+                path.write_text(json.dumps(model))
+                with self.assertRaises(ValueError):
+                    catalog.load_models([path])
+
+    def test_catalog_excludes_connectors_and_nonelectronic_items(self):
+        for library, name in [('Connector', 'USB'), ('Connector_Generic', 'Conn_01x02'),
+                              ('Mechanical', 'MountingHole'), ('power', 'GND'),
+                              ('Device', 'NetTie_2'), ('Device', 'Voltmeter_DC')]:
+            self.assertFalse(catalog.electronic(library, name), (library, name))
+        for library, name in [('Analog_Switch', 'CD4051B'), ('Diode', 'BZV55C12'),
+                              ('MCU_Microchip_ATmega', 'ATmega328P-P'),
+                              ('Relay', 'Relay_SPST'), ('Switch', 'SW_SPDT')]:
+            self.assertTrue(catalog.electronic(library, name), (library, name))
+
     def test_unnamed_pins_alternate_drawings_and_inheritance(self):
         source = '''(kicad_symbol_lib
 \t(symbol "Gate"

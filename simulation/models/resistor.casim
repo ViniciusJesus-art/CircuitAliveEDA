@@ -40,10 +40,35 @@
       "R_45deg",
       "R_Small",
       "R_Small_US",
-      "R_US"
+      "R_Trim",
+      "R_US",
+      "R_Variable",
+      "R_Variable_US",
+      "Thermistor",
+      "Thermistor_NTC",
+      "Thermistor_NTC_US",
+      "Thermistor_PTC",
+      "Thermistor_PTC_US",
+      "Thermistor_US"
     ],
     "device_hints": [
       "R"
+    ],
+    "library_ids": [
+      "Device:R",
+      "Device:R_45deg",
+      "Device:R_Small",
+      "Device:R_Small_US",
+      "Device:R_Trim",
+      "Device:R_US",
+      "Device:R_Variable",
+      "Device:R_Variable_US",
+      "Device:Thermistor",
+      "Device:Thermistor_NTC",
+      "Device:Thermistor_NTC_US",
+      "Device:Thermistor_PTC",
+      "Device:Thermistor_PTC_US",
+      "Device:Thermistor_US"
     ]
   },
   "ignore_legacy_spice_fields": true,
@@ -61,5 +86,9 @@
   },
   "equations": [
     "I = (V1 − V2) / R."
+  ],
+  "model_notes": [
+    "Trim/variable resistor symbols use the configured resistance; this is a two-terminal resistor, not a three-terminal potentiometer.",
+    "Thermistors use their configured resistance at a fixed operating point. Temperature is outside the current scope; NTC/PTC curves and self-heating are not simulated."
   ]
 }

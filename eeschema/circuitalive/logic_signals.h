@@ -14,6 +14,7 @@ struct LOGIC_PIN
     double low = .3, high = .7, minSupply = .1, maxSupply = 1e6;
     bool digital = false, output = false, externalDrive = true;
     std::vector<std::size_t> enables;
+    double thresholdReference = 0; // Zero follows VCC; positive values give absolute input thresholds.
 };
 LOGIC_LEVEL PinLogicLevel( const LOGIC_PIN& aPin, const SIM_SAMPLE& aSample );
 }

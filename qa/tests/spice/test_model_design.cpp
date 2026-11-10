@@ -452,6 +452,9 @@ BOOST_FIXTURE_TEST_CASE( VisibleCoresKeepAllBundledElectricalModelsAndTheirMetad
             BOOST_CHECK_EQUAL( original.parameters.size(), compiled.parameters.size() );
             BOOST_CHECK_EQUAL( original.memories.size(), compiled.memories.size() );
             BOOST_CHECK_EQUAL( original.logicVcc, compiled.logicVcc );
+            BOOST_CHECK_EQUAL( original.logicThresholdReference, compiled.logicThresholdReference );
+            BOOST_CHECK_EQUAL( original.currentWarnings.size(), compiled.currentWarnings.size() );
+            BOOST_CHECK( original.legacyParameterMap == compiled.legacyParameterMap );
             if( !original.indicatorSignal.empty() ) BOOST_CHECK( compiled.indicatorSignal.find("b_Core_") != std::string::npos );
             if( !original.controlSource.empty() ) BOOST_CHECK( compiled.controlSource.find("b_Core_") != std::string::npos );
             auto restored = MODEL_DESIGN::Open(design.Export());

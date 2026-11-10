@@ -26,6 +26,7 @@
 #include <wx/timer.h>
 #include <algorithm>
 #include <optional>
+#include <deque>
 
 namespace CIRCUITALIVE
 {
@@ -150,9 +151,83 @@ public:
     void OnSchSheetChanged( SCHEMATIC& ) override { cancel(); refresh(); }
     void OnSchCurrentVariantChanged( SCHEMATIC& ) override { cancel(); schedule(); }
 
-    bool BeginPlacement( const VECTOR2I& aPosition )
+    void RememberPlacement( const std::vector<SCH_ITEM*>& aItems, bool aUpdateOnly, bool aContinueUnits )
     {
-        if( !m_panel || m_choice.IsEmpty() || !m_frame->ToolStackIsEmpty()
+        if( aUpdateOnly && m_lastItems.empty() )
+            return;
+        auto copies = CopyPlacementItems( aItems );
+        auto queued = aUpdateOnly ? std::move( m_queuedLabels ) : decltype( m_queuedLabels ){};
+        cancel();
+        m_lastItems = std::move( copies );
+        m_continueUnits = aContinueUnits;
+        m_queuedLabels = std::move( queued );
+        m_useNextLabel = !m_queuedLabels.empty();
+    }
+
+    void QueueLabels( const std::vector<SCH_ITEM*>& aLabels )
+    {
+        for( SCH_ITEM* label : aLabels )
+        {
+            auto copies = CopyPlacementItems( { label } );
+            m_queuedLabels.push_back( std::move( copies.front() ) );
+        }
+        m_useNextLabel = !m_queuedLabels.empty();
+    }
+
+    void FinishItemPlacement() { m_placingItems = false; }
+
+    std::vector<std::unique_ptr<SCH_ITEM>> CopyLastPlacement() const
+    {
+        std::vector<SCH_ITEM*> items;
+        for( const auto& item : m_lastItems ) items.push_back( item.get() );
+        return CopyPlacementItems( items );
+    }
+
+    bool BeginPlacement( const VECTOR2I& aPosition, bool aOnWire )
+    {
+        if( !m_frame->ToolStackIsEmpty() )
+            return false;
+        if( !m_lastItems.empty() )
+        {
+            if( m_useNextLabel )
+            {
+                m_lastItems.clear();
+                m_lastItems.push_back( std::move( m_queuedLabels.front() ) );
+                m_queuedLabels.pop_front();
+                m_useNextLabel = false;
+            }
+            SCH_ITEM* source = m_lastItems.front().get();
+            const bool wireAttachment = m_lastItems.size() == 1
+                    && ( source->Type() == SCH_LABEL_T || source->Type() == SCH_GLOBAL_LABEL_T
+                         || source->Type() == SCH_HIER_LABEL_T || source->Type() == SCH_DIRECTIVE_LABEL_T
+                         || ( source->Type() == SCH_SYMBOL_T && static_cast<SCH_SYMBOL*>( source )->IsPower() ) );
+            if( aOnWire && !wireAttachment )
+                return false;
+            EE_GRID_HELPER grid( m_toolMgr );
+            const auto position = grid.Align( aPosition, grid.GetItemGrid( source ) );
+            getViewControls()->SetCursorPosition( position, false );
+            if( source->Type() == SCH_SYMBOL_T && !aOnWire )
+            {
+                const bool sameComponent = m_continueUnits && static_cast<SCH_SYMBOL*>( source )->GetUnit() > 1;
+                auto symbol = sameComponent
+                    ? std::unique_ptr<SCH_SYMBOL>( static_cast<SCH_SYMBOL*>( source->Duplicate( IGNORE_PARENT_GROUP ) ) )
+                    : CopyUsedSymbol( *static_cast<SCH_SYMBOL*>( source ), m_frame->GetCurrentSheet(), position );
+                symbol->Move( position - symbol->GetPosition() );
+                m_pending = symbol->m_Uuid;
+                SCH_ACTIONS::PLACE_SYMBOL_PARAMS parameters;
+                parameters.m_Symbol = symbol.release();
+                parameters.m_Reannotate = !sameComponent;
+                parameters.m_ContinueUnits = m_continueUnits;
+                m_toolMgr->PostAction( SCH_ACTIONS::placeSymbol, parameters );
+            }
+            else
+            {
+                m_placingItems = true;
+                m_toolMgr->PostAction( SCH_ACTIONS::placeRepeatedItem, aOnWire );
+            }
+            return true;
+        }
+        if( aOnWire || !m_panel || m_choice.IsEmpty()
             || !wxAuiManager::GetManager( m_frame )->GetPane( m_panel.get() ).IsShown() )
             return false;
         SCH_SYMBOL* source = chosenSymbol();
@@ -222,7 +297,7 @@ private:
         const bool shown = !pane.IsShown();
         pane.Show( shown );
         m_frame->eeconfig()->Set<bool>( "appearance.show_used_components", shown );
-        if( !shown )
+        if( !shown && !m_choice.IsEmpty() )
         {
             m_toolMgr->RunAction( ACTIONS::cancelInteractive );
             cancel();
@@ -242,8 +317,11 @@ private:
         if( m_panel && event.GetPane() && event.GetPane()->window == m_panel.get() )
         {
             m_frame->eeconfig()->Set<bool>( "appearance.show_used_components", false );
-            m_toolMgr->RunAction( ACTIONS::cancelInteractive );
-            cancel();
+            if( !m_choice.IsEmpty() )
+            {
+                m_toolMgr->RunAction( ACTIONS::cancelInteractive );
+                cancel();
+            }
         }
         event.Skip();
     }
@@ -263,7 +341,7 @@ private:
 
     void key( wxKeyEvent& event )
     {
-        if( event.GetKeyCode() == WXK_ESCAPE && !m_pending )
+        if( event.GetKeyCode() == WXK_ESCAPE && !m_pending && !m_placingItems )
             cancel();
         event.Skip();
     }
@@ -272,6 +350,11 @@ private:
     {
         m_choice.clear();
         m_pending.reset();
+        m_lastItems.clear();
+        m_queuedLabels.clear();
+        m_useNextLabel = false;
+        m_continueUnits = false;
+        m_placingItems = false;
         if( m_panel )
         {
             m_list->SetSelection( wxNOT_FOUND );
@@ -287,6 +370,7 @@ private:
             return;
         const wxString choice = m_entries[index].key;
         m_toolMgr->RunAction( ACTIONS::cancelInteractive );
+        cancel();
         m_choice = choice;
         m_list->SetSelection( index );
         showPreview();
@@ -354,9 +438,9 @@ private:
         m_entries = std::move( entries );
         m_list->Set( labels );
         m_list->SetSelection( selected );
-        if( selected == wxNOT_FOUND )
+        if( selected == wxNOT_FOUND && !m_choice.IsEmpty() )
             cancel();
-        else
+        else if( selected != wxNOT_FOUND )
             showPreview();
     }
 
@@ -372,6 +456,11 @@ private:
     wxString m_choice;
     wxString m_instruction;
     std::optional<KIID> m_pending;
+    std::vector<std::unique_ptr<SCH_ITEM>> m_lastItems;
+    bool m_placingItems = false;
+    bool m_continueUnits = false;
+    bool m_useNextLabel = false;
+    std::deque<std::unique_ptr<SCH_ITEM>> m_queuedLabels;
 };
 
 void RegisterUsedSymbols( TOOL_MANAGER* manager ) { manager->RegisterTool( new USED_SYMBOLS_TOOL ); }
@@ -386,10 +475,32 @@ void ShutdownUsedSymbols( SCH_EDIT_FRAME* frame )
     }
 }
 void RebindUsedSymbols( SCH_EDIT_FRAME* frame ) { frame->GetToolManager()->GetTool<USED_SYMBOLS_TOOL>()->Rebind(); }
-bool BeginUsedSymbolPlacement( SCH_EDIT_FRAME* frame, const VECTOR2I& position )
+bool BeginUsedSymbolPlacement( SCH_EDIT_FRAME* frame, const VECTOR2I& position, bool onWire )
 {
     auto* tool = frame->GetToolManager()->GetTool<USED_SYMBOLS_TOOL>();
-    return tool && tool->BeginPlacement( position );
+    return tool && tool->BeginPlacement( position, onWire );
+}
+void RememberPlacement( SCH_EDIT_FRAME* frame, const std::vector<SCH_ITEM*>& items,
+                         bool updateOnly, bool continueUnits )
+{
+    if( auto* tool = frame->GetToolManager()->GetTool<USED_SYMBOLS_TOOL>() )
+        tool->RememberPlacement( items, updateOnly, continueUnits );
+}
+void QueuePlacementLabels( SCH_EDIT_FRAME* frame, const std::vector<SCH_ITEM*>& labels )
+{
+    if( auto* tool = frame->GetToolManager()->GetTool<USED_SYMBOLS_TOOL>() )
+        tool->QueueLabels( labels );
+}
+void FinishItemPlacement( SCH_EDIT_FRAME* frame )
+{
+    if( auto* tool = frame->GetToolManager()->GetTool<USED_SYMBOLS_TOOL>() )
+        tool->FinishItemPlacement();
+}
+std::vector<std::unique_ptr<SCH_ITEM>> CopyLastPlacement( SCH_EDIT_FRAME* frame )
+{
+    if( auto* tool = frame->GetToolManager()->GetTool<USED_SYMBOLS_TOOL>() )
+        return tool->CopyLastPlacement();
+    return {};
 }
 bool CancelUsedSymbolPlacement( SCH_EDIT_FRAME* frame, const SCH_SYMBOL* preview )
 {

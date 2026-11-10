@@ -152,8 +152,10 @@ editáveis. Não são modelos certificados pelos fabricantes. Representam os efe
 listados, sem reproduzir cada transistor. Reguladores não incluem temperatura,
 dissipador, proteção térmica, área segura, ruído ou estabilidade de malha com todo
 capacitor/ESR. O 555 não inclui dispersão térmica, transistores completos ou todas
-as correntes de entrada. Os modelos LS usam limiares proporcionais calibrados em
-5 V, não uma etapa de entrada TTL completa.
+as correntes de entrada. A maioria dos modelos LS usa limiares proporcionais calibrados em 5 V.
+LS00/LS14 já incluem limiares absolutos e carga DC de entrada, conforme
+[calibração elétrica digital](SCHMITT_ELECTRICAL_MODELS.md), ainda sem uma etapa
+TTL completa por transistores.
 
 A RAM modela leitura e escrita, não todas as violações de setup/hold, tempos mínimos
 de escrita ou degradação por baixa tensão. Não carrega imagens ROM/Flash nesta etapa.

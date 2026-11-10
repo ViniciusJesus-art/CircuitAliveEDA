@@ -189,6 +189,7 @@ set( QA_EESCHEMA_SRCS
     test_schematic.cpp
     test_flat_hierarchy.cpp
     test_multi_top_level_sheets.cpp
+    test_property_stamp.cpp
     test_save_load_schematic.cpp
     test_project_name_instances.cpp
     test_legacy_load.cpp

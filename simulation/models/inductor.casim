@@ -39,11 +39,25 @@
   "matches": {
     "library_ids": [
       "Device:L",
-      "Device:L_Small"
+      "Device:L_45deg",
+      "Device:L_Ferrite",
+      "Device:L_Ferrite_Small",
+      "Device:L_Iron",
+      "Device:L_Iron_Small",
+      "Device:L_Polarized",
+      "Device:L_Small",
+      "Device:L_Trim"
     ],
     "symbol_names": [
       "L",
-      "L_Small"
+      "L_45deg",
+      "L_Ferrite",
+      "L_Ferrite_Small",
+      "L_Iron",
+      "L_Iron_Small",
+      "L_Polarized",
+      "L_Small",
+      "L_Trim"
     ]
   },
   "measurement_ports": {
@@ -60,5 +74,8 @@
   },
   "equations": [
     "V1 − V2 = L × dI/dt."
+  ],
+  "model_notes": [
+    "Core/trim/rotated variants use the configured linear inductance and winding resistance. Core saturation, hysteresis and adjustment mechanisms are not simulated."
   ]
 }

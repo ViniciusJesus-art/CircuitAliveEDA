@@ -137,11 +137,19 @@
   "matches": {
     "library_ids": [
       "Device:LED",
-      "Device:LED_Small"
+      "Device:LED_45deg",
+      "Device:LED_45deg_Filled",
+      "Device:LED_Filled",
+      "Device:LED_Small",
+      "Device:LED_Small_Filled"
     ],
     "symbol_names": [
       "LED",
-      "LED_Small"
+      "LED_45deg",
+      "LED_45deg_Filled",
+      "LED_Filled",
+      "LED_Small",
+      "LED_Small_Filled"
     ]
   },
   "legacy_spice_fields": {

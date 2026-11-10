@@ -3,11 +3,45 @@
 #include <sch_screen.h>
 #include <sch_sheet_path.h>
 #include <sch_symbol.h>
+#include <sch_group.h>
+#include <tools/sch_tool_utils.h>
 #include <algorithm>
 #include <map>
+#include <set>
 
 namespace CIRCUITALIVE
 {
+std::vector<std::unique_ptr<SCH_ITEM>> CopyPlacementItems( const std::vector<SCH_ITEM*>& aItems )
+{
+    std::vector<std::unique_ptr<SCH_ITEM>> copies;
+    const std::set<SCH_ITEM*> sources( aItems.begin(), aItems.end() );
+    for( SCH_ITEM* source : sources )
+    {
+        bool ownedByGroup = false;
+        for( EDA_GROUP* parent = source->GetParentGroup(); parent; parent = parent->AsEdaItem()->GetParentGroup() )
+            ownedByGroup |= sources.contains( static_cast<SCH_ITEM*>( parent->AsEdaItem() ) );
+        if( ownedByGroup )
+            continue;
+
+        SCH_ITEM* copy = source->Type() == SCH_GROUP_T
+                ? static_cast<SCH_GROUP*>( source )->DeepDuplicate( IGNORE_PARENT_GROUP )
+                : source->Duplicate( IGNORE_PARENT_GROUP );
+        copy->SetParentGroup( nullptr );
+        for( SCH_ITEM* member : FlattenGroups( EDA_ITEMS{ copy } ) )
+        {
+            member->ClearFlags();
+            member->SetParent( nullptr );
+            member->RunOnChildren( []( SCH_ITEM* child )
+            {
+                const_cast<KIID&>( child->m_Uuid ) = KIID();
+                child->ClearFlags();
+            }, RECURSE_MODE::NO_RECURSE );
+            copies.emplace_back( member );
+        }
+    }
+    return copies;
+}
+
 std::vector<USED_SYMBOL_ENTRY> BuildUsedSymbolList( SCH_SHEET_PATH& aSheet )
 {
     std::vector<USED_SYMBOL_ENTRY> entries;

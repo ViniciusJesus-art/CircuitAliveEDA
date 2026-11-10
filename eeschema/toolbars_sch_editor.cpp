@@ -173,6 +173,7 @@ std::optional<TOOLBAR_CONFIGURATION> SCH_EDIT_TOOLBAR_SETTINGS::DefaultToolbarCo
         config.AppendSeparator()
               .AppendAction( ACTIONS::find )
               .AppendAction( ACTIONS::findAndReplace );
+        config.AppendAction( SCH_ACTIONS::propertyStamp );
 
         config.AppendSeparator()
               .AppendAction( ACTIONS::zoomRedraw )

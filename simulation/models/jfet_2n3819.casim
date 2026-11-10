@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "jfet_2n3819",
+  "name": "2N3819 N-channel JFET",
+  "description": "Own nominal compact model. See docs/circuitalive/JFET_DIODE_DRIVER_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "d",
+      "label": "Drain",
+      "default_pin": "1",
+      "role": "passive"
+    },
+    {
+      "id": "g",
+      "label": "Gate",
+      "default_pin": "2",
+      "role": "input"
+    },
+    {
+      "id": "s",
+      "label": "Source",
+      "default_pin": "3",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "idss",
+      "label": "Zero-gate intrinsic saturation current",
+      "default": "10m",
+      "unit": "A",
+      "min": 1e-09,
+      "max": 10
+    },
+    {
+      "id": "pinch_voltage",
+      "label": "Magnitude of gate cutoff voltage",
+      "default": "4",
+      "unit": "V",
+      "min": 0.01,
+      "max": 100
+    },
+    {
+      "id": "lambda",
+      "label": "Channel length modulation",
+      "default": ".001",
+      "unit": "1/V",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "drain_resistance",
+      "label": "Drain series resistance",
+      "default": ".5",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "source_resistance",
+      "label": "Source series resistance",
+      "default": ".5",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "gate_current",
+      "label": "Gate junction saturation current",
+      "default": "1p",
+      "unit": "A",
+      "min": 1e-20,
+      "max": 0.001
+    },
+    {
+      "id": "gate_source_capacitance",
+      "label": "Zero-bias gate-source capacitance",
+      "default": "4p",
+      "unit": "F",
+      "min": 0,
+      "max": 0.001
+    },
+    {
+      "id": "gate_drain_capacitance",
+      "label": "Zero-bias gate-drain capacitance",
+      "default": "4p",
+      "unit": "F",
+      "min": 0,
+      "max": 0.001
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Transistor_FET:2N3819"
+    ],
+    "symbol_names": [
+      "2N3819"
+    ],
+    "part_names": [
+      "2N3819"
+    ],
+    "pin_names": {
+      "d": [
+        "D"
+      ],
+      "g": [
+        "G"
+      ],
+      "s": [
+        "S"
+      ]
+    }
+  },
+  "ignore_legacy_spice_fields": true,
+  "spice": {
+    "instance": [
+      "Vdrain_${id} ${pin:d} drain_${id} 0",
+      "J${id} drain_${id} ${pin:g} ${pin:s} channel_${id}"
+    ],
+    "definitions": [
+      ".model channel_${id} NJF(Level=1 B=1 Vto=-${param:pinch_voltage} Beta={${param:idss}/(${param:pinch_voltage}*${param:pinch_voltage})} Lambda=${param:lambda} Rd=${param:drain_resistance} Rs=${param:source_resistance} Is=${param:gate_current} Cgs=${param:gate_source_capacitance} Cgd=${param:gate_drain_capacitance} Pb=.7 Fc=.5 Tnom=25)",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "category": "Semiconductors/Transistors",
+  "family": "JFET",
+  "nominal_temperature_c": 25,
+  "measurement_ports": {
+    "positive": "d",
+    "negative": "s"
+  },
+  "sources": [
+    "https://my.centralsemi.com/datasheets/2N3819.PDF"
+  ],
+  "model_notes": [
+    "Native depletion-mode JFET: conductive at zero gate bias; reverse gate bias pinches off the channel. P-channel generic models reverse all voltage/current polarities.",
+    "Beta=idss/pinch_voltage^2; external zero-bias drain current also depends on series resistance, modulation and temperature. The selected point is not a guaranteed typical or worst-case part.",
+    "Includes the two gate PN junctions, nonlinear gate capacitances and bilateral channel. No MOSFET-style body diode.",
+    "No gate/channel avalanche, thermal SOA, self-heating, damage, exact RF response, manufacturing distribution or calibrated noise spectrum. Respect the actual device voltage/power limits.",
+    "Requests circuit-wide Gear order 2 for abrupt live source changes, without a fixed small global timestep."
+  ]
+}

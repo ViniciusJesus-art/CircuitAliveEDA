@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "resistor_network_11",
+  "name": "11-resistor bussed network",
+  "description": "Own compact electrical model. See docs/circuitalive/PASSIVE_BRIDGE_RELAY_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "common",
+      "label": "Common bus",
+      "default_pin": "1",
+      "role": "passive"
+    },
+    {
+      "id": "leg1",
+      "label": "Resistor 1",
+      "default_pin": "2",
+      "role": "passive"
+    },
+    {
+      "id": "leg2",
+      "label": "Resistor 2",
+      "default_pin": "3",
+      "role": "passive"
+    },
+    {
+      "id": "leg3",
+      "label": "Resistor 3",
+      "default_pin": "4",
+      "role": "passive"
+    },
+    {
+      "id": "leg4",
+      "label": "Resistor 4",
+      "default_pin": "5",
+      "role": "passive"
+    },
+    {
+      "id": "leg5",
+      "label": "Resistor 5",
+      "default_pin": "6",
+      "role": "passive"
+    },
+    {
+      "id": "leg6",
+      "label": "Resistor 6",
+      "default_pin": "7",
+      "role": "passive"
+    },
+    {
+      "id": "leg7",
+      "label": "Resistor 7",
+      "default_pin": "8",
+      "role": "passive"
+    },
+    {
+      "id": "leg8",
+      "label": "Resistor 8",
+      "default_pin": "9",
+      "role": "passive"
+    },
+    {
+      "id": "leg9",
+      "label": "Resistor 9",
+      "default_pin": "10",
+      "role": "passive"
+    },
+    {
+      "id": "leg10",
+      "label": "Resistor 10",
+      "default_pin": "11",
+      "role": "passive"
+    },
+    {
+      "id": "leg11",
+      "label": "Resistor 11",
+      "default_pin": "12",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "resistance",
+      "label": "Resistance per branch",
+      "default": "$value",
+      "unit": "Ohm",
+      "min": 1e-06,
+      "max": 1000000000000.0
+    }
+  ],
+  "ignore_legacy_spice_fields": true,
+  "matches": {
+    "library_ids": [
+      "Device:R_Network11",
+      "Device:R_Network11_Split",
+      "Device:R_Network11_US"
+    ],
+    "symbol_names": [
+      "R_Network11",
+      "R_Network11_Split",
+      "R_Network11_US"
+    ]
+  },
+  "spice": {
+    "instance": [
+      "R1_${id} ${pin:common} ${pin:leg1} ${param:resistance}",
+      "R2_${id} ${pin:common} ${pin:leg2} ${param:resistance}",
+      "R3_${id} ${pin:common} ${pin:leg3} ${param:resistance}",
+      "R4_${id} ${pin:common} ${pin:leg4} ${param:resistance}",
+      "R5_${id} ${pin:common} ${pin:leg5} ${param:resistance}",
+      "R6_${id} ${pin:common} ${pin:leg6} ${param:resistance}",
+      "R7_${id} ${pin:common} ${pin:leg7} ${param:resistance}",
+      "R8_${id} ${pin:common} ${pin:leg8} ${param:resistance}",
+      "R9_${id} ${pin:common} ${pin:leg9} ${param:resistance}",
+      "R10_${id} ${pin:common} ${pin:leg10} ${param:resistance}",
+      "R11_${id} ${pin:common} ${pin:leg11} ${param:resistance}"
+    ],
+    "definitions": []
+  },
+  "category": "Analog/Passive components",
+  "family": "Resistor networks",
+  "measurement_ports": {
+    "positive": "common",
+    "negative": "leg1"
+  },
+  "sources": [
+    "https://www.vishay.com/docs/31509/csc.pdf"
+  ],
+  "model_notes": [
+    "Each resistor connects physical pin 1 to one separate leg, including the split-unit drawing.",
+    "Value specifies each branch resistance, not the parallel equivalent. Ideal resistors; no tolerance, temperature drift, noise or thermal failure.",
+    "Displayed current enters the common bus; voltage is common to leg 1, so displayed power is not total package dissipation under unequal leg voltages."
+  ]
+}

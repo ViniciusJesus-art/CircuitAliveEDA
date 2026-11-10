@@ -3,7 +3,7 @@
   "backend": "ngspice",
   "id": "74hc00",
   "name": "74HC00 quad NAND (powered, mixed-signal)",
-  "description": "Modelo didático configurável; não é um macromodelo certificado pelo fabricante.",
+  "description": "Modelo did\u00e1tico configur\u00e1vel; n\u00e3o \u00e9 um macromodelo certificado pelo fabricante.",
   "license": "GPL-3.0-or-later",
   "pins": [
     {
@@ -163,54 +163,96 @@
       "unit": "F",
       "min": 0,
       "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Iq",
+      "default": "1u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "high_drop",
+      "label": "High drop",
+      "default": "0",
+      "unit": "V",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Low drop",
+      "default": "0",
+      "unit": "V",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "iil",
+      "label": "Low input current magnitude",
+      "default": "100n",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iih",
+      "label": "High input current magnitude",
+      "default": "100n",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "rout_high",
+      "label": "Rout high",
+      "default": "45",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "rout_low",
+      "label": "Rout low",
+      "default": "37.5",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "ioh",
+      "label": "Recommended source current per output",
+      "default": "4m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iol",
+      "label": "Recommended sink current per output",
+      "default": "4m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "cpd",
+      "label": "Internal switching capacitance per input",
+      "default": "22p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "rating_window",
+      "label": "Output current warning averaging time",
+      "default": "1u",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
     }
   ],
-  "spice": {
-    "instance": [
-      "Ben_${id} en_${id} 0 V={(v(${pin:vcc},${pin:gnd}) >= ${param:vmin} && v(${pin:vcc},${pin:gnd}) <= ${param:vmax})}",
-      "Bn_a1_${id} n_a1_${id} 0 V={(v(en_${id}) > 0.5 && ${drive:a1} > 0.5) ? v(${pin:a1},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
-      "Cin_a1_${id} ${pin:a1} ${pin:gnd} ${param:cin}",
-      "Bn_b1_${id} n_b1_${id} 0 V={(v(en_${id}) > 0.5 && ${drive:b1} > 0.5) ? v(${pin:b1},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
-      "Cin_b1_${id} ${pin:b1} ${pin:gnd} ${param:cin}",
-      "Aadc1_${id} [n_a1_${id} n_b1_${id}] [d_a1_${id} d_b1_${id}] adc_${id}",
-      "Ag1_${id} [d_a1_${id} d_b1_${id}] d_y1_${id} gate_${id}",
-      "Adac1_${id} [d_y1_${id}] [code1_${id}] dac_${id}",
-      "Bhi1_${id} ${pin:y1} ${pin:vcc} I={v(en_${id}) > 0.5 ? ((v(code1_${id}) > ${param:vih} || v(code1_${id}) < ${param:vil}) ? 1 : 1u)*v(code1_${id})*v(${pin:y1},${pin:vcc})/${param:rout} : 0}",
-      "Blo1_${id} ${pin:y1} ${pin:gnd} I={v(en_${id}) > 0.5 ? ((v(code1_${id}) > ${param:vih} || v(code1_${id}) < ${param:vil}) ? 1 : 1u)*(1-v(code1_${id}))*v(${pin:y1},${pin:gnd})/${param:rout} : 0}",
-      "Bn_a2_${id} n_a2_${id} 0 V={(v(en_${id}) > 0.5 && ${drive:a2} > 0.5) ? v(${pin:a2},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
-      "Cin_a2_${id} ${pin:a2} ${pin:gnd} ${param:cin}",
-      "Bn_b2_${id} n_b2_${id} 0 V={(v(en_${id}) > 0.5 && ${drive:b2} > 0.5) ? v(${pin:b2},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
-      "Cin_b2_${id} ${pin:b2} ${pin:gnd} ${param:cin}",
-      "Aadc2_${id} [n_a2_${id} n_b2_${id}] [d_a2_${id} d_b2_${id}] adc_${id}",
-      "Ag2_${id} [d_a2_${id} d_b2_${id}] d_y2_${id} gate_${id}",
-      "Adac2_${id} [d_y2_${id}] [code2_${id}] dac_${id}",
-      "Bhi2_${id} ${pin:y2} ${pin:vcc} I={v(en_${id}) > 0.5 ? ((v(code2_${id}) > ${param:vih} || v(code2_${id}) < ${param:vil}) ? 1 : 1u)*v(code2_${id})*v(${pin:y2},${pin:vcc})/${param:rout} : 0}",
-      "Blo2_${id} ${pin:y2} ${pin:gnd} I={v(en_${id}) > 0.5 ? ((v(code2_${id}) > ${param:vih} || v(code2_${id}) < ${param:vil}) ? 1 : 1u)*(1-v(code2_${id}))*v(${pin:y2},${pin:gnd})/${param:rout} : 0}",
-      "Bn_a3_${id} n_a3_${id} 0 V={(v(en_${id}) > 0.5 && ${drive:a3} > 0.5) ? v(${pin:a3},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
-      "Cin_a3_${id} ${pin:a3} ${pin:gnd} ${param:cin}",
-      "Bn_b3_${id} n_b3_${id} 0 V={(v(en_${id}) > 0.5 && ${drive:b3} > 0.5) ? v(${pin:b3},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
-      "Cin_b3_${id} ${pin:b3} ${pin:gnd} ${param:cin}",
-      "Aadc3_${id} [n_a3_${id} n_b3_${id}] [d_a3_${id} d_b3_${id}] adc_${id}",
-      "Ag3_${id} [d_a3_${id} d_b3_${id}] d_y3_${id} gate_${id}",
-      "Adac3_${id} [d_y3_${id}] [code3_${id}] dac_${id}",
-      "Bhi3_${id} ${pin:y3} ${pin:vcc} I={v(en_${id}) > 0.5 ? ((v(code3_${id}) > ${param:vih} || v(code3_${id}) < ${param:vil}) ? 1 : 1u)*v(code3_${id})*v(${pin:y3},${pin:vcc})/${param:rout} : 0}",
-      "Blo3_${id} ${pin:y3} ${pin:gnd} I={v(en_${id}) > 0.5 ? ((v(code3_${id}) > ${param:vih} || v(code3_${id}) < ${param:vil}) ? 1 : 1u)*(1-v(code3_${id}))*v(${pin:y3},${pin:gnd})/${param:rout} : 0}",
-      "Bn_a4_${id} n_a4_${id} 0 V={(v(en_${id}) > 0.5 && ${drive:a4} > 0.5) ? v(${pin:a4},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
-      "Cin_a4_${id} ${pin:a4} ${pin:gnd} ${param:cin}",
-      "Bn_b4_${id} n_b4_${id} 0 V={(v(en_${id}) > 0.5 && ${drive:b4} > 0.5) ? v(${pin:b4},${pin:gnd})/max(v(${pin:vcc},${pin:gnd}),1u) : 0.5}",
-      "Cin_b4_${id} ${pin:b4} ${pin:gnd} ${param:cin}",
-      "Aadc4_${id} [n_a4_${id} n_b4_${id}] [d_a4_${id} d_b4_${id}] adc_${id}",
-      "Ag4_${id} [d_a4_${id} d_b4_${id}] d_y4_${id} gate_${id}",
-      "Adac4_${id} [d_y4_${id}] [code4_${id}] dac_${id}",
-      "Bhi4_${id} ${pin:y4} ${pin:vcc} I={v(en_${id}) > 0.5 ? ((v(code4_${id}) > ${param:vih} || v(code4_${id}) < ${param:vil}) ? 1 : 1u)*v(code4_${id})*v(${pin:y4},${pin:vcc})/${param:rout} : 0}",
-      "Blo4_${id} ${pin:y4} ${pin:gnd} I={v(en_${id}) > 0.5 ? ((v(code4_${id}) > ${param:vih} || v(code4_${id}) < ${param:vil}) ? 1 : 1u)*(1-v(code4_${id}))*v(${pin:y4},${pin:gnd})/${param:rout} : 0}"
-    ],
-    "definitions": [
-      ".model adc_${id} adc_bridge(in_low=${param:vil} in_high=${param:vih})",
-      ".model gate_${id} d_nand(rise_delay=${param:rise_delay} fall_delay=${param:fall_delay})",
-      ".model dac_${id} dac_bridge(out_low=0 out_high=1 out_undef=0.5 t_rise=${param:transition} t_fall=${param:transition})"
-    ]
-  },
   "ignore_legacy_spice_fields": true,
   "matches": {
     "library_ids": [
@@ -220,30 +262,89 @@
       "74HC00"
     ]
   },
-  "logic": {
-    "vcc": "vcc",
-    "gnd": "gnd",
-    "low_parameter": "vil",
-    "high_parameter": "vih",
-    "min_supply_parameter": "vmin",
-    "max_supply_parameter": "vmax",
-    "driver_enable": {
-      "y1": "v(en_${id})",
-      "y2": "v(en_${id})",
-      "y3": "v(en_${id})",
-      "y4": "v(en_${id})"
-    },
-    "driver_value": {
-      "y1": "v(code1_${id})",
-      "y2": "v(code2_${id})",
-      "y3": "v(code3_${id})",
-      "y4": "v(code4_${id})"
-    }
-  },
   "measurement_ports": {
     "positive": "vcc",
     "negative": "gnd"
   },
   "category": "Digital/Logic ICs",
-  "family": "74HC"
+  "family": "74HC",
+  "behavioral": {
+    "version": 1,
+    "supply": {
+      "vcc": "vcc",
+      "gnd": "gnd"
+    },
+    "blocks": [
+      {
+        "type": "nand",
+        "inputs": [
+          "a1",
+          "b1"
+        ],
+        "out": "q1"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "a2",
+          "b2"
+        ],
+        "out": "q2"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "a3",
+          "b3"
+        ],
+        "out": "q3"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "a4",
+          "b4"
+        ],
+        "out": "q4"
+      }
+    ],
+    "outputs": {
+      "y1": {
+        "signal": "q1"
+      },
+      "y2": {
+        "signal": "q2"
+      },
+      "y3": {
+        "signal": "q3"
+      },
+      "y4": {
+        "signal": "q4"
+      }
+    },
+    "electrical": {
+      "input_low_current": "iil",
+      "input_high_current": "iih",
+      "output_high_resistance": "rout_high",
+      "output_low_resistance": "rout_low",
+      "source_rating": "ioh",
+      "sink_rating": "iol",
+      "switching_capacitance": "cpd",
+      "current_rating_window": "rating_window"
+    }
+  },
+  "sources": [
+    "https://assets.nexperia.com/documents/data-sheet/74HC_HCT00.pdf"
+  ],
+  "model_notes": [
+    "Own behavioral implementation, calibrated to selected datasheet points; no vendor SPICE copied.",
+    "Finite asymmetric output resistance, input DC current/capacitance, per-output source/sink current warnings and powered propagation delays are represented.",
+    "Output current ratings trigger warnings, not artificial hard current clamps. No transistor-level short-circuit or protection model.",
+    "Delay, drive strength and consumption use nominal values near the stated reference supply; full supply-dependent timing/drive curves, damage, input clamp/back-powering and temperature are outside this model. Inputs without an external driver remain unknown.",
+    "Reference: 4.5\u20135 V. HC input thresholds track supply (0.3/0.7 VCC). Input leakage uses a configurable conservative signed 100 nA load, not a complete protection I/V.",
+    "45/37.5 ohm source/sink resistances fit typical VOH=4.32 V, VOL=0.15 V at 4 mA and VCC=4.5 V. The 4 mA warnings are reference operating limits, not hard limits valid at every supply.",
+    "IQ=1 uA is an illustrative static nominal value; CPD=22 pF per switching input implements internal dynamic ICC=CPD*VCC*f. External capacitive load energy is additionally supplied by the physical output stage.",
+    "7 ns internal gate delay and 2 ns code transition plus output RC approximate nominal timing; no separate hard frequency cutoff is invented.",
+    "Per-output current warnings use a first-order 1 us averaging window for DC operating ratings; normal short capacitive charging peaks are not instantaneous overload limits."
+  ]
 }

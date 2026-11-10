@@ -3,7 +3,7 @@
   "backend": "ngspice",
   "id": "switch",
   "name": "Interactive SPST switch",
-  "description": "",
+  "description": "Interactive two-terminal contact with configurable finite open/closed resistance. Push, reed and temperature symbols are operated manually; no bounce, field, temperature or automatic trip is simulated.",
   "license": "GPL-3.0-or-later",
   "pins": [
     {
@@ -48,24 +48,51 @@
   },
   "matches": {
     "library_ids": [
+      "Switch:SW_DIP_x01",
+      "Switch:SW_Omron_B3FS",
+      "Switch:SW_Push",
+      "Switch:SW_Push_45deg",
+      "Switch:SW_Push_Open",
+      "Switch:SW_Reed",
+      "Switch:SW_Reed_Opener",
       "Switch:SW_SPST",
-      "Switch:SW_Push"
+      "Switch:SW_SPST_Temperature_NC",
+      "Switch:SW_SPST_Temperature_NO"
     ],
     "symbol_names": [
+      "SW_DIP_x01",
+      "SW_Omron_B3FS",
       "SW_Push",
-      "SW_SPST"
+      "SW_Push_45deg",
+      "SW_Push_Open",
+      "SW_Reed",
+      "SW_Reed_Opener",
+      "SW_SPST",
+      "SW_SPST_Temperature_NC",
+      "SW_SPST_Temperature_NO"
     ]
   },
   "control": {
     "source": "Vcontrol${id}",
     "on": 5,
     "off": 0,
-    "initially_open_symbols": ["SW_Push"]
+    "initially_open_symbols": [
+      "SW_Push",
+      "SW_Push_45deg",
+      "SW_DIP_x01",
+      "SW_Omron_B3FS",
+      "SW_Reed",
+      "SW_SPST_Temperature_NO"
+    ]
   },
   "measurement_ports": {
     "positive": "p",
     "negative": "n"
   },
   "category": "Electromechanical/Switches",
-  "family": "Interactive switches"
+  "family": "Interactive switches",
+  "model_notes": [
+    "Explicit reviewed symbol bindings; normally-closed Push_Open, Reed_Opener and temperature NC start closed. Existing SW_SPST initial state is preserved.",
+    "Push buttons use the existing click-to-toggle interaction. Thermal/reed actuation is manual, without temperature or magnetic-field simulation."
+  ]
 }

@@ -574,11 +574,17 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
             SCH_SELECTION_FILTER_OPTIONS rejected;
 
             CollectHits( collector, evt->Position() );
-            if( collector.GetCount() == 0 && !hasModifier() )
+            const bool onlyWires = collector.GetCount() > 0
+                    && std::all_of( collector.begin(), collector.end(), []( const EDA_ITEM* item )
+                    {
+                        return item->Type() == SCH_LINE_T
+                                && static_cast<const SCH_LINE*>( item )->GetLayer() == LAYER_WIRE;
+                    } );
+            if( ( collector.GetCount() == 0 || onlyWires ) && !hasModifier() )
             {
                 if( auto* editor = dynamic_cast<SCH_EDIT_FRAME*>( m_frame ) )
                 {
-                    if( CIRCUITALIVE::BeginUsedSymbolPlacement( editor, evt->Position() ) )
+                    if( CIRCUITALIVE::BeginUsedSymbolPlacement( editor, evt->Position(), onlyWires ) )
                         continue;
                 }
             }

@@ -41,6 +41,10 @@ Para comparação com um componente físico, use o datasheet e um modelo validad
 para o fabricante e a aplicação. Por exemplo, a pinagem e as condições do BC327
 estão no [datasheet da onsemi](https://www.onsemi.com/download/data-sheet/pdf/bc327-d.pdf).
 
+Para testar bloqueio reverso, use uma carga com retorno ao GND. Um terminal
+ligado somente a uma sonda pode mostrar quase a tensão da fonte, com corrente
+mínima. Veja a [bancada de bloqueio reverso dos diodos](DIODE_REVERSE_BIAS.md).
+
 ## Painel de probes recolhido
 
 O painel lateral inicia **oculto**. A seta diagonal no final da barra direita
@@ -72,6 +76,13 @@ a capacitância de entrada e os atrasos são parâmetros editáveis. Alimentaç�
 fora da faixa gera aviso no rodapé e desabilita as saídas neste modelo.
 Os valores nominais não reproduzem toda a dependência com temperatura, tensão
 e carga; consulte o [datasheet do 74HC00/74HCT00](https://assets.nexperia.com/documents/data-sheet/74HC_HCT00.pdf).
+
+Os novos 74HC14, 74LS14 e CD40106 preservam o estado entre os limiares de
+histerese. LS00/LS14 usam limiares absolutos em relação ao GND local e correntes
+de entrada TTL. HC00/HC14 incluem consumo interno por frequência. Esses cinco
+modelos também têm resistências distintas e avisos de corrente por saída.
+Veja [calibração elétrica e limites](SCHMITT_ELECTRICAL_MODELS.md); os demais
+modelos digitais ainda não receberam todos esses recursos.
 
 As unidades A–E do mesmo U1 são agrupadas em um único encapsulamento. Coloque
 também a unidade de alimentação e conecte VCC/GND. Portas não colocadas ficam
@@ -139,6 +150,9 @@ O modelo deve implementar eletricamente o mesmo enable que declara.
 `${drive:porta}` nas linhas SPICE é expandido para a presença de um driver
 possível na rede. Ele permite que o conversor de uma entrada aberta produza
 indefinido, em vez de interpretar a estabilização numérica por `rshunt` como 0.
+Portas com role `input` não contam como drivers de sua própria rede, inclusive
+em modelos analógicos sem a seção `logic`. Estes também podem usar o placeholder
+para impedir seleção indevida por controles abertos.
 Probes A/W preservam essa informação através de seus sensores ideais em série.
 `frequency_parameter` opcional aponta para o parâmetro que limita o passo da
 fonte senoidal. Veja os arquivos completos `74hc00.casim`, `74hc125.casim` e

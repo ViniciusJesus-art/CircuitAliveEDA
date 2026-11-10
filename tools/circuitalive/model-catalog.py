@@ -34,7 +34,9 @@ def load_models(paths):
     seen = set()
     for path in paths:
         model = json.loads(path.read_text(encoding='utf-8'))
-        if model['schema_version'] != 1 or model['backend'] != 'ngspice':
+        # Keep the same version/backend pairs as MODEL_REPOSITORY::LoadText.
+        expected = (2, 'ngspice+runtime') if 'runtime' in model else (1, 'ngspice')
+        if (model['schema_version'], model['backend']) != expected:
             raise ValueError(f'{path}: unsupported model version/backend')
         if model['id'] in seen:
             continue  # Same first-directory priority as MODEL_REPOSITORY.

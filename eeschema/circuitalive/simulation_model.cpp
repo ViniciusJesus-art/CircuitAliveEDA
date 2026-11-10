@@ -447,6 +447,19 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
             m.warningParameter = j.at( "current_warning" ).at( "limit_parameter" );
             if( !parameters.contains( m.warningParameter ) ) throw std::runtime_error( "Unknown warning parameter" );
         }
+        if( j.contains( "current_warnings" ) )
+        {
+            const auto& warnings = j.at( "current_warnings" );
+            if( !warnings.is_array() || warnings.size() > 256 ) throw std::runtime_error( "Invalid current warning list" );
+            for( const auto& warning : warnings )
+            {
+                SIMULATION_MODEL::CURRENT_WARNING descriptor{ warning.value( "label", "" ),
+                    warning.at( "signal" ), warning.at( "limit_parameter" ) };
+                if( descriptor.signal.empty() || !parameters.contains( descriptor.parameter ) )
+                    throw std::runtime_error( "Invalid current warning signal or parameter" );
+                m.currentWarnings.push_back( std::move( descriptor ) );
+            }
+        }
         m.voltageConstraint = j.value( "voltage_constraint_parameter", "" );
         m.frequencyParameter = j.value( "frequency_parameter", "" );
         m.maxStepParameter = j.value( "max_step_parameter", "" );
@@ -477,6 +490,9 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
             m.logicLow = logic.at( "low_parameter" ); m.logicHigh = logic.at( "high_parameter" );
             m.logicMinSupply = logic.at( "min_supply_parameter" );
             m.logicMaxSupply = logic.at( "max_supply_parameter" );
+            m.logicThresholdReference = logic.value( "threshold_reference_parameter", "" );
+            if( !m.logicThresholdReference.empty() && !parameters.contains( m.logicThresholdReference ) )
+                throw std::runtime_error( "Unknown logic threshold reference parameter" );
             if( !ports.contains( m.logicVcc ) || !ports.contains( m.logicGround ) || m.logicVcc == m.logicGround )
                 throw std::runtime_error( "Invalid logic supply ports" );
             for( const auto& p : { m.logicLow, m.logicHigh, m.logicMinSupply, m.logicMaxSupply } )
@@ -684,6 +700,8 @@ RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
         if( !r.parameters.contains( id ) ) throw std::runtime_error( "Unknown model parameter: " + id );
     if( !r.model.brightnessParameter.empty() && r.parameters.at( r.model.brightnessParameter ) <= 0 )
         throw std::runtime_error( "Brightness current must be positive" );
+    if( !r.model.logicThresholdReference.empty() && r.parameters.at( r.model.logicThresholdReference ) <= 0 )
+        throw std::runtime_error( "Logic threshold reference must be positive" );
     if( !r.model.logicVcc.empty() && ( r.parameters.at( r.model.logicLow ) < 0
         || r.parameters.at( r.model.logicHigh ) > 1
         || r.parameters.at( r.model.logicLow ) >= r.parameters.at( r.model.logicHigh )

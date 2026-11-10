@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "resistor_divider_center1",
+  "name": "Fixed voltage divider, tap pin 1",
+  "description": "Two configurable ideal resistors with a fixed center tap. Separate upper/lower resistance parameters determine the ratio and loaded output.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "top",
+      "label": "Top",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "tap",
+      "label": "Tap",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "bottom",
+      "label": "Bottom",
+      "role": "passive",
+      "default_pin": "3"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "upper_resistance",
+      "label": "Upper resistance",
+      "default": "10k",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000000000000.0
+    },
+    {
+      "id": "lower_resistance",
+      "label": "Lower resistance",
+      "default": "10k",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Rupper_${id} ${pin:top} ${pin:tap} ${param:upper_resistance}",
+      "Rlower_${id} ${pin:tap} ${pin:bottom} ${param:lower_resistance}"
+    ]
+  },
+  "measurement_ports": {
+    "positive": "top",
+    "negative": "bottom"
+  },
+  "category": "Analog/Passive components",
+  "family": "Resistor networks",
+  "matches": {
+    "library_ids": [
+      "Device:VoltageDivider_CenterPin1"
+    ],
+    "symbol_names": [
+      "VoltageDivider_CenterPin1"
+    ]
+  }
+}

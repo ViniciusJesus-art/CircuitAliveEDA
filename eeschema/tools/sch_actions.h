@@ -123,6 +123,8 @@ public:
     static TOOL_ACTION move;
     static TOOL_ACTION drag;
     static TOOL_ACTION repeatDrawItem;
+    static TOOL_ACTION placeRepeatedItem;
+    static TOOL_ACTION propertyStamp;
     static TOOL_ACTION rotateCW;
     static TOOL_ACTION rotateCCW;
     static TOOL_ACTION mirrorV;
@@ -333,6 +335,8 @@ public:
         SCH_SYMBOL* m_Symbol = nullptr;
         ///< If a symbol is provide, reannotate it?
         bool m_Reannotate = true;
+        ///< Continue through the chosen symbol's units, one preview per canvas click.
+        bool m_ContinueUnits = false;
     };
 
     struct PLACE_SYMBOL_UNIT_PARAMS

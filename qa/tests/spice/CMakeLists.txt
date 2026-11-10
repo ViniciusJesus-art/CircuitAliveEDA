@@ -124,7 +124,12 @@ if( TARGET circuitalive_sim_session )
         test_interactive_models.cpp test_interactive_measurements.cpp test_interactive_devices.cpp
         test_interactive_complex.cpp test_interactive_power.cpp test_model_design.cpp
         test_interactive_discretes.cpp test_scope_acquisition.cpp test_model_catalog.cpp
-        test_analog_model_catalog.cpp test_live_controls.cpp test_digital_pipeline.cpp test_memory_resources.cpp test_visual_signals.cpp
+        test_analog_model_catalog.cpp test_routing_protection_models.cpp test_register_counter_models.cpp
+        test_passive_bridge_relay_models.cpp
+        test_jfet_diode_driver_models.cpp test_schmitt_electrical_models.cpp
+        test_standard_symbol_associations.cpp
+        test_diode_reverse_bias.cpp
+        test_live_controls.cpp test_digital_pipeline.cpp test_memory_resources.cpp test_visual_signals.cpp
         test_programmable_devices.cpp test_compiled_expressions.cpp )
     target_link_libraries( qa_interactive_sim PRIVATE
         circuitalive_interactive circuitalive_sim_session circuitalive_programmable_runtime
@@ -139,7 +144,7 @@ if( TARGET circuitalive_sim_session )
         CIRCUITALIVE_TEST_DEMO="${PROJECT_SOURCE_DIR}/demos/simulation/circuitalive/rc_switch_led.cir" )
     add_dependencies( qa_interactive_sim circuitalive-sim-worker )
     add_test( NAME qa_interactive_sim COMMAND qa_interactive_sim --log_level=test_suite )
-    set_tests_properties( qa_interactive_sim PROPERTIES TIMEOUT 120 )
+    set_tests_properties( qa_interactive_sim PROPERTIES TIMEOUT 240 )
     # Exercise the desktop JSON imports as well as the standalone worker build.
     # A static-only test cannot expose collisions with kicommon's import library.
     add_executable( qa_circuitalive_json_link test_circuitalive_json_link.cpp )

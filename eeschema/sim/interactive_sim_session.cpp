@@ -254,7 +254,7 @@ void INTERACTIVE_SIM_SESSION::Configure( const std::string& aNetlist,
                 { "signal", monitor.signal }, { "reference", monitor.reference },
                 { "supply", monitor.supply }, { "low", monitor.low }, { "high", monitor.high },
                 { "default_supply", monitor.defaultSupply }, { "min_supply", monitor.minSupply },
-                { "max_supply", monitor.maxSupply } } );
+                { "max_supply", monitor.maxSupply }, { "threshold_reference", monitor.thresholdReference } } );
     request["memories"]=JSON::array();
     for(const auto& region:aConfig.memories)request["memories"].push_back({{"id",region.id},{"label",region.label},
         {"word_bits",region.wordBits},{"writable",region.writable},{"data",MemoryHex(region.initial.data)},{"known",MemoryHex(region.initial.known)}});

@@ -35,6 +35,10 @@
 #include <widgets/project_pages.h>
 #include <sch_symbol.h>
 #include <sch_label.h>
+#include <sch_group.h>
+#include <sch_sheet_pin.h>
+#include <sch_table.h>
+#include <sch_tablecell.h>
 #include <lib_symbol.h>
 #include <sch_io/kicad_sexpr/sch_io_kicad_sexpr.h>
 #include <wx/ffile.h>
@@ -322,6 +326,102 @@ BOOST_FIXTURE_TEST_CASE( UsedComponentsReflectCurrentPageAndType, PROJECT_PAGES_
     BOOST_REQUIRE_EQUAL( entries.size(), 2u );
     BOOST_CHECK_EQUAL( entries[0].label, "Device:R" );
     BOOST_CHECK_EQUAL( entries[1].label, "Timer:NE555" );
+}
+
+BOOST_AUTO_TEST_CASE( PlacementTemplatesPreserveLabelContentWithoutSharingSourceState )
+{
+    auto source = std::make_unique<SCH_GLOBALLABEL>( VECTOR2I( 100, 200 ), "SUPPLY5" );
+    source->SetShape( LABEL_FLAG_SHAPE::L_OUTPUT );
+    source->SetBold( true );
+    source->SetFlags( IS_NEW | IS_MOVING | SELECTED );
+    const KIID originalId = source->m_Uuid;
+    auto saved = CIRCUITALIVE::CopyPlacementItems( { source.get() } );
+    source.reset(); // A template must survive deletion/undo of the placed source.
+    BOOST_REQUIRE_EQUAL( saved.size(), 1u );
+    auto* label = dynamic_cast<SCH_GLOBALLABEL*>( saved.front().get() );
+    BOOST_REQUIRE( label );
+    BOOST_CHECK( label->m_Uuid != originalId );
+    BOOST_CHECK_EQUAL( label->GetText(), "SUPPLY5" );
+    BOOST_CHECK( label->GetShape() == LABEL_FLAG_SHAPE::L_OUTPUT );
+    BOOST_CHECK( label->IsBold() );
+    BOOST_CHECK( !label->IsSelected() );
+    BOOST_CHECK( !label->IsNew() );
+    BOOST_CHECK( !label->IsMoving() );
+    auto preview = CIRCUITALIVE::CopyPlacementItems( { label } );
+    BOOST_REQUIRE_EQUAL( preview.size(), 1u );
+    auto* next = static_cast<SCH_GLOBALLABEL*>( preview.front().get() );
+    BOOST_CHECK( next->m_Uuid != label->m_Uuid );
+    next->SetText( "CHANGED" );
+    next->Move( VECTOR2I( 10, 20 ) );
+    BOOST_CHECK_EQUAL( label->GetText(), "SUPPLY5" );
+    BOOST_CHECK( label->GetPosition() == VECTOR2I( 100, 200 ) );
+}
+
+BOOST_AUTO_TEST_CASE( PlacementTemplatesCopyGroupsOnceAndRetainOnlyCopiedMembers )
+{
+    SCH_GROUP outer, inner;
+    SCH_LABEL label( VECTOR2I( 100, 200 ), "DATA" );
+    outer.AddItem( &inner );
+    inner.AddItem( &label );
+    auto saved = CIRCUITALIVE::CopyPlacementItems( { &outer, &inner, &label } );
+    BOOST_REQUIRE_EQUAL( saved.size(), 3u );
+    SCH_GROUP* group = nullptr;
+    SCH_LABEL* copy = nullptr;
+    for( auto& item : saved )
+    {
+        BOOST_CHECK( item->m_Uuid != outer.m_Uuid && item->m_Uuid != inner.m_Uuid && item->m_Uuid != label.m_Uuid );
+        if( !item->GetParentGroup() ) group = dynamic_cast<SCH_GROUP*>( item.get() );
+        if( item->Type() == SCH_LABEL_T ) copy = static_cast<SCH_LABEL*>( item.get() );
+    }
+    BOOST_REQUIRE( group );
+    BOOST_REQUIRE( copy );
+    BOOST_CHECK( group->ContainsItem( copy ) );
+    BOOST_CHECK( !group->ContainsItem( &label ) );
+    group->Move( VECTOR2I( 50, 60 ) );
+    BOOST_CHECK( copy->GetPosition() == VECTOR2I( 150, 260 ) );
+    BOOST_CHECK( label.GetPosition() == VECTOR2I( 100, 200 ) );
+    BOOST_CHECK( label.GetParentGroup() == &inner );
+    BOOST_CHECK( inner.GetParentGroup() == &outer );
+}
+
+BOOST_FIXTURE_TEST_CASE( PlacementTemplatesKeepSheetContentsAliveAndCopyPins, PROJECT_PAGES_FIXTURE )
+{
+    auto source = std::make_unique<SCH_SHEET>( first );
+    source->SetName( "Child" );
+    source->SetFileName( "child.kicad_sch" );
+    source->SetScreen( new SCH_SCREEN( schematic.get() ) );
+    auto* pin = new SCH_SHEET_PIN( source.get(), VECTOR2I( 100, 200 ), "DATA" );
+    source->AddPin( pin );
+    auto saved = CIRCUITALIVE::CopyPlacementItems( { source.get() } );
+    source.reset();
+    auto* sheet = static_cast<SCH_SHEET*>( saved.front().get() );
+    BOOST_REQUIRE( sheet->GetScreen() );
+    BOOST_CHECK_EQUAL( sheet->GetFileName(), "child.kicad_sch" );
+    BOOST_REQUIRE_EQUAL( sheet->GetPins().size(), 1u );
+    BOOST_CHECK( sheet->GetPins().front()->GetParent() == sheet );
+    BOOST_CHECK_EQUAL( sheet->GetPins().front()->GetText(), "DATA" );
+    auto next = CIRCUITALIVE::CopyPlacementItems( { sheet } );
+    auto* copy = static_cast<SCH_SHEET*>( next.front().get() );
+    BOOST_CHECK( copy->m_Uuid != sheet->m_Uuid );
+    BOOST_CHECK( copy->GetPins().front()->m_Uuid != sheet->GetPins().front()->m_Uuid );
+    BOOST_CHECK( copy->GetPins().front()->GetParent() == copy );
+    copy->GetPins().front()->SetText( "OTHER" );
+    BOOST_CHECK_EQUAL( sheet->GetPins().front()->GetText(), "DATA" );
+}
+
+BOOST_AUTO_TEST_CASE( PlacementTemplatesKeepTableCellContentAndOwnership )
+{
+    auto source = std::make_unique<SCH_TABLE>( 0 );
+    source->SetColCount( 1 );
+    auto* cell = new SCH_TABLECELL();
+    cell->SetText( "Notes" );
+    source->AddCell( cell );
+    auto saved = CIRCUITALIVE::CopyPlacementItems( { source.get() } );
+    source.reset();
+    auto* table = static_cast<SCH_TABLE*>( saved.front().get() );
+    BOOST_REQUIRE_EQUAL( table->GetCells().size(), 1u );
+    BOOST_CHECK_EQUAL( table->GetCells().front()->GetText(), "Notes" );
+    BOOST_CHECK( table->GetCells().front()->GetParent() == table );
 }
 
 BOOST_FIXTURE_TEST_CASE( DiscoverPagesKeepsHierarchicalChildrenAsSingleInstances, PROJECT_PAGES_FIXTURE )

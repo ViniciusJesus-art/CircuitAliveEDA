@@ -156,7 +156,12 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         for( const auto& pin : model.model.pins )
         {
             auto& drive = drives[topology.nodes[i].at( model.pins.at( pin.id ) )];
-            if( model.model.logicVcc.empty() ) drive.external = true;
+            // A high-impedance input does not drive its own net. Analog models
+            // can use ${drive:port} without declaring digital output metadata.
+            if( model.model.logicVcc.empty() )
+            {
+                if( pin.role != "input" ) drive.external = true;
+            }
             else
             {
                 if( auto enable = model.model.driverEnable.find( pin.id ); enable != model.model.driverEnable.end() )
@@ -374,9 +379,33 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 result.adjustments.push_back( { i, control.id, control.label, expand( control.source ),
                     control.unit, control.minimum, control.maximum, control.step, initial, control.visual } );
             }
-            if( !model.model.warningSignal.empty() && model.parameters.at( model.model.warningParameter ) > 0 )
-                warnings.push_back( { expand( model.model.warningSignal ),
-                    { c.reference, NO_SIGNAL, model.parameters.at( model.model.warningParameter ) } } );
+            auto currentWarnings = model.model.currentWarnings;
+            if( !model.model.warningSignal.empty() )
+                currentWarnings.push_back( { "", model.model.warningSignal, model.model.warningParameter } );
+            std::size_t warningIndex = 0;
+            for( const auto& descriptor : currentWarnings )
+            {
+                const auto index = warningIndex++;
+                if( model.parameters.at( descriptor.parameter ) <= 0 ) continue;
+                auto warning = expand( descriptor.signal );
+                // .save accepts native vectors, not expressions such as abs(i(...))
+                // or the maximum of several channel currents. Evaluate those in
+                // the circuit and save a voltage carrying their numerical value.
+                const bool native = warning.size() > 3 && warning.back() == ')'
+                    && ( warning.starts_with( "i(" ) || warning.starts_with( "v(" ) )
+                    && warning.find( '(', 2 ) == std::string::npos
+                    && warning.find( ',' ) == std::string::npos;
+                if( !native )
+                {
+                    const auto node = "ca" + std::to_string( i + 1 ) + "_current_warning"
+                        + ( index ? "_" + std::to_string( index ) : "" );
+                    deck << 'B' << node << ' ' << node << " 0 V={" << warning << "}\n";
+                    warning = "v(" + node + ")";
+                }
+                warnings.push_back( { warning,
+                    { c.reference + ( descriptor.label.empty() ? "" : " " + descriptor.label ),
+                      NO_SIGNAL, model.parameters.at( descriptor.parameter ) } } );
+            }
         }
         catch( const std::exception& e )
         {
@@ -491,6 +520,8 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                     channel.ground = voltage( topology.nodes[i].at( model.pins.at( model.model.logicGround ) ) );
                     channel.low = model.parameters.at( model.model.logicLow ); channel.high = model.parameters.at( model.model.logicHigh );
                     channel.minSupply = model.parameters.at( model.model.logicMinSupply ); channel.maxSupply = model.parameters.at( model.model.logicMaxSupply );
+                    if( !model.model.logicThresholdReference.empty() )
+                        channel.thresholdReference = model.parameters.at( model.model.logicThresholdReference );
                     channel.output = model.model.driverEnable.contains( pin.id );
                     if( model.model.driverValue.contains( pin.id ) )
                         channel.driverValue = signal( ExpandModelTemplate( model.model.driverValue.at( pin.id ), model, topology.nodes[i], i ) );

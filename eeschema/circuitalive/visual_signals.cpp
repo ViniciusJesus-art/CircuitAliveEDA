@@ -14,7 +14,7 @@ void ConfigureVisualSignals( CIRCUIT_SNAPSHOT& circuit )
                               .01 * led.brightnessCurrent, .05 * led.brightnessCurrent } );
     for( const auto& pin : circuit.logicPins )
         monitors.push_back( { pin.voltage, pin.ground, pin.vcc, pin.low, pin.high,
-                              pin.digital ? 1.0 : 5.0, pin.minSupply, pin.maxSupply } );
+                              pin.digital ? 1.0 : 5.0, pin.minSupply, pin.maxSupply, pin.thresholdReference } );
 }
 
 void UpdateVisualSignals( const CIRCUIT_SNAPSHOT& circuit, EDITOR_SESSION_VIEW& view,

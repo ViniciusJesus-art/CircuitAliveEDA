@@ -166,8 +166,8 @@
     },
     {
       "id": "iq",
-      "label": "Iq",
-      "default": "2m",
+      "label": "Package ICC with outputs HIGH",
+      "default": "800u",
       "unit": "A",
       "min": 0,
       "max": 1
@@ -187,6 +187,94 @@
       "default": ".2",
       "min": 0,
       "max": 5
+    },
+    {
+      "id": "iil",
+      "label": "Low input current magnitude",
+      "default": "400u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iih",
+      "label": "High input current magnitude",
+      "default": "20u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "rout_high",
+      "label": "Rout high",
+      "default": "150",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "rout_low",
+      "label": "Rout low",
+      "default": "18.75",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "ioh",
+      "label": "Recommended source current per output",
+      "default": "400u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iol",
+      "label": "Recommended sink current per output",
+      "default": "8m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "vref",
+      "label": "Absolute input threshold reference",
+      "default": "5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "iil_ref",
+      "label": "IIL test voltage",
+      "default": ".4",
+      "unit": "V",
+      "min": 0,
+      "max": 20
+    },
+    {
+      "id": "iih_ref",
+      "label": "IIH test voltage",
+      "default": "2.7",
+      "unit": "V",
+      "min": 0.001,
+      "max": 20
+    },
+    {
+      "id": "iq_low",
+      "label": "Package ICC with outputs LOW",
+      "default": "2.4m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "rating_window",
+      "label": "Output current warning averaging time",
+      "default": "1u",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
     }
   ],
   "matches": {
@@ -251,17 +339,34 @@
       "y4": {
         "signal": "q4"
       }
+    },
+    "electrical": {
+      "input_low_current": "iil",
+      "input_high_current": "iih",
+      "output_high_resistance": "rout_high",
+      "output_low_resistance": "rout_low",
+      "source_rating": "ioh",
+      "sink_rating": "iol",
+      "threshold_reference": "vref",
+      "input_low_reference": "iil_ref",
+      "input_high_reference": "iih_ref",
+      "quiescent_low": "iq_low",
+      "current_rating_window": "rating_window"
     }
   },
   "sources": [
     "https://www.ti.com/lit/ds/symlink/sn74ls00.pdf"
   ],
   "model_notes": [
-    "Own behavioral implementation; no vendor SPICE source copied.",
-    "Truth table, physical pinout, supply operating range, input thresholds and approximate delay are represented.",
-    "Propagation delay, output resistance and quiescent current are fixed nominal parameters near 5V/room temperature, not complete supply/temperature/load curves.",
-    "No thermal damage, ESD/back-powering, short-circuit protection or setup/hold violation checking. Floating inputs remain unknown.",
-    "TTL input thresholds are normalized to nominal 5V (0.8V/2V); they scale slightly with supply in this approximation. DC TTL input currents/fan-out are not modeled."
+    "Own behavioral implementation, calibrated to selected datasheet points; no vendor SPICE copied.",
+    "Finite asymmetric output resistance, input DC current/capacitance, per-output source/sink current warnings and powered propagation delays are represented.",
+    "Output current ratings trigger warnings, not artificial hard current clamps. No transistor-level short-circuit or protection model.",
+    "Delay, drive strength and consumption use nominal values near the stated reference supply; full supply-dependent timing/drive curves, damage, input clamp/back-powering and temperature are outside this model. Inputs without an external driver remain unknown.",
+    "Reference: 5 V. Absolute TTL input levels are 0.8 V/2 V throughout the recommended 4.75\u20135.25 V supply range.",
+    "Input I/V interpolates conservative IIL=-0.4 mA at 0.4 V and IIH=20 uA at 2.7 V. These maximum input loads support a rated fan-out of 20 LS inputs (IOH=0.4 mA, IOL=8 mA). Shared multi-input transistor effects are not represented.",
+    "Unloaded VOH=VCC-1.6 V, VOL=0.2 V; nominal incremental high/low resistances 150/18.75 ohm. ICC interpolates 0.8/2.4 mA by mean output state; switching internal TTL current is not modeled.",
+    "Nominal tPLH/tPHL=9/10 ns plus finite transition and load response; these are approximate internal delays, not a complete maximum-frequency specification.",
+    "Per-output current warnings use a first-order 1 us averaging window for DC operating ratings; normal short capacitive charging peaks are not instantaneous overload limits."
   ],
   "measurement_ports": {
     "positive": "vcc",

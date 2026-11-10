@@ -20,12 +20,9 @@
   <img height="24" src="https://img.shields.io/badge/All_Releases-GitHub-24292e?style=for-the-badge&logo=github&logoColor=white" alt="All Releases">
 </a>
 
-
+**Read the English version 🇬🇧 [here](/README.md)**
 
 ---
-
-
-
 
 ## O que é o CircuitAliveEDA?
 
@@ -45,12 +42,10 @@ Por utilizar o KiCad como base, o projeto também mantém o caminho para o desen
 
 </div>
 
-
-
 ## Sumário
 
 - [O que é o CircuitAliveEDA?](#o-que-é-o-circuitaliveeda)
-- [O que já funciona](#o-que-já-funciona)
+- [Mudanças](#mudanças)
 - [Imagens do projeto](#imagens-do-projeto)
 - [O que ainda quero desenvolver](#o-que-ainda-quero-desenvolver)
 - [Como funciona por dentro](#como-funciona-por-dentro)
@@ -62,38 +57,98 @@ Por utilizar o KiCad como base, o projeto também mantém o caminho para o desen
 
 ---
 
-## O que já funciona
+## Mudanças
 
-### Simulação no próprio esquemático
+Estas são as adições e mudanças de fluxo desenvolvidas no CircuitAliveEDA sobre sua base KiCad. O editor de esquemáticos, o editor de PCB, o sistema de bibliotecas e as ferramentas de fabricação continuam vindo do KiCad. As seções abaixo explicam o que o CA acrescenta para quem está abrindo o programa pela primeira vez.
 
-O CA já conta com uma implementação inicial de simulação interativa usando **ngspice**, com suporte inicial a circuitos digitais por meio do **XSPICE**.
+### Simulação interativa no esquemático
 
-Entre as funções que já foram desenvolvidas estão:
+Monte o circuito, aperte **Play** e acompanhe seu comportamento no mesmo editor em que você desenha. O CA integra **ngspice** e **XSPICE** com controles para iniciar, pausar, continuar e interromper a simulação, ajustar sua velocidade ou avançar um passo enquanto estiver pausada.
 
-- Controles para iniciar, pausar, continuar e interromper a simulação.
-- Integração com o editor de esquemáticos.
-- Interação com chaves durante a simulação.
-- Representação visual do funcionamento de LEDs.
-- Medições de tensão, corrente e potência.
-- Osciloscópio com cursores, *trigger* e exportação CSV.
-- Indicação dos estados lógicos `0`, `1`, `Z` e `X`.
-- Testes com circuitos analógicos e digitais.
+- Clique nas chaves compatíveis para mudar seu estado durante a simulação.
+- Ajuste potenciômetros e trimpots compatíveis sem reiniciar a sessão nem perder o estado armazenado no circuito.
+- Acompanhe o brilho dos LEDs e os indicadores lógicos de `0`, `1`, `Z` (alta impedância) e `X` (indefinido).
+- Coloque sondas de tensão, corrente, potência e osciloscópio nos fios, ou habilite medições no próprio componente.
+- Examine as formas de onda com cursores e disparo do osciloscópio e exporte as amostras em CSV.
 
-Quero que testar um circuito seja algo tão natural quanto desenhá-lo: mudar uma ligação, apertar *Play* e ver o resultado.
+Veja [medições e osciloscópio](docs/circuitalive/MEASUREMENTS.md) e [ajustes durante a simulação](docs/circuitalive/LIVE_CONTROLS.md).
 
-### Modelos de componentes
+### Modelos de componentes e vínculos padrão dos símbolos
 
-Uma parte importante do projeto é facilitar o uso de modelos de simulação. Não adianta ter uma boa interface se cada novo componente exigir uma sequência complicada de configurações.
+O CA fornece os comportamentos de simulação em **arquivos `.casim`**, associados aos símbolos da biblioteca padrão. O catálogo foi ampliado com:
 
-O CA já possui suporte e documentação para modelos de componentes discretos e digitais, além da associação desses modelos aos símbolos. Também comecei um **editor visual de modelos**, para tornar esse processo mais acessível.
+- Resistores, capacitores, indutores, redes resistivas, divisores de tensão, potenciômetros, chaves e relés de bobina DC.
+- Diodos, Zeners, LEDs, pontes retificadoras, conjuntos de diodos, transistores bipolares, MOSFETs, JFETs e drivers Darlington.
+- Amplificadores operacionais, comparadores, reguladores, optoacopladores, chaves e multiplexadores analógicos, portas lógicas, disparadores Schmitt, flip-flops, registradores, decodificadores e contadores.
 
-O [catálogo de modelos](docs/circuitalive/MODEL_CATALOG.md) reúne informações sobre os arquivos `.casim`, modelos disponíveis, testes e cobertura da biblioteca padrão.
+Os vínculos são conferidos pela numeração dos pinos físicos e pela função do componente. Desenhos compatíveis de resistores, capacitores, diodos e chaves já recebem seu modelo pelos arquivos distribuídos com o CA. Chaves de vários contatos, bancos DIP, pacotes resistivos e shunts Kelvin usam ligações adequadas aos seus terminais, em vez de serem tratados como peças simples de dois terminais.
 
-### Pequenas mudanças no editor
+Esses padrões acompanham a instalação; não dependem das preferências do desenvolvedor nem de configurar cada símbolo manualmente. Um modelo escolhido explicitamente para o componente ou salvo em um perfil pessoal conserva a prioridade. **A cobertura ainda é parcial:** a meta é cobrir os componentes eletrônicos padrão, mas ter um símbolo na biblioteca não significa que ele já tenha modelo de simulação. Conectores, itens mecânicos e gráficos ficam fora dessa meta de cobertura de modelos.
 
-Além do simulador, comecei a adaptar algumas interações do editor para deixar o trabalho mais rápido. Entre elas estão ajustes na colocação contínua de símbolos e a possibilidade de **excluir elementos com dois cliques no botão direito**.
+Veja o [catálogo de modelos](docs/circuitalive/MODEL_CATALOG.md) e os [vínculos revisados da biblioteca padrão](docs/circuitalive/STANDARD_LIBRARY_ASSOCIATIONS.md).
 
-São detalhes pequenos, mas que fazem diferença quando se passa bastante tempo montando e modificando circuitos.
+### Comportamento elétrico e limites dos modelos
+
+Os modelos vão além de mostrar estados lógicos ideais. Conforme o componente, incluem faixas de tensão de alimentação, limiares de entrada, atrasos de propagação, resistência e quedas de tensão nas saídas, capacitância de entrada, consumo em repouso, fuga e limites ou avisos de corrente. A carga e o fan-out afetam a resposta elétrica pelas entradas e saídas modeladas. Os tempos de comutação e a frequência de operação dependem dos parâmetros e comportamentos implementados em cada modelo.
+
+São aproximações nominais, com níveis de detalhe diferentes entre os modelos. Não garantem todos os limites de um datasheet, e temperatura, autoaquecimento e dano permanente ficam fora do escopo atual. A documentação registra os comportamentos atendidos e as limitações restantes.
+
+Os diodos incluem condução direta, fuga reversa e ruptura quando configurada. Um terminal conectado apenas a uma sonda ideal de tensão pode flutuar próximo da tensão da fonte mesmo com o bloqueio da corrente de carga; o [guia de polarização reversa](docs/circuitalive/DIODE_REVERSE_BIAS.md) explica como testar isso com uma carga e retorno ao GND.
+
+### Editor visual de modelos e configurações reutilizáveis
+
+O **Simulation Model Editor**, em uma janela própria, permite escolher um símbolo da biblioteca, importar seus pinos, montar o comportamento com blocos, conectar terminais, expor parâmetros e salvar um arquivo `.casim` reutilizável. Modelos existentes também podem servir de ponto de partida.
+
+No esquemático, **Simulation model...** (**Ctrl+Alt+M**) configura o modelo, o mapa de pinos, os parâmetros e as medições. O navegador de modelos oferece categorias, famílias e busca. As configurações podem ser salvas como padrão para novas instâncias do mesmo símbolo de biblioteca, enquanto as instâncias existentes conservam sua configuração. Modelos expressáveis pelos blocos disponíveis ou por SPICE podem ser acrescentados sem recompilar o aplicativo.
+
+Veja o [editor visual de modelos](docs/circuitalive/MODEL_AUTHOR.md) e as [configurações reutilizáveis](docs/circuitalive/COMPLEX_MODELS.md).
+
+### Imagens de memória e execução de firmware
+
+Os modelos de ROM e RAM compatíveis podem carregar arquivos de dados iniciais. Um visualizador de memória captura o estado da simulação pausada, mostra endereços, bytes e bits indefinidos e exporta os dados em BIN, Intel HEX ou snapshots `.camem` do CA.
+
+Nos modelos fornecidos de ATmega48P/88P/168P/328P, Arduino UNO R3 e PIC16F84A, o CA pode executar firmware HEX/BIN pelos runtimes incluídos. Cada instância tem seu próprio firmware, clock, memória e conexões elétricas dos pinos. O firmware é compilado com as ferramentas externas habituais do dispositivo. Outros microcontroladores, dispositivos STM/ESP e FPGAs ainda precisam de seus próprios motores e modelos implementados.
+
+Veja [imagens de memória](docs/circuitalive/MEMORY_IMAGES.md) e [modelos programáveis](docs/circuitalive/MICROCONTROLLER_MODELS.md).
+
+### Inserção e reaproveitamento de itens no esquemático
+
+O fluxo de inserção foi padronizado para componentes, símbolos de alimentação, rótulos, texto, imagens, formas, tabelas e folhas:
+
+1. Use o atalho ou comando da barra, escolha o item e confirme.
+2. O item acompanha o cursor; clique para colocá-lo, e a prévia desaparece.
+3. Clique em espaço vazio para trazer o mesmo item de volta ao cursor.
+4. Clique novamente para colocar outra cópia, sem reabrir o seletor.
+
+Acionar o atalho ou comando novamente abre uma nova escolha. Os itens ligados diretamente aos fios mantêm a inserção direta. Componentes com várias unidades podem continuar pelas unidades disponíveis, mantendo referências como U1A/U1B juntas.
+
+O painel **Used Components** lista os tipos de componentes já presentes na página atual, com uma prévia do símbolo. Selecione um tipo e use o mesmo par de cliques para inserir outra instância com uma referência nova. O painel pode ser encaixado, deixado flutuante e redimensionado; suas preferências de disposição são mantidas entre projetos.
+
+Veja o [fluxo de inserção](docs/circuitalive/PLACEMENT_WORKFLOW.md) e o [painel de componentes usados](docs/circuitalive/USED_COMPONENTS.md).
+
+### Aplicação de propriedades por clique, com numeração automática
+
+A ferramenta **Apply Properties by Click...** está na barra superior e no menu **Tools**, com o atalho padrão **Ctrl+Shift+P**. Escolha uma propriedade editável e o valor de substituição, confirme e clique nos objetos para atualizá-los. Ela atende referências, valores, footprints, nomes/textos, campos personalizados e outras propriedades aplicáveis do editor.
+
+Ative a numeração automática para substituir `#` ou `?` em um padrão. Por exemplo, `Digital_D#`, começando em `10` com passo `2`, aplica `Digital_D10`, `Digital_D12`, `Digital_D14` e assim por diante. Um passo negativo faz a contagem decrescer. Cliques vazios ou recusados não consomem um número, e o cursor mostra o próximo valor.
+
+Com a criação de rótulos em fios habilitada, clicar no fio cria um rótulo local, global ou hierárquico conectado, usando o nome gerado. Desative essa opção para editar propriedades do próprio fio. As edições comuns têm desfazer/refazer, os campos dos componentes respeitam a variante ativa e as unidades relacionadas são mantidas em sincronia. **Esc** encerra a ferramenta.
+
+Veja [aplicação de propriedades por clique](docs/circuitalive/PROPERTY_STAMP.md).
+
+### Páginas, navegação e gestos do mouse
+
+O menu **Pages** permite criar, renomear, reordenar, remover e navegar pelas páginas do esquemático, incluindo várias páginas principais em um projeto. A ordem das páginas é preservada ao salvar e reabrir. Os indicadores e controles de simulação pertencem ao caminho completo da folha, de modo que a navegação mantém os controles de cada página associados ao circuito correto.
+
+Um **duplo clique direito** exclui o item sob o ponteiro pela ação normal de exclusão do editor, com suporte a desfazer. Um clique direito simples continua abrindo o menu de contexto. Nos campos de símbolos, o comportamento normal de exclusão oculta o campo.
+
+Veja [páginas do esquemático](docs/circuitalive/PAGES.md).
+
+### Bibliotecas incluídas na instalação
+
+Os pacotes do CA incluem símbolos, footprints, modelos 3D, templates de projetos, modelos de simulação, blocos e runtimes. O aplicativo inicializa as tabelas de bibliotecas no primeiro uso sem exigir uma instalação separada do KiCad nem downloads de bibliotecas, preservando as bibliotecas pessoais.
+
+Veja [bibliotecas incluídas](docs/circuitalive/BUNDLED_LIBRARIES.md).
 
 ## Imagens do projeto
 
@@ -169,6 +224,16 @@ Para quem quiser entender melhor o funcionamento ou estudar a implementação, m
 - [Editor visual de modelos](docs/circuitalive/MODEL_AUTHOR.md)
 - [Associação de modelos](docs/circuitalive/MODEL_FILES.md)
 - [Catálogo de modelos](docs/circuitalive/MODEL_CATALOG.md)
+- [Vínculos de modelos com a biblioteca padrão](docs/circuitalive/STANDARD_LIBRARY_ASSOCIATIONS.md)
+- [Comportamento elétrico e modelos Schmitt](docs/circuitalive/SCHMITT_ELECTRICAL_MODELS.md)
+- [Verificação de polarização reversa dos diodos](docs/circuitalive/DIODE_REVERSE_BIAS.md)
+- [Imagens e inspeção de memória](docs/circuitalive/MEMORY_IMAGES.md)
+- [Modelos programáveis e firmware](docs/circuitalive/MICROCONTROLLER_MODELS.md)
+- [Fluxo de inserção no esquemático](docs/circuitalive/PLACEMENT_WORKFLOW.md)
+- [Painel de componentes usados](docs/circuitalive/USED_COMPONENTS.md)
+- [Aplicação de propriedades por clique](docs/circuitalive/PROPERTY_STAMP.md)
+- [Páginas do esquemático](docs/circuitalive/PAGES.md)
+- [Bibliotecas incluídas](docs/circuitalive/BUNDLED_LIBRARIES.md)
 - [Mapa geral do desenvolvimento](docs/circuitalive/Mapa_KiCad_Simulacao_Interativa.md)
 
 ## Compilação e execução

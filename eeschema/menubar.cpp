@@ -574,6 +574,7 @@ void SCH_EDIT_FRAME::doReCreateMenuBar()
     toolsMenu->AppendSeparator();
     toolsMenu->Add( SCH_ACTIONS::editSymbolFields );
     toolsMenu->Add( SCH_ACTIONS::editSymbolLibraryLinks );
+    toolsMenu->Add( SCH_ACTIONS::propertyStamp );
 
     toolsMenu->AppendSeparator();
     toolsMenu->Add( SCH_ACTIONS::annotate );

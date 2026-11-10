@@ -750,6 +750,22 @@ TOOL_ACTION SCH_ACTIONS::closeOutline( TOOL_ACTION_ARGS()
 
 // SCH_EDIT_TOOL
 //
+TOOL_ACTION SCH_ACTIONS::placeRepeatedItem( TOOL_ACTION_ARGS()
+        .Name( "eeschema.InteractiveDrawing.placeRepeatedItem" )
+        .Scope( AS_GLOBAL )
+        .Flags( AF_ACTIVATE )
+        .Parameter<bool>( false ) );
+
+TOOL_ACTION SCH_ACTIONS::propertyStamp( TOOL_ACTION_ARGS()
+        .Name( "eeschema.PropertyStamp.apply" )
+        .Scope( AS_GLOBAL )
+        .DefaultHotkey( MD_CTRL + MD_SHIFT + 'P' )
+        .FriendlyName( _( "Apply Properties by Click..." ) )
+        .Tooltip( _( "Apply a property value by clicking items, with optional automatic numbering and wire labels" ) )
+        .ToolbarState( TOOLBAR_STATE::TOGGLE )
+        .Icon( BITMAPS::autoplace_fields )
+        .Flags( AF_ACTIVATE ) );
+
 TOOL_ACTION SCH_ACTIONS::repeatDrawItem( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveEdit.repeatDrawItem" )
         .Scope( AS_GLOBAL )

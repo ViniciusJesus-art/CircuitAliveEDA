@@ -1,0 +1,466 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "74ls165",
+  "name": "74LS165 8-bit parallel-in serial-out shift register",
+  "description": "Nominal mixed-signal logic with package pinout, propagation delay and finite output impedance. See docs/circuitalive/REGISTER_COUNTER_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "Positive supply",
+      "role": "power",
+      "default_pin": "16"
+    },
+    {
+      "id": "gnd",
+      "label": "Supply reference",
+      "role": "reference",
+      "default_pin": "8"
+    },
+    {
+      "id": "pl",
+      "label": "pl",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "clk",
+      "label": "clk",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "ce",
+      "label": "ce",
+      "role": "input",
+      "default_pin": "15"
+    },
+    {
+      "id": "serial",
+      "label": "serial",
+      "role": "input",
+      "default_pin": "10"
+    },
+    {
+      "id": "d0",
+      "label": "d0",
+      "role": "input",
+      "default_pin": "11"
+    },
+    {
+      "id": "d1",
+      "label": "d1",
+      "role": "input",
+      "default_pin": "12"
+    },
+    {
+      "id": "d2",
+      "label": "d2",
+      "role": "input",
+      "default_pin": "13"
+    },
+    {
+      "id": "d3",
+      "label": "d3",
+      "role": "input",
+      "default_pin": "14"
+    },
+    {
+      "id": "d4",
+      "label": "d4",
+      "role": "input",
+      "default_pin": "3"
+    },
+    {
+      "id": "d5",
+      "label": "d5",
+      "role": "input",
+      "default_pin": "4"
+    },
+    {
+      "id": "d6",
+      "label": "d6",
+      "role": "input",
+      "default_pin": "5"
+    },
+    {
+      "id": "d7",
+      "label": "d7",
+      "role": "input",
+      "default_pin": "6"
+    },
+    {
+      "id": "q",
+      "label": "q",
+      "role": "output",
+      "default_pin": "9"
+    },
+    {
+      "id": "nq",
+      "label": "nq",
+      "role": "output",
+      "default_pin": "7"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Vil",
+      "default": ".16",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "Vih",
+      "default": ".4",
+      "unit": "",
+      "min": 0.1,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Vmin",
+      "default": "4.75",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Vmax",
+      "default": "5.25",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "rise_delay",
+      "label": "Rise delay",
+      "default": "15n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "fall_delay",
+      "label": "Fall delay",
+      "default": "15n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Transition",
+      "default": "2n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "25",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Cin",
+      "default": "3.5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Iq",
+      "default": "18m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "high_drop",
+      "label": "High drop",
+      "unit": "V",
+      "default": "1.6",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Low drop",
+      "unit": "V",
+      "default": ".2",
+      "min": 0,
+      "max": 5
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "74xx:74LS165"
+    ],
+    "symbol_names": [
+      "74LS165"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "behavioral": {
+    "version": 1,
+    "supply": {
+      "vcc": "vcc",
+      "gnd": "gnd"
+    },
+    "blocks": [
+      {
+        "type": "or",
+        "inputs": [
+          "clk",
+          "ce"
+        ],
+        "out": "gated_clock"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "d0"
+        ],
+        "out": "load_set0"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "!d0"
+        ],
+        "out": "load_reset0"
+      },
+      {
+        "type": "dff",
+        "data": "serial",
+        "clock": "gated_clock",
+        "set": "load_set0",
+        "reset": "load_reset0",
+        "q": "s0",
+        "nq": "n_s0",
+        "initial": 2
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "d1"
+        ],
+        "out": "load_set1"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "!d1"
+        ],
+        "out": "load_reset1"
+      },
+      {
+        "type": "dff",
+        "data": "s0",
+        "clock": "gated_clock",
+        "set": "load_set1",
+        "reset": "load_reset1",
+        "q": "s1",
+        "nq": "n_s1",
+        "initial": 2
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "d2"
+        ],
+        "out": "load_set2"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "!d2"
+        ],
+        "out": "load_reset2"
+      },
+      {
+        "type": "dff",
+        "data": "s1",
+        "clock": "gated_clock",
+        "set": "load_set2",
+        "reset": "load_reset2",
+        "q": "s2",
+        "nq": "n_s2",
+        "initial": 2
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "d3"
+        ],
+        "out": "load_set3"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "!d3"
+        ],
+        "out": "load_reset3"
+      },
+      {
+        "type": "dff",
+        "data": "s2",
+        "clock": "gated_clock",
+        "set": "load_set3",
+        "reset": "load_reset3",
+        "q": "s3",
+        "nq": "n_s3",
+        "initial": 2
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "d4"
+        ],
+        "out": "load_set4"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "!d4"
+        ],
+        "out": "load_reset4"
+      },
+      {
+        "type": "dff",
+        "data": "s3",
+        "clock": "gated_clock",
+        "set": "load_set4",
+        "reset": "load_reset4",
+        "q": "s4",
+        "nq": "n_s4",
+        "initial": 2
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "d5"
+        ],
+        "out": "load_set5"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "!d5"
+        ],
+        "out": "load_reset5"
+      },
+      {
+        "type": "dff",
+        "data": "s4",
+        "clock": "gated_clock",
+        "set": "load_set5",
+        "reset": "load_reset5",
+        "q": "s5",
+        "nq": "n_s5",
+        "initial": 2
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "d6"
+        ],
+        "out": "load_set6"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "!d6"
+        ],
+        "out": "load_reset6"
+      },
+      {
+        "type": "dff",
+        "data": "s5",
+        "clock": "gated_clock",
+        "set": "load_set6",
+        "reset": "load_reset6",
+        "q": "s6",
+        "nq": "n_s6",
+        "initial": 2
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "d7"
+        ],
+        "out": "load_set7"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "!pl",
+          "!d7"
+        ],
+        "out": "load_reset7"
+      },
+      {
+        "type": "dff",
+        "data": "s6",
+        "clock": "gated_clock",
+        "set": "load_set7",
+        "reset": "load_reset7",
+        "q": "s7",
+        "nq": "n_s7",
+        "initial": 2
+      }
+    ],
+    "outputs": {
+      "q": {
+        "signal": "s7"
+      },
+      "nq": {
+        "signal": "n_s7"
+      }
+    },
+    "clock_hysteresis": true
+  },
+  "sources": [
+    "https://www.ti.com/lit/ds/symlink/sn74ls165a.pdf"
+  ],
+  "category": "Digital/Shift registers",
+  "family": "74LS",
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own event-driven functional model; no vendor SPICE source copied. The .casim file contains all device-specific behavior.",
+    "Package pin numbers, control polarity, functional state and finite nominal delays are represented. Initial storage is unknown until reset, parallel load or enough valid clocks.",
+    "Delays are per logic block, not a complete timing-characterization matrix. Allow settling and obey setup/hold; metastability and timing violations are not modeled.",
+    "Input thresholds scale with local supply. LS/HCT/AHCT thresholds are calibrated to 0.8/2 V at 5 V; LS outputs approximate 3.4/0.2 V before loading.",
+    "Finite output resistance, input capacitance and package quiescent current are fixed approximate nominal parameters. No detailed fan-out, TTL input current, ESD, parasitic power, thermal drift or damage.",
+    "Outputs release outside the supply window. No retention through a power cycle is guaranteed.",
+    "Physical clock inputs use supply-relative Schmitt action; data and other controls retain 0/X/1 conversion. All-input Schmitt behavior of AHC/AHCT is not reproduced.",
+    "No fixed small global maximum timestep; XSPICE schedules internal events. Use circuit resolution appropriate to the electrical stimulus.",
+    "PL LOW loads all parallel bits asynchronously. CE HIGH inhibits the clock.",
+    "The effective clock is CP OR CE, as in the device clock gate; changing CE from LOW to HIGH while CP is LOW can cause a rising edge. Change CE while CP is HIGH.",
+    "Parallel data may change while PL is LOW, with finite gate/load delay; do not use the model to assess load/clock races."
+  ]
+}

@@ -129,6 +129,11 @@ struct SIMULATION_MODEL
     std::map<std::string, std::string> legacyFields;
     std::string measurePositive, measureNegative;
     std::string warningSignal, warningParameter;
+    struct CURRENT_WARNING
+    {
+        std::string label, signal, parameter;
+    };
+    std::vector<CURRENT_WARNING> currentWarnings;
     std::string voltageConstraint;
     std::string frequencyParameter;
     std::string maxStepParameter;
@@ -137,6 +142,7 @@ struct SIMULATION_MODEL
     double timingRcFallback = 10e-6;
     // Mixed-signal behavior remains in the file's SPICE/XSPICE templates.
     std::string logicVcc, logicGround, logicLow, logicHigh, logicMinSupply, logicMaxSupply;
+    std::string logicThresholdReference;
     std::map<std::string, std::string> driverEnable;
     std::map<std::string, std::string> driverValue;
     std::map<std::string, std::string> internalDrive;

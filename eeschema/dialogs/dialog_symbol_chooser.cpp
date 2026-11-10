@@ -79,13 +79,14 @@ DIALOG_SYMBOL_CHOOSER::DIALOG_SYMBOL_CHOOSER( SCH_BASE_FRAME* aParent, const LIB
     m_keepSymbol = new wxCheckBox( this, wxID_ANY, _( "Place repeated copies" ) );
     m_keepSymbol->SetValue( true );
     m_keepSymbol->SetToolTip( _( "Keep the symbol selected for subsequent clicks." ) );
+    // Repetition now uses an idle choice and a fresh click to start each preview.
+    m_keepSymbol->Hide();
 
     m_useUnits = new wxCheckBox( this, wxID_ANY, _( "Place all units" ) );
     m_useUnits->SetValue( true );
     m_useUnits->SetToolTip( _( "Sequentially place all units of the symbol." ) );
 
-    buttonsSizer->Add( m_keepSymbol, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 5 );
-    buttonsSizer->Add( m_useUnits, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 30 );
+    buttonsSizer->Add( m_useUnits, 0, wxLEFT | wxALIGN_CENTER_VERTICAL, 5 );
 
     wxStdDialogButtonSizer* sdbSizer = new wxStdDialogButtonSizer();
     wxButton*               okButton = new wxButton( this, wxID_OK );

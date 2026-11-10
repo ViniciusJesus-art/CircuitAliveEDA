@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "resistor_pack_10",
+  "name": "10 isolated resistors",
+  "description": "Independent ideal resistors sharing the configured resistance value; physical pairing follows this package drawing.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "terminal1",
+      "label": "Terminal 1",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "terminal2",
+      "label": "Terminal 2",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "terminal3",
+      "label": "Terminal 3",
+      "role": "passive",
+      "default_pin": "3"
+    },
+    {
+      "id": "terminal4",
+      "label": "Terminal 4",
+      "role": "passive",
+      "default_pin": "4"
+    },
+    {
+      "id": "terminal5",
+      "label": "Terminal 5",
+      "role": "passive",
+      "default_pin": "5"
+    },
+    {
+      "id": "terminal6",
+      "label": "Terminal 6",
+      "role": "passive",
+      "default_pin": "6"
+    },
+    {
+      "id": "terminal7",
+      "label": "Terminal 7",
+      "role": "passive",
+      "default_pin": "7"
+    },
+    {
+      "id": "terminal8",
+      "label": "Terminal 8",
+      "role": "passive",
+      "default_pin": "8"
+    },
+    {
+      "id": "terminal9",
+      "label": "Terminal 9",
+      "role": "passive",
+      "default_pin": "9"
+    },
+    {
+      "id": "terminal10",
+      "label": "Terminal 10",
+      "role": "passive",
+      "default_pin": "10"
+    },
+    {
+      "id": "terminal11",
+      "label": "Terminal 11",
+      "role": "passive",
+      "default_pin": "11"
+    },
+    {
+      "id": "terminal12",
+      "label": "Terminal 12",
+      "role": "passive",
+      "default_pin": "12"
+    },
+    {
+      "id": "terminal13",
+      "label": "Terminal 13",
+      "role": "passive",
+      "default_pin": "13"
+    },
+    {
+      "id": "terminal14",
+      "label": "Terminal 14",
+      "role": "passive",
+      "default_pin": "14"
+    },
+    {
+      "id": "terminal15",
+      "label": "Terminal 15",
+      "role": "passive",
+      "default_pin": "15"
+    },
+    {
+      "id": "terminal16",
+      "label": "Terminal 16",
+      "role": "passive",
+      "default_pin": "16"
+    },
+    {
+      "id": "terminal17",
+      "label": "Terminal 17",
+      "role": "passive",
+      "default_pin": "17"
+    },
+    {
+      "id": "terminal18",
+      "label": "Terminal 18",
+      "role": "passive",
+      "default_pin": "18"
+    },
+    {
+      "id": "terminal19",
+      "label": "Terminal 19",
+      "role": "passive",
+      "default_pin": "19"
+    },
+    {
+      "id": "terminal20",
+      "label": "Terminal 20",
+      "role": "passive",
+      "default_pin": "20"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "resistance",
+      "label": "Resistance",
+      "default": "$value",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "R1_${id} ${pin:terminal1} ${pin:terminal20} ${param:resistance}",
+      "R2_${id} ${pin:terminal2} ${pin:terminal19} ${param:resistance}",
+      "R3_${id} ${pin:terminal3} ${pin:terminal18} ${param:resistance}",
+      "R4_${id} ${pin:terminal4} ${pin:terminal17} ${param:resistance}",
+      "R5_${id} ${pin:terminal5} ${pin:terminal16} ${param:resistance}",
+      "R6_${id} ${pin:terminal6} ${pin:terminal15} ${param:resistance}",
+      "R7_${id} ${pin:terminal7} ${pin:terminal14} ${param:resistance}",
+      "R8_${id} ${pin:terminal8} ${pin:terminal13} ${param:resistance}",
+      "R9_${id} ${pin:terminal9} ${pin:terminal12} ${param:resistance}",
+      "R10_${id} ${pin:terminal10} ${pin:terminal11} ${param:resistance}"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "category": "Analog/Passive components",
+  "family": "Resistor arrays",
+  "model_notes": [
+    "Reuses the native resistor element; channels are isolated, not bussed. Value is the resistance of each element."
+  ],
+  "matches": {
+    "library_ids": [
+      "Device:R_Pack10",
+      "Device:R_Pack10_Split"
+    ],
+    "symbol_names": [
+      "R_Pack10",
+      "R_Pack10_Split"
+    ]
+  }
+}

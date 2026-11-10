@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "switch_spdt_201",
+  "name": "SPDT contact, common pin 0",
+  "description": "Interactive contact topology; generic configurable contacts, not a manufacturer-certified model.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "common",
+      "label": "Common",
+      "role": "passive",
+      "default_pin": "0"
+    },
+    {
+      "id": "rest",
+      "label": "Rest",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "other",
+      "label": "Other",
+      "role": "passive",
+      "default_pin": "1"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "on_resistance",
+      "label": "Closed resistance",
+      "default": "0.01",
+      "unit": "Ohm",
+      "min": 1e-09,
+      "max": 1000000.0
+    },
+    {
+      "id": "off_resistance",
+      "label": "Open resistance",
+      "default": "1e12",
+      "unit": "Ohm",
+      "min": 1,
+      "max": 1000000000000000.0
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vcontrol${id} control${id} 0 ${control:initial}",
+      "Brest_${id} rest_${id} 0 V={5-v(control${id})}",
+      "Srest_${id} ${pin:common} ${pin:rest} rest_${id} 0 m${id}",
+      "Sother_${id} ${pin:common} ${pin:other} control${id} 0 m${id}"
+    ],
+    "definitions": [
+      ".model m${id} SW(Ron=${param:on_resistance} Roff=${param:off_resistance} Vt=2.5 Vh=0.1)"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "category": "Electromechanical/Switches",
+  "family": "Interactive switches",
+  "model_notes": [
+    "Generic contact combination using the existing switch primitive; finite Ron/Roff, no contact bounce or manufacturer-specific timing/current rating.",
+    "Pin pairs and common terminals were reviewed from the bundled standard symbol drawings. All physical pins are represented.",
+    "Control OFF connects common to rest (the drawn position); ON connects common to other. Both throws are never shorted together."
+  ],
+  "matches": {
+    "library_ids": [
+      "Switch:SW_SPDT_201"
+    ],
+    "symbol_names": [
+      "SW_SPDT_201"
+    ]
+  },
+  "control": {
+    "source": "Vcontrol${id}",
+    "on": 5,
+    "off": 0,
+    "initially_closed": false
+  }
+}

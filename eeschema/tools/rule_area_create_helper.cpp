@@ -30,6 +30,7 @@
 #include <tool/tool_manager.h>
 #include <tools/sch_actions.h>
 #include <tools/rule_area_create_helper.h>
+#include <widgets/used_symbols.h>
 
 
 RULE_AREA_CREATE_HELPER::RULE_AREA_CREATE_HELPER( KIGFX::VIEW& aView, SCH_EDIT_FRAME* aFrame,
@@ -67,6 +68,7 @@ void RULE_AREA_CREATE_HELPER::commitRuleArea( std::unique_ptr<SCH_RULE_AREA> aRu
 
     commit.Add( ruleArea, m_frame->GetScreen() );
     commit.Push( _( "Draw Rule Area" ) );
+    CIRCUITALIVE::RememberPlacement( m_frame, { ruleArea } );
 
     m_toolManager->RunAction<EDA_ITEM*>( ACTIONS::selectItem, ruleArea );
 

@@ -474,6 +474,8 @@ set( EESCHEMA_SRCS
     tools/rule_area_create_helper.cpp
     tools/sch_actions.cpp
     tools/sch_drawing_tools.cpp
+    tools/property_stamp.cpp
+    tools/property_stamp_tool.cpp
     tools/sch_design_block_control.cpp
     tools/sch_edit_table_tool.cpp
     tools/sch_edit_tool.cpp

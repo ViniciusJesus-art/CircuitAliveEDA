@@ -81,11 +81,20 @@
   "matches": {
     "library_ids": [
       "Device:D",
-      "Device:D_Small"
+      "Device:D_45deg",
+      "Device:D_45deg_Filled",
+      "Device:D_Filled",
+      "Device:D_Small",
+      "Device:D_Small_Filled",
+      "Simulation_SPICE:D"
     ],
     "symbol_names": [
       "D",
-      "D_Small"
+      "D_45deg",
+      "D_45deg_Filled",
+      "D_Filled",
+      "D_Small",
+      "D_Small_Filled"
     ]
   },
   "measurement_ports": {
@@ -99,5 +108,16 @@
     "Series path: V(A,K) = Vj + I × Rs.",
     "Cjo sets zero-bias junction capacitance; Tt sets stored-charge transit time. BV sets reverse breakdown.",
     "Edit these parameters to change the physical junction. For a simple IF/ELSE diode, choose DIODE (piecewise linear)."
-  ]
+  ],
+  "legacy_parameters": {
+    "map": {
+      "is": "saturation_current",
+      "n": "emission",
+      "rs": "series_resistance",
+      "bv": "breakdown",
+      "cjo": "junction_capacitance",
+      "tt": "transit_time"
+    },
+    "only_if_value_invalid": true
+  }
 }

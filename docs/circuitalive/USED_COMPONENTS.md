@@ -29,5 +29,9 @@ prévia, mantendo a escolha para inserir novamente. **Esc** sem prévia desativa
 a escolha e volta ao ponteiro normal.
 Ocultar o painel também encerra essa escolha.
 
+O mesmo [ciclo de inserção e repetição](PLACEMENT_WORKFLOW.md) atende agora os
+itens escolhidos por atalho ou botão, incluindo alimentação, rótulos, texto e
+objetos gráficos. Essas escolhas independem da visibilidade deste painel.
+
 O painel e a inserção usam os mesmos mecanismos wxWidgets e ferramentas do
 editor nas versões Windows e Linux.

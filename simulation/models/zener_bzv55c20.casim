@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "zener_bzv55c20",
+  "name": "BZV55B/C20 Zener diode",
+  "description": "Nominal 25 C Zener behavior, shared by B/C tolerance grades. See docs/circuitalive/ROUTING_PROTECTION_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "k",
+      "label": "Cathode",
+      "default_pin": "1",
+      "role": "passive"
+    },
+    {
+      "id": "a",
+      "label": "Anode",
+      "default_pin": "2",
+      "role": "passive"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "zener_voltage",
+      "label": "Zener voltage at test current",
+      "default": "20",
+      "unit": "V",
+      "min": 2,
+      "max": 100
+    },
+    {
+      "id": "test_current",
+      "label": "Zener calibration current",
+      "default": "0.005",
+      "unit": "A",
+      "min": 1e-05,
+      "max": 0.1
+    },
+    {
+      "id": "zener_resistance",
+      "label": "Reverse branch series resistance",
+      "default": "9.83",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "capacitance",
+      "label": "Lumped terminal capacitance",
+      "default": "60p",
+      "unit": "F",
+      "min": 0,
+      "max": 0.001
+    },
+    {
+      "id": "current_warning",
+      "label": "Reverse current warning (~400mW / Vz)",
+      "default": "0.02",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vanode_${id} ${pin:a} anode_${id} 0",
+      "Dforward_${id} anode_${id} ${pin:k} forward_${id}",
+      "Rzener_${id} ${pin:k} zener_${id} {max(0.001,${param:zener_resistance})}",
+      "Dreverse_${id} zener_${id} offset_${id} clamp_${id}",
+      "Voffset_${id} offset_${id} anode_${id} {${param:zener_voltage}-0.02585*ln(${param:test_current}/1e-12)-${param:zener_resistance}*${param:test_current}}",
+      "Cleak_${id} ${pin:k} anode_${id} ${param:capacitance}",
+      "Rleak_${id} ${pin:k} anode_${id} 2800000000"
+    ],
+    "definitions": [
+      ".model forward_${id} D(Is=1n N=1.5 Rs=0.5)",
+      ".model clamp_${id} D(Is=1p N=1)",
+      ".options method=gear maxord=2"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "Diode:BZV55B20",
+      "Diode:BZV55C20"
+    ],
+    "part_names": [
+      "BZV55B20",
+      "BZV55C20"
+    ],
+    "pin_names": {
+      "a": [
+        "A"
+      ],
+      "k": [
+        "K"
+      ]
+    },
+    "symbol_names": [
+      "BZV55B20",
+      "BZV55C20"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "measurement_ports": {
+    "positive": "a",
+    "negative": "k"
+  },
+  "sources": [
+    "https://assets.nexperia.com/documents/data-sheet/BZV55_SER.pdf"
+  ],
+  "model_notes": [
+    "Own compact model with separate forward and reverse branches. Nominal reverse voltage is calibrated at 5.0 mA; the differential resistance target is 15 Ohm at that point.",
+    "B and C grades share nominal behavior; their production tolerances are not sampled.",
+    "Reverse leakage uses a fixed resistor at one tenth of the specified 25 C maximum at its reference voltage. The soft low-current knee is not a complete measured curve.",
+    "Terminal capacitance is a constant using the datasheet upper bound at zero bias, not a voltage-dependent junction curve.",
+    "Current warning uses 400 mW / nominal voltage. No thermal derating, surge energy limit, self-heating or damage is modeled.",
+    "Requests circuit-wide Gear order 2 to damp charge transients on interactive drive changes; no fixed small global timestep."
+  ],
+  "current_warning": {
+    "signal": "i(Vanode_${id})",
+    "limit_parameter": "current_warning"
+  },
+  "category": "Semiconductors/Diodes",
+  "family": "Zener",
+  "nominal_temperature_c": 25
+}
