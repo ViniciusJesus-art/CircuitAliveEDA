@@ -346,7 +346,7 @@ BOOST_AUTO_TEST_CASE( InvalidRequestsDoNotMutateActiveCircuit )
     cfg.historyCapacity = 0;
     BOOST_CHECK_THROW( session.Configure( RC, cfg ), std::runtime_error );
     cfg = Config(); cfg.historyCapacity = 1; cfg.signals.clear();
-    for( int i = 0; i < 257; ++i ) cfg.signals.push_back( "v(n" + std::to_string( i ) + ")" );
+    for( std::size_t i = 0; i <= MAX_SESSION_SIGNALS; ++i ) cfg.signals.push_back( "v(n" + std::to_string( i ) + ")" );
     BOOST_CHECK_THROW( session.Configure( RC, cfg ), std::runtime_error );
     cfg = Config();
     BOOST_CHECK_THROW( session.Configure( "Bad\n.control\nquit\n.endc\n.end\n", cfg ),
@@ -363,23 +363,35 @@ BOOST_AUTO_TEST_CASE( InvalidRequestsDoNotMutateActiveCircuit )
     session.AdvanceTo( 0.001 );
 }
 
-BOOST_AUTO_TEST_CASE( TwoHundredFiftySixSignalsKeepBoundedHistory )
+BOOST_AUTO_TEST_CASE( DigitalBusSignalsKeepBoundedHistoryAtTheSessionLimit )
 {
-    auto cfg = Config(); cfg.signals.clear(); cfg.historyCapacity = 4;
-    std::string deck = "Many pin signals\nV1 supply 0 5\n";
-    for( int i = 0; i < 256; ++i )
+    for( const auto count : { std::size_t(256), MAX_SESSION_SIGNALS } )
     {
-        const auto n = std::to_string( i );
-        deck += "Ra" + n + " supply n" + n + " 1k\nRb" + n + " n" + n + " 0 1k\n";
-        cfg.signals.push_back( "v(n" + n + ")" );
+        auto cfg = Config(); cfg.signals.clear(); cfg.historyCapacity = 4;
+        std::string deck = "Many pin signals\nV1 supply 0 5\n";
+        for( std::size_t i = 0; i < count; ++i )
+        {
+            const auto n = std::to_string( i );
+            deck += "Ra" + n + " supply n" + n + " 1k\nRb" + n + " n" + n + " 0 1k\n";
+            cfg.signals.push_back( "v(n" + n + ")" );
+        }
+        deck += ".end\n";
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+        session.Configure( deck, cfg ); session.AdvanceTo( .001 );
+        const auto snapshot = session.Snapshot();
+        BOOST_REQUIRE_EQUAL( snapshot.latest.values.size(), count );
+        BOOST_CHECK_LE( snapshot.history.size(), 4 );
+        for( double value : snapshot.latest.values ) BOOST_CHECK_CLOSE( value, 2.5, 1e-5 );
+        session.Stop();
+        cfg.historyCapacity = MAX_SESSION_HISTORY_VALUES / count + 1;
+        BOOST_CHECK_THROW( session.Configure( deck, cfg ), std::runtime_error );
+        if( count == MAX_SESSION_SIGNALS )
+        {
+            cfg.historyCapacity = 1;
+            cfg.signals.push_back( "v(n0)" );
+            BOOST_CHECK_THROW( session.Configure( deck, cfg ), std::runtime_error );
+        }
     }
-    deck += ".end\n";
-    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
-    session.Configure( deck, cfg ); session.AdvanceTo( .001 );
-    const auto snapshot = session.Snapshot();
-    BOOST_REQUIRE_EQUAL( snapshot.latest.values.size(), 256 );
-    BOOST_CHECK_LE( snapshot.history.size(), 4 );
-    for( double value : snapshot.latest.values ) BOOST_CHECK_CLOSE( value, 2.5, 1e-5 );
 }
 
 BOOST_AUTO_TEST_CASE( MissingSignalFailsAndStopAllowsRecovery )

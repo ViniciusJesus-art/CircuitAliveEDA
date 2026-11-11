@@ -39,6 +39,7 @@ class NETINFO_ITEM;
 class PAD;
 class PCB_EDIT_FRAME;
 class PCB_GROUP;
+class PCB_TRACK;
 
 #include <board_commit.h>
 #include <map>
@@ -106,6 +107,9 @@ public:
      */
     static FOOTPRINT_ASSOCIATIONS BuildFootprintAssociations( BOARD& aBoard, NETLIST& aNetlist,
                                                              bool aLookupByTimestamp );
+
+    static std::set<PCB_TRACK*> FindObsoleteTracks( BOARD& aBoard, NETLIST& aNetlist,
+                                                   bool aLookupByTimestamp = false );
 
     void SetReporter( REPORTER* aReporter ) { m_reporter = aReporter; }
 

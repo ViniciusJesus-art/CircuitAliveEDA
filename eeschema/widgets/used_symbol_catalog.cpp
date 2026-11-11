@@ -4,6 +4,7 @@
 #include <sch_sheet_path.h>
 #include <sch_symbol.h>
 #include <sch_group.h>
+#include <lib_symbol.h>
 #include <tools/sch_tool_utils.h>
 #include <algorithm>
 #include <map>
@@ -54,7 +55,7 @@ std::vector<USED_SYMBOL_ENTRY> BuildUsedSymbolList( SCH_SHEET_PATH& aSheet )
         if( symbol->IsPower() || symbol->GetField( "CA.Probe" ) )
             continue;
         // A library symbol is one component type, irrespective of values, models, units or
-        // other instance properties. Keep a stable representative for copying its settings.
+        // other instance properties. Keep a stable representative for resolving its library definition.
         const auto [at, inserted] = symbols.emplace( symbol->GetLibId().Format(), symbol );
         if( !inserted && ( symbol->GetUnit() < at->second->GetUnit()
             || ( symbol->GetUnit() == at->second->GetUnit()
@@ -69,6 +70,15 @@ std::vector<USED_SYMBOL_ENTRY> BuildUsedSymbolList( SCH_SHEET_PATH& aSheet )
         return comparison == 0 ? a.key < b.key : comparison < 0;
     } );
     return entries;
+}
+
+std::unique_ptr<SCH_SYMBOL> MakeUsedSymbolTemplate( const SCH_SYMBOL& aSource, SCH_SHEET_PATH& aSheet )
+{
+    if( !aSource.GetLibSymbolRef() )
+        return nullptr;
+
+    return std::make_unique<SCH_SYMBOL>( *aSource.GetLibSymbolRef(), aSource.GetLibId(), &aSheet,
+                                        1, aSource.GetBodyStyle(), VECTOR2I( 0, 0 ), nullptr );
 }
 
 std::unique_ptr<SCH_SYMBOL> CopyUsedSymbol( const SCH_SYMBOL& aSource,

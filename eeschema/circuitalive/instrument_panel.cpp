@@ -44,7 +44,7 @@ INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_
     m_tabs = new wxNotebook( this, wxID_ANY );
     auto* tools = new wxScrolledWindow( m_tabs ); tools->SetScrollRate( 0, FromDIP( 10 ) );
     auto* contents = new wxBoxSizer( wxVERTICAL );
-    contents->Add( new wxStaticText( tools, wxID_ANY, _( "Place probes on wires or pin endpoints" ) ), 0, wxALL, 8 );
+    contents->Add( new wxStaticText( tools, wxID_ANY, _( "Place probes on connections or in empty space" ) ), 0, wxALL, 8 );
     auto* buttons = new wxGridSizer( 2, 6, 6 );
     auto* measurementsGrid = buttons;
     const wxString labels[] = { _( "Voltage (V)" ), _( "Current (A)" ), _( "Power (W)" ), _( "Oscilloscope" ),
@@ -85,10 +85,10 @@ INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_
     } );
     contents->Add( new wxStaticText( tools, wxID_ANY, _( "Probe name (optional)" ) ), 0, wxLEFT | wxRIGHT | wxTOP, 8 );
     m_name = new wxTextCtrl( tools, wxID_ANY ); contents->Add( m_name, 0, wxEXPAND | wxALL, 8 );
-    m_help = new wxStaticText( tools, wxID_ANY, _( "Choose a tool, click a wire or pin endpoint. Esc finishes placement." ) );
+    m_help = new wxStaticText( tools, wxID_ANY, _( "Choose a probe. Click a connection to place directly, or empty space to preview; click again to place. Esc cancels." ) );
     m_help->Wrap( 300 ); contents->Add( m_help, 0, wxEXPAND | wxALL, 8 );
     auto* description = new wxStaticText( tools, wxID_ANY,
-        _( "V and scope use the circuit reference.\nA and W insert an ideal series sensor.\nCurrent: left → right or top → bottom.\nWire power: V(reference) × I.\n\nSources drive the connected wire relative to GND.\nDuring simulation: click 0/1 to toggle; click PWM/square to adjust duty cycle.\nEsc finishes placement before interacting.\nSelect a probe, Ctrl+Alt+M: edit its settings.\n\nComponent V / I / P: Simulation model..." ) );
+        _( "V and scope use the circuit reference.\nA and W insert an ideal series sensor.\nCurrent: left → right or top → bottom.\nWire power: V(reference) × I.\n\nSources drive the connected wire relative to GND.\nDuring simulation: click 0/1 to toggle; click PWM/square to adjust duty cycle.\nEsc finishes placement before interacting.\nDouble-click a probe or press E to edit its settings.\n\nComponent V / I / P: Simulation model..." ) );
     description->Wrap( 300 ); contents->Add( description, 0, wxALL, 8 );
     tools->SetSizer( contents ); tools->FitInside(); m_tabs->AddPage( tools, _( "Probes" ), true );
     m_measurePage = new wxPanel( m_tabs );
@@ -130,7 +130,6 @@ INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_
     if( auto* cfg = GetAppSettings<EESCHEMA_SETTINGS>( "eeschema" ) )
     {
         const auto selected = cfg->Get<int>( "appearance.simulation_tab" );
-        m_hasTabPreference = selected.has_value();
         m_tabs->ChangeSelection( std::clamp( selected.value_or( 0 ), 0, 2 ) );
     }
     m_tabs->Bind( wxEVT_NOTEBOOK_PAGE_CHANGED, &INSTRUMENT_PANEL::tabChanged, this );
@@ -148,7 +147,6 @@ void INSTRUMENT_PANEL::SetProbeName( const std::string& name ) { m_name->ChangeV
 void INSTRUMENT_PANEL::ClearProbeName() { m_name->Clear(); }
 void INSTRUMENT_PANEL::tabChanged( wxBookCtrlEvent& event )
 {
-    m_hasTabPreference = true;
     if( auto* cfg = GetAppSettings<EESCHEMA_SETTINGS>( "eeschema" ) )
     {
         cfg->Set<int>( "appearance.simulation_tab", m_tabs->GetSelection() );
@@ -159,7 +157,7 @@ void INSTRUMENT_PANEL::tabChanged( wxBookCtrlEvent& event )
 void INSTRUMENT_PANEL::SetPlacement( std::optional<PROBE_KIND> kind )
 {
     for( std::size_t i = 0; i < m_buttons.size(); ++i ) m_buttons[i]->SetValue( kind && static_cast<std::size_t>( *kind ) == i );
-    m_help->SetLabel( kind ? _( "Click a wire to place the probe. Esc finishes placement." ) : _( "Choose a tool, click a wire or pin endpoint. Esc finishes placement." ) );
+    m_help->SetLabel( kind ? _( "Click a connection to place directly, or empty space to preview; click again to place. Esc cancels." ) : _( "Choose a probe. Click a connection to place directly, or empty space to preview; click again to place. Esc cancels." ) );
     m_help->Wrap( 300 );
 }
 
@@ -183,7 +181,8 @@ void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const 
     for( const auto& channel : snapshot.circuit.measurements )
         if( channel.scope ) scope = true; else values = true;
     // Keep the controls alive across Stop/Play, including their column widths, scope
-    // settings and notebook selections. Only the acquired circuit data is reset.
+    // settings. A new simulation selects its result tab regardless of the last
+    // saved tab; subsequent updates leave the user's tab selection alone.
     if( active != m_wasActive )
         m_scope->ResetSession();
     const auto now = std::chrono::steady_clock::now();
@@ -210,7 +209,7 @@ void INSTRUMENT_PANEL::UpdateSession( const SCHEMATIC_SNAPSHOT& snapshot, const 
         m_rows.resize( row );
     }
     if( m_scope ) m_scope->UpdateSession( snapshot.circuit, session );
-    if( active && !m_wasActive && !m_hasTabPreference )
+    if( active && !m_wasActive )
     {
         if( values || scope )
             m_tabs->SetSelection( values ? 1 : 2 );

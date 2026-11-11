@@ -229,7 +229,7 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
                                  r.at( "address_bits" ),
                                  r.value( "word_bits", 8u ),
                                  r.value( "writable", false ),
-                                 r.value( "fill", -1 ) };
+                                 r.value( "fill", r.value( "writable", false ) ? 0 : -1 ) };
             if( !Identifier( memory.id ) || !memoryIds.insert( memory.id ).second || memory.label.empty() ||
                 !memory.addressBits || memory.addressBits > 20 || !memory.wordBits || memory.wordBits > 32 ||
                 memory.fill < -1 || memory.fill > 255 || memoryIds.size() > 16 ||

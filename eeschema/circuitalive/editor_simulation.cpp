@@ -12,6 +12,13 @@
 #include "instrument_panel.h"
 #include "probe_placement.h"
 #include "source_probe_dialog.h"
+#include "probe_symbol.h"
+#include <tools/ee_grid_helper.h>
+#include <tools/sch_tool_utils.h>
+#include <sch_pin.h>
+#include <view/view_controls.h>
+#include <gal/graphics_abstraction_layer.h>
+#include <tool/tool_manager.h>
 #include "live_control_popup.h"
 #include "control_references.h"
 #include <tool/actions.h>
@@ -20,6 +27,7 @@
 
 #include <tools/sch_tool_base.h>
 #include <tools/sch_selection_tool.h>
+#include <tools/sch_actions.h>
 #include <sch_symbol.h>
 #include <sch_screen.h>
 #include <sch_commit.h>
@@ -43,6 +51,12 @@
 
 namespace CIRCUITALIVE
 {
+namespace
+{
+TOOL_ACTION placeProbes( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.placeProbes" )
+        .Scope( AS_GLOBAL ).Flags( AF_ACTIVATE ) );
+}
+
 class EDITOR_SIMULATION_TOOL : public wxEvtHandler, public SCH_TOOL_BASE<SCH_EDIT_FRAME>,
                                public SCHEMATIC_LISTENER
 {
@@ -77,6 +91,8 @@ private:
         Go( &EDITOR_SIMULATION_TOOL::Stop, SIMULATION_ACTIONS::stop.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Memory, SIMULATION_ACTIONS::memory.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Configure, SIMULATION_ACTIONS::configure.MakeEvent() );
+        Go( &EDITOR_SIMULATION_TOOL::Configure, SIMULATION_ACTIONS::probeProperties.MakeEvent() );
+        Go( &EDITOR_SIMULATION_TOOL::PlaceProbes, placeProbes.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::ToggleProbes, SIMULATION_ACTIONS::probes.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::ToggleLogic, SIMULATION_ACTIONS::logicLevels.MakeEvent() );
     }
@@ -84,6 +100,7 @@ private:
     int Pause( const TOOL_EVENT& );
     int Stop( const TOOL_EVENT& );
     int Configure( const TOOL_EVENT& );
+    int PlaceProbes( const TOOL_EVENT& );
     int Memory( const TOOL_EVENT& );
     int ToggleProbes( const TOOL_EVENT& );
     int ToggleLogic( const TOOL_EVENT& );
@@ -92,7 +109,6 @@ private:
     void saveInstrumentLayout();
     void tick( wxTimerEvent& );
     void click( wxMouseEvent& );
-    void key( wxKeyEvent& );
     void chooseProbe( PROBE_KIND );
     void redraw( bool aForce = true );
     void setStatus( const wxString& aText );
@@ -107,7 +123,7 @@ private:
     bool m_installed = false;
     wxString m_status;
     bool m_statusPending = false;
-    std::unique_ptr<SESSION_RUNNER> m_runner;
+    std::shared_ptr<SESSION_RUNNER> m_runner;
     std::unique_ptr<SIMULATION_OVERLAY> m_overlay;
     std::unique_ptr<INSTRUMENT_PANEL> m_instruments;
     std::optional<PROBE_KIND> m_placing;
@@ -130,6 +146,7 @@ private:
     std::vector<double> m_overlayAdjustments;
     std::vector<LOGIC_LEVEL> m_overlayLevels;
     std::vector<bool> m_overlayRapid;
+    std::vector<bool> m_overlayContentions;
     wxWeakRef<LIVE_CONTROL_POPUP> m_liveControl;
 };
 
@@ -137,7 +154,7 @@ void EDITOR_SIMULATION_TOOL::Install()
 {
     if( m_installed )
         return;
-    m_runner = std::make_unique<SESSION_RUNNER>( FindSessionWorker(
+    m_runner = std::make_shared<SESSION_RUNNER>( FindSessionWorker(
             wxStandardPaths::Get().GetExecutablePath().ToStdString(wxConvUTF8) ) );
     m_overlay = std::make_unique<SIMULATION_OVERLAY>();
     m_frame->Schematic().AddListener( this );
@@ -145,7 +162,11 @@ void EDITOR_SIMULATION_TOOL::Install()
     auto* selection = m_toolMgr->GetTool<SCH_SELECTION_TOOL>();
     selection->GetToolMenu().GetMenu().AddItem( SIMULATION_ACTIONS::configure,
         []( const SELECTION& selected )
-        { return selected.Size() == 1 && selected.Front()->Type() == SCH_SYMBOL_T; } );
+        { return selected.Size() == 1 && selected.Front()->Type() == SCH_SYMBOL_T
+                 && !ProbeSymbolForItem( selected.Front() ); } );
+    selection->GetToolMenu().GetMenu().AddItem( SIMULATION_ACTIONS::probeProperties,
+        []( const SELECTION& selected )
+        { return selected.Size() == 1 && ProbeSymbolForItem( selected.Front() ); } );
     selection->GetToolMenu().GetMenu().AddItem( SIMULATION_ACTIONS::memory,
         [this]( const SELECTION& selected )
         {
@@ -201,7 +222,6 @@ void EDITOR_SIMULATION_TOOL::Install()
     setStatus( _( "Stopped — t = 0 s" ) );
     Bind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
     m_frame->GetCanvas()->Bind( wxEVT_LEFT_DOWN, &EDITOR_SIMULATION_TOOL::click, this );
-    m_frame->Bind( wxEVT_CHAR_HOOK, &EDITOR_SIMULATION_TOOL::key, this );
     ReloadPreferences();
 }
 
@@ -227,7 +247,6 @@ void EDITOR_SIMULATION_TOOL::Shutdown()
     dismissControl();
     Unbind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
     m_frame->GetCanvas()->Unbind( wxEVT_LEFT_DOWN, &EDITOR_SIMULATION_TOOL::click, this );
-    m_frame->Unbind( wxEVT_CHAR_HOOK, &EDITOR_SIMULATION_TOOL::key, this );
     if( m_instruments )
     {
         if( auto* manager = wxAuiManager::GetManager( m_frame ) ) manager->DetachPane( m_instruments.get() );
@@ -289,6 +308,9 @@ int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
         try
         {
             // Freeze a complete graph/model snapshot on this thread; the solver never reads it live.
+            SCH_COMMIT probeIds( m_frame );
+            EnsureUniqueProbeIdentities( m_frame->Schematic(), {}, &probeIds );
+            if( !probeIds.Empty() ) probeIds.Push( _( "Assign probe identifiers" ) );
             m_frame->RecalculateConnections( nullptr, NO_CLEANUP );
             m_circuit = CaptureSchematic( m_frame->Schematic(), true, m_preferences );
             m_runner->SetSpeed( m_preferences.playbackSpeed );
@@ -437,14 +459,14 @@ int EDITOR_SIMULATION_TOOL::Memory( const TOOL_EVENT& )
             if( regions.empty() )
                 throw std::runtime_error( "This component has no memory in the active simulation. Stop and restart "
                                           "after changing its model." );
-            ShowMemoryViewer( m_frame, component.reference, regions, m_runner.get(), slots );
+            ShowMemoryViewer( m_frame, component.reference, regions, m_runner, slots );
         }
         else
         {
             auto model = MODEL_REPOSITORY( MODEL_REPOSITORY::DefaultDirectories( component.projectDirectory ) )
                                  .SelectModel( component );
             regions = InitialModelMemories( component, model );
-            ShowMemoryViewer( m_frame, component.reference, regions );
+            ShowMemoryViewer( m_frame, component.reference, regions, m_runner );
         }
     }
     catch( const std::exception& e )
@@ -452,6 +474,48 @@ int EDITOR_SIMULATION_TOOL::Memory( const TOOL_EVENT& )
         wxMessageBox( DiagnosticText( e.what() ), _( "Memory" ), wxOK | wxICON_INFORMATION, m_frame );
     }
     return 0;
+}
+
+bool EditSimulationProbe( SCH_EDIT_FRAME* frame, SCH_SYMBOL* symbol )
+{
+    if( !symbol || !symbol->GetField( "CA.Probe" ) )
+        return false;
+    try
+    {
+        const auto kind = ParseProbeKind( symbol->GetField( "CA.Probe" )->GetText().ToStdString() );
+        if( IsSourceProbe( kind ) )
+        {
+            auto settings = ReadSourceProbeSettings( *symbol );
+            auto name = symbol->GetField( FIELD_T::VALUE )->GetText().ToStdString();
+            if( EditSourceProbe( frame, kind, settings, name ) )
+            {
+                SCH_COMMIT commit( frame );
+                commit.Modify( symbol, frame->GetScreen() );
+                WriteSourceProbeSettings( *symbol, kind, settings );
+                symbol->GetField( FIELD_T::VALUE )->SetText( wxString::FromUTF8( name ) );
+                commit.Push( _( "Configure source probe" ) );
+                InvalidateEditorSimulation( frame );
+            }
+        }
+        else
+        {
+            wxTextEntryDialog dialog( frame, _( "Probe name (blank uses the net label or A, B, C...)" ),
+                    _( "Probe properties" ), symbol->GetField( FIELD_T::VALUE )->GetText() );
+            if( dialog.ShowModal() == wxID_OK )
+            {
+                SCH_COMMIT commit( frame );
+                commit.Modify( symbol, frame->GetScreen() );
+                symbol->GetField( FIELD_T::VALUE )->SetText( dialog.GetValue() );
+                commit.Push( _( "Rename simulation probe" ) );
+                InvalidateEditorSimulation( frame );
+            }
+        }
+    }
+    catch( const std::exception& error )
+    {
+        wxMessageBox( DiagnosticText( error.what() ), _( "Probe properties" ), wxOK | wxICON_ERROR, frame );
+    }
+    return true;
 }
 
 int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
@@ -462,32 +526,8 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
     m_placing.reset(); if( m_instruments ) m_instruments->SetPlacement( {} );
     try
     {
-        if( symbol->GetField( "CA.Probe" ) )
-        {
-            const auto kind = ParseProbeKind( symbol->GetField( "CA.Probe" )->GetText().ToStdString() );
-            if( IsSourceProbe( kind ) )
-            {
-                auto settings = ReadSourceProbeSettings( *symbol );
-                auto name = symbol->GetField( FIELD_T::VALUE )->GetText().ToStdString();
-                if( EditSourceProbe( m_frame, kind, settings, name ) )
-                {
-                    SCH_COMMIT commit( m_frame ); commit.Modify( symbol, m_frame->GetScreen() );
-                    WriteSourceProbeSettings( *symbol, kind, settings );
-                    symbol->GetField( FIELD_T::VALUE )->SetText( wxString::FromUTF8( name ) );
-                    commit.Push( _( "Configure source probe" ) ); Invalidate();
-                }
-                return 0;
-            }
-            wxTextEntryDialog dialog( m_frame, _( "Probe name (blank uses the net label or A, B, C...)" ),
-                _( "Probe properties" ), symbol->GetField( FIELD_T::VALUE )->GetText() );
-            if( dialog.ShowModal() == wxID_OK )
-            {
-                SCH_COMMIT commit( m_frame ); commit.Modify( symbol, m_frame->GetScreen() );
-                symbol->GetField( FIELD_T::VALUE )->SetText( dialog.GetValue() );
-                commit.Push( _( "Rename simulation probe" ) ); Invalidate();
-            }
+        if( EditSimulationProbe( m_frame, symbol ) )
             return 0;
-        }
         auto component = ReadSymbolModelSettings( *symbol, m_frame->GetCurrentSheet(),
             m_frame->Schematic().GetCurrentVariant(), m_frame->Prj().GetProjectPath().ToStdString(wxConvUTF8), true );
         bool excluded = symbol->GetExcludedFromSim( &m_frame->GetCurrentSheet(),
@@ -520,16 +560,8 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
 {
     if( m_placing )
     {
-        try
-        {
-            const auto position = m_frame->GetCanvas()->GetView()->ToWorld( VECTOR2D( aEvent.GetPosition().x, aEvent.GetPosition().y ) );
-            PlaceProbe( *m_frame, *m_placing, m_instruments->ProbeName(), VECTOR2I( position ),
-                        std::max( 1, int( m_frame->GetCanvas()->GetView()->ToWorld( 12.0 ) ) ),
-                        m_sourceSettings[*m_placing] );
-            m_instruments->ClearProbeName();
-            setStatus( _( "Probe placed — click another wire or pin endpoint, or press Esc" ) );
-        }
-        catch( const std::exception& e ) { setStatus( DiagnosticText( e.what() ) ); }
+        // The native placement tool handles these clicks, including its moving preview.
+        aEvent.Skip();
         return;
     }
     if( m_active && ( m_session.state == EDITOR_SESSION_STATE::RUNNING
@@ -587,19 +619,149 @@ void EDITOR_SIMULATION_TOOL::chooseProbe( PROBE_KIND kind )
         m_instruments->SetProbeName( name );
     }
     m_toolMgr->RunAction( ACTIONS::cancelInteractive );
-    m_placing = kind; m_instruments->SetPlacement( kind );
-    setStatus( _( "Click a wire or pin endpoint to place the probe; Esc finishes placement" ) );
+    m_toolMgr->PostAction( placeProbes, kind );
     m_frame->GetCanvas()->SetFocus();
 }
 
-void EDITOR_SIMULATION_TOOL::key( wxKeyEvent& event )
+int EDITOR_SIMULATION_TOOL::PlaceProbes( const TOOL_EVENT& action )
 {
-    if( m_placing && event.GetKeyCode() == WXK_ESCAPE )
+    const auto kind = action.Parameter<PROBE_KIND>();
+    m_placing = kind;
+    m_instruments->SetPlacement( kind );
+    m_toolMgr->RunAction( ACTIONS::selectionClear );
+    m_frame->PushTool( action );
+    Activate();
+    auto* controls = getViewControls();
+    auto* screen = m_frame->GetScreen();
+    EE_GRID_HELPER grid( m_toolMgr );
+    std::unique_ptr<SCH_SYMBOL> preview;
+    auto* selection = m_toolMgr->GetTool<SCH_SELECTION_TOOL>();
+    controls->ShowCursor( true );
+    setStatus( _( "Click a connection to place directly, or empty space to preview. Esc finishes placement." ) );
+
+    auto hidePreview = [&]()
     {
-        m_placing.reset(); m_instruments->SetPlacement( {} );
-        setStatus( _( "Probe placement finished" ) ); return;
+        if( preview ) selection->ClearSelection();
+        getView()->ClearPreview();
+        preview.reset();
+        controls->SetAutoPan( false );
+        controls->CaptureCursor( false );
+    };
+    auto updatePreview = [&]( const PROBE_PLACEMENT& plan )
+    {
+        getView()->ClearPreview();
+        if( !preview )
+        {
+            preview = MakeProbeSymbol( kind, m_frame->GetCurrentSheet(), plan.anchor, plan.vertical,
+                    NextProbeSequence( m_frame->Schematic() ), m_instruments->ProbeName(), m_sourceSettings[kind] );
+            preview->SetParent( screen );
+            selection->AddItemToSel( preview.get() );
+            preview->SetFlags( IS_NEW | IS_MOVING );
+        }
+        AlignProbeForPlacement( *preview, plan );
+        getView()->AddToPreview( preview.get(), false );
+        controls->SetAutoPan( true );
+    };
+
+    while( TOOL_EVENT* event = Wait() )
+    {
+        if( !m_placing || m_frame->GetScreen() != screen )
+        {
+            event->SetPassEvent();
+            break;
+        }
+        m_frame->GetCanvas()->SetCurrentCursor( preview ? KICURSOR::MOVING : KICURSOR::BULLSEYE );
+        if( event->IsAction( &ACTIONS::undo ) )
+        {
+            event->SetPassEvent();
+            break;
+        }
+        else if( event->IsCancelInteractive() )
+        {
+            event->SetPassEvent( false );
+            if( preview )
+                hidePreview();
+            else
+                break;
+        }
+        else if( event->IsActivate() )
+        {
+            event->SetPassEvent();
+            break;
+        }
+        else if( preview && event->IsAction( &ACTIONS::refreshPreview ) )
+        {
+            getView()->ClearPreview();
+            getView()->AddToPreview( preview.get(), false );
+        }
+        else if( preview && event->IsAction( &ACTIONS::doDelete ) )
+            hidePreview();
+        else if( preview && ( event->IsAction( &ACTIONS::redo ) || event->IsAction( &ACTIONS::duplicate )
+                              || event->IsAction( &ACTIONS::paste )
+                              || event->IsAction( &SCH_ACTIONS::repeatDrawItem )
+                              || event->IsAction( &SCH_ACTIONS::properties )
+                              || event->IsAction( &SIMULATION_ACTIONS::probeProperties )
+                              || event->IsAction( &SIMULATION_ACTIONS::configure ) ) )
+            wxBell();
+        else if( preview && ( event->IsAction( &SCH_ACTIONS::rotateCW )
+                              || event->IsAction( &SCH_ACTIONS::rotateCCW )
+                              || event->IsAction( &SCH_ACTIONS::mirrorV )
+                              || event->IsAction( &SCH_ACTIONS::mirrorH ) ) )
+        {
+            m_toolMgr->PostAction( ACTIONS::refreshPreview );
+            event->SetPassEvent();
+        }
+        else if( event->IsMotion() || event->IsClick( BUT_LEFT )
+                 || event->IsAction( &ACTIONS::cursorClick ) )
+        {
+            grid.SetSnap( !event->Modifier( MD_SHIFT ) );
+            grid.SetUseGrid( getView()->GetGAL()->GetGridSnapping() && !event->DisableGridSnapping() );
+            auto position = grid.Align( controls->GetMousePosition(), GRID_HELPER_GRIDS::GRID_CONNECTABLE );
+            const int tolerance = std::max( 1, int( getView()->ToWorld( 12.0 ) ) );
+            if( kind != PROBE_KIND::CURRENT && kind != PROBE_KIND::POWER )
+            {
+                if( const SCH_PIN* pin = FindPinConnectionAt( *screen, &m_frame->GetCurrentSheet(),
+                        controls->GetMousePosition(), tolerance ) )
+                    position = pin->GetPosition();
+            }
+            try
+            {
+                const auto plan = PlanProbePlacement( *screen, position, tolerance, kind,
+                                                       &m_frame->GetCurrentSheet(), true );
+                controls->ForceCursorPosition( true, plan.anchor );
+                if( event->IsMotion() )
+                {
+                    if( preview ) updatePreview( plan );
+                }
+                else if( !preview && !plan.wire && !plan.pin )
+                    updatePreview( plan );
+                else
+                {
+                    PlaceProbe( *m_frame, kind, m_instruments->ProbeName(), plan.anchor, tolerance,
+                                m_sourceSettings[kind], true, preview.get() );
+                    hidePreview();
+                    m_instruments->ClearProbeName();
+                    setStatus( _( "Probe placed — click a connection or empty space; Esc finishes placement" ) );
+                }
+            }
+            catch( const std::exception& error )
+            {
+                setStatus( DiagnosticText( error.what() ) );
+            }
+        }
+        else if( event->IsClick( BUT_RIGHT ) )
+            m_menu->ShowContextMenu( m_toolMgr->GetTool<SCH_SELECTION_TOOL>()->GetSelection() );
+        else
+            event->SetPassEvent();
     }
-    event.Skip();
+    hidePreview();
+    controls->ForceCursorPosition( false );
+    m_placing.reset();
+    if( m_instruments ) m_instruments->SetPlacement( {} );
+    m_frame->GetCanvas()->SetCurrentCursor( KICURSOR::ARROW );
+    m_frame->PopTool( action );
+    setStatus( _( "Probe placement finished" ) );
+    return 0;
 }
 
 void EDITOR_SIMULATION_TOOL::redraw( bool force )
@@ -617,11 +779,13 @@ void EDITOR_SIMULATION_TOOL::redraw( bool force )
         && m_logicLevels == m_overlayLogic && brightness == m_overlayBrightness
         && m_session.switches == m_overlaySwitches
         && m_session.adjustments == m_overlayAdjustments
+        && m_session.netContentions == m_overlayContentions
         && ( !m_logicLevels || ( m_session.logicLevels == m_overlayLevels
                                  && m_session.logicRapid == m_overlayRapid ) ) ) return;
     m_overlayCached = true; m_overlayVisible = visible; m_overlaySheet = sheet; m_overlayLogic = m_logicLevels;
     m_overlayBrightness = std::move( brightness ); m_overlaySwitches = m_session.switches;
     m_overlayAdjustments = m_session.adjustments;
+    m_overlayContentions = m_session.netContentions;
     m_overlayLevels = m_logicLevels ? m_session.logicLevels : std::vector<LOGIC_LEVEL>{};
     m_overlayRapid = m_logicLevels ? m_session.logicRapid : std::vector<bool>{};
     auto* view = m_frame->GetCanvas()->GetView();

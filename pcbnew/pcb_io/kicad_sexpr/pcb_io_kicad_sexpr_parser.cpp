@@ -7403,7 +7403,7 @@ PCB_ARC* PCB_IO_KICAD_SEXPR_PARSER::parseARC()
 
         // We continue to parse the status field but it is no longer written
         case T_status:
-            parseHex();
+            arc->SetSchematicConnectionMissing( parseHex() == PCB_TRACK::MISSING_SCHEMATIC_STATUS );
             NeedRIGHT();
             break;
 
@@ -7498,7 +7498,7 @@ PCB_TRACK* PCB_IO_KICAD_SEXPR_PARSER::parsePCB_TRACK()
 
         // We continue to parse the status field but it is no longer written
         case T_status:
-            parseHex();
+            track->SetSchematicConnectionMissing( parseHex() == PCB_TRACK::MISSING_SCHEMATIC_STATUS );
             NeedRIGHT();
             break;
 
@@ -7700,7 +7700,7 @@ PCB_VIA* PCB_IO_KICAD_SEXPR_PARSER::parsePCB_VIA()
 
         // We continue to parse the status field but it is no longer written
         case T_status:
-            parseHex();
+            via->SetSchematicConnectionMissing( parseHex() == PCB_TRACK::MISSING_SCHEMATIC_STATUS );
             NeedRIGHT();
             break;
 

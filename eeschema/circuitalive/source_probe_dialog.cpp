@@ -16,9 +16,9 @@ bool EditSourceProbe( wxWindow* parent, PROBE_KIND kind, SOURCE_PROBE_SETTINGS& 
                      wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER );
     auto* layout = new wxBoxSizer( wxVERTICAL );
     auto* info = new wxStaticText( &dialog, wxID_ANY,
-        _( "Connect the probe to a wire or pin endpoint. Its voltage is referenced to GND.\n"
+        _( "Place on a connection, or in empty space and connect a wire later. Voltage is referenced to GND.\n"
            "During simulation: click 0/1 to toggle, or PWM/square to adjust duty cycle.\n"
-           "Select a placed probe and press Ctrl+Alt+M to edit its settings." ) );
+           "Double-click a placed probe, or press E, to edit these settings." ) );
     layout->Add( info, 0, wxALL, 12 );
     auto* grid = new wxFlexGridSizer( 2, 8, 12 ); grid->AddGrowableCol( 1 );
     grid->Add( new wxStaticText( &dialog, wxID_ANY, _( "Probe name (optional)" ) ), 0, wxALIGN_CENTER_VERTICAL );

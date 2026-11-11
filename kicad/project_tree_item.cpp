@@ -277,7 +277,12 @@ void PROJECT_TREE_ITEM::Activate( PROJECT_TREE_PANE* aTreePrjFrame )
             if( !rootSchematic.IsEmpty() && wxFileExists( rootSchematic ) )
                 ScanSchematicHierarchy( rootSchematic, hierarchyFiles );
 
-            bool isInHierarchy = hierarchyFiles.count( fullFileName ) > 0;
+            // The schematic editor discovers native top-level pages in the project folder.
+            // Open those pages in the project's existing editor and PCB context as well.
+            const bool isProjectPage = GetType() == TREE_FILE_TYPE::SEXPR_SCHEMATIC
+                    && wxFileName( fullFileName ).GetPath()
+                            == wxFileName( frame->GetProjectFileName() ).GetPath();
+            bool isInHierarchy = isProjectPage || hierarchyFiles.count( fullFileName ) > 0;
 
             if( isInHierarchy )
             {

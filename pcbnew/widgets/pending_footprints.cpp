@@ -152,8 +152,7 @@ public:
         m_status = new wxStaticText( lower, wxID_ANY, _( "Focus the PCB to synchronize with the schematic." ) );
         contents->Add( m_status, 0, wxEXPAND | wxALL, 8 );
         auto* hint = new wxStaticText( lower, wxID_ANY,
-                _( "Select a component. Click empty PCB space to preview, then click to place. "
-                   "The next empty click picks the next component. Esc cancels." ) );
+                _( "Select a component. Click empty PCB space to preview and place. Esc cancels." ) );
         hint->Wrap( m_panel->FromDIP( 270 ) );
         contents->Add( hint, 0, wxEXPAND | wxALL, 8 );
         m_list = new wxListBox( lower, wxID_ANY, wxDefaultPosition, wxDefaultSize,

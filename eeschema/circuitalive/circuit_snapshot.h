@@ -89,7 +89,8 @@ struct CIRCUIT_SNAPSHOT
     std::vector<MEASUREMENT_CHANNEL> measurements;
     std::vector<CURRENT_WARNING> currentWarnings;
     std::vector<LOGIC_PIN> logicPins;
-    struct MEMORY_LOCATION { std::size_t component; std::string id, label; std::size_t slot; };
+    std::vector<DRIVEN_NET> drivenNets;
+    struct MEMORY_LOCATION { std::size_t component; std::string id, label; std::size_t slot; std::string reference; };
     std::vector<MEMORY_LOCATION> memories;
 };
 

@@ -1718,7 +1718,7 @@
 (text "EPROM 27C512-55 and SRAM: external images and paused memory inspection" (at 25 15 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "dd25e5a7-b475-4fe4-a5bc-67cd490d52ab"))
 (text "Right-click U1 or U2 > Simulation model > Data files to change the image." (at 25 22 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "646ce8ab-e9e7-4976-940b-afd62b6ac7cb"))
 (text "Right-click > View memory: initial bytes before Play; actual paused contents during simulation." (at 25 29 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "ad074f0f-95ec-4857-a407-97e3f7b5540a"))
-(text "SW1 selects EPROM address 0000 (43) or 8000 (3C). Unspecified EPROM bytes are FF; RAM bytes are X." (at 25 36 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "2f124fc2-b18d-41d3-b51d-35e64fec9675"))
+(text "SW1 selects EPROM address 0000 (43) or 8000 (3C). Unspecified EPROM bytes are FF; RAM bytes are 00." (at 25 36 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "2f124fc2-b18d-41d3-b51d-35e64fec9675"))
 (text "Export CAMEM to preserve X; use BIN for completely known bytes. Play resumes after closing the viewer." (at 25 43 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "3ee2975d-edb1-4696-8ad4-4e5d57e36b8a"))
 (wire (pts (xy 30.0 64.92) (xy 30.0 59.84)) (stroke (width 0) (type default)) (uuid "963cab77-985f-45c1-9d7f-2f195cda034f"))
 (wire (pts (xy 30.0 75.08) (xy 30.0 80.16)) (stroke (width 0) (type default)) (uuid "dba2c54d-aa9b-4088-86ad-037f93066367"))

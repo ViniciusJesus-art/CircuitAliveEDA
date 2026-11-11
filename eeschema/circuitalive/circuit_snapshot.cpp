@@ -118,7 +118,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 const auto id = region.id;
                 const auto slot = result.config.memories.size();
                 model.memorySlots[id] = slot;
-                result.memories.push_back( { componentIndex, id, region.label, slot } );
+                result.memories.push_back( { componentIndex, id, region.label, slot, component.reference } );
                 region.id = "ca" + std::to_string( componentIndex + 1 ) + "_" + id;
                 region.label = component.reference + " — " + region.label;
                 result.config.memories.push_back( std::move( region ) );
@@ -157,7 +157,12 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     for( const auto& symbol : aPowerSymbols )
         if( !symbol.net.empty() && IsSimulationGround( symbol.value ) ) groundNets.insert( symbol.net );
     const auto topology = BuildCircuitTopology( allComponents, models, groundNets );
-    struct NET_DRIVE { bool external = false; std::vector<std::string> enables; };
+    struct NET_DRIVE
+    {
+        bool external = false;
+        std::set<std::string> enables;
+        std::set<std::pair<std::string, std::string>> drivers;
+    };
     std::map<std::string, NET_DRIVE> drives;
     for( std::size_t i = 0; i < aComponents.size(); ++i )
     {
@@ -169,31 +174,58 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             // can use ${drive:port} without declaring digital output metadata.
             if( model.model.logicVcc.empty() )
             {
-                if( pin.role != "input" ) drive.external = true;
+                // A capacitor is not a DC source. Resistors/inductors carry
+                // drive from their other terminal instead of inventing a LOW.
+                if( pin.role != "input" && model.model.id != "resistor"
+                    && model.model.id != "capacitor" && model.model.id != "inductor" )
+                    drive.external = true;
             }
             else
             {
                 if( auto enable = model.model.driverEnable.find( pin.id ); enable != model.model.driverEnable.end() )
-                    drive.enables.push_back( ExpandModelTemplate( enable->second, model, topology.nodes[i], i ) );
+                {
+                    const auto enabled = ExpandModelTemplate( enable->second, model, topology.nodes[i], i );
+                    drive.enables.insert( enabled );
+                    if( auto code = model.model.driverValue.find( pin.id ); code != model.model.driverValue.end() )
+                        drive.drivers.emplace( enabled, ExpandModelTemplate( code->second, model, topology.nodes[i], i ) );
+                }
                 if( auto internal = model.model.internalDrive.find( pin.id ); internal != model.model.internalDrive.end() )
-                    drive.enables.push_back( ExpandModelTemplate( internal->second, model, topology.nodes[i], i ) );
+                    drive.enables.insert( ExpandModelTemplate( internal->second, model, topology.nodes[i], i ) );
             }
         }
     }
     for( std::size_t i = 0; i < powerRails.size(); ++i )
         for( const auto& [pin, node] : topology.nodes[powerStart + i] ) drives[node].external = true;
-    // Ideal inline sensors preserve the driver's presence across the cut wire.
-    for( std::size_t pass = 0; pass < aProbes.size(); ++pass )
-        for( std::size_t i = 0; i < aProbes.size(); ++i )
-            if( aProbes[i].kind == PROBE_KIND::CURRENT || aProbes[i].kind == PROBE_KIND::POWER )
-            {
-                auto& a = drives[topology.nodes[aComponents.size()+i].at( "1" )];
-                auto& b = drives[topology.nodes[aComponents.size()+i].at( "2" )];
-                a.external = b.external = a.external || b.external;
-                auto merged = a.enables; merged.insert( merged.end(), b.enables.begin(), b.enables.end() );
-                std::sort( merged.begin(), merged.end() ); merged.erase( std::unique( merged.begin(), merged.end() ), merged.end() );
-                a.enables = b.enables = std::move( merged );
-            }
+    drives["0"].external = true;
+    std::vector<std::pair<std::string, std::string>> drivePaths, sensorPaths;
+    for( std::size_t i = 0; i < aProbes.size(); ++i )
+        if( aProbes[i].kind == PROBE_KIND::CURRENT || aProbes[i].kind == PROBE_KIND::POWER )
+            sensorPaths.emplace_back( topology.nodes[aComponents.size()+i].at( "1" ),
+                                      topology.nodes[aComponents.size()+i].at( "2" ) );
+    drivePaths = sensorPaths;
+    for( std::size_t i = 0; i < aComponents.size(); ++i )
+        if( models[i].model.id == "resistor" || models[i].model.id == "inductor" )
+            drivePaths.emplace_back( topology.nodes[i].at( models[i].pins.at( "p" ) ),
+                                     topology.nodes[i].at( models[i].pins.at( "n" ) ) );
+    // Fixed point also handles chains of resistors and multiple inline meters.
+    // Only presence is propagated: ngspice still resolves voltage, impedance,
+    // input loading and the resulting current through each individual element.
+    for( std::size_t pass = 0; pass <= drivePaths.size(); ++pass )
+    {
+        bool changed = false;
+        for( const auto& [first, second] : drivePaths )
+        {
+            auto& a = drives[first]; auto& b = drives[second];
+            const auto oldSize = a.enables.size() + b.enables.size() + a.drivers.size() + b.drivers.size();
+            const bool external = a.external || b.external;
+            changed |= a.external != external || b.external != external;
+            a.external = b.external = external;
+            a.enables.insert( b.enables.begin(), b.enables.end() ); b.enables = a.enables;
+            a.drivers.insert( b.drivers.begin(), b.drivers.end() ); b.drivers = a.drivers;
+            changed |= oldSize != a.enables.size() + b.enables.size() + a.drivers.size() + b.drivers.size();
+        }
+        if( !changed ) break;
+    }
     for( std::size_t i = 0; i < aComponents.size(); ++i )
         for( const auto& pin : models[i].model.pins )
         {
@@ -220,6 +252,99 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     };
     auto voltage = [&]( const std::string& node )
         { return node == "0" ? NO_SIGNAL : signal( "v(" + node + ")" ); };
+    std::map<std::string, std::size_t> expressionSignals;
+    auto expressionSignal = [&]( const std::string& expression ) -> std::size_t
+    {
+        auto [it, inserted] = expressionSignals.try_emplace( expression, NO_SIGNAL );
+        if( inserted )
+        {
+            if( expression.size() > 3 && expression.back() == ')'
+                && ( expression.starts_with( "v(" ) || expression.starts_with( "i(" ) )
+                && expression.find( '(', 2 ) == std::string::npos
+                && expression.find( ',' ) == std::string::npos )
+                it->second = signal( expression );
+            else
+            {
+                const auto node = "ca_logic_monitor" + std::to_string( expressionSignals.size() );
+                deck << 'B' << node << ' ' << node << " 0 V={" << expression << "}\n";
+                it->second = voltage( node );
+            }
+        }
+        return it->second;
+    };
+    // Current probes split solver nodes but not the electrical bus. Passive
+    // resistors deliberately do not merge buses for contention detection.
+    std::map<std::string, std::string> busParents;
+    auto busRoot = [&]( std::string node )
+    {
+        while( busParents.contains( node ) && busParents.at( node ) != node ) node = busParents.at( node );
+        return node;
+    };
+    for( const auto& [a, b] : sensorPaths )
+        if( busRoot( a ) != busRoot( b ) ) busParents[busRoot( b )] = busRoot( a );
+    struct DRIVER_PORT { std::size_t component; std::string port; bool programmable; };
+    std::map<std::string, std::vector<DRIVER_PORT>> busPorts;
+    for( std::size_t i = 0; i < aComponents.size(); ++i )
+    {
+        const auto& model = models[i].model;
+        for( const auto& pin : model.pins )
+        {
+            const bool programmable = model.runtime && std::any_of( model.runtime->pins.begin(), model.runtime->pins.end(),
+                    [&]( const auto& p ) { return p.port == pin.id && p.drive; } );
+            if( model.driverEnable.contains( pin.id ) || programmable
+                || ( model.logicVcc.empty() && pin.role == "output" )
+                || ( !model.voltageConstraint.empty() && pin.id == model.measurePositive ) )
+                busPorts[busRoot( topology.nodes[i].at( models[i].pins.at( pin.id ) ) )].push_back(
+                        { i, pin.id, programmable } );
+        }
+    }
+    for( std::size_t i = 0; i < powerRails.size(); ++i )
+        busPorts[busRoot( topology.nodes[powerStart+i].at( "1" ) )].push_back( { powerStart+i, "p", false } );
+    std::map<std::pair<std::size_t, std::string>, std::pair<std::size_t, std::size_t>> driverPorts;
+    for( const auto& [root, ports] : busPorts )
+    {
+        if( ports.size() < 2 ) continue;
+        DRIVEN_NET net;
+        std::set<std::string> nodes;
+        for( const auto& [node, drive] : drives ) if( busRoot( node ) == root ) nodes.insert( node );
+        net.nodes.assign( nodes.begin(), nodes.end() );
+        for( const auto& port : ports )
+        {
+            NET_DRIVER driver;
+            const auto& model = models[port.component];
+            driver.reference = allComponents[port.component].reference;
+            driver.pin = model.pins.at( port.port );
+            driver.programmable = port.programmable;
+            if( model.model.driverEnable.contains( port.port ) )
+                driver.state.enable = expressionSignal( ExpandModelTemplate(
+                    model.model.driverEnable.at( port.port ), model, topology.nodes[port.component], port.component ) );
+            if( model.model.driverValue.contains( port.port ) )
+                driver.state.value = expressionSignal( ExpandModelTemplate(
+                    model.model.driverValue.at( port.port ), model, topology.nodes[port.component], port.component ) );
+            if( port.programmable )
+            {
+                driver.voltage = voltage( topology.nodes[port.component].at( driver.pin ) );
+                driver.ground = voltage( topology.nodes[port.component].at( model.pins.at( model.model.runtime->ground ) ) );
+                driver.vcc = voltage( topology.nodes[port.component].at( model.pins.at( model.model.runtime->vcc ) ) );
+            }
+            driverPorts[{ port.component, port.port }] = { result.drivenNets.size(), net.drivers.size() };
+            net.drivers.push_back( std::move( driver ) );
+        }
+        result.drivenNets.push_back( std::move( net ) );
+    }
+    auto senseDrivers = [&]( std::size_t component, std::map<std::string, std::string>& nodes )
+    {
+        for( const auto& [port, location] : driverPorts )
+        {
+            if( port.first != component ) continue;
+            const auto& [netIndex, driverIndex] = location;
+            const auto stem = "ca_bus" + std::to_string( netIndex + 1 ) + "_driver" + std::to_string( driverIndex + 1 );
+            const auto& physical = models[component].pins.at( port.second );
+            deck << 'V' << stem << ' ' << nodes.at( physical ) << ' ' << stem << " 0\n";
+            nodes[physical] = stem;
+            result.drivenNets[netIndex].drivers[driverIndex].current = signal( "i(V" + stem + ")" );
+        }
+    };
     std::vector<std::pair<std::string, CURRENT_WARNING>> warnings;
     VOLTAGE_CONSTRAINTS supplies;
     int programmableDriverSlot = 0;
@@ -313,6 +438,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                         std::pair{ selected.power, MEASURE_QUANTITY::POWER } } )
                     if( enabled ) { channel.quantity = quantity; result.measurements.push_back( channel ); }
             }
+            senseDrivers( i, modelNodes );
             auto expand = [&]( const std::string& text )
                 { return ExpandModelTemplate( text, model, modelNodes, i ); };
             for( const auto& line : model.model.instance ) deck << expand( line ) << '\n';
@@ -457,10 +583,11 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     }
     for( std::size_t i = 0; i < powerRails.size(); ++i )
     {
-        const auto& rail = powerRails[i]; const auto& nodes = topology.nodes[powerStart + i];
+        const auto& rail = powerRails[i]; auto nodes = topology.nodes[powerStart + i];
         if( supplies.Add( nodes.at( "1" ), nodes.at( "2" ), rail.voltage,
                          rail.reference + " (" + rail.name + ")" ) )
         {
+            senseDrivers( powerStart + i, nodes );
             const auto source = "Vpower" + std::to_string( i + 1 );
             deck << source << ' ' << nodes.at( "1" ) << ' ' << nodes.at( "2" ) << " DC " << rail.voltage << '\n';
             warnings.push_back( { "i(" + source + ")", { rail.name, NO_SIGNAL, 10 } } );
@@ -533,20 +660,23 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                         channel.thresholdReference = model.parameters.at( model.model.logicThresholdReference );
                     channel.output = model.model.driverEnable.contains( pin.id );
                     if( model.model.driverValue.contains( pin.id ) )
-                        channel.driverValue = signal( ExpandModelTemplate( model.model.driverValue.at( pin.id ), model, topology.nodes[i], i ) );
+                        channel.driverValue = expressionSignal( ExpandModelTemplate( model.model.driverValue.at( pin.id ), model, topology.nodes[i], i ) );
                     const auto& drive = drives.at( topology.nodes[i].at( channel.pin ) );
                     channel.externalDrive = drive.external || pin.role == "power" || pin.role == "reference";
                     if( channel.output )
-                        channel.enables.push_back( signal( ExpandModelTemplate( model.model.driverEnable.at( pin.id ), model, topology.nodes[i], i ) ) );
-                    else for( const auto& enabled : drive.enables ) channel.enables.push_back( signal( enabled ) );
+                        channel.driverEnable = expressionSignal( ExpandModelTemplate( model.model.driverEnable.at( pin.id ), model, topology.nodes[i], i ) );
+                    for( const auto& enabled : drive.enables ) channel.enables.push_back( expressionSignal( enabled ) );
+                    for( const auto& [enabled, code] : drive.drivers )
+                        channel.drivers.push_back( { expressionSignal( enabled ), expressionSignal( code ) } );
                 }
                 result.logicPins.push_back( std::move( channel ) );
             }
         }
-    if( result.config.signals.size() > 256 ) throw std::runtime_error( "This session supports up to 256 saved signals; reduce the circuit or measurements" );
-    result.config.historyCapacity = std::min<std::size_t>( 256, 65536 / result.config.signals.size() );
+    if( result.config.signals.size() > MAX_SESSION_SIGNALS )
+        throw std::runtime_error( "Too many saved signals; reduce the circuit or measurements" );
+    result.config.historyCapacity = std::min<std::size_t>( 256, MAX_SESSION_HISTORY_VALUES / result.config.signals.size() );
     if( std::any_of( result.measurements.begin(), result.measurements.end(), []( const auto& c ) { return c.scope; } ) )
-        result.config.historyCapacity = std::min<std::size_t>( 4096, 65536 / result.config.signals.size() );
+        result.config.historyCapacity = std::min<std::size_t>( 4096, MAX_SESSION_HISTORY_VALUES / result.config.signals.size() );
     // 1 Tohm numerical leakage keeps genuinely open/capacitive nodes solvable.
     // It is not a wire or logic pull-down; floating islands remain identified in the snapshot.
     deck << ".options rshunt=1e12\n.end\n";

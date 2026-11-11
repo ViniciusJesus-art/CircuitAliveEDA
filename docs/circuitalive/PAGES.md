@@ -10,6 +10,13 @@ existentes recebem um sufixo, sem sobrescrever outras folhas. **Edit Page...**
 permite alterar o nome e a posição da folha atual. A ordem é armazenada nos
 números das folhas e mantida ao salvar e reabrir o projeto.
 
+As setas esquerda/direita da barra superior percorrem a ordem das páginas desde
+a primeira abertura, sem precisar visitar cada página pelo menu. **Page Up** e
+**Page Down** também navegam nessa ordem. A árvore de arquivos do gerenciador
+mostra as páginas `.kicad_sch` salvas, inclusive quando o nome difere do projeto,
+e acompanha a criação de novos arquivos. Abrir uma dessas páginas pela árvore
+usa o editor e a PCB do próprio projeto.
+
 **Delete Page...** pede confirmação e remove a folha atual e sua hierarquia do
 projeto. Não é permitido remover a última folha principal. Após a confirmação,
 os arquivos correspondentes são excluídos, exceto os ainda usados por outras

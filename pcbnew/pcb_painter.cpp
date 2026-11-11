@@ -79,6 +79,17 @@
 
 using namespace KIGFX;
 
+namespace
+{
+bool missingSymbol( const FOOTPRINT* aFootprint )
+{
+    return aFootprint && !aFootprint->IsBoardOnly()
+           && aFootprint->GetField( wxS( "CA.LinkStatus" ) );
+}
+
+
+}
+
 
 PCBNEW_SETTINGS* pcbconfig()
 {
@@ -584,6 +595,20 @@ COLOR4D PCB_RENDER_SETTINGS::GetColor( const BOARD_ITEM* aItem, int aLayer ) con
     if( aItem->GetForcedTransparency() > 0.0 )
         color = color.WithAlpha( color.a * ( 1.0 - aItem->GetForcedTransparency() ) );
 
+    // A missing schematic link is a view-only treatment. Copper and fabrication
+    // geometry stay untouched, and selection/printing retain their normal colors.
+    const FOOTPRINT* footprint = aItem->Type() == PCB_FOOTPRINT_T
+            ? static_cast<const FOOTPRINT*>( aItem ) : aItem->GetParentFootprint();
+    const bool missingRoute = ( aItem->Type() == PCB_TRACE_T || aItem->Type() == PCB_ARC_T
+                                || aItem->Type() == PCB_VIA_T )
+            && static_cast<const PCB_TRACK*>( aItem )->IsSchematicConnectionMissing();
+    if( !m_isPrinting && !selected && !( footprint && footprint->IsSelected() )
+        && ( missingSymbol( footprint ) || missingRoute ) )
+    {
+        const auto background = m_layerColors.find( LAYER_PCB_BACKGROUND );
+        color = color.Mix( background == m_layerColors.end() ? COLOR4D::BLACK : background->second, 0.28 );
+    }
+
     // No special modifiers enabled
     return color;
 }
@@ -815,6 +840,14 @@ bool PCB_PAINTER::Draw( const VIEW_ITEM* aItem, int aLayer )
 
 void PCB_PAINTER::draw( const PCB_TRACK* aTrack, int aLayer )
 {
+    if( aLayer == LAYER_ANCHOR && aTrack->IsSchematicConnectionMissing()
+        && !m_pcbSettings.m_isPrinting && m_frameType == FRAME_PCB_EDITOR )
+    {
+        // Use the same centerline, sizing and orientation as regular net names.
+        const SHAPE_SEGMENT segment( { aTrack->GetStart(), aTrack->GetEnd() }, aTrack->GetWidth() );
+        renderNetNameForSegment( segment, COLOR4D( 1.0, 0.65, 0.15, 1.0 ), wxS( "MISS" ) );
+        return;
+    }
     VECTOR2I start( aTrack->GetStart() );
     VECTOR2I end( aTrack->GetEnd() );
     int      track_width = aTrack->GetWidth();
@@ -822,6 +855,8 @@ void PCB_PAINTER::draw( const PCB_TRACK* aTrack, int aLayer )
 
     if( IsNetnameLayer( aLayer ) )
     {
+        if( aTrack->IsSchematicConnectionMissing() && !m_pcbSettings.m_isPrinting )
+            return;
         if( !pcbconfig() || pcbconfig()->m_Display.m_NetNames < 2 )
             return;
 
@@ -947,6 +982,8 @@ void PCB_PAINTER::renderNetNameForSegment( const SHAPE_SEGMENT& aSeg, const COLO
 
 void PCB_PAINTER::draw( const PCB_ARC* aArc, int aLayer )
 {
+    const bool missingLabel = aLayer == LAYER_ANCHOR && aArc->IsSchematicConnectionMissing()
+                              && !m_pcbSettings.m_isPrinting && m_frameType == FRAME_PCB_EDITOR;
     VECTOR2D  center( aArc->GetCenter() );
     int       width = aArc->GetWidth();
     COLOR4D   color = m_pcbSettings.GetColor( aArc, aLayer );
@@ -954,15 +991,23 @@ void PCB_PAINTER::draw( const PCB_ARC* aArc, int aLayer )
     EDA_ANGLE start_angle = aArc->GetArcAngleStart();
     EDA_ANGLE angle = aArc->GetAngle();
 
-    if( IsNetnameLayer( aLayer ) )
+    if( IsNetnameLayer( aLayer ) || missingLabel )
     {
-        if( !pcbconfig() || pcbconfig()->m_Display.m_NetNames < 2 )
-            return;
+        if( !missingLabel )
+        {
+            if( aArc->IsSchematicConnectionMissing() && !m_pcbSettings.m_isPrinting )
+                return;
+            if( !pcbconfig() || pcbconfig()->m_Display.m_NetNames < 2 )
+                return;
+            if( aArc->GetNetCode() <= NETINFO_LIST::UNCONNECTED )
+                return;
+        }
+        else
+        {
+            color = COLOR4D( 1.0, 0.65, 0.15, 1.0 );
+        }
 
-        if( aArc->GetNetCode() <= NETINFO_LIST::UNCONNECTED )
-            return;
-
-        wxString netname = aArc->GetDisplayNetname();
+        wxString netname = missingLabel ? wxS( "MISS" ) : aArc->GetDisplayNetname();
 
         if( netname.IsEmpty() )
             return;

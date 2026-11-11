@@ -129,6 +129,78 @@ BOOST_AUTO_TEST_CASE( SourceProbePulsePreservesConfiguredEdgesWhenTheyFitTheDuty
     BOOST_CHECK_GT(At(session,.0015),4.9);
 }
 
+BOOST_AUTO_TEST_CASE( ClockProbeStartsAtConfiguredFrequencyBeforeAnyInteraction )
+{
+    for( const auto kind : { PROBE_KIND::PWM, PROBE_KIND::SQUARE } )
+    for( const double frequency : { 1., 10., 123. } )
+    BOOST_TEST_CONTEXT( ProbeKindName( kind ) << " frequency=" << frequency )
+    {
+        SOURCE_PROBE_SETTINGS settings;
+        settings.frequency = frequency;
+        settings.duty = .25;
+        const auto circuit = Bench( kind, settings );
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+        session.Configure( circuit.netlist, circuit.config );
+        const double period = 1 / frequency;
+        // No alter/control command: the initial deck must already have the right timing.
+        for( int cycle = 0; cycle < 3; ++cycle )
+        {
+            BOOST_CHECK_GT( At( session, ( cycle + .1 ) * period ), 4.9 );
+            BOOST_CHECK_SMALL( At( session, ( cycle + .7 ) * period ), 1e-6 );
+        }
+    }
+}
+
+BOOST_AUTO_TEST_CASE( ClockProbeHasNoExtraStartupTransitionsBetweenDisplayFrames )
+{
+    for( const auto kind : { PROBE_KIND::PWM, PROBE_KIND::SQUARE } )
+    BOOST_TEST_CONTEXT( ProbeKindName( kind ) )
+    {
+        SOURCE_PROBE_SETTINGS settings; settings.frequency = 10;
+        const auto circuit = Bench( kind, settings );
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+        session.Configure( circuit.netlist, circuit.config );
+        session.AdvanceTo( circuit.config.step );
+        int transitions = 0;
+        bool high = session.Snapshot().latest.values.at( 0 ) > 2.5;
+        for( int frame = 1; frame <= 75; ++frame )
+        {
+            session.AdvanceTo( session.Snapshot().latest.time + .008 );
+            const auto& sample = session.Snapshot().latest;
+            const bool nextHigh = sample.values.at( 0 ) > 2.5;
+            if( high != nextHigh ) ++transitions;
+            high = nextHigh;
+            const double phase = std::fmod( sample.time, .1 );
+            if( std::abs( phase - .05 ) > .001 && phase > .001 && phase < .099 )
+                BOOST_CHECK_EQUAL( high, phase < .05 );
+        }
+        BOOST_CHECK_EQUAL( transitions, 12 );
+    }
+}
+
+BOOST_AUTO_TEST_CASE( ClockProbePlaybackStartsAtSelectedSpeed )
+{
+    SOURCE_PROBE_SETTINGS settings; settings.frequency = 10;
+    for( const double speed : { .05, 1. } )
+    BOOST_TEST_CONTEXT( "speed=" << speed )
+    {
+        SESSION_RUNNER runner( CIRCUITALIVE_TEST_WORKER );
+        runner.SetSpeed( speed );
+        runner.Start( Bench( PROBE_KIND::SQUARE, settings ) );
+        const auto first = Await( runner, []( const auto& view )
+                { return view.state == EDITOR_SESSION_STATE::RUNNING; } );
+        BOOST_CHECK_EQUAL( first.speed, speed );
+        const auto started = std::chrono::steady_clock::now();
+        std::this_thread::sleep_for( std::chrono::milliseconds( 400 ) );
+        const auto view = runner.View();
+        const double elapsed = std::chrono::duration<double>( std::chrono::steady_clock::now() - started ).count();
+        const double advanced = view.sample.latest.time - first.sample.latest.time;
+        BOOST_REQUIRE_MESSAGE( view.state == EDITOR_SESSION_STATE::RUNNING, view.error );
+        BOOST_CHECK_GT( advanced, elapsed * speed * .25 );
+        BOOST_CHECK_LE( advanced, ( elapsed + .025 ) * speed + 2e-4 );
+    }
+}
+
 BOOST_AUTO_TEST_CASE( SquareAndSineSourceProbesKeepTheirConfiguredLevelsAndPhase )
 {
     SOURCE_PROBE_SETTINGS s; s.frequency=2000;s.low=-2;s.high=3;

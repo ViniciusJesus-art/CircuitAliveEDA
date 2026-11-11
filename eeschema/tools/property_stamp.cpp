@@ -28,6 +28,15 @@
 
 namespace CIRCUITALIVE
 {
+SPIN_STYLE LabelSpinAwayFromPin( const SCH_PIN& pin )
+{
+    const auto outward = pin.GetPosition() - pin.GetPinRoot();
+    if( outward.x < 0 ) return SPIN_STYLE::LEFT;
+    if( outward.x > 0 ) return SPIN_STYLE::RIGHT;
+    if( outward.y < 0 ) return SPIN_STYLE::UP;
+    return outward.y > 0 ? SPIN_STYLE::BOTTOM : SPIN_STYLE::RIGHT;
+}
+
 namespace
 {
 void Fail( const wxString& message ) { throw std::runtime_error( message.ToStdString() ); }

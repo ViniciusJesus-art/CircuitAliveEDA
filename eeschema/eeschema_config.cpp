@@ -17,6 +17,7 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <settings/circuitalive_editor_layout.h>
 #include <mutex>
 #include <wx/ffile.h>
 
@@ -275,6 +276,7 @@ void SCH_EDIT_FRAME::LoadSettings( APP_SETTINGS_BASE* aCfg )
 {
     // For now, axes are forced off in Eeschema even if turned on in config
     EESCHEMA_SETTINGS* cfg = eeconfig();
+    CIRCUITALIVE::ApplyDefaultEditorLayout( *cfg, true );
     cfg->m_Window.grid.axes_enabled = false;
 
     SCH_BASE_FRAME::LoadSettings( cfg );

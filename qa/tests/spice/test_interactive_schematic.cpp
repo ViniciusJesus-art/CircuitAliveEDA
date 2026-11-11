@@ -82,6 +82,29 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
         session.AdvanceTo( std::getenv( "CIRCUITALIVE_AUDIT_UNTIL" )
                 ? std::stod( std::getenv( "CIRCUITALIVE_AUDIT_UNTIL" ) ) : .01 );
         report["result_time"] = session.Snapshot().latest.time;
+        const auto sample = session.Snapshot().latest;
+        report["logic_pins"] = JSON::array();
+        auto stateName = []( LOGIC_LEVEL state )
+        {
+            return state == LOGIC_LEVEL::LOW ? "0" : state == LOGIC_LEVEL::HIGH ? "1"
+                : state == LOGIC_LEVEL::HIGH_Z ? "Z" : "X";
+        };
+        for( const auto& pin : circuit.logicPins )
+            report["logic_pins"].push_back( { { "reference", pin.reference }, { "pin", pin.pin },
+                { "level", stateName( PinLogicLevel( pin, sample ) ) },
+                { "drive", stateName( PinDriveLevel( pin, sample ) ) },
+                { "voltage", pin.voltage == NO_SIGNAL ? 0.0 : sample.values.at( pin.voltage ) } } );
+        report["driven_nets"] = JSON::array();
+        for( const auto& net : circuit.drivenNets )
+        {
+            JSON drivers = JSON::array();
+            for( const auto& driver : net.drivers )
+                drivers.push_back( { { "reference", driver.reference }, { "pin", driver.pin },
+                    { "current", driver.current == NO_SIGNAL ? 0.0 : sample.values.at( driver.current ) } } );
+            report["driven_nets"].push_back( { { "nodes", net.nodes }, { "drivers", drivers },
+                { "conflict", !ContendingDrivers( net, sample ).empty() } } );
+        }
+        report["wire_count"] = snapshot.wires.size();
         save();
     }
     catch( const std::exception& error ) { report["error"] = error.what(); save(); BOOST_FAIL( error.what() ); }
@@ -1126,7 +1149,7 @@ BOOST_FIXTURE_TEST_CASE( MemoryResourceFieldsPersistAndNativeDemoLoadsBothImages
     BOOST_CHECK_EQUAL(c.config.memories[rom].initial.data[0],0x43);
     BOOST_CHECK_EQUAL(c.config.memories[rom].initial.data[0x8000],0x3c);
     BOOST_CHECK_EQUAL(c.config.memories[ram].initial.data[0],0x49);
-    BOOST_CHECK_EQUAL(c.config.memories[ram].initial.known[0x200],0);
+    BOOST_CHECK_EQUAL(c.config.memories[ram].initial.known[0x200],255);
     for(auto* item:m_schematic->RootScreen()->Items().OfType(SCH_SYMBOL_T))
     {
         auto* symbol=static_cast<SCH_SYMBOL*>(item);
@@ -1204,4 +1227,38 @@ BOOST_FIXTURE_TEST_CASE( NativeSourceProbesPersistSettingsAndDriveTheirWireWithI
         std::filesystem::copy_file(saved,std::filesystem::path(reinterpret_cast<const char8_t*>(demo)),
                                     std::filesystem::copy_options::overwrite_existing);
     std::filesystem::remove(saved);
+}
+
+BOOST_FIXTURE_TEST_CASE( DuplicatedSourceProbeReferencesAreRepairedAndTheirControlsStayIndependent,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "standard_library_led.kicad_sch" );
+    LoadSchematic( file );
+    auto& sheet = m_schematic->CurrentSheet(); auto* screen = sheet.LastScreen();
+    SOURCE_PROBE_SETTINGS settings; settings.initialHigh = true;
+    auto original = MakeProbeSymbol( PROBE_KIND::LOGIC, sheet,
+            VECTOR2I( schIUScale.mmToIU( 80 ), schIUScale.mmToIU( 130 ) ), false, 14, "Original", settings );
+    auto* copy = static_cast<SCH_SYMBOL*>( original->Duplicate( IGNORE_PARENT_GROUP ) );
+    copy->Move( VECTOR2I( schIUScale.mmToIU( 10 ), 0 ) );
+    settings.initialHigh = false; WriteSourceProbeSettings( *copy, PROBE_KIND::LOGIC, settings );
+    const auto originalId = original->m_Uuid.AsString(), copyId = copy->m_Uuid.AsString();
+    screen->Append( original.release() ); screen->Append( copy );
+    m_schematic->ConnectionGraph()->Recalculate( m_schematic->Hierarchy(), true );
+    BOOST_CHECK_THROW( CaptureSchematic( *m_schematic ), std::runtime_error );
+    EnsureUniqueProbeIdentities( *m_schematic );
+    m_schematic->ConnectionGraph()->Recalculate( m_schematic->Hierarchy(), true );
+    auto snapshot = CaptureSchematic( *m_schematic );
+    std::size_t first = 0, second = 0;
+    for( std::size_t i = 0; i < snapshot.locations.size(); ++i )
+    {
+        if( snapshot.locations[i].uuid == originalId ) first = i;
+        if( snapshot.locations[i].uuid == copyId ) second = i;
+    }
+    BOOST_REQUIRE( first != second );
+    snapshot.circuit.config.signals = { "v(" + snapshot.circuit.pinNodes[first].at( "1" ) + ")",
+                                        "v(" + snapshot.circuit.pinNodes[second].at( "1" ) + ")" };
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config ); session.AdvanceTo( 1e-6 );
+    BOOST_CHECK_GT( session.Snapshot().latest.values.at( 0 ), 4.9 );
+    BOOST_CHECK_SMALL( session.Snapshot().latest.values.at( 1 ), .01 );
 }

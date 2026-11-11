@@ -63,3 +63,8 @@ propriedades nativas, unidades de componentes e variantes. O fluxo de cliques,
 atalho, conversão em milímetros, desfazer/refazer e criação de rótulos foi
 exercitado no editor em uma tela virtual. A conexão do rótulo ao fio foi
 conferida na netlist exportada.
+
+O seletor de propriedades usa um clique para abrir e outro para escolher, com
+uma lista de altura limitada e rolagem. Em pinos, a orientação da label segue
+a direção do terminal para fora do corpo do componente, inclusive após rotação
+ou espelhamento; isso vale para labels locais, globais e hierárquicas.

@@ -52,6 +52,19 @@ dos pads. O relatório também avisa sobre o componente. O caminho histórico do
 é mantido para permitir recuperar a mesma posição após desfazer a exclusão e atualizar
 novamente. O aviso desaparece quando o vínculo é recuperado.
 
+No canvas da PCB, o footprint e seus pads ficam escurecidos, sem selo adicional,
+mesmo sem seleção e com a camada de comentários oculta.
+Ao sincronizar, os trechos fisicamente conectados de trilhas, arcos e vias são
+comparados com os pinos do esquema. Se um símbolo/pino desaparecer ou o trecho
+passar a unir redes diferentes, o cobre recebe o mesmo escurecimento e trilhas
+e arcos exibem **MISS** na própria linha do cobre, com a orientação e o tamanho
+do texto de rede, sem caixa ou etiqueta flutuante. Apenas renomear uma rede, mantendo a ligação entre os
+mesmos pinos, não causa esse aviso. Os avisos permanecem ao salvar e reabrir,
+participam do desfazer/refazer e são retirados na sincronização após restaurar
+as ligações. São indicadores de tela; não acrescentam desenho aos Gerbers nem
+às impressões. Um trecho marcado pode conter um curto físico: o cobre continua
+na placa e precisa ser revisado.
+
 As trilhas de cobre existentes permanecem: limpar a atribuição lógica de um pad
 não remove uma ligação física de cobre. Revise o roteamento e execute o DRC após
 alterar conexões ou remover componentes. A opção **Delete footprints with no symbols**

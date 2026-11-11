@@ -129,7 +129,7 @@ if( TARGET circuitalive_sim_session )
         test_jfet_diode_driver_models.cpp test_schmitt_electrical_models.cpp
         test_standard_symbol_associations.cpp
         test_diode_reverse_bias.cpp
-        test_live_controls.cpp test_source_probes.cpp test_digital_pipeline.cpp test_memory_resources.cpp test_visual_signals.cpp
+        test_live_controls.cpp test_source_probes.cpp test_digital_pipeline.cpp test_digital_bus.cpp test_memory_resources.cpp test_memory_viewer.cpp test_visual_signals.cpp
         test_programmable_devices.cpp test_compiled_expressions.cpp )
     target_link_libraries( qa_interactive_sim PRIVATE
         circuitalive_interactive circuitalive_sim_session circuitalive_programmable_runtime
@@ -143,6 +143,16 @@ if( TARGET circuitalive_sim_session )
         CIRCUITALIVE_TEST_PIC_RUNTIME="${PROJECT_SOURCE_DIR}/simulation/runtime/pic16.js"
         CIRCUITALIVE_TEST_DEMO="${PROJECT_SOURCE_DIR}/demos/simulation/circuitalive/rc_switch_led.cir" )
     add_dependencies( qa_interactive_sim circuitalive-sim-worker )
+    add_executable( qa_memory_viewer test_memory_viewer_gui.cpp
+        ${PROJECT_SOURCE_DIR}/eeschema/circuitalive/memory_viewer.cpp )
+    target_link_libraries( qa_memory_viewer PRIVATE circuitalive_interactive
+        circuitalive_sim_session circuitalive_programmable_runtime
+        Boost::unit_test_framework ${wxWidgets_LIBRARIES} )
+    target_compile_definitions( qa_memory_viewer PRIVATE BOOST_TEST_DYN_LINK
+        BOOST_TEST_ALTERNATIVE_INIT_API CIRCUITALIVE_TEST_WORKER="$<TARGET_FILE:circuitalive-sim-worker>" )
+    add_dependencies( qa_memory_viewer circuitalive-sim-worker )
+    kicad_add_boost_test( qa_memory_viewer qa_memory_viewer )
+    setup_qa_env( qa_memory_viewer )
     add_test( NAME qa_interactive_sim COMMAND qa_interactive_sim --log_level=test_suite )
     set_tests_properties( qa_interactive_sim PROPERTIES TIMEOUT 240 )
     # Exercise the desktop JSON imports as well as the standalone worker build.

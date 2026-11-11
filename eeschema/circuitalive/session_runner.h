@@ -3,6 +3,7 @@
 
 #include "circuit_snapshot.h"
 #include "scope_history.h"
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <mutex>
@@ -13,7 +14,25 @@ namespace CIRCUITALIVE
 /// Installed bin/, standalone source build, and source-build KiCad project manager layouts.
 std::string FindSessionWorker( const std::string& aApplicationExecutable );
 
+std::chrono::steady_clock::time_point NextPlaybackDeadline(
+        std::chrono::steady_clock::time_point aPrevious,
+        std::chrono::steady_clock::time_point aNow,
+        std::chrono::steady_clock::duration aInterval );
+
 enum class EDITOR_SESSION_STATE { STOPPED, PREPARING, RUNNING, PAUSED, COMPLETED, FAILED };
+
+struct SESSION_MEMORY_REGION
+{
+    std::string reference, modelId, id;
+    std::size_t slot;
+    std::shared_ptr<const MEMORY_SNAPSHOT> initial;
+};
+struct SESSION_MEMORY_CAPTURE
+{
+    std::uint64_t request = 0, pause = 0;
+    std::shared_ptr<const MEMORY_SNAPSHOT> snapshot;
+    std::string error;
+};
 
 struct EDITOR_SESSION_VIEW
 {
@@ -30,10 +49,15 @@ struct EDITOR_SESSION_VIEW
     std::vector<std::string> warnings;
     std::vector<LOGIC_LEVEL> logicLevels;
     std::vector<bool> logicRapid;
+    std::vector<bool> netContentions;
+    std::vector<std::string> contentionWarnings;
     std::string error;
     std::shared_ptr<const MEMORY_SNAPSHOT> memory;
     std::uint64_t memorySequence = 0;
     std::string memoryError;
+    std::uint64_t sessionRevision = 0, pauseSequence = 0;
+    std::vector<SESSION_MEMORY_REGION> memoryRegions;
+    std::map<std::string, SESSION_MEMORY_CAPTURE> memoryCaptures;
     double speed = 1;
     SIMULATION_PREFERENCES preferences;
 };
@@ -53,7 +77,8 @@ public:
     void SetSpeed( double aSpeed );
     void SetPreferences( SIMULATION_PREFERENCES aPreferences );
     void Step();
-    void CaptureMemory( std::size_t aRegion );
+    /// Read only when paused/completed; never changes the playback state. Zero means queue full.
+    std::uint64_t CaptureMemory( std::size_t aRegion );
     EDITOR_SESSION_VIEW View() const;
 
 private:
@@ -66,6 +91,7 @@ private:
         std::size_t index = 0;
         double value = 0;
         SIMULATION_PREFERENCES preferences = {};
+        std::uint64_t request = 0;
     };
     void enqueue( COMMAND_TYPE aType, std::size_t aIndex = 0 );
     void run();
@@ -75,6 +101,7 @@ private:
     std::deque<COMMAND> m_commands;
     EDITOR_SESSION_VIEW m_view;
     std::uint64_t m_revision = 0;
+    std::uint64_t m_memoryRequest = 0;
     bool m_quit = false;
     double m_speed = 1;
     SIMULATION_PREFERENCES m_preferences;

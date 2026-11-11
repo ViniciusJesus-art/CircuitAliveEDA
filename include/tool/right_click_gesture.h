@@ -52,7 +52,7 @@ public:
 
     static TOOL_EVENT ContextEvent()
     {
-        return TOOL_EVENT( TC_COMMAND, TA_ACTION, std::string( "circuitalive.Schematic.contextMenu" ) );
+        return TOOL_EVENT( TC_COMMAND, TA_ACTION, std::string( "circuitalive.Editor.contextMenu" ) );
     }
 
 private:

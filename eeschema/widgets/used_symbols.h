@@ -13,6 +13,7 @@ class SCH_SHEET_PATH;
 class SCH_SYMBOL;
 class SCH_ITEM;
 class TOOL_MANAGER;
+class TOOL_EVENT;
 
 namespace CIRCUITALIVE
 {
@@ -26,6 +27,8 @@ struct USED_SYMBOL_ENTRY
 std::vector<USED_SYMBOL_ENTRY> BuildUsedSymbolList( SCH_SHEET_PATH& aSheet );
 std::unique_ptr<SCH_SYMBOL> CopyUsedSymbol( const SCH_SYMBOL& aSource,
                                            SCH_SHEET_PATH& aSheet, const VECTOR2I& aPosition );
+// Fresh library defaults, without properties or variant overrides from the placed instance.
+std::unique_ptr<SCH_SYMBOL> MakeUsedSymbolTemplate( const SCH_SYMBOL& aSource, SCH_SHEET_PATH& aSheet );
 // Independent copies, including group members, suitable for a placement template or preview.
 std::vector<std::unique_ptr<SCH_ITEM>> CopyPlacementItems( const std::vector<SCH_ITEM*>& aItems );
 
@@ -41,6 +44,8 @@ void ShutdownUsedSymbols( SCH_EDIT_FRAME* aFrame );
 void RebindUsedSymbols( SCH_EDIT_FRAME* aFrame );
 bool BeginUsedSymbolPlacement( SCH_EDIT_FRAME* aFrame, const VECTOR2I& aPosition,
                                bool aOnWire = false );
+void RememberUsedSymbolDefaults( SCH_EDIT_FRAME* aFrame, const SCH_SYMBOL& aSymbol );
+void HandleUsedSymbolToolActivation( SCH_EDIT_FRAME* aFrame, const TOOL_EVENT& aEvent );
 void RememberPlacement( SCH_EDIT_FRAME* aFrame, const std::vector<SCH_ITEM*>& aItems,
                          bool aUpdateOnly = false, bool aContinueUnits = false );
 void QueuePlacementLabels( SCH_EDIT_FRAME* aFrame, const std::vector<SCH_ITEM*>& aLabels );

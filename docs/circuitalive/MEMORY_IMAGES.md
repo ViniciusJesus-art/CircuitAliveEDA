@@ -1,13 +1,13 @@
 # Arquivos de dados e inspeção de memória
 
-Cada instância pode ter arquivos próprios. Em **Simulation model… → Data files…**, escolha uma imagem, o formato e o endereço de carga em hexadecimal. Confirme as duas janelas e salve o esquema. O botão só aparece se o `.casim` declarar recursos; resistores e outros modelos sem arquivos não ganham esses controles.
+Cada instância pode ter arquivos próprios. O botão **Simulation Model…** nas propriedades do símbolo abre a mesma janela do CA usada pelo atalho **Ctrl+Alt+M**; as alterações só chegam ao componente quando as propriedades são confirmadas. Em **Simulation model… → Data files…**, escolha uma imagem, o formato e o endereço de carga em hexadecimal. Confirme as duas janelas e salve o esquema. O campo à esquerda de **Data files…** mostra primeiro o nome do arquivo e depois seu diretório; o caminho completo também aparece na dica ao passar o mouse. O seletor mostra o caminho completo, inclusive para arquivos salvos com caminho relativo. O botão só aparece se o `.casim` declarar recursos; resistores e outros modelos sem arquivos não ganham esses controles.
 
 A seleção fica no campo oculto `CA.Resources` do símbolo, com caminho relativo quando o arquivo está dentro do projeto. O arquivo continua externo: inclua-o ao compartilhar o projeto. Os padrões salvos para novos símbolos copiam modelo, pinos e parâmetros, mas não copiam a imagem de uma instância para todas as outras.
 
 ## Modelos disponíveis
 
 - **27C512-55**: `Memory_EPROM:27C512`, 65.536 bytes, endereços A0–A15, oito saídas, CE/OE ativos em zero, alimentação de 5 V e atraso de acesso configurável, inicialmente 55 ns. Sem imagem, o conteúdo apagado é `FF`. A memória conserva os dados ao cortar a alimentação; as saídas ficam desabilitadas. A programação em alta tensão não é simulada.
-- **CY62256-70PC**: SRAM de 32.768 bytes, barramento bidirecional e controles CS/OE/WE. Pode começar com uma imagem; posições não fornecidas começam indefinidas (`X`). As escritas do circuito alteram o estado em execução. A perda de alimentação invalida os dados. A imagem inicial só é reaplicada ao reiniciar a sessão com Stop/Play.
+- **CY62256-70PC**: SRAM de 32.768 bytes, barramento bidirecional e controles CS/OE/WE. Pode começar com uma imagem; sem imagem, todas as posições começam em `0x00`; uma imagem parcial mantém as posições não fornecidas em `0x00`. Um snapshot CAMEM conserva sua máscara explícita de bits conhecidos. As escritas do circuito alteram o estado em execução. A perda de alimentação invalida os dados. A imagem inicial só é reaplicada ao reiniciar a sessão com Stop/Play.
 
 São aproximações comportamentais nominais. Os 55 ns são a configuração da variante solicitada; os níveis elétricos e a pinagem seguem a família 27C512. Os parâmetros de saída continuam sendo resistência e quedas nominais, sem reproduzir curvas completas nem programação física. Referência da família: [datasheet Microchip AT27C512R](https://www.microchip.com/content/dam/mchp/documents/OTH/ProductDocuments/DataSheets/doc0015.pdf). As variantes comerciais desse documento têm outros tempos; o parâmetro pode ser ajustado ao componente desejado.
 
@@ -15,7 +15,13 @@ São aproximações comportamentais nominais. Os 55 ns são a configuração da 
 
 Clique com o botão direito em um componente com regiões de memória e escolha **View memory…**.
 
-Antes de Play, a janela mostra a imagem inicial. Durante uma sessão, o comando pausa a simulação e captura o conteúdo real da região, com o instante em segundos. A captura não altera os pinos, não percorre o barramento e não avança o tempo. **Capture paused state** repete a leitura do estado pausado. Ao fechar a janela, use Play para continuar.
+O visualizador abre em uma janela independente: o esquemático e os controles de simulação continuam disponíveis. Antes de Play, mostra a imagem inicial. Durante a execução, informa que é preciso pausar e oculta a tabela para não apresentar um estado antigo como se fosse atual. Abrir, fechar ou atualizar o visualizador não pausa nem retoma a simulação.
+
+Ao pausar, a janela lê automaticamente o conteúdo real das regiões daquele componente, com o instante em segundos. A captura não altera os pinos, não percorre o barramento e não avança o tempo. **Re-Capture**, à direita de **Export…**, repete manualmente essa leitura; o botão só fica disponível com a simulação pausada ou concluída. Não é necessário clicar nele após cada pausa.
+
+Os bytes diferentes em relação à pausa anterior ficam com fundo amarelo, assim como o ASCII das linhas afetadas; o cabeçalho informa a quantidade de bytes alterados. Mudanças entre bits conhecidos e indefinidos também são destacadas. Na primeira pausa, a comparação usa o conteúdo inicial carregado naquela sessão, destacando também as alterações feitas antes dela. Atualizar manualmente na mesma pausa mantém a comparação; na próxima pausa sem alterações, o destaque desaparece. Reiniciar a sessão passa a usar o conteúdo inicial da nova execução. A posição de navegação na tabela é mantida nas atualizações.
+
+Você pode manter visualizadores de componentes diferentes abertos ao mesmo tempo. Cada região recebe sua própria captura, e as janelas acompanham novas sessões pelo componente e pela região de memória, sem reutilizar dados de outro componente quando a ordem do circuito muda.
 
 A tabela virtual mostra endereços, 16 bytes por linha e ASCII, com busca por endereço hexadecimal. `?` indica um nibble com bits indefinidos; `??` não significa `00` nem representa a alta impedância dos pinos. O visor é de leitura: para mudar o estado inicial, escolha outra imagem em Data files e reinicie a sessão.
 
@@ -54,12 +60,12 @@ O próprio `.casim` declara os recursos e as regiões, sem lista paralela de com
     "address_bits": 15,
     "word_bits": 8,
     "writable": true,
-    "fill": -1
+    "fill": 0
   }
 ]
 ```
 
-`fill: -1` significa bits indefinidos; valores de 0 a 255 preenchem bytes conhecidos. Regiões usam palavras little endian, com `ceil(word_bits/8)` bytes por endereço; as duas memórias fornecidas usam palavras de oito bits. Os vetores dos blocos são LSB primeiro.
+Em regiões graváveis, omitir `fill` usa `0x00`. `fill: -1` explícito significa bits indefinidos; valores de 0 a 255 preenchem bytes conhecidos. Regiões usam palavras little endian, com `ceil(word_bits/8)` bytes por endereço; as duas memórias fornecidas usam palavras de oito bits. Os vetores dos blocos são LSB primeiro.
 
 Um bloco comportamental `ram` com `"memory": "main"` vincula `data_in`, `data_out`, `address`, `write` e `select` à região. O bloco `rom` usa `memory`, `data_out`, `address` e `select`. O compilador verifica a largura e a capacidade. Templates SPICE podem usar `${memory:main}` para obter o slot do worker. Blocos RAM antigos sem `memory` continuam compatíveis com `d_ram`, mas não oferecem imagens nem inspeção do estado.
 

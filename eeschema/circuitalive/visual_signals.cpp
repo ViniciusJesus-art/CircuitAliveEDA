@@ -47,5 +47,21 @@ void UpdateVisualSignals( const CIRCUIT_SNAPSHOT& circuit, EDITOR_SESSION_VIEW& 
                                    && preferences.markFastDigital
                                    && rapid( circuit.leds.size() + i, preferences.digitalCutoffHz ) );
     }
+    view.netContentions.clear();
+    view.contentionWarnings.clear();
+    for( const auto& net : circuit.drivenNets )
+    {
+        const auto drivers = ContendingDrivers( net, view.sample.latest );
+        view.netContentions.push_back( !drivers.empty() );
+        if( drivers.empty() ) continue;
+        std::string warning = "Bus contention: ";
+        for( const auto i : drivers )
+        {
+            if( warning.back() != ' ' ) warning += ", ";
+            const auto& driver = net.drivers[i];
+            warning += driver.reference + "." + driver.pin;
+        }
+        view.contentionWarnings.push_back( std::move( warning ) );
+    }
 }
 }

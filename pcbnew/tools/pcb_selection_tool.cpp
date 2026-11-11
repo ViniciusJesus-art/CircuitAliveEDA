@@ -53,6 +53,7 @@ using namespace std::placeholders;
 #include <router/router_tool.h>
 #include <pcbnew_settings.h>
 #include <tool/tool_event.h>
+#include <tool/right_click_gesture.h>
 #include <tool/tool_manager.h>
 #include <tools/tool_event_utils.h>
 #include <tools/pcb_point_editor.h>
@@ -115,6 +116,7 @@ class PCB_SELECTION_TOOL::PRIV
 {
 public:
     DIALOG_FILTER_SELECTION::OPTIONS m_filterOpts;
+    std::unique_ptr<CIRCUITALIVE::RIGHT_CLICK_GESTURE> m_rightClickGesture;
 };
 
 
@@ -240,6 +242,15 @@ bool PCB_SELECTION_TOOL::Init()
     Connect( m_disambiguateTimer.GetId(), wxEVT_TIMER,
              wxTimerEventHandler( PCB_SELECTION_TOOL::onDisambiguationExpire ), nullptr, this );
 
+    m_priv->m_rightClickGesture = std::make_unique<CIRCUITALIVE::RIGHT_CLICK_GESTURE>(
+            [this]( const TOOL_EVENT& aContextEvent )
+            {
+                if( m_frame->ToolStackIsEmpty() )
+                    m_toolMgr->ProcessEvent( aContextEvent );
+                else
+                    m_priv->m_rightClickGesture->Cancel();
+            } );
+
     return true;
 }
 
@@ -248,6 +259,9 @@ void PCB_SELECTION_TOOL::Reset( RESET_REASON aReason )
 {
     m_frame = getEditFrame<PCB_BASE_FRAME>();
     m_isFootprintEditor = m_frame->IsType( FRAME_FOOTPRINT_EDITOR );
+
+    if( m_priv->m_rightClickGesture )
+        m_priv->m_rightClickGesture->Cancel();
 
     if( aReason != TOOL_BASE::REDRAW )
     {
@@ -296,6 +310,21 @@ int PCB_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
     // Main loop: keep receiving events
     while( TOOL_EVENT* evt = Wait() )
     {
+        const bool deferredContext = evt->Matches( CIRCUITALIVE::RIGHT_CLICK_GESTURE::ContextEvent() );
+        if( deferredContext )
+        {
+            if( !m_priv->m_rightClickGesture || !m_priv->m_rightClickGesture->Consume( *evt )
+                || !m_frame->ToolStackIsEmpty() )
+            {
+                continue;
+            }
+        }
+        else if( m_priv->m_rightClickGesture && !evt->IsMotion() && !evt->IsClick( BUT_RIGHT )
+                 && !evt->IsMouseDown( BUT_RIGHT ) )
+        {
+            m_priv->m_rightClickGesture->Cancel();
+        }
+
         MOUSE_DRAG_ACTION dragAction = m_frame->GetDragAction();
         TRACK_DRAG_ACTION trackDragAction = TRACK_DRAG_ACTION::MOVE;
 
@@ -372,9 +401,38 @@ int PCB_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
 
             m_canceledMenu = false;
         }
-        else if( evt->IsClick( BUT_RIGHT ) )
+        else if( evt->IsDblClick( BUT_RIGHT ) && brd_editor && m_frame->ToolStackIsEmpty() )
         {
             m_disambiguateTimer.Stop();
+            m_priv->m_rightClickGesture->Cancel();
+            m_frame->ClearFocus();
+
+            // Always target the item under the pointer, including when a different
+            // item was selected. Keep the native deletion, locks and undo handling.
+            ClearSelection();
+            setModifiersState( false, false, false );
+            bool selectionCancelled = false;
+            selectPoint( evt->Position(), false, &selectionCancelled,
+                    []( const VECTOR2I&, GENERAL_COLLECTOR& collector, PCB_SELECTION_TOOL* tool )
+                    {
+                        tool->FilterCollectorForHierarchy( collector, true );
+                        tool->FilterCollectorForLockedItems( collector );
+                    } );
+            if( !selectionCancelled && !m_selection.Empty() )
+            {
+                m_selection.SetIsHover( true );
+                m_toolMgr->RunAction( ACTIONS::doDelete );
+            }
+        }
+        else if( evt->IsClick( BUT_RIGHT ) || deferredContext )
+        {
+            m_disambiguateTimer.Stop();
+
+            if( !deferredContext && brd_editor && m_frame->ToolStackIsEmpty() )
+            {
+                m_priv->m_rightClickGesture->Defer( *evt );
+                continue;
+            }
 
             // Right click? if there is any object - show the context menu
             bool selectionCancelled = false;

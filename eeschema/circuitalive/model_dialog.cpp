@@ -53,9 +53,18 @@ public:
         auto* reload = new wxButton( this, wxID_ANY, _( "Reload file" ) );
         row->Add( browse, 0, wxRIGHT, 8 ); row->Add( reload );
         layout->Add( row, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
-        m_files=new wxButton(this,wxID_ANY,_("Data files…"));
-        m_files->Hide();layout->Add(m_files,0,wxLEFT|wxRIGHT|wxBOTTOM,10);
-        m_files->Bind(wxEVT_BUTTON,[this](wxCommandEvent&){if(m_model)EditModelResources(this,m_component,*m_model);});
+        auto* filesRow = new wxBoxSizer( wxHORIZONTAL );
+        m_filePath = new wxTextCtrl( this, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize, wxTE_READONLY );
+        m_filePath->SetHint( _( "No data file selected" ) );
+        m_files = new wxButton( this, wxID_ANY, _( "Data files…" ) );
+        m_files->Hide(); m_filePath->Hide();
+        filesRow->Add( m_filePath, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8 );
+        filesRow->Add( m_files );
+        layout->Add( filesRow, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
+        m_files->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& )
+        {
+            if( m_model && EditModelResources( this, m_component, *m_model ) ) updateResourcePaths();
+        } );
         m_details = new wxStaticText( this, wxID_ANY, "" );
         layout->Add( m_details, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
         layout->Add( new wxStaticText( this, wxID_ANY, _( "Model ports → physical symbol pins" ) ),
@@ -124,7 +133,7 @@ public:
         m_selected = selected;
         if( !excluded ) { selectExternalFile(); load( true ); }
         else m_details->SetLabel( _( "Excluded — no simulation model is required." ) );
-        m_editingControls = { m_choice, chooseModel, automatic, browse, reload, m_files, m_pins, m_parameterPages,
+        m_editingControls = { m_choice, chooseModel, automatic, browse, reload, m_files, m_filePath, m_pins, m_parameterPages,
             m_voltage, m_current, m_power, m_positive, m_negative, m_remember, forget };
         enableModelControls();
         m_exclude->Bind( wxEVT_CHECKBOX, [this]( wxCommandEvent& )
@@ -200,6 +209,28 @@ public:
     bool Excluded() const { return m_exclude->GetValue(); }
 
 private:
+    void updateResourcePaths()
+    {
+        wxString paths, fullPaths;
+        if( m_model )
+            for( const auto& resource : m_model->resources )
+            {
+                const auto it = m_component.resources.find( resource.id );
+                if( it == m_component.resources.end() || it->second.path.empty() ) continue;
+                auto path = std::filesystem::u8path( it->second.path );
+                if( path.is_relative() ) path = std::filesystem::u8path( m_component.projectDirectory ) / path;
+                if( !paths.IsEmpty() ) paths += "; ";
+                if( !fullPaths.IsEmpty() ) fullPaths += "\n";
+                path = path.lexically_normal();
+                paths += wxString::FromUTF8( PathUtf8( path.filename() ) ) + " — "
+                         + wxString::FromUTF8( PathUtf8( path.parent_path() ) );
+                fullPaths += wxString::FromUTF8( PathUtf8( path ) );
+            }
+        m_filePath->ChangeValue( paths );
+        m_filePath->SetToolTip( fullPaths );
+        m_filePath->SetInsertionPoint( 0 );
+    }
+
     void enableModelControls()
     {
         for( auto* control : m_editingControls ) control->Enable( !m_exclude->GetValue() );
@@ -347,6 +378,8 @@ private:
         }
         else if(m_parameterPages->GetPageCount()>1){m_parameterPages->RemovePage(1);m_appearance->Hide();}
         m_files->Show(m_model && !m_model->resources.empty());
+        m_filePath->Show( m_model && !m_model->resources.empty() );
+        updateResourcePaths();
         m_details->Wrap( 830 ); Layout();
     }
     void collect()
@@ -378,6 +411,7 @@ private:
     std::vector<SIMULATION_MODEL> m_models;
     std::optional<SIMULATION_MODEL> m_model;
     wxButton* m_files;
+    wxTextCtrl* m_filePath;
     wxTextCtrl* m_choice;
     int m_selected = 0;
     wxStaticText* m_details;

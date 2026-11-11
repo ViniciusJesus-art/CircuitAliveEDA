@@ -206,6 +206,7 @@ BOOST_AUTO_TEST_CASE( VisualFastPulsesSurviveHistoryOverflowAndPauseAtActualStat
     BOOST_CHECK( view.logicLevels.at( 0 ) == LOGIC_LEVEL::UNKNOWN );
     BOOST_CHECK( !view.logicRapid.at( 0 ) );
     circuit.logicPins[0].digital = circuit.logicPins[0].output = true;
+    circuit.logicPins[0].externalDrive = false;
     UpdateVisualSignals( circuit, view, 1 );
     BOOST_CHECK( view.logicLevels.at( 0 ) == LOGIC_LEVEL::HIGH_Z );
     BOOST_CHECK( !view.logicRapid.at( 0 ) );
@@ -332,6 +333,28 @@ BOOST_AUTO_TEST_CASE( VisualRunnerAppliesPreferencesWithoutRestartingOrOverwriti
     BOOST_CHECK_GE( stepped.sample.latest.time - paused.sample.latest.time, expected * .999 );
     BOOST_CHECK_LE( stepped.sample.latest.time - paused.sample.latest.time, expected + 2e-5 );
     BOOST_CHECK( stepped.state == EDITOR_SESSION_STATE::PAUSED );
+}
+
+BOOST_AUTO_TEST_CASE( PlaybackPacingDiscardsStartupLagWithoutBurstingThroughClockCycles )
+{
+    using namespace std::chrono;
+    const steady_clock::time_point start{};
+    const auto interval = milliseconds( 8 );
+    // Fast frames keep their absolute cadence, including normal OS wake jitter.
+    auto next = NextPlaybackDeadline( start, start + milliseconds( 3 ), interval );
+    BOOST_CHECK( next == start + interval );
+    next = NextPlaybackDeadline( next, start + milliseconds( 11 ), interval );
+    BOOST_CHECK( next == start + 2 * interval );
+    // A slow initial batch must not leave a queue of already-overdue deadlines.
+    const auto delayed = start + seconds( 2 );
+    next = NextPlaybackDeadline( next, delayed, interval );
+    BOOST_CHECK( next == delayed + interval );
+    for( int frame = 0; frame < 10; ++frame )
+    {
+        const auto finished = next + milliseconds( 1 );
+        next = NextPlaybackDeadline( next, finished, interval );
+        BOOST_CHECK( next > finished );
+    }
 }
 
 BOOST_AUTO_TEST_CASE( VisualPreferencesNormalizeInvalidValuesBeforeUse )

@@ -57,6 +57,9 @@
 #include <sch_bus_entry.h>
 #include <sch_commit.h>
 #include <sch_edit_frame.h>
+#if defined( __linux__ ) || defined( _WIN32 )
+#include <circuitalive/probe_placement.h>
+#endif
 #include <sch_draw_panel.h>
 #include <sch_io/kicad_legacy/sch_io_kicad_legacy.h>
 #include <sch_file_versions.h>
@@ -765,6 +768,11 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
 
 #ifdef PROFILE
     openFiles.Show();
+#endif
+    // Refresh legacy probe artwork before rebuilding the view's spatial index.
+#if defined( __linux__ ) || defined( _WIN32 )
+    CIRCUITALIVE::NormalizeSourceProbeSymbols( Schematic() );
+    CIRCUITALIVE::EnsureUniqueProbeIdentities( Schematic() );
 #endif
     // Ensure all items are redrawn (especially the drawing-sheet items):
     if( GetCanvas() )

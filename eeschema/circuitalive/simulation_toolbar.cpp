@@ -14,6 +14,9 @@ namespace CIRCUITALIVE
 TOOL_ACTION SIMULATION_ACTIONS::memory( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.viewMemory" )
         .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "View memory…" ) )
         .Tooltip( wxTRANSLATE( "Inspect or export the initial image or paused memory contents" ) ) );
+TOOL_ACTION SIMULATION_ACTIONS::probeProperties( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.probeProperties" )
+        .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "Probe properties..." ) )
+        .Tooltip( wxTRANSLATE( "Edit probe name, frequency, voltage levels and waveform parameters" ) ) );
 TOOL_ACTION SIMULATION_ACTIONS::configure( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.configureModel" )
         .Scope( AS_GLOBAL ).DefaultHotkey( MD_CTRL + MD_ALT + 'M' )
         .FriendlyName( wxTRANSLATE( "Simulation model..." ) )

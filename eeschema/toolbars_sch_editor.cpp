@@ -184,9 +184,9 @@ std::optional<TOOLBAR_CONFIGURATION> SCH_EDIT_TOOLBAR_SETTINGS::DefaultToolbarCo
               .AppendAction( ACTIONS::zoomTool );
 
         config.AppendSeparator()
-              .AppendAction( SCH_ACTIONS::navigateBack )
+              .AppendAction( SCH_ACTIONS::navigatePrevious )
               .AppendAction( SCH_ACTIONS::navigateUp )
-              .AppendAction( SCH_ACTIONS::navigateForward );
+              .AppendAction( SCH_ACTIONS::navigateNext );
 
         config.AppendSeparator()
               .AppendAction( SCH_ACTIONS::rotateCCW )

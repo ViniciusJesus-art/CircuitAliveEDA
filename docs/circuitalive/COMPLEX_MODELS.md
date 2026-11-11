@@ -104,7 +104,10 @@ As interfaces medem a alimentação local, convertem tensões de entrada para ev
 digitais e aplicam saídas com resistência finita e corrente retirada da alimentação.
 A queda nominal da saída é configurável. Alimentação inválida desabilita os drivers.
 X é um estado interno distinto de Z, mesmo quando um resistor externo define a
-tensão da rede. O código interno 0/0,5/1 independe dos limiares físicos da família.
+tensão da rede. Os indicadores mostram o nível presente na conexão: uma saída
+em Z pode ler 0 ou 1 quando outro componente ou um resistor polariza o barramento.
+Disputas entre saídas ativas são destacadas sem interromper a simulação.
+O código interno 0/0,5/1 independe dos limiares físicos da família.
 A detecção de rede sem driver conserva as limitações descritas em
 [BASIC_AND_DIGITAL_MODELS.md](BASIC_AND_DIGITAL_MODELS.md).
 

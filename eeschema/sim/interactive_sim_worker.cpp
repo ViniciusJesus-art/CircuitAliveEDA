@@ -178,8 +178,8 @@ private:
                 || cfg.horizon <= 0 || cfg.step > cfg.horizon || cfg.maxStep > cfg.horizon
                 || cfg.horizon / std::min( cfg.step, cfg.maxStep ) > 1e8
                 || cfg.historyCapacity == 0 || cfg.historyCapacity > 4096
-                || cfg.signals.empty() || cfg.signals.size() > 256
-                || cfg.signals.size() * cfg.historyCapacity > 65536 )
+                || cfg.signals.empty() || cfg.signals.size() > MAX_SESSION_SIGNALS
+                || cfg.signals.size() * cfg.historyCapacity > MAX_SESSION_HISTORY_VALUES )
             throw std::runtime_error( "Invalid simulation timing, signals or history capacity" );
 
         if( aRequest.contains( "history_signals" ) )

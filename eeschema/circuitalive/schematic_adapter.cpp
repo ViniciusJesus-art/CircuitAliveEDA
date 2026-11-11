@@ -6,6 +6,7 @@
 #include <project.h>
 #include <sch_connection.h>
 #include <sch_field.h>
+#include <sch_line.h>
 #include <sch_pin.h>
 #include <sch_screen.h>
 #include <sch_sheet_path.h>
@@ -247,6 +248,28 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
         }
     }
     result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators, powerSymbols, aPreferences );
+    std::map<std::string, std::string> netNodes;
+    for( std::size_t i = 0; i < components.size(); ++i )
+        for( const auto& [pin, net] : components[i].pins )
+            if( !net.empty() ) netNodes[net] = result.circuit.pinNodes[i].at( pin );
+    for( std::size_t i = 0; i < probes.size(); ++i )
+        for( const auto& [pin, net] : probes[i].pins )
+            if( !net.empty() ) netNodes[net] = result.circuit.pinNodes[components.size()+i].at( pin );
+    for( SCH_SHEET_PATH& sheet : aSchematic.Hierarchy() )
+    {
+        if( sheet.GetExcludedFromSim( variant ) ) continue;
+        for( SCH_ITEM* item : sheet.LastScreen()->Items().OfType( SCH_LINE_T ) )
+        {
+            const auto* wire = static_cast<SCH_LINE*>( item );
+            if( !wire->IsWire() ) continue;
+            const auto* connection = wire->Connection( &sheet );
+            if( !connection || connection->IsUnconnected() ) continue;
+            const auto net = IsSimulationGround( connection->LocalName().ToStdString() )
+                    ? "0" : connection->Name().ToStdString();
+            if( const auto it = netNodes.find( net ); it != netNodes.end() )
+                result.wires.push_back( { it->second, sheet.Path().AsString(), wire->GetStartPoint(), wire->GetEndPoint() } );
+        }
+    }
     return result;
 }
 }

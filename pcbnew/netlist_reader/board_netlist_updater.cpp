@@ -182,6 +182,85 @@ BOARD_NETLIST_UPDATER::BuildFootprintAssociations( BOARD& aBoard, NETLIST& aNetl
 }
 
 
+std::set<PCB_TRACK*> BOARD_NETLIST_UPDATER::FindObsoleteTracks( BOARD& aBoard, NETLIST& aNetlist,
+                                                              bool aLookupByTimestamp )
+{
+    const auto links = BuildFootprintAssociations( aBoard, aNetlist, aLookupByTimestamp );
+    std::set<wxString> expectedNets, boardOnlyNets;
+    for( unsigned i = 0; i < aNetlist.GetCount(); ++i )
+    {
+        const COMPONENT* component = aNetlist.GetComponent( i );
+        if( component->GetProperties().count( "exclude_from_board" ) )
+            continue;
+        for( unsigned j = 0; j < component->GetNetCount(); ++j )
+            expectedNets.insert( component->GetNet( j ).GetNetName() );
+    }
+    for( const FOOTPRINT* footprint : aBoard.Footprints() )
+        if( footprint->IsBoardOnly() )
+            for( const PAD* pad : footprint->Pads() )
+                boardOnlyNets.insert( pad->GetNetname() );
+
+    std::set<PCB_TRACK*> visited, obsolete;
+    const auto connectivity = aBoard.GetConnectivity();
+    for( PCB_TRACK* first : aBoard.Tracks() )
+    {
+        if( !visited.insert( first ).second )
+            continue;
+        std::vector<PCB_TRACK*> island{ first };
+        std::set<PAD*> pads;
+        for( std::size_t i = 0; i < island.size(); ++i )
+        {
+            // Walk physical copper, ignoring net names. Renaming a net is harmless,
+            // but copper joining pads now assigned to different nets needs review.
+            connectivity->GetConnectedPads( island[i], &pads );
+            for( PCB_TRACK* next : connectivity->GetConnectedTracks( island[i] ) )
+                if( visited.insert( next ).second )
+                    island.push_back( next );
+        }
+
+        bool missing = false;
+        bool hasBoardOnlyPad = false;
+        std::set<wxString> destinations;
+        for( PAD* pad : pads )
+        {
+            const FOOTPRINT* footprint = pad->GetParentFootprint();
+            if( footprint->IsBoardOnly() )
+            {
+                hasBoardOnlyPad = true;
+                continue;
+            }
+            const auto it = links.matches.find( const_cast<FOOTPRINT*>( footprint ) );
+            if( it == links.matches.end()
+                || it->second->GetProperties().count( "exclude_from_board" ) )
+            {
+                missing = true;
+                continue;
+            }
+            const wxString net = it->second->GetNet( pad->GetNumber() ).GetNetName();
+            if( net.empty() || net.StartsWith( "unconnected-(" ) )
+                missing = true;
+            else
+                destinations.insert( net );
+        }
+        missing |= destinations.size() > 1;
+        if( pads.empty() && !hasBoardOnlyPad )
+        {
+            // Retain saved warnings on detached copper. Never mark arbitrary unassigned
+            // copper, or nets intentionally owned by board-only footprints.
+            for( const PCB_TRACK* track : island )
+            {
+                const wxString net = track->GetNetname();
+                missing |= track->IsSchematicConnectionMissing()
+                        || ( !net.empty() && !expectedNets.count( net ) && !boardOnlyNets.count( net ) );
+            }
+        }
+        if( missing )
+            obsolete.insert( island.begin(), island.end() );
+    }
+    return obsolete;
+}
+
+
 // These functions allow inspection of pad nets during dry runs by keeping a cache of
 // current pad netnames indexed by pad.
 
@@ -2193,6 +2272,24 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
                     RPT_SEVERITY_ERROR );
         }
         return false;
+    }
+
+    const auto obsoleteTracks = FindObsoleteTracks( *m_board, aNetlist, m_lookupByTimestamp );
+    if( !obsoleteTracks.empty() )
+    {
+        m_reporter->Report( wxString::Format(
+                _( "%zu routed items no longer match the schematic (MISS). Review the existing copper." ),
+                obsoleteTracks.size() ), RPT_SEVERITY_WARNING );
+        ++m_warningCount;
+    }
+    for( PCB_TRACK* track : m_board->Tracks() )
+    {
+        const bool missing = obsoleteTracks.count( track ) > 0;
+        if( !m_isDryRun && missing != track->IsSchematicConnectionMissing() )
+        {
+            m_commit.Modify( track );
+            track->SetSchematicConnectionMissing( missing );
+        }
     }
 
     cacheCopperZoneConnections();

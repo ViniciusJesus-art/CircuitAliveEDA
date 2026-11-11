@@ -46,8 +46,6 @@ Por utilizar o KiCad como base, o projeto também mantém o caminho para o desen
 
 - [O que é o CircuitAliveEDA?](#o-que-é-o-circuitaliveeda)
 - [Mudanças](#mudanças)
-- [Imagens do projeto](#imagens-do-projeto)
-- [O que ainda quero desenvolver](#o-que-ainda-quero-desenvolver)
 - [Como funciona por dentro](#como-funciona-por-dentro)
 - [Especificações rápidas](#especificações-rápidas)
 - [Documentação](#documentação)
@@ -61,20 +59,50 @@ Por utilizar o KiCad como base, o projeto também mantém o caminho para o desen
 
 Estas são as adições e mudanças de fluxo desenvolvidas no CircuitAliveEDA sobre sua base KiCad. O editor de esquemáticos, o editor de PCB, o sistema de bibliotecas e as ferramentas de fabricação continuam vindo do KiCad. As seções abaixo explicam o que o CA acrescenta para quem está abrindo o programa pela primeira vez.
 
-### Simulação interativa no esquemático
 
-Monte o circuito, aperte **Play** e acompanhe seu comportamento no mesmo editor em que você desenha. O CA integra **ngspice** e **XSPICE** com controles para iniciar, pausar, continuar e interromper a simulação, ajustar sua velocidade ou avançar um passo enquanto estiver pausada.
+
+<h3 align="center">
+  Simulação interativa no esquemático
+</h3>
+
+<p align="center">
+  <img
+    src="resources/screenshot/Montando_Led_com_SW+Medir.webp"
+    alt="Circuito com LED, chave e medições durante a simulação"
+    width="850"
+  >
+</p>
+
+
+Monte o circuito, aperte **Play** e acompanhe seu comportamento no mesmo editor em que você desenha. O CA integra **ngspice** e **XSPICE** com controles para iniciar, pausar, continuar e interromper a simulação, ajustar sua velocidade ou avançar um passo enquanto estiver pausada. Após uma demora, a reprodução retoma a velocidade escolhida sem uma rajada de ciclos acelerados.
 
 - Clique nas chaves compatíveis para mudar seu estado durante a simulação.
 - Ajuste potenciômetros e trimpots compatíveis sem reiniciar a sessão nem perder o estado armazenado no circuito.
 - Acompanhe o brilho dos LEDs e os indicadores lógicos de `0`, `1`, `Z` (alta impedância) e `X` (indefinido).
-- Coloque sondas de tensão e osciloscópio nos fios ou diretamente nas pontas dos pinos dos componentes; sondas de corrente e potência usam um trecho de fio para seu sensor em série. Você também pode habilitar medições no próprio componente.
-- Acione entradas digitais com uma **probe 0/1** clicável (azul/vermelha), ou coloque **geradores de PWM, onda quadrada e senoide** configuráveis, referenciados ao GND. O duty cycle do PWM pode ser ajustado durante a simulação.
+- Saídas desabilitadas mostram o nível presente no barramento compartilhado, incluindo sinais da RAM ou de resistores de pull. Saídas ativas em oposição destacam o fio inteiro em rosa e mostram um aviso sem pausar; corrente e tensão continuam sendo calculadas pelos modelos elétricos.
+- Coloque probes diretamente em uma conexão ou clique em espaço vazio para ver a prévia e clique novamente para posicioná-las livremente; os fios podem ser conectados depois. A prévia acompanha o cursor com o mesmo destaque azul dos componentes e pode ser girada com **R**. Probes de corrente e potência inserem um sensor em série quando colocadas em um fio. Você também pode habilitar medições no próprio componente.
+- Acione entradas digitais com uma **probe 0/1** clicável (azul/vermelha), ou coloque **geradores de PWM, onda quadrada e senoide** configuráveis, referenciados ao GND. Dê duplo clique na probe, pressione **E** ou escolha **Probe properties...** para editar frequência, tensões, duty cycle e outros ajustes. O duty cycle do PWM também pode ser ajustado durante a simulação. O nome e os textos internos da probe pertencem à probe inteira para seleção e exclusão.
+- Ao iniciar a simulação, **Measurements** é selecionada quando houver leituras de tensão, corrente ou potência; com apenas probes de osciloscópio, seleciona **Oscilloscope**, independentemente da aba anterior.
+- Probes de estímulo cabem junto a pinos adjacentes dos CIs, ficam orientadas para fora do componente e mantêm o número unido durante a seleção por caixa. Duplicar, colar ou repetir probes atribui identificadores novos a cada probe de estímulo, medição e osciloscópio; identificadores repetidos em cópias antigas são corrigidos automaticamente.
 - Examine as formas de onda com cursores e disparo do osciloscópio e exporte as amostras em CSV.
 
 Veja [medições e osciloscópio](docs/circuitalive/MEASUREMENTS.md) e [ajustes durante a simulação](docs/circuitalive/LIVE_CONTROLS.md).
 
-### Modelos de componentes e vínculos padrão dos símbolos
+---
+
+
+<h3 align="center">
+  Modelos de componentes e vínculos padrão dos símbolos
+</h3>
+
+<p align="center">
+  <img
+    src="resources/screenshot/Probes_E_Ociloscopio.webp"
+    alt="Probes e osciloscópio no esquemático"
+    width="850"
+  >
+</p>
+
 
 O CA fornece os comportamentos de simulação em **arquivos `.casim`**, associados aos símbolos da biblioteca padrão. O catálogo foi ampliado com:
 
@@ -88,31 +116,102 @@ Esses padrões acompanham a instalação; não dependem das preferências do des
 
 Veja o [catálogo de modelos](docs/circuitalive/MODEL_CATALOG.md) e os [vínculos revisados da biblioteca padrão](docs/circuitalive/STANDARD_LIBRARY_ASSOCIATIONS.md).
 
-### Comportamento elétrico e limites dos modelos
+---
+
+
+<h3 align="center">
+  Comportamento elétrico e limites dos modelos
+</h3>
+
+<p align="center">
+  <img
+    src="resources/screenshot/Como_Funciona_os_Models.webp"
+    alt="Configuração e comportamento dos modelos de simulação"
+    width="850"
+  >
+</p>
+
 
 Os modelos vão além de mostrar estados lógicos ideais. Conforme o componente, incluem faixas de tensão de alimentação, limiares de entrada, atrasos de propagação, resistência e quedas de tensão nas saídas, capacitância de entrada, consumo em repouso, fuga e limites ou avisos de corrente. A carga e o fan-out afetam a resposta elétrica pelas entradas e saídas modeladas. Os tempos de comutação e a frequência de operação dependem dos parâmetros e comportamentos implementados em cada modelo.
 
 São aproximações nominais, com níveis de detalhe diferentes entre os modelos. Não garantem todos os limites de um datasheet, e temperatura, autoaquecimento e dano permanente ficam fora do escopo atual. A documentação registra os comportamentos atendidos e as limitações restantes.
 
+Em barramentos digitais, uma saída em **Z** libera a conexão: seu indicador passa a mostrar o nível elétrico estabelecido por quem ainda estiver conduzindo. Por exemplo, uma EPROM 27C512 com a saída desabilitada pode mostrar os dados fornecidos pela RAM no mesmo barramento. Uma rede realmente flutuante aparece como **Z**; uma tensão fora dos níveis lógicos válidos pode aparecer como **X**, respeitando os limiares e a alimentação do componente.
+
+Quando saídas ativas tentam impor níveis opostos com corrente de disputa, o fio inteiro recebe um destaque rosa e os indicadores dos pinos mostram **!**, com um aviso que identifica os envolvidos. A simulação continua, e o aviso desaparece quando a disputa termina. Resistores de pull-up/pull-down e entradas não são tratados como saídas concorrentes; as resistências, correntes e quedas de tensão continuam participando da solução elétrica. Veja os [modelos analógicos e digitais](docs/circuitalive/BASIC_AND_DIGITAL_MODELS.md).
+
 Os diodos incluem condução direta, fuga reversa e ruptura quando configurada. Um terminal conectado apenas a uma sonda ideal de tensão pode flutuar próximo da tensão da fonte mesmo com o bloqueio da corrente de carga; o [guia de polarização reversa](docs/circuitalive/DIODE_REVERSE_BIAS.md) explica como testar isso com uma carga e retorno ao GND.
 
-### Editor visual de modelos e configurações reutilizáveis
+---
+
+
+
+<h3 align="center">
+  Editor visual de modelos e configurações reutilizáveis
+</h3>
+
+
+<p align="center">
+  <img
+    src="resources/screenshot/Como_Vincular_um_Models.webp"
+    alt="Vínculo de um modelo de simulação ao símbolo"
+    width="850"
+  >
+</p>
+
 
 O **Simulation Model Editor**, em uma janela própria, permite escolher um símbolo da biblioteca, importar seus pinos, montar o comportamento com blocos, conectar terminais, expor parâmetros e salvar um arquivo `.casim` reutilizável. Modelos existentes também podem servir de ponto de partida.
 
-No esquemático, **Simulation model...** (**Ctrl+Alt+M**) configura o modelo, o mapa de pinos, os parâmetros e as medições. O navegador de modelos oferece categorias, famílias e busca. As configurações podem ser salvas como padrão para novas instâncias do mesmo símbolo de biblioteca, enquanto as instâncias existentes conservam sua configuração. Modelos expressáveis pelos blocos disponíveis ou por SPICE podem ser acrescentados sem recompilar o aplicativo.
+No esquemático, **Simulation model...** (**Ctrl+Alt+M**, também disponível pelo botão **Simulation Model...** nas propriedades do símbolo) configura o modelo, o mapa de pinos, os parâmetros e as medições. O navegador de modelos oferece categorias, famílias e busca. As configurações podem ser salvas como padrão para novas instâncias do mesmo símbolo de biblioteca, enquanto as instâncias existentes conservam sua configuração. Modelos expressáveis pelos blocos disponíveis ou por SPICE podem ser acrescentados sem recompilar o aplicativo. A janela original de modelos SPICE do KiCad continua disponível em **Editor de Símbolos → Propriedades do Símbolo → Simulation Model...**.
 
 Veja o [editor visual de modelos](docs/circuitalive/MODEL_AUTHOR.md) e as [configurações reutilizáveis](docs/circuitalive/COMPLEX_MODELS.md).
 
-### Imagens de memória e execução de firmware
+---
 
-Os modelos de ROM e RAM compatíveis podem carregar arquivos de dados iniciais. Um visualizador de memória captura o estado da simulação pausada, mostra endereços, bytes e bits indefinidos e exporta os dados em BIN, Intel HEX ou snapshots `.camem` do CA.
+
+
+<h3 align="center">
+  Imagens de memória e execução de firmware
+</h3>
+
+
+
+<p align="center">
+  <img
+    src="resources/screenshot/Manupulação_de_Memory.webp"
+    alt="Inspeção e manipulação de imagens de memória"
+    width="850"
+  >
+</p>
+
+Os modelos de ROM e RAM compatíveis podem carregar arquivos de dados iniciais. O campo ao lado de **Data files…** mostra o nome e o diretório do arquivo. Os bytes não inicializados da SRAM começam em **0x00**, inclusive as posições fora de uma imagem parcial; snapshots CAMEM conservam os bits explicitamente indefinidos.
+
+Abra **View memory…** pelo menu de contexto do componente para inspecionar sua memória em uma janela independente. O esquemático e os controles de simulação continuam acessíveis, e podem ser abertas janelas de memórias de componentes diferentes. Antes de iniciar, o visualizador mostra a imagem inicial. Durante a execução, a tabela é ocultada e uma mensagem pede que você pause para consultar os dados; abrir ou fechar o visualizador não pausa nem retoma a simulação.
+
+Ao pausar, a tabela é atualizada automaticamente com o conteúdo real da memória naquele instante, sem avançar o tempo nem modificar o circuito. Os bytes alterados e suas linhas de texto ASCII ficam destacados em amarelo, com uma contagem das alterações. **Na primeira pausa, a comparação usa o conteúdo inicial carregado naquela sessão**, incluindo uma imagem de arquivo, quando houver; nas pausas seguintes, usa a captura da pausa anterior. Mudanças entre bits conhecidos e indefinidos também são destacadas. Uma nova pausa sem alterações limpa o destaque, e reiniciar a simulação estabelece uma nova referência inicial.
+
+O botão **Re-Capture**, à direita de **Export…**, relê manualmente o estado pausado sem avançar o tempo. Ele é opcional, pois a captura ao pausar já é automática, e repetir a captura na mesma pausa mantém a referência usada para destacar as alterações. A posição de navegação na tabela é preservada nas atualizações.
+
+O visualizador é somente para leitura: apresenta endereços em hexadecimal, 16 bytes por linha, texto ASCII e navegação até um endereço. `?` indica bits indefinidos, e não um byte zerado ou uma saída em alta impedância. Os dados podem ser exportados em BIN, Intel HEX ou snapshots `.camem` do CA, conforme o suporte de cada formato a bits indefinidos.
 
 Nos modelos fornecidos de ATmega48P/88P/168P/328P, Arduino UNO R3 e PIC16F84A, o CA pode executar firmware HEX/BIN pelos runtimes incluídos. Cada instância tem seu próprio firmware, clock, memória e conexões elétricas dos pinos. O firmware é compilado com as ferramentas externas habituais do dispositivo. Outros microcontroladores, dispositivos STM/ESP e FPGAs ainda precisam de seus próprios motores e modelos implementados.
 
 Veja [imagens de memória](docs/circuitalive/MEMORY_IMAGES.md) e [modelos programáveis](docs/circuitalive/MICROCONTROLLER_MODELS.md).
 
-### Inserção e reaproveitamento de itens no esquemático
+---
+
+
+<h3 align="center">
+  Inserção e reaproveitamento de itens no esquemático
+</h3>
+
+<p align="center">
+  <img
+    src="resources/screenshot/Lista_de_Componentes_usados.webp"
+    alt="Painel de componentes usados no esquemático"
+    width="850"
+  >
+</p>
 
 O fluxo de inserção foi padronizado para componentes, símbolos de alimentação, rótulos, texto, imagens, formas, tabelas e folhas:
 
@@ -123,29 +222,75 @@ O fluxo de inserção foi padronizado para componentes, símbolos de alimentaç�
 
 Acionar o atalho ou comando novamente abre uma nova escolha. Os itens ligados diretamente aos fios mantêm a inserção direta. Componentes com várias unidades podem continuar pelas unidades disponíveis, mantendo referências como U1A/U1B juntas.
 
-O painel **Used Components** lista os tipos de componentes já presentes na página atual, com uma prévia do símbolo. Selecione um tipo e use o mesmo par de cliques para inserir outra instância com uma referência nova. Para componentes com várias unidades, ele coloca todas elas, incluindo as de alimentação, antes de iniciar o próximo encapsulamento (por exemplo, U2:A → U2:B → U2:C → U3:A). O painel pode ser encaixado, deixado flutuante e redimensionado; suas preferências de disposição são mantidas entre projetos.
+O painel **Used Components** lista os tipos de componentes já presentes na página atual, com uma prévia do símbolo. Selecione um tipo e use o mesmo par de cliques para inserir outra instância com uma referência nova. A linha permanece selecionada entre inserções até cancelar a escolha ou ativar outra ferramenta. Novos símbolos usam os padrões da biblioteca e a configuração inicial do seletor, sem herdar edições de instâncias existentes. Para componentes com várias unidades, ele coloca todas elas, incluindo as de alimentação, antes de iniciar o próximo encapsulamento (por exemplo, U2:A → U2:B → U2:C → U3:A). O painel pode ser encaixado, deixado flutuante e redimensionado; suas preferências de disposição são mantidas entre projetos.
 
 Veja o [fluxo de inserção](docs/circuitalive/PLACEMENT_WORKFLOW.md) e o [painel de componentes usados](docs/circuitalive/USED_COMPONENTS.md).
 
-### Aplicação de propriedades por clique, com numeração automática
+---
+
+
+
+<h3 align="center">
+  Aplicação de propriedades por clique, com numeração automática
+</h3>
+
+
+<p align="center">
+  <img
+    src="resources/screenshot/Mundaça_Por_Click_Label_Sequencia.webp"
+    alt="Criação de labels com numeração automática por clique"
+    width="850"
+  >
+  <img
+    src="resources/screenshot/Mundaça_Por_Click_Valor_Cap.webp"
+    alt="Alteração de valores de capacitores por clique"
+    width="850"
+  >
+</p>
 
 A ferramenta **Apply Properties by Click...** está na barra superior e no menu **Tools**, com o atalho padrão **Ctrl+Shift+P**. Escolha uma propriedade editável e o valor de substituição, confirme e clique nos objetos para atualizá-los. Ela atende referências, valores, footprints, nomes/textos, campos personalizados e outras propriedades aplicáveis do editor.
 
 Ative a numeração automática para substituir `#` ou `?` em um padrão. Por exemplo, `Digital_D#`, começando em `10` com passo `2`, aplica `Digital_D10`, `Digital_D12`, `Digital_D14` e assim por diante. Um passo negativo faz a contagem decrescer. Cliques vazios ou recusados não consomem um número, e o cursor mostra o próximo valor.
 
-Com a criação de rótulos em fios habilitada, clicar em um fio ou na ponta de um pino de componente cria um rótulo local, global ou hierárquico conectado, usando o nome gerado. Desative essa opção para editar propriedades do próprio fio. As edições comuns têm desfazer/refazer, os campos dos componentes respeitam a variante ativa e as unidades relacionadas são mantidas em sincronia. **Esc** encerra a ferramenta.
+Com a criação de rótulos em fios habilitada, clicar em um fio ou na ponta de um pino de componente cria um rótulo local, global ou hierárquico conectado, usando o nome gerado. As labels nos pinos se estendem para fora do componente, inclusive em símbolos girados ou espelhados. O seletor de propriedades abre com um clique e aceita a escolha com outro. Desative essa opção para editar propriedades do próprio fio. As edições comuns têm desfazer/refazer, os campos dos componentes respeitam a variante ativa e as unidades relacionadas são mantidas em sincronia. **Esc** encerra a ferramenta.
 
 Veja [aplicação de propriedades por clique](docs/circuitalive/PROPERTY_STAMP.md).
 
-### Páginas, navegação e gestos do mouse
+---
 
-O menu **Pages** permite criar, renomear, reordenar, remover e navegar pelas páginas do esquemático, incluindo várias páginas principais em um projeto. A ordem das páginas é preservada ao salvar e reabrir. Os indicadores e controles de simulação pertencem ao caminho completo da folha, de modo que a navegação mantém os controles de cada página associados ao circuito correto.
 
-Um **duplo clique direito** exclui o item sob o ponteiro pela ação normal de exclusão do editor, com suporte a desfazer. Um clique direito simples continua abrindo o menu de contexto. Nos campos de símbolos, o comportamento normal de exclusão oculta o campo.
+<h3 align="center">
+  Páginas, navegação e gestos do mouse
+</h3>
+
+<p align="center">
+  <img
+    src="resources/screenshot/Pages.webp"
+    alt="Navegação entre páginas do esquemático"
+    width="850"
+  >
+</p>
+
+O menu **Pages** permite criar, renomear, reordenar, remover e navegar pelas páginas do esquemático, incluindo várias páginas principais em um projeto. A ordem das páginas é preservada ao salvar e reabrir. As setas da barra de ferramentas seguem essa ordem desde a primeira abertura, incluindo páginas ainda não visitadas. Páginas `.kicad_sch` salvas também aparecem na árvore de arquivos do projeto mesmo quando seus nomes são diferentes do projeto; abri-las por ali usa o esquemático e a PCB do mesmo projeto. Os indicadores e controles de simulação pertencem ao caminho completo da folha, de modo que a navegação mantém os controles de cada página associados ao circuito correto.
+
+Nos editores de esquemático e PCB, um **duplo clique direito** exclui o item sob o ponteiro pela ação normal de exclusão do editor, com suporte a desfazer. Na PCB, isso também atende trilhas, vias, textos e desenhos, respeitando os filtros de seleção e bloqueios normais. Um clique direito simples continua abrindo o menu de contexto. Nos campos de símbolos, o comportamento normal de exclusão oculta o campo.
 
 Veja [páginas do esquemático](docs/circuitalive/PAGES.md).
 
-### Vínculos entre esquemático e PCB
+---
+
+
+<h3 align="center">
+  Vínculos entre esquemático e PCB
+</h3>
+
+<p align="center">
+  <img
+    src="resources/screenshot/Lista_de_Componentes_Pendentes_PCB_E_Excluir.webp"
+    alt="Footprints pendentes e indicação de itens excluídos do esquemático"
+    width="850"
+  >
+</p>
 
 Todas as páginas do projeto alimentam a mesma PCB do projeto. O vínculo por **Reference** fica habilitado por padrão: um U1 do esquema usa o U1 da PCB. Se uma referência mudar (por exemplo, U1 para U12) e a nova referência ainda não tiver footprint, a identidade do símbolo existente recupera sua posição. Unidades distribuídas entre páginas continuam pertencendo a um único encapsulamento. As posições dos footprints e o roteamento existentes são preservados; mudar o footprint atribuído usa o processo normal de substituição de footprints. A janela de atualização também oferece o vínculo apenas por identidade.
 
@@ -153,43 +298,22 @@ No modo de projeto, trazer o editor de PCB para o foco sincroniza automaticament
 
 O painel acoplável **Pending Footprints** mostra a **Reference**, o **Value** e a prévia do footprint de cada componente ainda não posicionado. Selecione uma linha, clique em uma área vazia da PCB para trazer o footprint ao ponteiro e clique novamente para posicioná-lo. O item posicionado sai da lista; o próximo clique vazio escolhe a próxima linha automaticamente. Clicar em um footprint, trilha ou texto existente mantém o comportamento normal de seleção. **Esc** cancela a prévia. O posicionamento permite desfazer/refazer, e a lista se atualiza ao retornar à PCB, incluindo adições, remoções e alterações de propriedades no esquema. Use **View > Panels > Pending Footprints** para mostrar ou ocultar o painel; sua disposição acoplada/flutuante é salva.
 
-Quando um símbolo é excluído, a próxima atualização da PCB mantém seu footprint com um aviso **Missing schematic symbol** na camada de comentários e limpa as atribuições de rede dos pads. A janela de atualização permite remover os footprints sem símbolos. Footprints exclusivos da PCB são preservados. Referências duplicadas ou candidatos ambíguos de recuperação são informados antes de aplicar mudanças. Veja [vínculos entre esquemático e PCB](docs/circuitalive/PCB_LINKS.md).
+Quando um símbolo é excluído, a próxima atualização da PCB mantém seu footprint escurecido, com um aviso **Missing schematic symbol** na camada de comentários e as atribuições de rede dos pads limpas. Trechos conectados de cobre roteado que deixaram de corresponder ao esquema também ficam escurecidos, com **MISS** escrito na própria linha da trilha como um nome de rede, sem precisar selecioná-los. Esses avisos visuais permanecem ao salvar e desaparecem quando o vínculo é restaurado e sincronizado. O cobre permanece na placa para revisão; os indicadores não alteram a saída de fabricação. A janela de atualização permite remover os footprints sem símbolos. Footprints exclusivos da PCB são preservados. Referências duplicadas ou candidatos ambíguos de recuperação são informados antes de aplicar mudanças. Veja [vínculos entre esquemático e PCB](docs/circuitalive/PCB_LINKS.md).
 
-### Bibliotecas incluídas na instalação
+
+<h3 align="center">
+  Bibliotecas incluídas na instalação
+</h3>
+
+Novas instalações começam com os painéis dos editores já organizados: **Used Components** à esquerda do esquemático, instrumentos de simulação à direita quando abertos e **Pending Footprints** à esquerda da PCB com **Appearance** à direita. As mudanças pessoais no layout são salvas e preservadas.
 
 Os pacotes do CA incluem símbolos, footprints, modelos 3D, templates de projetos, modelos de simulação, blocos e runtimes. O aplicativo inicializa as tabelas de bibliotecas no primeiro uso sem exigir uma instalação separada do KiCad nem downloads de bibliotecas, preservando as bibliotecas pessoais.
 
 Veja [bibliotecas incluídas](docs/circuitalive/BUNDLED_LIBRARIES.md).
 
-## Imagens do projeto
-
-As imagens abaixo mostram o CircuitAliveEDA durante o desenvolvimento:
-
-![CircuitAliveEDA — captura do projeto 1](./resources/screenshot/Screenshot_20261017_163020.png)
-
-![CircuitAliveEDA — captura do projeto 2](./resources/screenshot/Screenshot_20261017_165517.png)
-
-![CircuitAliveEDA — captura do projeto 3](./resources/screenshot/Screenshot_20261017_165613.png)
-
-![CircuitAliveEDA — captura do projeto 4](./resources/screenshot/Screenshot_20261017_165649.png)
 
 ---
 
-## O que ainda quero desenvolver
-
-Não quero que o CA fique limitado a circuitos pequenos ou exemplos didáticos. Minha intenção é que ele também sirva para projetos maiores, com centenas ou milhares de elementos, circuitos analógicos e digitais, memórias, processadores e outros sistemas eletrônicos.
-
-Algumas das ideias que quero explorar:
-
-- Ampliar a biblioteca de componentes que podem ser simulados sem configurações complicadas.
-- Permitir a criação e reutilização de modelos personalizados de maneira modular.
-- Melhorar os instrumentos virtuais e a interação com os circuitos durante a execução.
-- Investigar formas de aproveitar melhor os vários núcleos do processador em simulações complexas.
-- Manter um fluxo contínuo entre a ideia, os testes no esquemático e a fabricação da PCB.
-
-Esses são **objetivos de desenvolvimento**, não uma lista de funcionalidades já concluídas. Prefiro registrar o caminho que quero seguir e ir documentando os resultados conforme forem aparecendo.
-
----
 
 ## Como funciona por dentro
 

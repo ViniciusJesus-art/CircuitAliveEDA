@@ -34,6 +34,7 @@
 #include <widgets/used_symbols.h>
 #include <widgets/project_pages.h>
 #include <sch_symbol.h>
+#include <sch_shape.h>
 #include <sch_label.h>
 #include <sch_group.h>
 #include <sch_sheet_pin.h>
@@ -49,6 +50,10 @@
 #include <richio.h>
 #include <sch_pin.h>
 #include <connection_graph.h>
+#include <circuitalive/probe_placement.h>
+#include <circuitalive/probe_symbol.h>
+#include <circuitalive/probe_geometry.h>
+#include <sch_line.h>
 
 static SCH_SHEET* createTopLevelSheet( SCHEMATIC& aSchematic, const wxString& aName,
                                        const wxString& aFileName )
@@ -263,6 +268,292 @@ BOOST_FIXTURE_TEST_CASE( DeleteFirstPageKeepsSharedChildInSurvivingHierarchy, PR
     BOOST_CHECK( wxFileExists( Path( "child.kicad_sch" ) ) );
     BOOST_CHECK( wxFileExists( Path( "second.kicad_sch" ) ) );
 }
+
+BOOST_FIXTURE_TEST_CASE( QuickListStartsWithLibraryDefaultsInsteadOfInstanceProperties, PROJECT_PAGES_FIXTURE )
+{
+    SCH_SHEET_PATH path;
+    path.push_back( first );
+    LIB_SYMBOL lib( "74LS139" );
+    lib.GetReferenceField().SetText( "U" );
+    lib.GetValueField().SetText( "74LS139" );
+    lib.GetFootprintField().SetText( "Package_DIP:DIP-16_W7.62mm" );
+    lib.SetUnitCount( 3, false );
+    SCH_SYMBOL placed( lib, LIB_ID( "74xx", "74LS139" ), &path, 3,
+                       0, VECTOR2I( 0, 0 ), schematic.get() );
+    placed.SetRef( &path, "U12" );
+    placed.GetField( FIELD_T::VALUE )->SetText( "changed value" );
+    placed.GetField( FIELD_T::FOOTPRINT )->SetText( "changed footprint" );
+    SCH_FIELD local( &placed, FIELD_T::USER, "LocalOnly" );
+    local.SetText( "not a default" );
+    placed.AddField( local );
+    auto initial = CIRCUITALIVE::MakeUsedSymbolTemplate( placed, path );
+    BOOST_REQUIRE( initial );
+    BOOST_CHECK_EQUAL( initial->GetField( FIELD_T::VALUE )->GetText(), "74LS139" );
+    BOOST_CHECK_EQUAL( initial->GetField( FIELD_T::FOOTPRINT )->GetText(), "Package_DIP:DIP-16_W7.62mm" );
+    BOOST_CHECK( initial->GetField( "LocalOnly" ) == nullptr );
+    BOOST_CHECK_EQUAL( initial->GetRef( &path ), "U?" );
+    BOOST_CHECK_EQUAL( initial->GetUnit(), 1 );
+    BOOST_CHECK_EQUAL( initial->GetUnitCount(), 3 );
+    BOOST_CHECK_EQUAL( placed.GetRef( &path ), "U12" );
+
+    // A remembered chooser template is independent of both the original occurrence
+    // and every subsequent placement, while ordinary duplicate keeps instance values.
+    initial->GetField( FIELD_T::FOOTPRINT )->SetText( "chooser footprint" );
+    auto next = CIRCUITALIVE::CopyUsedSymbol( *initial, path, VECTOR2I( 10000, 20000 ) );
+    next->GetField( FIELD_T::VALUE )->SetText( "per-instance edit" );
+    auto another = CIRCUITALIVE::CopyUsedSymbol( *initial, path, VECTOR2I( 30000, 40000 ) );
+    BOOST_CHECK_EQUAL( another->GetField( FIELD_T::VALUE )->GetText(), "74LS139" );
+    BOOST_CHECK_EQUAL( another->GetField( FIELD_T::FOOTPRINT )->GetText(), "chooser footprint" );
+    auto duplicate = CIRCUITALIVE::CopyUsedSymbol( placed, path, VECTOR2I( 0, 0 ) );
+    BOOST_CHECK_EQUAL( duplicate->GetField( FIELD_T::VALUE )->GetText(), "changed value" );
+}
+
+#if defined( __linux__ ) || defined( _WIN32 )
+BOOST_FIXTURE_TEST_CASE( ProbePlacementSupportsFloatingSymbolsWithRealTerminals, PROJECT_PAGES_FIXTURE )
+{
+    using namespace CIRCUITALIVE;
+    SCH_SHEET_PATH path;
+    path.push_back( first );
+    const VECTOR2I position( schIUScale.mmToIU( 50 ), schIUScale.mmToIU( 50 ) );
+    for( auto kind : { PROBE_KIND::VOLTAGE, PROBE_KIND::CURRENT, PROBE_KIND::POWER, PROBE_KIND::OSCILLOSCOPE,
+                       PROBE_KIND::LOGIC, PROBE_KIND::PWM, PROBE_KIND::SINE, PROBE_KIND::SQUARE } )
+    {
+        auto plan = PlanProbePlacement( *first->GetScreen(), position, 1, kind, &path, true );
+        BOOST_CHECK( !plan.wire && !plan.pin );
+        BOOST_CHECK( plan.anchor == position );
+        auto probe = MakeProbeSymbol( kind, path, plan.anchor, plan.vertical, 1, "test" );
+        probe->SetParent( first->GetScreen() );
+        const bool series = kind == PROBE_KIND::CURRENT || kind == PROBE_KIND::POWER;
+        BOOST_CHECK_EQUAL( probe->GetPins( &path ).size(), series ? 2u : 1u );
+        if( series )
+        {
+            BOOST_CHECK( plan.first != plan.second );
+            for( auto* pin : probe->GetPins( &path ) )
+                BOOST_CHECK( pin->GetPosition() == plan.first || pin->GetPosition() == plan.second );
+        }
+        else
+            BOOST_CHECK( probe->GetPins( &path ).front()->GetPosition() == position );
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( FloatingProbesRetainDirectWireAndSeriesSafetyRules, PROJECT_PAGES_FIXTURE )
+{
+    using namespace CIRCUITALIVE;
+    SCH_SHEET_PATH path;
+    path.push_back( first );
+    const int mm = schIUScale.mmToIU( 1 );
+    auto* wire = new SCH_LINE( VECTOR2I( 10 * mm, 20 * mm ), LAYER_WIRE );
+    wire->SetEndPoint( VECTOR2I( 30 * mm, 20 * mm ) );
+    first->GetScreen()->Append( wire );
+    auto plan = PlanProbePlacement( *first->GetScreen(), VECTOR2I( 20 * mm, 20 * mm ), 1,
+                                    PROBE_KIND::CURRENT, &path, true );
+    BOOST_CHECK( plan.wire == wire );
+    BOOST_CHECK( plan.first == plan.anchor - VECTOR2I( schIUScale.mmToIU( 1.27 ), 0 ) );
+    BOOST_CHECK( plan.second == plan.anchor + VECTOR2I( schIUScale.mmToIU( 1.27 ), 0 ) );
+    BOOST_CHECK_THROW( PlanProbePlacement( *first->GetScreen(), wire->GetStartPoint(), 1,
+                       PROBE_KIND::CURRENT, &path, true ), std::runtime_error );
+    auto floating = PlanProbePlacement( *first->GetScreen(), VECTOR2I( 20 * mm, 40 * mm ), 1,
+                                        PROBE_KIND::CURRENT, &path, true );
+    BOOST_CHECK( !floating.wire );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProbePlacementPreservesRotationAndConnectsSeriesTerminalsToTheWire, PROJECT_PAGES_FIXTURE )
+{
+    using namespace CIRCUITALIVE;
+    SCH_SHEET_PATH path;
+    path.push_back( first );
+    const int mm = schIUScale.mmToIU( 1 );
+    const VECTOR2I position( 50 * mm, 50 * mm );
+    for( auto kind : { PROBE_KIND::VOLTAGE, PROBE_KIND::CURRENT, PROBE_KIND::POWER, PROBE_KIND::OSCILLOSCOPE,
+                       PROBE_KIND::LOGIC, PROBE_KIND::PWM, PROBE_KIND::SINE, PROBE_KIND::SQUARE } )
+    for( int turns = 0; turns < 4; ++turns )
+    {
+        auto preview = MakeProbeSymbol( kind, path, position, false, 1, "clock" );
+        for( int i = 0; i < turns; ++i ) preview->Rotate( position, true );
+        const auto transform = preview->GetTransform();
+        auto floating = PlanProbePlacement( *first->GetScreen(), position + VECTOR2I( 0, 10 * mm ),
+                                            1, kind, &path, true );
+        auto placed = std::make_unique<SCH_SYMBOL>( *preview );
+        AlignProbeForPlacement( *placed, floating );
+        BOOST_CHECK( placed->GetTransform() == transform );
+        BOOST_CHECK( placed->GetPosition() == floating.anchor );
+        for( auto* pin : placed->GetPins( &path ) )
+            BOOST_CHECK( ( pin->GetPosition() - placed->GetPosition() ).EuclideanNorm()
+                         == ( preview->GetPins( &path ).front()->GetPosition() - position ).EuclideanNorm() );
+        if( kind != PROBE_KIND::CURRENT && kind != PROBE_KIND::POWER ) continue;
+        for( bool vertical : { false, true } )
+        {
+            SCH_LINE wire( position, LAYER_WIRE );
+            PROBE_PLACEMENT plan;
+            plan.wire = &wire; plan.anchor = position; plan.vertical = vertical;
+            const VECTOR2I delta = vertical ? VECTOR2I( 0, schIUScale.mmToIU( 1.27 ) )
+                                            : VECTOR2I( schIUScale.mmToIU( 1.27 ), 0 );
+            AlignProbeForPlacement( *placed, plan );
+            const auto pins = placed->GetPins( &path );
+            BOOST_REQUIRE_EQUAL( pins.size(), 2u );
+            BOOST_CHECK( pins[0]->GetPosition() != pins[1]->GetPosition() );
+            for( auto* pin : pins )
+                BOOST_CHECK( pin->GetPosition() == position - delta || pin->GetPosition() == position + delta );
+        }
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( ProbesOnPinsPointAwayFromTheComponentAndFitAdjacentPinSpacing, PROJECT_PAGES_FIXTURE )
+{
+    using namespace CIRCUITALIVE;
+    SCH_SHEET_PATH path; path.push_back( first );
+    LIB_SYMBOL lib( "PinDirection" );
+    auto* terminal = new SCH_PIN( &lib );
+    terminal->SetNumber( "1" ); terminal->SetUnit( 1 ); terminal->SetBodyStyle( 1 );
+    terminal->SetPosition( VECTOR2I( -schIUScale.mmToIU( 5.08 ), 0 ) );
+    terminal->SetLength( schIUScale.mmToIU( 2.54 ) ); lib.AddDrawItem( terminal );
+    SCH_SYMBOL component( lib, LIB_ID( "Test", "PinDirection" ), &path, 1, 1,
+                          VECTOR2I( schIUScale.mmToIU( 40 ), schIUScale.mmToIU( 40 ) ), schematic.get() );
+    for( int rotation : { SYM_ORIENT_0, SYM_ORIENT_90, SYM_ORIENT_180, SYM_ORIENT_270 } )
+    for( int mirror : std::vector<int>{ 0, SYM_MIRROR_X, SYM_MIRROR_Y } )
+    for( auto kind : { PROBE_KIND::LOGIC, PROBE_KIND::PWM, PROBE_KIND::SINE, PROBE_KIND::SQUARE,
+                       PROBE_KIND::VOLTAGE, PROBE_KIND::OSCILLOSCOPE } )
+    {
+        component.SetOrientation( rotation + mirror );
+        auto* pin = component.GetPins( &path ).front();
+        PROBE_PLACEMENT plan; plan.pin = pin; plan.anchor = pin->GetPosition();
+        auto probe = MakeProbeSymbol( kind, path, plan.anchor, false, 1, "" );
+        AlignProbeForPlacement( *probe, plan );
+        const auto outward = pin->GetPosition() - pin->GetPinRoot();
+        const auto body = probe->GetBodyBoundingBox().GetCenter() - plan.anchor;
+        BOOST_CHECK_GT( double( body.x ) * outward.x + double( body.y ) * outward.y, 0 );
+        BOOST_CHECK( probe->GetPins( &path ).front()->GetPosition() == plan.anchor );
+        if( !IsSourceProbe( kind ) ) continue;
+        const auto box = probe->GetBodyBoundingBox();
+        const auto textBox = probe->GetField( "CA.ProbeState" )->GetBoundingBox();
+        const int pitch = schIUScale.mmToIU( 2.54 );
+        BOOST_CHECK_LE( outward.x ? box.GetHeight() : box.GetWidth(), pitch );
+        BOOST_CHECK_LE( outward.x ? textBox.GetHeight() : textBox.GetWidth(), pitch );
+        BOOST_CHECK( box.Contains( probe->GetField( "CA.ProbeState" )->GetPosition() ) );
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( LegacyProbeArtworkBecomesCompactWithoutChangingItsIdentityOrSettings, PROJECT_PAGES_FIXTURE )
+{
+    using namespace CIRCUITALIVE;
+    SCH_SHEET_PATH path; path.push_back( first );
+    SOURCE_PROBE_SETTINGS settings; settings.frequency = 123; settings.initialHigh = true;
+    auto probe = MakeProbeSymbol( PROBE_KIND::LOGIC, path,
+            VECTOR2I( schIUScale.mmToIU( 40 ), schIUScale.mmToIU( 40 ) ), false, 7, "debug", settings );
+    probe->RemoveField( "CA.ProbeAppearance" );
+    auto* oldBody = new SCH_SHAPE( SHAPE_T::RECTANGLE, LAYER_DEVICE );
+    oldBody->SetStart( VECTOR2I( schIUScale.mmToIU( -5 ), schIUScale.mmToIU( -1.8 ) ) );
+    oldBody->SetEnd( VECTOR2I( 0, schIUScale.mmToIU( 1.8 ) ) );
+    oldBody->SetUnit( 1 ); oldBody->SetBodyStyle( 1 );
+    probe->GetLibSymbolRef()->AddDrawItem( oldBody );
+    probe->GetField( "CA.ProbeState" )->SetPosition( VECTOR2I( 0, 0 ) );
+    const auto uuid = probe->m_Uuid;
+    const auto json = probe->GetField( "CA.ProbeSettings" )->GetText();
+    auto* placed = probe.release(); first->GetScreen()->Append( placed );
+    BOOST_CHECK_GT( placed->GetBodyBoundingBox().GetHeight(), schIUScale.mmToIU( 3 ) );
+    NormalizeSourceProbeSymbols( *schematic );
+    BOOST_CHECK( placed->m_Uuid == uuid );
+    BOOST_CHECK_EQUAL( placed->GetRef( &path ), "#P7" );
+    BOOST_CHECK_EQUAL( placed->GetField( FIELD_T::VALUE )->GetText(), "debug" );
+    BOOST_CHECK_EQUAL( placed->GetField( "CA.ProbeSettings" )->GetText(), json );
+    BOOST_CHECK_LE( placed->GetBodyBoundingBox().GetHeight(), schIUScale.mmToIU( 2.54 ) );
+    BOOST_CHECK( placed->GetBodyBoundingBox().Contains( placed->GetField( "CA.ProbeState" )->GetPosition() ) );
+    BOOST_CHECK_EQUAL( placed->GetField( "CA.ProbeAppearance" )->GetText(), SOURCE_PROBE_APPEARANCE );
+    NormalizeSourceProbeSymbols( *schematic );
+    BOOST_CHECK_EQUAL( NextProbeSequence( *schematic ), 8u );
+}
+
+BOOST_FIXTURE_TEST_CASE( BatchCopiedProbesReceiveNewIdentitiesForEveryInstrumentKind, PROJECT_PAGES_FIXTURE )
+{
+    using namespace CIRCUITALIVE;
+    SCH_SHEET_PATH path; path.push_back( first );
+    std::set<SCH_SYMBOL*> copies;
+    std::vector<SCH_SYMBOL*> originals;
+    std::size_t index = 14;
+    for( auto kind : { PROBE_KIND::LOGIC, PROBE_KIND::PWM, PROBE_KIND::SINE, PROBE_KIND::SQUARE,
+                       PROBE_KIND::VOLTAGE, PROBE_KIND::CURRENT, PROBE_KIND::POWER, PROBE_KIND::OSCILLOSCOPE } )
+    {
+        auto original = MakeProbeSymbol( kind, path, VECTOR2I( index * 10000, 0 ), false, index++, "Debug" );
+        auto* copy = static_cast<SCH_SYMBOL*>( original->Duplicate( IGNORE_PARENT_GROUP ) );
+        BOOST_CHECK( copy->m_Uuid != original->m_Uuid );
+        copy->Move( VECTOR2I( 0, 10000 ) ); copies.insert( copy );
+        originals.push_back( original.get() );
+        first->GetScreen()->Append( original.release() ); first->GetScreen()->Append( copy );
+    }
+    EnsureUniqueProbeIdentities( *schematic, copies );
+    std::set<wxString> references, sequences;
+    for( auto* item : first->GetScreen()->Items().OfType( SCH_SYMBOL_T ) )
+    {
+        auto* symbol = static_cast<SCH_SYMBOL*>( item );
+        BOOST_CHECK( references.insert( symbol->GetRef( &path ) ).second );
+        BOOST_CHECK( sequences.insert( symbol->GetField( "CA.ProbeSequence" )->GetText() ).second );
+        BOOST_CHECK_EQUAL( symbol->GetField( FIELD_T::VALUE )->GetText(), "Debug" );
+    }
+    index = 14;
+    for( auto* original : originals )
+        BOOST_CHECK_EQUAL( original->GetRef( &path ), wxString::Format( "#P%zu", index++ ) );
+    BOOST_CHECK_EQUAL( references.size(), 16u );
+    BOOST_CHECK_EQUAL( NextProbeSequence( *schematic ), 30u );
+}
+
+BOOST_FIXTURE_TEST_CASE( ExistingProbeCollisionsAreRepairedAcrossPagesWithoutReannotatingComponents, PROJECT_PAGES_FIXTURE )
+{
+    using namespace CIRCUITALIVE;
+    SCH_SHEET_PATH a, b; a.push_back( first ); b.push_back( second );
+    auto one = MakeProbeSymbol( PROBE_KIND::LOGIC, a, VECTOR2I( 0, 0 ), false, 14, "A" );
+    auto two = MakeProbeSymbol( PROBE_KIND::VOLTAGE, b, VECTOR2I( 0, 0 ), false, 14, "B" );
+    auto missing = MakeProbeSymbol( PROBE_KIND::OSCILLOSCOPE, b, VECTOR2I( 10000, 0 ), false, 99, "C" );
+    missing->RemoveField( "CA.ProbeSequence" );
+    first->GetScreen()->Append( one.release() ); second->GetScreen()->Append( two.release() );
+    second->GetScreen()->Append( missing.release() );
+    LIB_SYMBOL lib( "R" );
+    auto* componentA = new SCH_SYMBOL( lib, LIB_ID( "Device", "R" ), &a, 1, 1, VECTOR2I( 0, 0 ) );
+    auto* componentB = new SCH_SYMBOL( lib, LIB_ID( "Device", "R" ), &b, 1, 1, VECTOR2I( 0, 0 ) );
+    componentA->SetRef( &a, "R1" ); componentB->SetRef( &b, "R1" );
+    first->GetScreen()->Append( componentA ); second->GetScreen()->Append( componentB );
+    BOOST_CHECK_EQUAL( NextProbeSequence( *schematic ), 100u );
+    EnsureUniqueProbeIdentities( *schematic );
+    std::set<wxString> references, sequences;
+    for( auto& sheet : schematic->Hierarchy() )
+        for( auto* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
+        {
+            auto* symbol = static_cast<SCH_SYMBOL*>( item );
+            if( !symbol->GetField( "CA.Probe" ) ) continue;
+            BOOST_CHECK( references.insert( symbol->GetRef( &sheet ) ).second );
+            BOOST_CHECK( sequences.insert( symbol->GetField( "CA.ProbeSequence" )->GetText() ).second );
+        }
+    BOOST_CHECK_EQUAL( references.size(), 3u );
+    BOOST_CHECK_EQUAL( componentA->GetRef( &a ), "R1" ); BOOST_CHECK_EQUAL( componentB->GetRef( &b ), "R1" );
+    const auto next = NextProbeSequence( *schematic );
+    EnsureUniqueProbeIdentities( *schematic );
+    BOOST_CHECK_EQUAL( NextProbeSequence( *schematic ), next );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProbeFieldsBelongToTheProbeAndSettingsRemainEditable, PROJECT_PAGES_FIXTURE )
+{
+    using namespace CIRCUITALIVE;
+    SCH_SHEET_PATH path;
+    path.push_back( first );
+    SOURCE_PROBE_SETTINGS settings;
+    settings.frequency = 10;
+    auto probe = MakeProbeSymbol( PROBE_KIND::PWM, path, VECTOR2I( 0, 0 ), false, 1, "clock", settings );
+    BOOST_CHECK( ProbeSymbolForItem( probe->GetField( "CA.ProbeState" ) ) == probe.get() );
+    BOOST_CHECK( ProbeSymbolForItem( probe->GetField( FIELD_T::VALUE ) ) == probe.get() );
+    BOOST_CHECK( ProbeSymbolForItem( probe->GetPins( &path ).front() ) == probe.get() );
+    settings = ReadSourceProbeSettings( *probe );
+    BOOST_CHECK_EQUAL( settings.frequency, 10.0 );
+    settings.frequency = 123;
+    settings.duty = .25;
+    WriteSourceProbeSettings( *probe, PROBE_KIND::PWM, settings );
+    const auto edited = ReadSourceProbeSettings( *probe );
+    BOOST_CHECK_EQUAL( edited.frequency, 123.0 );
+    BOOST_CHECK_EQUAL( edited.duty, .25 );
+    first->GetScreen()->Append( probe.release() );
+    BOOST_CHECK_EQUAL( NextProbeSequence( *schematic ), 2u );
+    SCH_SYMBOL ordinary;
+    BOOST_CHECK( !ProbeSymbolForItem( ordinary.GetField( FIELD_T::VALUE ) ) );
+}
+#endif
 
 BOOST_FIXTURE_TEST_CASE( UsedComponentsReflectCurrentPageAndType, PROJECT_PAGES_FIXTURE )
 {

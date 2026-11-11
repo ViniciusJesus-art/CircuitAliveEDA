@@ -805,6 +805,21 @@ int KICAD_MANAGER_CONTROL::ShowPlayer( const TOOL_EVENT& aEvent )
                 filepath = kicad_schematic.GetFullPath();
             else
                 filepath = legacy_schematic.GetFullPath();
+
+            // A multi-page project need not contain a <project>.kicad_sch file.
+            if( !wxFileExists( filepath ) )
+            {
+                for( const auto& page : Prj().GetProjectFile().GetTopLevelSheets() )
+                {
+                    wxFileName candidate( page.filename );
+                    candidate.MakeAbsolute( Prj().GetProjectPath() );
+                    if( candidate.FileExists() )
+                    {
+                        filepath = candidate.GetFullPath();
+                        break;
+                    }
+                }
+            }
         }
         else if( playerType == FRAME_PCB_EDITOR )
         {

@@ -428,7 +428,7 @@
       "address_bits": 15,
       "word_bits": 8,
       "writable": true,
-      "fill": -1
+      "fill": 0
     }
   ]
 }

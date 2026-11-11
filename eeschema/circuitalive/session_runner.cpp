@@ -11,6 +11,18 @@
 
 namespace CIRCUITALIVE
 {
+std::chrono::steady_clock::time_point NextPlaybackDeadline(
+        std::chrono::steady_clock::time_point previous,
+        std::chrono::steady_clock::time_point now,
+        std::chrono::steady_clock::duration interval )
+{
+    const auto deadline = previous + interval;
+    // Keep the normal cadence, but discard accumulated wall-clock lag after a
+    // slow startup/batch. Replaying overdue frames at full CPU speed makes a
+    // low-frequency clock visibly accelerate until an interaction resets it.
+    return deadline > now ? deadline : now + interval;
+}
+
 std::string FindSessionWorker( const std::string& aApplicationExecutable )
 {
     namespace fs = std::filesystem;
@@ -53,6 +65,7 @@ void SESSION_RUNNER::Start( CIRCUIT_SNAPSHOT aCircuit )
     m_commands.clear();
     m_commands.push_back( { COMMAND_TYPE::START, m_revision, std::move( aCircuit ), 0, m_speed, m_preferences } );
     m_view = {};
+    m_view.sessionRevision = m_revision;
     m_view.state = EDITOR_SESSION_STATE::PREPARING;
     m_view.speed = m_speed;
     m_view.preferences = m_preferences;
@@ -67,6 +80,7 @@ void SESSION_RUNNER::enqueue( COMMAND_TYPE aType, std::size_t aIndex )
         ++m_revision;
         m_commands.clear();
         m_view = {};
+        m_view.sessionRevision = m_revision;
         m_view.speed = m_speed;
         m_view.preferences = m_preferences;
     }
@@ -82,7 +96,15 @@ void SESSION_RUNNER::Resume() { enqueue( COMMAND_TYPE::RESUME ); }
 void SESSION_RUNNER::Pause() { enqueue( COMMAND_TYPE::PAUSE ); }
 void SESSION_RUNNER::Stop() { enqueue( COMMAND_TYPE::STOP ); }
 void SESSION_RUNNER::ToggleSwitch( std::size_t aIndex ) { enqueue( COMMAND_TYPE::TOGGLE, aIndex ); }
-void SESSION_RUNNER::CaptureMemory(std::size_t region) { enqueue(COMMAND_TYPE::MEMORY,region); }
+std::uint64_t SESSION_RUNNER::CaptureMemory( std::size_t region )
+{
+    std::lock_guard lock( m_mutex );
+    if( m_commands.size() >= 128 ) return 0;
+    const auto request = ++m_memoryRequest;
+    m_commands.push_back( { COMMAND_TYPE::MEMORY, m_revision, {}, region, 0, {}, request } );
+    m_wake.notify_one();
+    return request;
+}
 void SESSION_RUNNER::Step() { enqueue( COMMAND_TYPE::STEP ); }
 
 void SESSION_RUNNER::SetSpeed( double value )
@@ -204,6 +226,13 @@ void SESSION_RUNNER::run()
                     session->Configure( circuit.netlist, circuit.config );
                     session->AdvanceTo( circuit.config.step );
                     view = {};
+                    for( const auto& region : circuit.memories )
+                    {
+                        const auto& config = circuit.config.memories.at( region.slot );
+                        view.memoryRegions.push_back( { region.reference, region.id,
+                            config.id, region.slot,
+                            std::make_shared<MEMORY_SNAPSHOT>( MEMORY_SNAPSHOT{ config.id, 0, config.initial } ) } );
+                    }
                     for( const auto& channel : circuit.measurements ) if( channel.scope )
                     {
                         auto projected = channel;
@@ -229,6 +258,7 @@ void SESSION_RUNNER::run()
                     next = std::chrono::steady_clock::now();
                     break;
                 case COMMAND_TYPE::PAUSE:
+                    if( running ) ++view.pauseSequence;
                     running = false; // AdvanceTo has already confirmed a quiescent solver.
                     if( session && view.sample.state != SIM_SESSION_STATE::COMPLETED )
                         view.state = EDITOR_SESSION_STATE::PAUSED;
@@ -281,7 +311,6 @@ void SESSION_RUNNER::run()
                     next = std::chrono::steady_clock::now() + preferences.FrameInterval();
                     break;
                 case COMMAND_TYPE::MEMORY:
-                    running = false;
                     view.memory.reset();
                     view.memoryError.clear();
                     ++view.memorySequence;
@@ -290,6 +319,13 @@ void SESSION_RUNNER::run()
                         if( !session || command.index >= circuit.config.memories.size() )
                             throw std::runtime_error( "No active memory for this component" );
                         const auto& region = circuit.config.memories.at( command.index );
+                        auto& capture = view.memoryCaptures[region.id];
+                        capture = { command.request, view.pauseSequence, {}, {} };
+                        if( running )
+                        {
+                            capture.error = view.memoryError = "Pause the simulation to inspect memory";
+                            break;
+                        }
                         auto snapshot = std::make_shared<MEMORY_SNAPSHOT>();
                         snapshot->id = region.id;
                         const auto size = region.initial.data.size();
@@ -305,11 +341,15 @@ void SESSION_RUNNER::run()
                             snapshot->image.known.insert( snapshot->image.known.end(), page.image.known.begin(),
                                                           page.image.known.end() );
                         }
-                        view.memory = std::move( snapshot );
+                        view.memory = snapshot;
+                        capture.snapshot = std::move( snapshot );
                     }
                     catch( const std::exception& e )
                     {
                         view.memoryError = e.what();
+                        if( command.index < circuit.config.memories.size() )
+                            view.memoryCaptures[circuit.config.memories[command.index].id] =
+                                { command.request, view.pauseSequence, {}, view.memoryError };
                     }
                     break;
                 case COMMAND_TYPE::STEP:
@@ -318,6 +358,7 @@ void SESSION_RUNNER::run()
                         session->AdvanceTo( std::min( view.sample.latest.time + preferences.stepMs * .001 * speed,
                                                      circuit.config.horizon ) );
                         view.sample = session->Snapshot( true );
+                        ++view.pauseSequence;
                     }
                     break;
                 }
@@ -344,14 +385,16 @@ void SESSION_RUNNER::run()
                 if( view.sample.state == SIM_SESSION_STATE::FAILED )
                     throw std::runtime_error( view.sample.error );
                 running = view.sample.state != SIM_SESSION_STATE::COMPLETED;
-                // Keep an absolute schedule: solver work, publication and OS wake
-                // latency all belong inside the budget. Catch up without skipping
-                // simulated time if a frame finishes late.
-                next += std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                        std::chrono::duration<double>( advance / speed ) );
+                // Solver work belongs inside the frame budget. If a whole frame
+                // is missed, resume at the requested speed without a catch-up burst.
+                next = NextPlaybackDeadline( next, std::chrono::steady_clock::now(),
+                        std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                std::chrono::duration<double>( advance / speed ) ) );
             }
             if( session )
             {
+                if( view.sample.state == SIM_SESSION_STATE::COMPLETED && view.state != EDITOR_SESSION_STATE::COMPLETED )
+                    ++view.pauseSequence;
                 view.state = view.sample.state == SIM_SESSION_STATE::COMPLETED
                         ? EDITOR_SESSION_STATE::COMPLETED
                         : running ? EDITOR_SESSION_STATE::RUNNING : EDITOR_SESSION_STATE::PAUSED;
@@ -369,7 +412,9 @@ void SESSION_RUNNER::run()
                 for( const auto& warning : circuit.currentWarnings ) warn( warning.name, warning.limit, warning.signal );
                 for( const auto& led : circuit.leds )
                     if( led.ratedCurrent > 0 ) warn( led.reference.empty() ? "LED" : led.reference, led.ratedCurrent, led.signal );
-                view.warnings.clear();
+                // Contention is a live, non-modal diagnostic. Clear it as soon
+                // as the bus is released, without pausing or altering the solver.
+                view.warnings = view.contentionWarnings;
                 if( preferences.warnOvercurrent )
                     for( const auto& [name, warning] : latchedWarnings ) view.warnings.push_back( warning );
                 std::set<std::size_t> checkedSupplies;
@@ -407,6 +452,7 @@ void SESSION_RUNNER::run()
         {
             std::lock_guard lock( m_mutex );
             view.speed = speed;
+            view.sessionRevision = revision;
             view.preferences = preferences;
             if( revision == m_revision )
                 m_view = view;

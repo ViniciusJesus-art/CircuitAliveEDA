@@ -501,6 +501,8 @@ wxTreeItemId PROJECT_TREE_PANE::addItemToProjectTree( const wxString& aName,
 
     wxString   file = wxFileNameFromPath( aName );
     wxFileName currfile( file );
+    if( currfile.GetFullName().StartsWith( "_autosave-" ) )
+        return wxTreeItemId();
     wxFileName project( m_Parent->GetProjectFileName() );
     bool       showAllSchematics = m_TreeProject->GetGitRepo() != nullptr;
 
@@ -511,8 +513,9 @@ wxTreeItemId PROJECT_TREE_PANE::addItemToProjectTree( const wxString& aName,
         return wxTreeItemId();
     }
 
-    if( !showAllSchematics && ( currfile.GetExt() == GetFileExt( TREE_FILE_TYPE::LEGACY_SCHEMATIC )
-                                || currfile.GetExt() == GetFileExt( TREE_FILE_TYPE::SEXPR_SCHEMATIC ) ) )
+    // Native schematics can be top-level pages of this project even when their
+    // filename differs from the project. Apply the old name filter to legacy files only.
+    if( !showAllSchematics && currfile.GetExt() == GetFileExt( TREE_FILE_TYPE::LEGACY_SCHEMATIC ) )
     {
         if( aProjectNames )
         {
@@ -1428,6 +1431,10 @@ void PROJECT_TREE_PANE::onFileSystemEvent( wxFileSystemWatcherEvent& event )
 
     switch( event.GetChangeType() )
     {
+    case wxFSW_EVENT_MODIFY:
+        if( pathModified.GetExt() != FILEEXT::KiCadSchematicFileExtension )
+            return;
+        KI_FALLTHROUGH;
     case wxFSW_EVENT_CREATE:
     {
         wxTreeItemId newitem = addItemToProjectTree( fn, root_id, nullptr, true );

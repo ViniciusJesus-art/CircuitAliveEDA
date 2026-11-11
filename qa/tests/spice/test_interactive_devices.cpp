@@ -117,7 +117,7 @@ BOOST_AUTO_TEST_CASE( FloatingDigitalInputIsZAndIndeterminateVoltageIsX )
     c = BuildCircuitSnapshot( parts, {}, true ); sample = RunDevice( c );
     BOOST_CHECK( PinLogicLevel( Pin( c, "U1", "1" ), sample ) == LOGIC_LEVEL::UNKNOWN );
 }
-BOOST_AUTO_TEST_CASE( UnpoweredOutputIsZEvenWithExternalPullup )
+BOOST_AUTO_TEST_CASE( UnpoweredOutputReleasesThePulledUpNet )
 {
     auto parts = LogicCircuit(); parts[0].value = "0";
     parts.push_back( { "V2", "Simulation_SPICE:VDC", "5", { { "1", "pullup" }, { "2", "gnd" } } } );
@@ -125,7 +125,9 @@ BOOST_AUTO_TEST_CASE( UnpoweredOutputIsZEvenWithExternalPullup )
     auto c = BuildCircuitSnapshot( parts, {}, true ); const auto sample = RunDevice( c );
     const auto& output = Pin( c, "U1", "3" );
     BOOST_CHECK_GT( sample.values.at( output.voltage ), 4.9 );
-    BOOST_CHECK( PinLogicLevel( output, sample ) == LOGIC_LEVEL::HIGH_Z );
+    BOOST_CHECK( PinDriveLevel( output, sample ) == LOGIC_LEVEL::HIGH_Z );
+    // No valid local supply exists for interpreting the externally applied 5 V.
+    BOOST_CHECK( PinLogicLevel( output, sample ) == LOGIC_LEVEL::UNKNOWN );
 }
 BOOST_AUTO_TEST_CASE( Hc00PropagationDelayRunsInsideSolverAtNanosecondResolution )
 {
@@ -143,7 +145,7 @@ BOOST_AUTO_TEST_CASE( Hc00PropagationDelayRunsInsideSolverAtNanosecondResolution
     BOOST_CHECK( PinLogicLevel( Pin( c, "U1", "3" ), session.Snapshot().latest ) == LOGIC_LEVEL::LOW );
 }
 
-BOOST_AUTO_TEST_CASE( Hc125DisabledOutputIsZWhilePulledUpInputReadsOne )
+BOOST_AUTO_TEST_CASE( Hc125DisabledOutputReadsTheSamePulledUpLevelAsItsReceiver )
 {
     auto parts = LogicCircuit();
     parts[1].libraryId = "74xx:74HC125"; parts[1].value = "74HC125";
@@ -154,7 +156,8 @@ BOOST_AUTO_TEST_CASE( Hc125DisabledOutputIsZWhilePulledUpInputReadsOne )
     parts.push_back( receiver );
     parts.push_back( { "R1", "Device:R", "10k", { { "1", "vcc" }, { "2", "out" } } } );
     auto c = BuildCircuitSnapshot( parts, {}, true ); auto sample = RunDevice( c );
-    BOOST_CHECK( PinLogicLevel( Pin( c, "U1", "3" ), sample ) == LOGIC_LEVEL::HIGH_Z );
+    BOOST_CHECK( PinDriveLevel( Pin( c, "U1", "3" ), sample ) == LOGIC_LEVEL::HIGH_Z );
+    BOOST_CHECK( PinLogicLevel( Pin( c, "U1", "3" ), sample ) == LOGIC_LEVEL::HIGH );
     BOOST_CHECK( PinLogicLevel( Pin( c, "U2", "1" ), sample ) == LOGIC_LEVEL::HIGH );
     BOOST_CHECK( PinLogicLevel( Pin( c, "U2", "3" ), sample ) == LOGIC_LEVEL::LOW );
     parts[1].pins["1"] = "gnd";

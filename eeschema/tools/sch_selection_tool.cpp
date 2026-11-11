@@ -66,7 +66,8 @@
 #include <view/view.h>
 #include <view/view_controls.h>
 #include <wx/log.h>
-#include <circuitalive/right_click_gesture.h>
+#include <tool/right_click_gesture.h>
+#include <circuitalive/probe_symbol.h>
 
 #include "symb_transforms_utils.h"
 
@@ -507,6 +508,12 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
     // Main loop: keep receiving events
     while( TOOL_EVENT* evt = Wait() )
     {
+        if( evt->IsActivate() )
+        {
+            if( auto* editor = dynamic_cast<SCH_EDIT_FRAME*>( m_frame ) )
+                CIRCUITALIVE::HandleUsedSymbolToolActivation( editor, *evt );
+        }
+
         const bool deferredContext = evt->Matches( CIRCUITALIVE::RIGHT_CLICK_GESTURE::ContextEvent() );
 
         if( deferredContext )
@@ -1498,6 +1505,24 @@ bool SCH_SELECTION_TOOL::CollectHits( SCH_COLLECTOR& aCollector, const VECTOR2I&
     else
     {
         aCollector.Collect( m_frame->GetScreen(), aScanTypes, aWhere, m_unit, m_bodyStyle );
+
+        // A probe's visible name/state belongs to the whole probe. Preserve field-only
+        // queries used by explicit field commands, which expect SCH_FIELD results.
+        if( alg::contains( aScanTypes, SCH_SYMBOL_T ) || alg::contains( aScanTypes, SCH_LOCATE_ANY_T ) )
+        {
+            for( int i = aCollector.GetCount() - 1; i >= 0; --i )
+            {
+                if( aCollector[i]->Type() == SCH_FIELD_T || aCollector[i]->Type() == SCH_PIN_T )
+                {
+                    if( SCH_SYMBOL* probe = CIRCUITALIVE::ProbeSymbolForItem( aCollector[i] ) )
+                    {
+                        aCollector.Remove( i );
+                        if( !aCollector.HasItem( probe ) )
+                            aCollector.Append( probe );
+                    }
+                }
+            }
+        }
 
         // If pins are disabled in the filter, they will be removed later.  Let's add the parent
         // so that people can use pins to select symbols in this case.
@@ -2618,9 +2643,15 @@ void SCH_SELECTION_TOOL::SelectMultiple( KIGFX::PREVIEW::SELECTION_AREA& aArea, 
 
     for( SCH_ITEM* item : uniqueCandidates )
     {
-        if( Selectable( item ) && ( hitTest( item ) || item->Type() == SCH_LINE_T )
+        SCH_SYMBOL* probe = m_isSymbolEditor ? nullptr : CIRCUITALIVE::ProbeSymbolForItem( item );
+        if( Selectable( probe ? probe : item ) && ( hitTest( item ) || item->Type() == SCH_LINE_T )
             && ( !containedMode || !group_items.count( item ) ) )
         {
+            if( probe )
+            {
+                if( !collector.HasItem( probe ) ) collector.Append( probe );
+                continue;
+            }
             if( item->Type() == SCH_PIN_T && !m_isSymbolEditor )
                 pinsCollector.Append( item );
             else

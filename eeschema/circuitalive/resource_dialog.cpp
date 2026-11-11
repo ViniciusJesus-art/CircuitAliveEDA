@@ -49,7 +49,14 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
         group->Add( new wxStaticText( &dialog, wxID_ANY,
                                       ModelText( resource.label ) + ( resource.required ? _(" (required)") : _(" (optional)") ) ),
                     0, wxBOTTOM, 4 );
-        auto* path = new wxTextCtrl( &dialog, wxID_ANY, wxString::FromUTF8( selected.path ) );
+        auto displayPath = std::filesystem::u8path( selected.path );
+        if( !selected.path.empty() && displayPath.is_relative() )
+            displayPath = std::filesystem::u8path( component.projectDirectory ) / displayPath;
+        auto* path = new wxTextCtrl( &dialog, wxID_ANY,
+                wxString::FromUTF8( selected.path.empty() ? "" : PathUtf8( displayPath.lexically_normal() ) ) );
+        path->SetToolTip( path->GetValue() );
+        path->SetInsertionPointEnd();
+        path->Bind( wxEVT_TEXT, [path]( wxCommandEvent& ) { path->SetToolTip( path->GetValue() ); } );
         auto* browse = new wxButton( &dialog, wxID_ANY, _( "Browse…" ) );
         auto* fileRow = new wxBoxSizer( wxHORIZONTAL );
         fileRow->Add( path, 1, wxRIGHT, 6 );
@@ -84,7 +91,10 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
                             _( "Memory data (*.bin;*.hex;*.ihex;*.camem)|*.bin;*.hex;*.ihex;*.camem|All files|*" ),
                             wxFD_OPEN | wxFD_FILE_MUST_EXIST );
                     if( picker.ShowModal() == wxID_OK )
-                        path->ChangeValue( picker.GetPath() );
+                    {
+                        path->SetValue( picker.GetPath() );
+                        path->SetInsertionPointEnd();
+                    }
                 } );
     }
     for( const auto& region : model.memories )
@@ -92,7 +102,8 @@ bool EditModelResources( wxWindow* parent, CIRCUIT_COMPONENT& component, const S
                              &dialog, wxID_ANY,
                              ModelText( region.label ) + " — " + wxString::Format(_("%zu bytes, %s"),
                                  (std::size_t(1) << region.addressBits) * ((region.wordBits + 7) / 8),
-                                 region.writable ? _("RAM; unspecified bits start X")
+                                 region.writable ? ( region.fill < 0 ? _("RAM; unspecified bits start X")
+                                     : _("RAM; initial byte 0x") + wxString::FromUTF8(MemoryHex({static_cast<std::uint8_t>(region.fill)})) )
                                      : _("read only; erased byte 0x") + wxString::FromUTF8(MemoryHex({static_cast<std::uint8_t>(region.fill)}))) ),
                      0, wxLEFT | wxRIGHT | wxBOTTOM, 10 );
     layout->Add( dialog.CreateSeparatedButtonSizer( wxOK | wxCANCEL ), 0, wxEXPAND | wxALL, 10 );

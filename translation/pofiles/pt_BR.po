@@ -84505,3 +84505,42 @@ msgstr "O ngspice não oferece armazenamento contínuo de ponto único ("
 #. CircuitAliveEDA interface and bundled simulation models.
 msgid "ngspice rejected: "
 msgstr "O ngspice rejeitou: "
+
+
+#: pcbnew/widgets/pending_footprints.cpp:153
+msgid "Select a component. Click empty PCB space to preview and place. Esc cancels."
+msgstr "Selecione um componente. Clique em uma área vazia para visualizar e posicionar. Esc cancela."
+
+#. CircuitAliveEDA live electrical diagnostic.
+msgid "Bus contention: "
+msgstr "Disputa no barramento: "
+
+msgid "Read the current paused memory again without advancing time. Updates automatically after each pause."
+msgstr "Lê novamente a memória pausada sem avançar o tempo. Atualiza automaticamente após cada pausa."
+
+msgid "Yellow = changed since the previous pause. ? = unknown bits (X). Read-only; capture does not advance time."
+msgstr "Amarelo = alterado desde a pausa anterior. ? = bits indefinidos (X). Somente leitura; capturar não avança o tempo."
+
+msgid "Simulation running — pause the simulation to view memory. The table updates automatically when paused."
+msgstr "Simulação em execução — pause para visualizar a memória. A tabela atualiza automaticamente ao pausar."
+
+msgid "Capturing paused memory…"
+msgstr "Capturando a memória pausada…"
+
+msgid "Paused snapshot — t = %.9g s; %zu bytes; %zu changed bytes"
+msgstr "Snapshot pausado — t = %.9g s; %zu bytes; %zu bytes alterados"
+
+msgid "This memory is not present in the current simulation."
+msgstr "Esta memória não está presente na simulação atual."
+
+msgid "Simulation stopped — start and pause the simulation to view memory."
+msgstr "Simulação parada — inicie e pause a simulação para visualizar a memória."
+
+msgid "Pause the simulation to inspect memory"
+msgstr "Pause a simulação para inspecionar a memória"
+
+msgid "Re-Capture"
+msgstr "Recapturar"
+
+msgid "Yellow = changed since the previous pause (first pause: initial contents). ? = unknown bits (X). Read-only; capture does not advance time."
+msgstr "Amarelo = alterado desde a pausa anterior (na primeira pausa: conteúdo inicial). ? = bits indefinidos (X). Somente leitura; capturar não avança o tempo."

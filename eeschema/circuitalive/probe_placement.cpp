@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "probe_placement.h"
+#include "probe_geometry.h"
 #include <base_units.h>
 #include <lib_symbol.h>
 #include <sch_commit.h>
@@ -15,13 +16,15 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <set>
+#include <limits>
 
 namespace CIRCUITALIVE
 {
 static bool Series( PROBE_KIND kind ) { return kind == PROBE_KIND::CURRENT || kind == PROBE_KIND::POWER; }
 
 PROBE_PLACEMENT PlanProbePlacement( SCH_SCREEN& screen, const VECTOR2I& position,
-                                   int tolerance, PROBE_KIND kind, const SCH_SHEET_PATH* sheet )
+                                   int tolerance, PROBE_KIND kind, const SCH_SHEET_PATH* sheet, bool allowFloating )
 {
     PROBE_PLACEMENT plan;
     if( !Series( kind ) ) plan.pin = FindPinConnectionAt( screen, sheet, position, tolerance );
@@ -49,9 +52,24 @@ PROBE_PLACEMENT PlanProbePlacement( SCH_SCREEN& screen, const VECTOR2I& position
         plan.vertical = root.x == target.x && root.y != target.y;
         return plan;
     }
-    if( !plan.wire ) throw std::runtime_error( Series( kind )
-            ? "Current and power probes need a wire section for their series sensor"
-            : "Click on an electrical wire or a component pin endpoint to place the probe" );
+    if( !plan.wire )
+    {
+        if( allowFloating )
+        {
+            plan.anchor = position;
+            plan.first = plan.second = position;
+            if( Series( kind ) )
+            {
+                const VECTOR2I delta( schIUScale.mmToIU( 1.27 ), 0 );
+                plan.first -= delta;
+                plan.second += delta;
+            }
+            return plan;
+        }
+        throw std::runtime_error( Series( kind )
+                ? "Current and power probes need a wire section for their series sensor"
+                : "Click on an electrical wire or a component pin endpoint to place the probe" );
+    }
     const auto start = plan.wire->GetStartPoint(), end = plan.wire->GetEndPoint();
     plan.vertical = start.x == end.x;
     plan.first = plan.second = plan.anchor;
@@ -107,14 +125,14 @@ std::unique_ptr<SCH_SYMBOL> MakeProbeSymbol( PROBE_KIND kind, SCH_SHEET_PATH& sh
         // Library symbols serialize line segments as two-point polylines.
         auto* shape = new SCH_SHAPE( SHAPE_T::POLY, LAYER_DEVICE );
         shape->SetPolyPoints( { a, b } ); shape->SetUnit( 1 ); shape->SetBodyStyle( 1 );
-        shape->SetStroke( STROKE_PARAMS( schIUScale.mmToIU( .18 ), LINE_STYLE::SOLID ) );
+        shape->SetStroke( STROKE_PARAMS( schIUScale.mmToIU( IsSourceProbe( kind ) ? SOURCE_PROBE_STROKE : .18 ), LINE_STYLE::SOLID ) );
         lib.AddDrawItem( shape );
     };
     if( IsSourceProbe( kind ) )
     {
         auto point = []( double x, double y ) { return VECTOR2I( schIUScale.mmToIU( x ), schIUScale.mmToIU( y ) ); };
-        const std::vector<VECTOR2I> points = { point(-5,-1.8), point(-1.8,-1.8), point(-.6,0),
-                                              point(-1.8,1.8), point(-5,1.8), point(-5,-1.8) };
+        std::vector<VECTOR2I> points;
+        for( auto [x, y] : SOURCE_PROBE_OUTLINE ) points.push_back( point( x, y ) );
         for( std::size_t i = 1; i < points.size(); ++i ) line( points[i-1], points[i] );
         line( point(-.6,0), {0,0} );
     }
@@ -157,7 +175,12 @@ std::unique_ptr<SCH_SYMBOL> MakeProbeSymbol( PROBE_KIND kind, SCH_SHEET_PATH& sh
         SCH_FIELD field( symbol.get(), FIELD_T::USER, wxString::FromUTF8( key ) );
         field.SetText( wxString::FromUTF8( value ) ); field.SetVisible( false ); symbol->AddField( field );
     }
-    if( IsSourceProbe( kind ) ) WriteSourceProbeSettings( *symbol, kind, settings );
+    if( IsSourceProbe( kind ) )
+    {
+        WriteSourceProbeSettings( *symbol, kind, settings );
+        SCH_FIELD appearance( symbol.get(), FIELD_T::USER, "CA.ProbeAppearance" );
+        appearance.SetText( SOURCE_PROBE_APPEARANCE ); appearance.SetVisible( false ); symbol->AddField( appearance );
+    }
     return symbol;
 }
 
@@ -180,32 +203,166 @@ void WriteSourceProbeSettings( SCH_SYMBOL& symbol, PROBE_KIND kind, const SOURCE
     if( !state )
     {
         state = symbol.AddField( SCH_FIELD( &symbol, FIELD_T::USER, "CA.ProbeState" ) );
-        state->SetPosition( symbol.GetPosition() + VECTOR2I( schIUScale.mmToIU(-3.2), 0 ) );
-        state->SetTextSize( VECTOR2I( schIUScale.mmToIU(1.1), schIUScale.mmToIU(1.1) ) );
         state->SetHorizJustify( GR_TEXT_H_ALIGN_CENTER ); state->SetVertJustify( GR_TEXT_V_ALIGN_CENTER );
     }
+    state->SetPosition( symbol.GetPosition() + symbol.GetTransform().TransformCoordinate(
+            VECTOR2I( schIUScale.mmToIU( SOURCE_PROBE_TEXT_X ), 0 ) ) );
+    const int textSize = schIUScale.mmToIU( kind == PROBE_KIND::LOGIC
+            ? SOURCE_PROBE_LOGIC_TEXT_SIZE : SOURCE_PROBE_WAVE_TEXT_SIZE );
+    state->SetTextSize( VECTOR2I( textSize, textSize ) );
     state->SetText( kind == PROBE_KIND::LOGIC ? ( settings.initialHigh ? "1" : "0" )
                     : kind == PROBE_KIND::PWM ? "PWM" : kind == PROBE_KIND::SINE ? "~" : "CLK" );
     state->SetVisible( true ); state->SetNameShown( false );
 }
 
+std::size_t NextProbeSequence( SCHEMATIC& schematic )
+{
+    std::size_t sequence = 1;
+    auto reserve = [&]( const wxString& text )
+    {
+        unsigned long long index = 0;
+        if( !text.ToULongLong( &index ) ) return;
+        if( index >= std::numeric_limits<std::size_t>::max() )
+            throw std::runtime_error( "Probe sequence is too large" );
+        sequence = std::max( sequence, std::size_t( index ) + 1 );
+    };
+    for( auto& sheet : schematic.Hierarchy() )
+        for( const auto* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
+        {
+            const auto* symbol = static_cast<const SCH_SYMBOL*>( item );
+            if( auto* field = symbol->GetField( "CA.ProbeSequence" ) ) reserve( field->GetText() );
+            const auto reference = symbol->GetRef( &sheet );
+            if( reference.StartsWith( "#P" ) ) reserve( reference.Mid( 2 ) );
+        }
+    return sequence;
+}
+
+void EnsureUniqueProbeIdentities( SCHEMATIC& schematic, const std::set<SCH_SYMBOL*>& newSymbols,
+                                  SCH_COMMIT* commit )
+{
+    std::size_t next = NextProbeSequence( schematic );
+    std::set<wxString> references;
+    std::map<unsigned long long, SCH_SYMBOL*> sequences;
+    std::set<SCH_SYMBOL*> visited, modified;
+    // Ordinary symbol references also reserve names, but are never changed here.
+    for( auto& sheet : schematic.Hierarchy() )
+        for( auto* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
+        {
+            auto* symbol = static_cast<SCH_SYMBOL*>( item );
+            if( !symbol->GetField( "CA.Probe" ) ) references.insert( symbol->GetRef( &sheet ) );
+        }
+    for( auto& sheet : schematic.Hierarchy() )
+        for( auto* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
+        {
+            auto* symbol = static_cast<SCH_SYMBOL*>( item );
+            if( !symbol->GetField( "CA.Probe" ) ) continue;
+            const auto reference = symbol->GetRef( &sheet );
+            const auto* field = symbol->GetField( "CA.ProbeSequence" );
+            unsigned long long index = 0;
+            const bool firstOccurrence = visited.insert( symbol ).second;
+            const bool validSequence = field && field->GetText().ToULongLong( &index ) && index > 0;
+            const bool repeatedSequence = validSequence && sequences.contains( index ) && sequences.at( index ) != symbol;
+            const bool fresh = newSymbols.contains( symbol ) && firstOccurrence;
+            if( fresh || reference.IsEmpty() || reference.Contains( '?' ) || references.contains( reference )
+                || ( firstOccurrence && ( !validSequence || repeatedSequence ) ) )
+            {
+                if( commit && !newSymbols.contains( symbol ) && modified.insert( symbol ).second )
+                    commit->Modify( symbol, sheet.LastScreen() );
+                if( next == std::numeric_limits<std::size_t>::max() )
+                    throw std::runtime_error( "Probe sequence is too large" );
+                index = next++;
+                symbol->SetRef( &sheet, wxString::Format( "#P%zu", std::size_t( index ) ) );
+                auto* sequence = symbol->GetField( "CA.ProbeSequence" );
+                if( !sequence ) sequence = symbol->AddField( SCH_FIELD( symbol, FIELD_T::USER, "CA.ProbeSequence" ) );
+                sequence->SetText( wxString::Format( "%zu", std::size_t( index ) ) );
+                sequence->SetVisible( false );
+            }
+            sequences[index] = symbol;
+            references.insert( symbol->GetRef( &sheet ) );
+        }
+}
+
+void NormalizeSourceProbeSymbols( SCHEMATIC& schematic )
+{
+    std::set<SCH_SCREEN*> seen;
+    for( auto& sheet : schematic.Hierarchy() )
+    {
+        auto* screen = sheet.LastScreen();
+        if( !seen.insert( screen ).second ) continue;
+        std::vector<SCH_SYMBOL*> probes;
+        for( auto* item : screen->Items().OfType( SCH_SYMBOL_T ) )
+        {
+            auto* symbol = static_cast<SCH_SYMBOL*>( item );
+            const auto* kind = symbol->GetField( "CA.Probe" );
+            const auto* appearance = symbol->GetField( "CA.ProbeAppearance" );
+            if( !kind || ( appearance && appearance->GetText() == SOURCE_PROBE_APPEARANCE ) ) continue;
+            if( kind->GetText() == "logic" || kind->GetText() == "pwm"
+                || kind->GetText() == "sine" || kind->GetText() == "square" ) probes.push_back( symbol );
+        }
+        for( auto* symbol : probes )
+        {
+            const auto kind = ParseProbeKind( symbol->GetField( "CA.Probe" )->GetText().ToStdString() );
+            SOURCE_PROBE_SETTINGS settings;
+            try { settings = ReadSourceProbeSettings( *symbol ); }
+            catch( const std::exception& ) { continue; } // Keep malformed settings editable.
+            auto prototype = MakeProbeSymbol( kind, sheet, symbol->GetPosition(),
+                    wxString( symbol->GetLibId().GetLibItemName() ).EndsWith( "_vertical" ), 1, "", settings );
+            auto lib = std::make_unique<LIB_SYMBOL>( *prototype->GetLibSymbolRef() );
+            screen->Remove( symbol );
+            symbol->SetLibSymbol( lib.release() );
+            WriteSourceProbeSettings( *symbol, kind, settings );
+            auto* appearance = symbol->GetField( "CA.ProbeAppearance" );
+            if( !appearance ) appearance = symbol->AddField( SCH_FIELD( symbol, FIELD_T::USER, "CA.ProbeAppearance" ) );
+            appearance->SetText( SOURCE_PROBE_APPEARANCE ); appearance->SetVisible( false );
+            AlignProbeForPlacement( *symbol, PlanProbePlacement( *screen, symbol->GetPosition(), 1, kind, &sheet, true ) );
+            screen->Append( symbol );
+        }
+    }
+}
+
+void AlignProbeForPlacement( SCH_SYMBOL& symbol, const PROBE_PLACEMENT& plan )
+{
+    symbol.Move( plan.anchor - symbol.GetPosition() );
+    if( plan.pin )
+    {
+        auto outward = plan.pin->GetPosition() - plan.pin->GetPinRoot();
+        if( outward == VECTOR2I( 0, 0 ) )
+            outward = plan.pin->GetPosition() - plan.pin->GetParentSymbol()->GetPosition();
+        // Use the transformed body, so both sources and measurement arrows
+        // extend away from the component rather than covering it.
+        for( int turns = 0; turns < 4; ++turns )
+        {
+            const auto body = symbol.GetBodyBoundingBox().GetCenter() - symbol.GetPosition();
+            if( double( body.x ) * outward.x + double( body.y ) * outward.y >= 1 ) break;
+            if( outward == VECTOR2I( 0, 0 ) ) break;
+            symbol.Rotate( plan.anchor, true );
+        }
+    }
+    const auto pins = symbol.GetPins();
+    if( plan.wire && pins.size() == 2
+        && ( pins[0]->GetPosition().x == pins[1]->GetPosition().x ) != plan.vertical )
+        symbol.Rotate( plan.anchor, true );
+}
+
 void PlaceProbe( SCH_EDIT_FRAME& frame, PROBE_KIND kind, const std::string& name,
-                 const VECTOR2I& position, int tolerance, const SOURCE_PROBE_SETTINGS& settings )
+                 const VECTOR2I& position, int tolerance, const SOURCE_PROBE_SETTINGS& settings,
+                 bool allowFloating, const SCH_SYMBOL* preview )
 {
     auto* screen = frame.GetScreen();
-    auto target = frame.GetNearestGridPosition( position );
+    auto target = allowFloating ? position : frame.GetNearestGridPosition( position );
     if( !Series( kind ) )
         if( const auto* pin = FindPinConnectionAt( *screen, &frame.GetCurrentSheet(), position, tolerance ) )
             target = pin->GetPosition();
-    const auto plan = PlanProbePlacement( *screen, target, tolerance, kind, &frame.GetCurrentSheet() );
-    std::size_t sequence = 1;
-    for( auto& sheet : frame.Schematic().Hierarchy() )
-        for( const auto* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
-            if( auto* field = static_cast<const SCH_SYMBOL*>( item )->GetField( "CA.ProbeSequence" ) )
-            {
-                unsigned long index = 0; field->GetText().ToULong( &index ); sequence = std::max<std::size_t>( sequence, index + 1 );
-            }
-    auto symbol = MakeProbeSymbol( kind, frame.GetCurrentSheet(), plan.anchor, plan.vertical, sequence, name, settings );
+    const auto plan = PlanProbePlacement( *screen, target, tolerance, kind, &frame.GetCurrentSheet(), allowFloating );
+    const auto sequence = NextProbeSequence( frame.Schematic() );
+    auto symbol = preview ? std::make_unique<SCH_SYMBOL>( *preview )
+                          : MakeProbeSymbol( kind, frame.GetCurrentSheet(), plan.anchor, plan.vertical, sequence, name, settings );
+    // A preview may outlive other placements. Allocate its identity again at commit.
+    symbol->SetRef( &frame.GetCurrentSheet(), wxString::Format( "#P%zu", sequence ) );
+    symbol->GetField( "CA.ProbeSequence" )->SetText( wxString::Format( "%zu", sequence ) );
+    AlignProbeForPlacement( *symbol, plan );
+    symbol->ClearFlags();
+    symbol->RunOnChildren( []( SCH_ITEM* item ) { item->ClearFlags(); }, RECURSE_MODE::RECURSE );
     auto* wire = plan.wire;
     SCH_COMMIT commit( &frame );
     if( wire )

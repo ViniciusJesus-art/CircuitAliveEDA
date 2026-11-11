@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "property_stamp.h"
+#include <circuitalive/choice_controls.h>
 #include <tools/sch_actions.h>
 #include <tools/sch_tool_base.h>
 #include <tools/sch_tool_utils.h>
@@ -23,7 +24,6 @@
 #include <status_popup.h>
 #include <string_utils.h>
 #include <wx/checkbox.h>
-#include <wx/choice.h>
 #include <wx/msgdlg.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
@@ -89,7 +89,8 @@ public:
             form->Add( new wxStaticText( this, wxID_ANY, name ), 0, wxALIGN_CENTER_VERTICAL );
             form->Add( control, 1, wxEXPAND );
         };
-        m_property = new wxChoice( this, wxID_ANY );
+        m_property = new CLICK_CHOICE( this, wxID_ANY );
+        m_property->SetPopupMaxHeight( FromDIP( 300 ) );
         for( const auto& choice : m_choices ) m_property->Append( choice.label );
         m_property->SetSelection( 0 );
         for( std::size_t i = 0; i < m_choices.size(); ++i )
@@ -109,7 +110,7 @@ public:
         m_create->SetValue( settings.createFields ); row( "", m_create );
         m_wireLabels = new wxCheckBox( this, wxID_ANY, _( "Create labels on wires or pin endpoints" ) );
         m_wireLabels->SetValue( settings.wireLabels ); row( "", m_wireLabels );
-        m_labelKind = new wxChoice( this, wxID_ANY );
+        m_labelKind = new CLICK_CHOICE( this, wxID_ANY );
         m_labelKind->Append( _( "Local label" ) ); m_labelKind->Append( _( "Global label" ) );
         m_labelKind->Append( _( "Hierarchical label" ) );
         m_labelKind->SetSelection( std::clamp( settings.labelKind, 0, 2 ) );
@@ -124,10 +125,18 @@ public:
         layout->Add( m_preview, 0, wxEXPAND | wxALL, 12 );
         layout->Add( CreateStdDialogButtonSizer( wxOK | wxCANCEL ), 0, wxEXPAND | wxALL, 8 );
         SetSizer( layout ); SetMinSize( FromDIP( wxSize( 580, -1 ) ) );
-        Bind( wxEVT_CHOICE, [this]( wxCommandEvent& ) { update(); } );
+        Bind( wxEVT_COMBOBOX, [this]( wxCommandEvent& ) { update(); } );
         Bind( wxEVT_CHECKBOX, [this]( wxCommandEvent& ) { update(); } );
         Bind( wxEVT_TEXT, [this]( wxCommandEvent& ) { update(); } );
         update(); SetInitialFocus( m_pattern ); finishDialogSettings();
+    }
+
+    bool TransferDataToWindow() override
+    {
+        if( !DIALOG_SHIM::TransferDataToWindow() ) return false;
+        // The base dialog restores remembered control values on opening.
+        update();
+        return true;
     }
 
     bool TransferDataFromWindow() override
@@ -172,7 +181,7 @@ private:
     }
     PROPERTY_STAMP_SETTINGS& m_settings;
     std::vector<PROPERTY_CHOICE> m_choices;
-    wxChoice *m_property, *m_labelKind;
+    CLICK_CHOICE *m_property, *m_labelKind;
     wxTextCtrl *m_field, *m_pattern, *m_start, *m_step;
     wxCheckBox *m_numbering, *m_create, *m_wireLabels;
     wxStaticText* m_preview;
@@ -186,7 +195,7 @@ public:
 private:
     void setTransitions() override { Go( &SCH_PROPERTY_STAMP_TOOL::Main, SCH_ACTIONS::propertyStamp.MakeEvent() ); }
 
-    bool stampLabel( const VECTOR2I& position, bool vertical, const wxString& value )
+    bool stampLabel( const VECTOR2I& position, SPIN_STYLE spin, const wxString& value )
     {
         if( !m_settings.wireLabels ) throw std::runtime_error( "Wire labels are disabled for this tool" );
         if( value.IsEmpty() || value.Contains( '\n' ) || value.Contains( '\r' ) )
@@ -197,6 +206,8 @@ private:
             {
                 commit.Modify( existing, m_frame->GetScreen() );
                 existing->SetText( EscapeString( value, CTX_NETNAME ) );
+                existing->SetSpinStyle( spin );
+                existing->AutoplaceFields( nullptr, AUTOPLACE_AUTO );
                 commit.Push( _( "Apply Property by Click" ) ); return true;
             }
         std::unique_ptr<SCH_LABEL_BASE> label;
@@ -207,7 +218,7 @@ private:
         label->SetParent( m_frame->GetScreen() );
         const int size = m_frame->Schematic().Settings().m_DefaultTextSize;
         label->SetTextSize( VECTOR2I( size, size ) );
-        label->SetSpinStyle( vertical ? SPIN_STYLE::UP : SPIN_STYLE::RIGHT );
+        label->SetSpinStyle( spin );
         label->SetFlags( IS_NEW );
         label->AutoplaceFields( nullptr, AUTOPLACE_AUTO );
         commit.Add( label.release(), m_frame->GetScreen() );
@@ -260,15 +271,15 @@ private:
                     const auto value = sequence.Current();
                     if( pin )
                     {
-                        const auto end = pin->GetPosition(), root = pin->GetPinRoot();
-                        accepted = stampLabel( end, root.x == end.x && root.y != end.y, value );
+                        accepted = stampLabel( pin->GetPosition(), LabelSpinAwayFromPin( *pin ), value );
                     }
                     else if( auto* wire = dynamic_cast<SCH_LINE*>( item ); wire && wire->IsWire() && m_settings.wireLabels )
                     {
                         EE_GRID_HELPER grid( m_toolMgr );
                         const auto anchor = SEG( wire->GetStartPoint(), wire->GetEndPoint() ).NearestPoint(
                                 grid.Align( position, GRID_CONNECTABLE ) );
-                        accepted = stampLabel( anchor, wire->GetStartPoint().x == wire->GetEndPoint().x, value );
+                        accepted = stampLabel( anchor, wire->GetStartPoint().x == wire->GetEndPoint().x
+                                ? SPIN_STYLE::UP : SPIN_STYLE::RIGHT, value );
                     }
                     else if( item )
                     {

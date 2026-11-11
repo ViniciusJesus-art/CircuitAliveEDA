@@ -2861,6 +2861,8 @@ void PCB_IO_KICAD_SEXPR::format( const PCB_TRACK* aTrack ) const
         m_out->Print( "(net %s)", m_out->Quotew( aTrack->GetNetname() ).c_str() );
 
     KICAD_FORMAT::FormatUuid( m_out, aTrack->m_Uuid );
+    if( aTrack->IsSchematicConnectionMissing() )
+        m_out->Print( "(status %X)", PCB_TRACK::MISSING_SCHEMATIC_STATUS );
     m_out->Print( ")" );
 }
 

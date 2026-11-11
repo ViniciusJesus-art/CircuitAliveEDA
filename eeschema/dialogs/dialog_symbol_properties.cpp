@@ -48,7 +48,12 @@
 #include <tool/tool_manager.h>
 #include <tool/actions.h>
 
+#if defined( __linux__ ) || defined( _WIN32 )
+#include <circuitalive/model_dialog.h>
+#include <circuitalive/schematic_adapter.h>
+#else
 #include <dialog_sim_model.h>
+#endif
 #include <panel_embedded_files.h>
 
 
@@ -596,10 +601,44 @@ void DIALOG_SYMBOL_PROPERTIES::OnEditSpiceModel( wxCommandEvent& event )
     for( const SCH_FIELD& field : *m_fields )
         fields.emplace_back( field );
 
-    DIALOG_SIM_MODEL dialog( this, m_parentFrame, *m_symbol, fields );
-
-    if( dialog.ShowModal() != wxID_OK )
+#if defined( __linux__ ) || defined( _WIN32 )
+    try
+    {
+        // Edit the pending fields, not the live symbol. Canceling Symbol
+        // Properties must also discard changes accepted in the model dialog.
+        SCH_SYMBOL pending( *m_symbol );
+        pending.GetFields().clear();
+        for( auto field : fields )
+        {
+            field.SetParent( &pending );
+            field.Offset( pending.GetPosition() );
+            pending.GetFields().push_back( field );
+        }
+        auto& sheet = GetParent()->GetCurrentSheet();
+        pending.SetRef( &sheet, m_fields->GetField( FIELD_T::REFERENCE )->GetText() );
+        auto component = CIRCUITALIVE::ReadSymbolModelSettings( pending, sheet, wxEmptyString,
+                GetParent()->Prj().GetProjectPath().ToStdString( wxConvUTF8 ), true );
+        bool excluded = m_cbExcludeFromSim->IsChecked();
+        if( !CIRCUITALIVE::EditSimulationModel( this, component, excluded ) ) return;
+        if( !excluded ) CIRCUITALIVE::WriteSymbolModelSettings( pending, component );
+        m_cbExcludeFromSim->SetValue( excluded );
+        fields.clear();
+        for( auto field : pending.GetFields() )
+        {
+            field.SetParent( m_symbol );
+            field.Offset( -pending.GetPosition() );
+            fields.push_back( field );
+        }
+    }
+    catch( const std::exception& error )
+    {
+        DisplayError( this, wxString::FromUTF8( error.what() ) );
         return;
+    }
+#else
+    DIALOG_SIM_MODEL dialog( this, m_parentFrame, *m_symbol, fields );
+    if( dialog.ShowModal() != wxID_OK ) return;
+#endif
 
     // Add in any new fields
     for( const SCH_FIELD& editedField : fields )

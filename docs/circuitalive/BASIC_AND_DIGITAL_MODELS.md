@@ -68,6 +68,7 @@ indicações no esquema, sem reiniciar o solver:
 | Azul | 0 |
 | Cinza | Z, sem acionamento |
 | Amarelo | X, indefinido ou fora de uma condição lógica válida |
+| Rosa, fio espesso e `!` nos pinos | Disputa entre saídas ativas no barramento |
 
 Para os CIs digitais, os limiares são relativos aos **próprios pinos VCC e GND**.
 Os padrões didáticos HC são 0 até 0,3 × VCC e 1 a partir de 0,7 × VCC, sempre
@@ -91,11 +92,42 @@ o modelo por uma unidade atualiza os campos de todas as unidades daquele CI,
 em uma única operação de desfazer.
 
 Z não é deduzido de uma tensão intermediária. O arquivo declara quando cada
-saída está habilitada. Assim, no 74HC125, /OE=1 coloca a saída em Z; um pull-up
-pode deixar o fio em 1 e outra entrada ler 1, enquanto a saída permanece Z.
-Uma rede composta apenas por entradas digitais, sem driver, também é Z. A
-tensão entre os limiares é X. Uma entrada indefinida pode tornar a saída X;
-por exemplo, NAND(X,1)=X e NAND(X,0)=1.
+saída está habilitada, mas os indicadores dos pinos mostram o **nível lido na
+conexão**, separado do estado do acionamento local. Com /OE=1 no 74HC125 ou
+na 27C512, o estágio de saída fica em Z; se a RAM ou um pull-up mantiver o
+barramento em 1, o pino desabilitado também mostra 1. O mesmo vale para 0.
+Sem fonte nem polarização resistiva, a conexão mostra Z; uma tensão entre os
+limiares é X. Uma entrada indefinida pode tornar a saída X;
+por exemplo, NAND(X,1)=X e NAND(X,0)=1. A alimentação local e os limiares de
+cada família continuam sendo considerados; um CI sem alimentação válida
+não tem condições válidas para interpretar o nível externo.
+
+Redes de resistores propagam a presença de acionamento, mas mantêm suas
+resistências individuais no cálculo elétrico. Um resistor entre dois nós
+flutuantes ou um capacitor para GND não inventa uma fonte lógica. Sensores
+ideais de corrente e potência preservam a continuidade do barramento.
+
+Quando duas saídas ativas tentam impor níveis opostos e há corrente circulando
+entre elas, o fio inteiro fica rosa e mais espesso. O rodapé identifica os
+pinos em disputa. O aviso é removido quando a disputa termina e **não pausa a
+simulação**. Resistores de pull-up/pull-down, entradas e pull-ups fracos de
+GPIO não são contados como saídas em disputa. Saídas de coletor aberto podem
+compartilhar o mesmo pull-up sem falso alarme. A tensão resultante, as quedas
+e as correntes continuam sendo calculadas pelo ngspice, com os parâmetros dos
+modelos; não são substituídas por uma prioridade artificial de 0 ou 1.
+
+A detecção acompanha portas de saída declaradas pelos modelos, incluindo
+probes de estímulo, fontes, memórias, lógica e GPIOs. Ela não analisa
+universalmente o acionamento interno de qualquer circuito analógico ou
+subcircuito personalizado. O diagnóstico visual usa a amostra elétrica atual;
+pulsos de disputa menores que o intervalo de atualização podem exigir análise
+no osciloscópio. Avisos de sobrecorrente continuam independentes, conforme os
+limites implementados por cada modelo.
+
+O comportamento de liberação por /OE está descrito no
+[datasheet da AT27C512R](https://www.microchip.com/content/dam/mchp/documents/OTH/ProductDocuments/DataSheets/doc0015.pdf).
+Para o efeito das características elétricas das saídas durante disputas, veja
+[Designing With Logic, da Texas Instruments](https://www.ti.com/lit/an/sdya009c/sdya009c.pdf).
 
 Circuitos analógicos conectados a uma entrada são avaliados pela tensão que
 produzem; a implementação conserva uma classificação de driver possível

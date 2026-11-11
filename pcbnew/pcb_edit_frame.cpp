@@ -20,6 +20,7 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <settings/circuitalive_editor_layout.h>
 #include <circuitalive/branding.h>
 #include <algorithm>
 #include <type_traits>
@@ -1725,6 +1726,7 @@ void PCB_EDIT_FRAME::FocusSearch()
 
 void PCB_EDIT_FRAME::LoadSettings( APP_SETTINGS_BASE* aCfg )
 {
+    CIRCUITALIVE::ApplyDefaultEditorLayout( *aCfg, false );
     PCB_BASE_FRAME::LoadSettings( aCfg );
 
     PCBNEW_SETTINGS* cfg = dynamic_cast<PCBNEW_SETTINGS*>( aCfg );

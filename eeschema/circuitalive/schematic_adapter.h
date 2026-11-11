@@ -26,6 +26,8 @@ struct SCHEMATIC_SNAPSHOT
     std::vector<SYMBOL_LOCATION> probes;
     struct PIN_LOCATION { std::size_t component; std::string pin; wxString sheet; VECTOR2I position; };
     std::vector<PIN_LOCATION> pins;
+    struct WIRE_LOCATION { std::string node; wxString sheet; VECTOR2I start, end; };
+    std::vector<WIRE_LOCATION> wires;
 };
 
 /// The only adapter that reads KiCad symbols/connectivity. Call exclusively on the GUI thread.

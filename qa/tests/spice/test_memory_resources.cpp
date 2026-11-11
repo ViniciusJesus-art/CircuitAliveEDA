@@ -96,6 +96,47 @@ BOOST_AUTO_TEST_CASE( RuntimeMemorySupportsRollbackAndBoundedStorage )
     BOOST_CHECK_LE( runtime.Versions(), 3 );
     BOOST_CHECK( runtime.Error().empty() );
 }
+
+BOOST_AUTO_TEST_CASE( UnloadedSramStartsWithKnownZeroBytesAndRetainsUnwrittenLocations )
+{
+    CIRCUIT_COMPONENT component{ "U1", "Memory_RAM:CY62256-70PC", "CY62256-70PC", {} };
+    const auto model = MODEL_REPOSITORY().SelectModel( component );
+    const auto regions = InitialModelMemories( component, model );
+    BOOST_REQUIRE_EQUAL( regions.size(), 1u );
+    BOOST_REQUIRE_EQUAL( regions.front().initial.data.size(), 32768u );
+    for( std::size_t i = 0; i < regions.front().initial.data.size(); ++i )
+    {
+        BOOST_REQUIRE_EQUAL( regions.front().initial.data[i], 0 );
+        BOOST_REQUIRE_EQUAL( regions.front().initial.known[i], 255 );
+    }
+    RUNTIME_MEMORY runtime;
+    runtime.Reset( regions );
+    auto backend = runtime.Backend();
+    auto token = backend.write( backend.user, 0, 0, 1e-6, 7, 0xa5, 255, 0 );
+    backend.mark( backend.user, 0, token, 1e-6 );
+    runtime.Commit( 1e-6 );
+    const auto memory = runtime.Read( regions.front().id, 0, 16 );
+    for( std::size_t i = 0; i < memory.data.size(); ++i )
+    {
+        BOOST_CHECK_EQUAL( memory.data[i], i == 7 ? 0xa5 : 0 );
+        BOOST_CHECK_EQUAL( memory.known[i], 255 );
+    }
+}
+
+BOOST_AUTO_TEST_CASE( PartialRamImageLeavesOtherAddressesAtKnownZero )
+{
+    TEMP tmp;
+    SaveMemoryImage( EmptyMemory( 4, 0xa5 ), tmp.path / "short.bin", "bin" );
+    CIRCUIT_COMPONENT component{ "U1", "Memory_RAM:CY62256-70PC", "CY62256-70PC", {} };
+    component.projectDirectory = tmp.path.string();
+    component.resources["image"] = { "short.bin", "auto", 10 };
+    const auto regions = InitialModelMemories( component, MODEL_REPOSITORY().SelectModel( component ) );
+    for( std::size_t i = 0; i < regions.front().initial.data.size(); ++i )
+    {
+        BOOST_REQUIRE_EQUAL( regions.front().initial.data[i], i >= 10 && i < 14 ? 0xa5 : 0 );
+        BOOST_REQUIRE_EQUAL( regions.front().initial.known[i], 255 );
+    }
+}
 BOOST_AUTO_TEST_CASE( EpromImagesArePerInstanceAndHaveSixtyFourKAddresses )
 {
     TEMP tmp;
@@ -151,6 +192,30 @@ BOOST_AUTO_TEST_CASE( EpromImagesArePerInstanceAndHaveSixtyFourKAddresses )
     BOOST_CHECK_EQUAL( two.config.memories[1].initial.data[0], 255 );
     BOOST_CHECK_NE( two.config.memories[0].id, two.config.memories[1].id );
 }
+BOOST_AUTO_TEST_CASE( SramWithoutImageRemainsZeroDuringSimulationUntilWritten )
+{
+    CIRCUIT_COMPONENT ram{ "U1", "Memory_RAM:CY62256-70PC", "CY62256-70PC", {} };
+    const auto model = MODEL_REPOSITORY().SelectModel( ram );
+    for( const auto& pin : model.pins )
+        ram.pins[pin.defaultPin] = pin.id == "vcc" || pin.id == "we" ? "vcc"
+                                  : pin.role == "bidirectional" ? pin.id : "0";
+    auto circuit = BuildCircuitSnapshot( { Source( "V1", "vcc", "5" ), ram } );
+    circuit.config.signals = { "v(" + circuit.pinNodes.at( 1 ).at( "11" ) + ")" };
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 1e-6 );
+    for( std::size_t start = 0; start < 32768; start += 4096 )
+    {
+        const auto memory = session.ReadMemory( circuit.config.memories.front().id, start, 4096 );
+        for( std::size_t i = 0; i < memory.image.data.size(); ++i )
+        {
+            BOOST_REQUIRE_EQUAL( memory.image.data[i], 0 );
+            BOOST_REQUIRE_EQUAL( memory.image.known[i], 255 );
+        }
+    }
+    BOOST_CHECK_SMALL( session.Snapshot().latest.values.at( 0 ), .1 );
+}
+
 BOOST_AUTO_TEST_CASE( SramLoadsInitialDataAndExportsActualPausedWrites )
 {
     TEMP tmp;

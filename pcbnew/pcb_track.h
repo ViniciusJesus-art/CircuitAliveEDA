@@ -120,6 +120,13 @@ public:
     void SetHasSolderMask( bool aVal )      { m_hasSolderMask = aVal; }
     bool HasSolderMask() const              { return m_hasSolderMask; }
 
+    bool IsSchematicConnectionMissing() const { return m_schematicConnectionMissing; }
+    void SetSchematicConnectionMissing( bool aMissing ) { m_schematicConnectionMissing = aMissing; }
+
+    // Use the legacy display-status token, which KiCad accepts and ignores, rather
+    // than adding a token that would prevent the board from opening in KiCad.
+    static constexpr unsigned MISSING_SCHEMATIC_STATUS = 0x43414D53;
+
     void SetLocalSolderMaskMargin( std::optional<int> aMargin ) { m_solderMaskMargin = aMargin; }
     std::optional<int> GetLocalSolderMaskMargin() const         { return m_solderMaskMargin; }
 
@@ -250,6 +257,7 @@ protected:
     VECTOR2I m_End;          ///< Line end point
 
     bool               m_hasSolderMask;
+    bool               m_schematicConnectionMissing = false;
     std::optional<int> m_solderMaskMargin;
 
 private:

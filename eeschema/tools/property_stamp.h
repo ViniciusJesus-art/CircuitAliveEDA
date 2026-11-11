@@ -7,6 +7,8 @@
 #include <vector>
 
 class SCH_ITEM;
+class SCH_PIN;
+class SPIN_STYLE;
 class SCH_EDIT_FRAME;
 class SCH_SHEET_PATH;
 class SCH_COMMIT;
@@ -56,5 +58,6 @@ struct PROPERTY_STAMP_EDIT
 PROPERTY_STAMP_EDIT PlanPropertyStamp( SCH_ITEM& aItem, SCH_SHEET_PATH& aSheet,
     const PROPERTY_STAMP_SETTINGS& aSettings, const wxString& aValue,
     SCH_EDIT_FRAME* aFrame = nullptr );
+SPIN_STYLE LabelSpinAwayFromPin( const SCH_PIN& aPin );
 void RegisterPropertyStamp( TOOL_MANAGER* aManager );
 }

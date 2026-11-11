@@ -1,5 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "used_symbols.h"
+#include <circuitalive/schematic_adapter.h>
+#include <confirm.h>
 #include <widgets/symbol_preview_widget.h>
 #include <schematic.h>
 #include <sch_collectors.h>
@@ -27,6 +29,7 @@
 #include <algorithm>
 #include <optional>
 #include <deque>
+#include <map>
 
 namespace CIRCUITALIVE
 {
@@ -134,6 +137,7 @@ public:
         {
             m_frame->Schematic().AddListener( this );
             cancel();
+            m_initialSymbols.clear();
             schedule();
         }
     }
@@ -142,7 +146,10 @@ public:
     {
         SCH_TOOL_BASE<SCH_EDIT_FRAME>::Reset( aReason );
         if( m_panel && ( aReason == SUPERMODEL_RELOAD || aReason == SHUTDOWN ) )
+        {
             cancel();
+            m_initialSymbols.clear();
+        }
     }
 
     void OnSchItemsAdded( SCHEMATIC&, std::vector<SCH_ITEM*>& ) override { schedule(); }
@@ -157,11 +164,30 @@ public:
             return;
         auto copies = CopyPlacementItems( aItems );
         auto queued = aUpdateOnly ? std::move( m_queuedLabels ) : decltype( m_queuedLabels ){};
-        cancel();
+        if( !aUpdateOnly )
+            cancel();
         m_lastItems = std::move( copies );
         m_continueUnits = aContinueUnits;
         m_queuedLabels = std::move( queued );
         m_useNextLabel = !m_queuedLabels.empty();
+    }
+
+    void RememberDefaults( const SCH_SYMBOL& symbol )
+    {
+        m_initialSymbols[symbol.GetLibId().Format()] = CopyUsedSymbol(
+                symbol, m_frame->GetCurrentSheet(), VECTOR2I( 0, 0 ) );
+    }
+
+    void HandleActivation( const TOOL_EVENT& event )
+    {
+        // Our own preview activates the drawing tool as part of the two-click cycle.
+        if( ( m_pending || m_placingItems )
+            && ( event.IsAction( &SCH_ACTIONS::placeSymbol )
+                 || event.IsAction( &SCH_ACTIONS::placeRepeatedItem )
+                 || event.Matches( TOOL_EVENT( TC_COMMAND, TA_ACTIVATE,
+                                               std::string( "eeschema.InteractiveDrawing" ) ) ) ) )
+            return;
+        cancel();
     }
 
     void QueueLabels( const std::vector<SCH_ITEM*>& aLabels )
@@ -212,6 +238,22 @@ public:
                 auto symbol = sameComponent
                     ? std::unique_ptr<SCH_SYMBOL>( static_cast<SCH_SYMBOL*>( source->Duplicate( IGNORE_PARENT_GROUP ) ) )
                     : CopyUsedSymbol( *static_cast<SCH_SYMBOL*>( source ), m_frame->GetCurrentSheet(), position );
+                if( !m_choice.IsEmpty() )
+                {
+                    // Package sequencing comes from the last placement; field values come
+                    // from the original chooser settings, never from a placed occurrence.
+                    if( SCH_SYMBOL* initial = placementTemplate() )
+                    {
+                        const auto* previous = static_cast<const SCH_SYMBOL*>( source );
+                        symbol = CopyUsedSymbol( *initial, m_frame->GetCurrentSheet(), position );
+                        symbol->SetOrientation( previous->GetOrientation() );
+                        symbol->SetUnit( previous->GetUnit() );
+                        symbol->SetUnitSelection( &m_frame->GetCurrentSheet(), previous->GetUnit() );
+                        if( sameComponent )
+                            symbol->SetRef( &m_frame->GetCurrentSheet(),
+                                            previous->GetRef( &m_frame->GetCurrentSheet() ) );
+                    }
+                }
                 symbol->Move( position - symbol->GetPosition() );
                 m_pending = symbol->m_Uuid;
                 SCH_ACTIONS::PLACE_SYMBOL_PARAMS parameters;
@@ -230,7 +272,7 @@ public:
         if( aOnWire || !m_panel || m_choice.IsEmpty()
             || !wxAuiManager::GetManager( m_frame )->GetPane( m_panel.get() ).IsShown() )
             return false;
-        SCH_SYMBOL* source = chosenSymbol();
+        SCH_SYMBOL* source = placementTemplate();
         if( !source || source->IsMissingLibSymbol() )
             return false;
         EE_GRID_HELPER grid( m_toolMgr );
@@ -398,9 +440,37 @@ private:
         return nullptr;
     }
 
+    SCH_SYMBOL* placementTemplate()
+    {
+        const auto saved = m_initialSymbols.find( m_choice );
+        if( saved != m_initialSymbols.end() )
+            return saved->second.get();
+        if( SCH_SYMBOL* source = chosenSymbol() )
+        {
+            auto initial = MakeUsedSymbolTemplate( *source, m_frame->GetCurrentSheet() );
+            if( initial )
+            {
+                try
+                {
+                    ApplySavedSymbolModelSettings( *initial, m_frame->GetCurrentSheet(),
+                            m_frame->Schematic().GetCurrentVariant(),
+                            m_frame->Prj().GetProjectPath().ToStdString() );
+                }
+                catch( const std::exception& error )
+                {
+                    DisplayError( m_frame, wxString::FromUTF8( error.what() ) );
+                }
+                SCH_SYMBOL* result = initial.get();
+                m_initialSymbols[m_choice] = std::move( initial );
+                return result;
+            }
+        }
+        return nullptr;
+    }
+
     void showPreview()
     {
-        if( SCH_SYMBOL* symbol = chosenSymbol() )
+        if( SCH_SYMBOL* symbol = placementTemplate() )
         {
             if( !symbol->GetLibSymbolRef() )
             {
@@ -461,6 +531,7 @@ private:
     wxTimer m_timer;
     std::vector<USED_SYMBOL_ENTRY> m_entries;
     wxString m_choice;
+    std::map<wxString, std::unique_ptr<SCH_SYMBOL>> m_initialSymbols;
     wxString m_instruction;
     std::optional<KIID> m_pending;
     std::vector<std::unique_ptr<SCH_ITEM>> m_lastItems;
@@ -486,6 +557,16 @@ bool BeginUsedSymbolPlacement( SCH_EDIT_FRAME* frame, const VECTOR2I& position, 
 {
     auto* tool = frame->GetToolManager()->GetTool<USED_SYMBOLS_TOOL>();
     return tool && tool->BeginPlacement( position, onWire );
+}
+void RememberUsedSymbolDefaults( SCH_EDIT_FRAME* frame, const SCH_SYMBOL& symbol )
+{
+    if( auto* tool = frame->GetToolManager()->GetTool<USED_SYMBOLS_TOOL>() )
+        tool->RememberDefaults( symbol );
+}
+void HandleUsedSymbolToolActivation( SCH_EDIT_FRAME* frame, const TOOL_EVENT& event )
+{
+    if( auto* tool = frame->GetToolManager()->GetTool<USED_SYMBOLS_TOOL>() )
+        tool->HandleActivation( event );
 }
 void RememberPlacement( SCH_EDIT_FRAME* frame, const std::vector<SCH_ITEM*>& items,
                          bool updateOnly, bool continueUnits )

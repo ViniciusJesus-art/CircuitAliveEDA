@@ -146,6 +146,7 @@ PCB_VIA& PCB_VIA::operator=( const PCB_VIA &aOther )
 
     m_Start = aOther.m_Start;
     m_End = aOther.m_End;
+    m_schematicConnectionMissing = aOther.m_schematicConnectionMissing;
 
     m_viaType = aOther.m_viaType;
     m_padStack = aOther.m_padStack;
@@ -2147,6 +2148,9 @@ std::vector<int> PCB_TRACK::ViewGetLayers() const
 
     layers.reserve( 6 );
 
+    if( IsSchematicConnectionMissing() )
+        layers.push_back( LAYER_ANCHOR );
+
     if( m_hasSolderMask )
     {
         if( m_layer == F_Cu )
@@ -2172,6 +2176,9 @@ double PCB_TRACK::ViewGetLOD( int aLayer, const KIGFX::VIEW* aView ) const
 
     if( IsNetnameLayer( aLayer ) )
     {
+        if( IsSchematicConnectionMissing() && !renderSettings->IsPrinting() )
+            return LOD_HIDE; // The independent MISS text uses the anchor layer.
+
         if( GetNetCode() <= NETINFO_LIST::UNCONNECTED )
             return LOD_HIDE;
 
@@ -2201,6 +2208,9 @@ double PCB_TRACK::ViewGetLOD( int aLayer, const KIGFX::VIEW* aView ) const
         // Netnames will be shown only if zoom is appropriate
         return lodScaleForThreshold( aView, m_width, pcbIUScale.mmToIU( 4.0 ) );
     }
+
+    if( aLayer == LAYER_ANCHOR && IsSchematicConnectionMissing() )
+        return aView->IsLayerVisible( m_layer ) ? LOD_SHOW : LOD_HIDE;
 
     if( aLayer == LAYER_LOCKED_ITEM_SHADOW )
     {

@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "simulation_overlay.h"
+#include "probe_geometry.h"
 #include "control_geometry.h"
 #include "control_references.h"
 #include <base_units.h>
@@ -16,6 +17,17 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
     if( aSession.state == EDITOR_SESSION_STATE::STOPPED
         || aSession.state == EDITOR_SESSION_STATE::FAILED )
         return;
+    std::set<std::string> conflictingNodes;
+    for( std::size_t i = 0; i < aCircuit.circuit.drivenNets.size() && i < aSession.netContentions.size(); ++i )
+        if( aSession.netContentions[i] )
+            conflictingNodes.insert( aCircuit.circuit.drivenNets[i].nodes.begin(), aCircuit.circuit.drivenNets[i].nodes.end() );
+    // Render the entire affected connection, even when pin indicators are hidden.
+    const KIGFX::COLOR4D contentionColor( 1, .12, .65, 1 );
+    SetIsStroke( true ); SetIsFill( false ); SetStrokeColor( contentionColor );
+    SetLineWidth( schIUScale.mmToIU( .65 ) );
+    for( const auto& wire : aCircuit.wires )
+        if( wire.sheet == aCurrentSheet && conflictingNodes.contains( wire.node ) )
+            Line( wire.start, wire.end );
     SetLineWidth( schIUScale.mmToIU( 0.12 ) );
     if( aLogicLevels )
         for( const auto& location : aCircuit.pins )
@@ -26,8 +38,10 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
                 const auto& pin = aCircuit.circuit.logicPins[i];
                 if( pin.component != location.component || pin.pin != location.pin ) continue;
                 const auto level = aSession.logicLevels[i];
+                const bool conflict = pin.component < aCircuit.circuit.pinNodes.size()
+                    && conflictingNodes.contains( aCircuit.circuit.pinNodes[pin.component].at( pin.pin ) );
                 const bool rapid = i < aSession.logicRapid.size() && aSession.logicRapid[i];
-                const auto color = rapid ? KIGFX::COLOR4D( .75, .2, 1, 1 )
+                const auto color = conflict ? contentionColor : rapid ? KIGFX::COLOR4D( .75, .2, 1, 1 )
                     : level == LOGIC_LEVEL::HIGH ? KIGFX::COLOR4D( .95, .12, .08, 1 )
                     : level == LOGIC_LEVEL::LOW ? KIGFX::COLOR4D( .08, .35, 1, 1 )
                     : level == LOGIC_LEVEL::HIGH_Z ? KIGFX::COLOR4D( .55, .57, .6, 1 ) : KIGFX::COLOR4D( 1, .7, .05, 1 );
@@ -35,7 +49,7 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
                 Circle( VECTOR2D( location.position ), schIUScale.mmToIU( .45 ) );
                 SetIsFill( false ); SetStrokeColor( color );
                 SetGlyphSize( VECTOR2I( schIUScale.mmToIU( .8 ), schIUScale.mmToIU( .8 ) ) );
-                const char* text = rapid ? "~" : level == LOGIC_LEVEL::HIGH ? "1" : level == LOGIC_LEVEL::LOW ? "0"
+                const char* text = conflict ? "!" : rapid ? "~" : level == LOGIC_LEVEL::HIGH ? "1" : level == LOGIC_LEVEL::LOW ? "0"
                     : level == LOGIC_LEVEL::HIGH_Z ? "Z" : "X";
                 BitmapText( text, location.position + VECTOR2I( schIUScale.mmToIU( .7 ), schIUScale.mmToIU( -.7 ) ), ANGLE_0 );
                 break;
@@ -106,16 +120,16 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
                         + location.axisY * schIUScale.mmToIU(y);
             };
             std::deque<VECTOR2D> points;
-            for( const auto& p : { point(-5,-1.8), point(-1.8,-1.8), point(-.6,0), point(-1.8,1.8), point(-5,1.8) } )
-                points.emplace_back( p );
+            for( auto [x, y] : SOURCE_PROBE_OUTLINE ) points.emplace_back( point( x, y ) );
             // Keep the background behind the number in both OpenGL and software rendering.
             SetDepthOffset( 1 );
             SetIsFill( true ); SetIsStroke( true ); SetStrokeColor( color ); SetFillColor( color );
+            SetLineWidth( schIUScale.mmToIU( SOURCE_PROBE_STROKE ) );
             Polygon( points ); Line( point(-.6,0), location.position );
             SetDepthOffset( 0 );
             SetIsFill( false ); SetStrokeColor( KIGFX::COLOR4D(1,1,1,1) );
-            SetGlyphSize( VECTOR2I( schIUScale.mmToIU(1.3), schIUScale.mmToIU(1.3) ) );
-            BitmapText( closed ? "1" : "0", point(-3.2,0), ANGLE_0 );
+            SetGlyphSize( VECTOR2I( schIUScale.mmToIU(SOURCE_PROBE_LOGIC_TEXT_SIZE), schIUScale.mmToIU(SOURCE_PROBE_LOGIC_TEXT_SIZE) ) );
+            BitmapText( closed ? "1" : "0", point(SOURCE_PROBE_TEXT_X,0), ANGLE_0 );
             continue;
         }
         SetIsFill( false );

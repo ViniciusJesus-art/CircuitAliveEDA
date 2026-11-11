@@ -113,19 +113,21 @@ Mudar essas opções encerra a sessão anterior; Play reconstrói o circuito.
 
 ## Abas durante a execução
 
-- **Measurements** é selecionada no primeiro Play se houver probes V/A/W ou
-  medições marcadas em componentes. Mostra nome, unidade e valor instantâneo,
+- **Measurements** é selecionada no início de cada simulação se houver probes V/A/W ou
+  medições marcadas em componentes, independentemente da aba anterior. Tem prioridade
+  quando também houver probes de osciloscópio. Mostra nome, unidade e valor instantâneo,
   incluindo prefixos m, µ, k etc. Uma probe desconectada mostra `—`.
 - **Oscilloscope** recebe os sinais das probes desse tipo no esquema.
-  Se ela for o único instrumento e ainda não houver uma aba preferida, sua aba é selecionada automaticamente.
+  Se houver apenas probes de osciloscópio, sua aba é selecionada automaticamente
+  no início de cada simulação, independentemente da aba anterior.
   Várias probes de osciloscópio geram curvas com cores diferentes no mesmo gráfico.
 - Pause congela o tempo, as leituras e as curvas. Play retoma a sessão;
   Stop descarta os dados da sessão e mantém os controles das três abas.
 
 A largura, a posição fixa ou flutuante e a aba escolhida ficam nas configurações
 globais do editor, inclusive ao reabrir outro projeto. Ocultar/mostrar o painel
-ou usar Stop/Play conserva esses ajustes, os controles do osciloscópio e sua
-aba interna. Expandir e voltar a fixar o painel conserva os tamanhos da lateral
+conserva esses ajustes, os controles do osciloscópio e sua aba interna.
+Ao iniciar outra simulação, a aba principal é escolhida conforme os instrumentos presentes. Expandir e voltar a fixar o painel conserva os tamanhos da lateral
 e da janela flutuante separadamente.
 
 ## Osciloscópio
@@ -323,3 +325,49 @@ abertura do painel; o cenário final manteve as duas curvas visíveis durante
 a aquisição. Esse diagnóstico local não é uma garantia para outros circuitos
 ou máquinas, nem mede a velocidade do solver. A memória residente não mostrou
 redução significativa nesse ensaio com o renderizador por software.
+
+
+## Colocar e editar probes
+
+Escolha uma probe no painel. Um clique em um fio ou terminal compatível a coloca
+diretamente, como antes. Um clique em espaço vazio abre uma prévia que acompanha
+o cursor; o próximo clique posiciona a probe, inclusive sem conexão. Depois é
+possível desenhar fios até seus terminais. Probes A/W têm dois terminais para o
+sensor em série; quando inseridas diretamente em um fio, o trecho é dividido
+sem deixar fio por trás do sensor. Probes V, osciloscópio e fontes têm um
+terminal. As fontes mantêm a referência interna ao GND.
+
+Após colocar, a prévia desaparece e a ferramenta continua disponível. **Esc**
+com uma prévia a descarta; **Esc** sem prévia encerra a ferramenta. Trocar de
+ferramenta também descarta a prévia. Colocar, excluir e editar permitem desfazer.
+
+Dê duplo clique na probe ou use **E** / **Probe properties...** no menu de
+contexto. Nas fontes, isso abre os parâmetros aplicáveis: frequência, duty
+cycle, tensões baixa/alta ou amplitude/offset, fase, atraso, tempos de subida e
+descida e resistência de saída. Os valores são validados e salvos no esquema.
+**Ctrl+Alt+M** continua disponível. O nome e o indicador interno, como `PWM`,
+`CLK` ou `0/1`, selecionam a probe inteira; excluir por eles remove a probe,
+sem apenas ocultar seu texto. Campos de símbolos comuns conservam seu
+comportamento normal.
+
+Durante a prévia, a probe recebe o destaque azul de seleção dos componentes.
+Use **R** para girar antes de posicionar; a orientação é mantida ao salvar.
+Sensores A/W se alinham ao fio quando inseridos em série, mantendo seus dois
+terminais conectados às extremidades do corte.
+
+A reprodução mantém a velocidade escolhida desde o início. Se a preparação ou
+um avanço do solver demorar, o controlador retoma a cadência sem executar uma
+rajada de ciclos para recuperar o atraso de tempo real.
+
+As probes de estímulo usam um corpo compacto que, incluindo o traço e o indicador,
+cabe em uma faixa de 2,54 mm entre pinos adjacentes. Ao conectar a uma ponta de
+pino, a orientação automática mantém a probe para fora do corpo do componente.
+A seleção por caixa ou laço inclui o indicador na probe inteira. Ao abrir esquemas
+antigos, o desenho das probes de estímulo é atualizado sem trocar suas referências,
+identificadores, nomes ou configurações.
+
+A duplicação em lote, colagem e repetição geram novas referências `#P…` e
+sequências internas para cada probe, incluindo V/A/W e osciloscópio. O nome
+e os parâmetros configurados são preservados. Ao abrir um esquema ou iniciar
+a simulação, identificadores de probes repetidos ou ausentes são corrigidos.
+Essa numeração não altera as referências dos componentes comuns.

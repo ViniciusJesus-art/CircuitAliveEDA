@@ -23,6 +23,11 @@
  */
 
 #include <kiway.h>
+#include <circuitalive/editor_simulation.h>
+#include <circuitalive/probe_symbol.h>
+#if defined( __linux__ ) || defined( _WIN32 )
+#include <circuitalive/probe_placement.h>
+#endif
 #include <tool/action_manager.h>
 #include <tool/picker_tool.h>
 #include <tools/sch_edit_tool.h>
@@ -2185,6 +2190,12 @@ int SCH_EDIT_TOOL::RepeatDrawItem( const TOOL_EVENT& aEvent )
                                           reporter, SYMBOL_FILTER_NON_POWER );
             }
 
+            // Probes have their own hidden numbering, including measurement and
+            // scope probes. Repeating must not reuse the original identity.
+#if defined( __linux__ ) || defined( _WIN32 )
+            if( auto* symbol = static_cast<SCH_SYMBOL*>( newItem ); symbol->GetField( "CA.Probe" ) )
+                CIRCUITALIVE::EnsureUniqueProbeIdentities( m_frame->Schematic(), { symbol }, &commit );
+#endif
             // Annotation clears the selection so re-add the item
             m_toolMgr->RunAction<EDA_ITEM*>( ACTIONS::selectItem, newItem );
 
@@ -2224,6 +2235,17 @@ int SCH_EDIT_TOOL::DoDelete( const TOOL_EVENT& aEvent )
 {
     SCH_SCREEN*           screen = m_frame->GetScreen();
     std::deque<EDA_ITEM*> items = m_selectionTool->RequestSelection( SCH_COLLECTOR::DeletableItems ).GetItems();
+    // Delete a complete probe even when a field was selected by an explicit field command.
+    std::deque<EDA_ITEM*> probeItems;
+    std::set<EDA_ITEM*> seen;
+    for( EDA_ITEM* item : items )
+    {
+        if( SCH_SYMBOL* probe = CIRCUITALIVE::ProbeSymbolForItem( item ) )
+            item = probe;
+        if( seen.insert( item ).second )
+            probeItems.push_back( item );
+    }
+    items = std::move( probeItems );
     SCH_COMMIT            commit( m_toolMgr );
     std::vector<VECTOR2I> pts;
     bool                  updateHierarchy = false;
@@ -2693,6 +2715,12 @@ int SCH_EDIT_TOOL::Properties( const TOOL_EVENT& aEvent )
 
 void SCH_EDIT_TOOL::EditProperties( EDA_ITEM* aItem )
 {
+    if( SCH_SYMBOL* probe = CIRCUITALIVE::ProbeSymbolForItem( aItem ) )
+    {
+        if( CIRCUITALIVE::EditSimulationProbe( m_frame, probe ) )
+            return;
+    }
+
     switch( aItem->Type() )
     {
     case SCH_SYMBOL_T:

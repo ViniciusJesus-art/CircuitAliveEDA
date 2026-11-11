@@ -57,6 +57,9 @@
 #include <richio.h>
 #include <sch_design_block_pane.h>
 #include <sch_edit_frame.h>
+#if defined( __linux__ ) || defined( _WIN32 )
+#include <circuitalive/probe_placement.h>
+#endif
 #include <sch_io/kicad_sexpr/sch_io_kicad_sexpr.h>
 #include <sch_bitmap.h>
 #include <sch_group.h>
@@ -2661,6 +2664,13 @@ int SCH_EDITOR_CONTROL::Paste( const TOOL_EVENT& aEvent )
         }
     }
 
+    // Probe identities are independent of component annotation and of the
+    // "keep annotations" paste option. This also covers a batch inside a group.
+#if defined( __linux__ ) || defined( _WIN32 )
+    if( std::any_of( m_pastedSymbols.begin(), m_pastedSymbols.end(),
+                    []( SCH_SYMBOL* symbol ) { return symbol->GetField( "CA.Probe" ) != nullptr; } ) )
+        CIRCUITALIVE::EnsureUniqueProbeIdentities( m_frame->Schematic(), m_pastedSymbols, &commit );
+#endif
     m_frame->GetCurrentSheet().UpdateAllScreenReferences();
 
     // The copy operation creates instance paths that are not valid for the current project or

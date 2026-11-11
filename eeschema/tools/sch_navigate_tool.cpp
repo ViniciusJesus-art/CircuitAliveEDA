@@ -132,7 +132,9 @@ int SCH_NAVIGATE_TOOL::Forward( const TOOL_EVENT& aEvent )
     }
     else
     {
-        wxBell();
+        // Older/custom toolbars still use history arrows. They must also work before
+        // the user has visited another page.
+        Next( aEvent );
     }
 
     return 0;
@@ -153,7 +155,7 @@ int SCH_NAVIGATE_TOOL::Back( const TOOL_EVENT& aEvent )
     }
     else
     {
-        wxBell();
+        Previous( aEvent );
     }
 
     return 0;
@@ -162,10 +164,11 @@ int SCH_NAVIGATE_TOOL::Back( const TOOL_EVENT& aEvent )
 
 int SCH_NAVIGATE_TOOL::Previous( const TOOL_EVENT& aEvent )
 {
-    if( CanGoPrevious() )
+    const auto pages = m_frame->Schematic().Hierarchy();
+    const auto current = std::find( pages.begin(), pages.end(), m_frame->GetCurrentSheet() );
+    if( current != pages.end() && current != pages.begin() )
     {
-        int targetSheet = m_frame->GetCurrentSheet().GetVirtualPageNumber() - 1;
-        changeSheet( m_frame->Schematic().Hierarchy().at( targetSheet - 1 ) );
+        changeSheet( *std::prev( current ) );
     }
     else
     {
@@ -178,10 +181,11 @@ int SCH_NAVIGATE_TOOL::Previous( const TOOL_EVENT& aEvent )
 
 int SCH_NAVIGATE_TOOL::Next( const TOOL_EVENT& aEvent )
 {
-    if( CanGoNext() )
+    const auto pages = m_frame->Schematic().Hierarchy();
+    const auto current = std::find( pages.begin(), pages.end(), m_frame->GetCurrentSheet() );
+    if( current != pages.end() && std::next( current ) != pages.end() )
     {
-        int targetSheet = m_frame->GetCurrentSheet().GetVirtualPageNumber() + 1;
-        changeSheet( m_frame->Schematic().Hierarchy().at( targetSheet - 1 ) );
+        changeSheet( *std::next( current ) );
     }
     else
     {

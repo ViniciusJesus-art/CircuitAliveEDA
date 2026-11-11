@@ -44,7 +44,6 @@ private:
     SCOPE_PREFERENCES m_scopePreferences;
     std::vector<std::string> m_rows;
     bool m_wasActive = false;
-    bool m_hasTabPreference = false;
     std::chrono::steady_clock::time_point m_lastValues{};
 };
 }

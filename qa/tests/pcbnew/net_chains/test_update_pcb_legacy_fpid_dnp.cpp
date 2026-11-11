@@ -22,6 +22,7 @@
  */
 
 #include <boost/test/unit_test.hpp>
+#include <settings/circuitalive_editor_layout.h>
 #include <lib_id.h>
 #include <netlist_reader/board_netlist_updater.h>
 #include <qa_utils/wx_utils/unit_test_utils.h>
@@ -29,6 +30,12 @@
 #include <footprint.h>
 #include <netlist_reader/pcb_netlist.h>
 #include <widgets/pending_footprints.h>
+#include <pad.h>
+#include <pcb_track.h>
+#include <pcb_painter.h>
+#include <netinfo.h>
+#include <pcb_io/kicad_sexpr/pcb_io_kicad_sexpr.h>
+#include <wx/filename.h>
 
 
 BOOST_AUTO_TEST_SUITE( UpdatePcbLegacyFpidDnp )
@@ -93,6 +100,158 @@ BOOST_AUTO_TEST_CASE( QualifiedSchematicFpidComparesExactly )
     BOOST_CHECK( !BOARD_NETLIST_UPDATER::fpidsEquivalent( otherLibBoardFpid, schematicFpid ) );
 }
 
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE( SchematicLinkVisibility )
+
+struct ROUTING_FIXTURE
+{
+    ROUTING_FIXTURE()
+    {
+        auto* net = new NETINFO_ITEM( &board, "OLD", 1 );
+        board.Add( net );
+        for( int i = 0; i < 2; ++i )
+        {
+            const wxString ref = wxString::Format( "U%d", i + 1 );
+            auto* footprint = new FOOTPRINT( &board );
+            footprint->SetReference( ref );
+            footprint->SetPosition( VECTOR2I( pcbIUScale.mmToIU( i * 10 ), 0 ) );
+            auto* pad = new PAD( footprint );
+            pad->SetNumber( "1" );
+            pad->SetAttribute( PAD_ATTRIB::SMD );
+            pad->SetLayerSet( LSET( { F_Cu } ) );
+            pad->SetSize( F_Cu, VECTOR2I( pcbIUScale.mmToIU( 1 ), pcbIUScale.mmToIU( 1 ) ) );
+            pad->SetPosition( footprint->GetPosition() );
+            pad->SetNet( net );
+            footprint->Add( pad );
+            board.Add( footprint );
+            auto* component = new COMPONENT( LIB_ID(), ref, "IC", {}, { KIID() } );
+            component->AddNet( "1", "NEW", "I/O", "bidirectional" );
+            netlist.AddComponent( component );
+        }
+        for( int i = 0; i < 2; ++i )
+        {
+            auto* track = new PCB_TRACK( &board );
+            track->SetStart( VECTOR2I( pcbIUScale.mmToIU( i * 5 ), 0 ) );
+            track->SetEnd( VECTOR2I( pcbIUScale.mmToIU( ( i + 1 ) * 5 ), 0 ) );
+            track->SetLayer( F_Cu );
+            track->SetNet( net );
+            board.Add( track );
+        }
+        board.BuildConnectivity();
+    }
+
+    BOARD board;
+    NETLIST netlist;
+};
+
+BOOST_FIXTURE_TEST_CASE( RenamingANetKeepsExistingCopperValid, ROUTING_FIXTURE )
+{
+    BOOST_CHECK( BOARD_NETLIST_UPDATER::FindObsoleteTracks( board, netlist ).empty() );
+}
+
+BOOST_FIXTURE_TEST_CASE( SplittingARoutedConnectionMarksItsPhysicalCopper, ROUTING_FIXTURE )
+{
+    netlist.GetComponent( 1 )->ClearNets();
+    netlist.GetComponent( 1 )->AddNet( "1", "OTHER", "I/O", "bidirectional" );
+    BOOST_CHECK_EQUAL( BOARD_NETLIST_UPDATER::FindObsoleteTracks( board, netlist ).size(), 2u );
+}
+
+BOOST_FIXTURE_TEST_CASE( RemovingASymbolOrPinMarksOldCopper, ROUTING_FIXTURE )
+{
+    netlist.GetComponent( 1 )->SetReference( "U99" );
+    BOOST_CHECK_EQUAL( BOARD_NETLIST_UPDATER::FindObsoleteTracks( board, netlist ).size(), 2u );
+    netlist.GetComponent( 1 )->SetReference( "U2" );
+    netlist.GetComponent( 1 )->ClearNets();
+    BOOST_CHECK_EQUAL( BOARD_NETLIST_UPDATER::FindObsoleteTracks( board, netlist ).size(), 2u );
+}
+
+BOOST_FIXTURE_TEST_CASE( RestoringTheConnectionClearsSavedWarnings, ROUTING_FIXTURE )
+{
+    for( PCB_TRACK* track : board.Tracks() )
+        track->SetSchematicConnectionMissing( true );
+    BOOST_CHECK( BOARD_NETLIST_UPDATER::FindObsoleteTracks( board, netlist ).empty() );
+}
+
+BOOST_FIXTURE_TEST_CASE( BoardOnlyCopperIsPreserved, ROUTING_FIXTURE )
+{
+    for( FOOTPRINT* footprint : board.Footprints() )
+        footprint->SetBoardOnly( true );
+    BOOST_CHECK( BOARD_NETLIST_UPDATER::FindObsoleteTracks( board, netlist ).empty() );
+}
+
+BOOST_AUTO_TEST_CASE( MissingCopperIsDimmedWithoutChangingGeometryOrPrinting )
+{
+    BOARD board;
+    PCB_TRACK track( &board );
+    KIGFX::PCB_RENDER_SETTINGS settings;
+    settings.SetLayerColor( F_Cu, KIGFX::COLOR4D( 1.0, 0.2, 0.2, 1.0 ) );
+    settings.SetBackgroundColor( KIGFX::COLOR4D::BLACK );
+    const auto normal = settings.GetColor( &track, F_Cu );
+    track.SetSchematicConnectionMissing( true );
+    const auto missing = settings.GetColor( &track, F_Cu );
+    BOOST_CHECK_LT( missing.GetBrightness(), normal.GetBrightness() );
+    settings.SetIsPrinting( true );
+    BOOST_CHECK_CLOSE( settings.GetColor( &track, F_Cu ).GetBrightness(), normal.GetBrightness(), 0.001 );
+    std::unique_ptr<PCB_TRACK> copy( static_cast<PCB_TRACK*>( track.Clone() ) );
+    copy->SetSchematicConnectionMissing( false );
+    track.SwapItemData( copy.get() );
+    BOOST_CHECK( !track.IsSchematicConnectionMissing() );
+    BOOST_CHECK( copy->IsSchematicConnectionMissing() );
+}
+
+BOOST_AUTO_TEST_CASE( MissingSymbolDimsItsPadsAndRestoringTheLinkRestoresColor )
+{
+    BOARD board;
+    FOOTPRINT footprint( &board );
+    PAD* pad = new PAD( &footprint );
+    footprint.Add( pad );
+    KIGFX::PCB_RENDER_SETTINGS settings;
+    settings.SetLayerColor( F_Cu, KIGFX::COLOR4D( 1.0, 0.2, 0.2, 1.0 ) );
+    settings.SetBackgroundColor( KIGFX::COLOR4D::BLACK );
+    const auto normal = settings.GetColor( pad, F_Cu );
+    auto* status = new PCB_FIELD( &footprint, FIELD_T::USER, "CA.LinkStatus" );
+    status->SetText( "Missing schematic symbol" );
+    footprint.Add( status );
+    BOOST_CHECK_LT( settings.GetColor( pad, F_Cu ).GetBrightness(), normal.GetBrightness() );
+    footprint.Remove( status );
+    delete status;
+    BOOST_CHECK_CLOSE( settings.GetColor( pad, F_Cu ).GetBrightness(), normal.GetBrightness(), 0.001 );
+}
+
+BOOST_AUTO_TEST_CASE( MissingStatusSurvivesSavingTracksArcsAndVias )
+{
+    BOARD board;
+    auto* track = new PCB_TRACK( &board );
+    track->SetStart( VECTOR2I( 0, 0 ) );
+    track->SetEnd( VECTOR2I( 1000000, 0 ) );
+    auto* arc = new PCB_ARC( &board );
+    arc->SetStart( VECTOR2I( 2000000, 0 ) );
+    arc->SetMid( VECTOR2I( 2500000, 500000 ) );
+    arc->SetEnd( VECTOR2I( 3000000, 0 ) );
+    auto* via = new PCB_VIA( &board );
+    for( PCB_TRACK* item : { track, static_cast<PCB_TRACK*>( arc ), static_cast<PCB_TRACK*>( via ) } )
+    {
+        item->SetSchematicConnectionMissing( true );
+        std::unique_ptr<PCB_TRACK> snapshot( static_cast<PCB_TRACK*>( item->Clone() ) );
+        BOOST_CHECK( snapshot->IsSchematicConnectionMissing() );
+        snapshot->SetSchematicConnectionMissing( false );
+        item->SwapItemData( snapshot.get() );
+        BOOST_CHECK( !item->IsSchematicConnectionMissing() );
+        BOOST_CHECK( snapshot->IsSchematicConnectionMissing() );
+        item->SwapItemData( snapshot.get() );
+        board.Add( item );
+    }
+    const wxString file = wxFileName::CreateTempFileName( wxFileName::GetTempDir() + "/ca-missing-" );
+    PCB_IO_KICAD_SEXPR plugin;
+    plugin.SaveBoard( file, &board );
+    std::unique_ptr<BOARD> loaded( plugin.LoadBoard( file, nullptr ) );
+    wxRemoveFile( file );
+    BOOST_REQUIRE_EQUAL( loaded->Tracks().size(), 3u );
+    for( const PCB_TRACK* item : loaded->Tracks() )
+        BOOST_CHECK( item->IsSchematicConnectionMissing() );
+}
 
 BOOST_AUTO_TEST_SUITE_END()
 
@@ -317,6 +476,67 @@ BOOST_AUTO_TEST_CASE( MissingAssignmentsStayVisibleAndVariantFootprintsHaveSepar
     pending = CIRCUITALIVE::BuildPendingFootprints( board, netlist );
     BOOST_REQUIRE_EQUAL( pending.size(), 1u );
     BOOST_CHECK_EQUAL( pending[0].reference, "R1" );
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+
+BOOST_AUTO_TEST_SUITE( DefaultEditorLayouts )
+
+BOOST_AUTO_TEST_CASE( FreshSchematicGetsUsedComponentsOnLeft )
+{
+    APP_SETTINGS_BASE settings( "eeschema-layout-test", 0 );
+    settings.Load();
+    CIRCUITALIVE::ApplyDefaultEditorLayout( settings, true );
+    BOOST_CHECK( settings.m_Window.perspective.Contains( "name=UsedComponents" ) );
+    BOOST_CHECK( settings.m_Window.perspective.Contains( "dir=4;layer=0;row=0;pos=0" ) );
+    BOOST_CHECK( !settings.Get<bool>( "aui.show_schematic_hierarchy" ).value() );
+    BOOST_CHECK_EQUAL( settings.Get<int>( "appearance.used_components_preview_height" ).value(), 144 );
+    BOOST_CHECK( !settings.Contains( "circuitalive.simulation" ) );
+    BOOST_CHECK( !settings.Contains( "window.size_x" ) );
+}
+
+BOOST_AUTO_TEST_CASE( FreshPcbGetsPendingFootprintsAndAppearance )
+{
+    APP_SETTINGS_BASE settings( "pcb-layout-test", 0 );
+    settings.Load();
+    CIRCUITALIVE::ApplyDefaultEditorLayout( settings, false );
+    BOOST_CHECK( settings.m_Window.perspective.Contains( "name=PendingFootprints" ) );
+    BOOST_CHECK( settings.Get<bool>( "circuitalive.pending_visible" ).value() );
+    BOOST_CHECK_EQUAL( settings.Get<int>( "aui.right_panel_width" ).value(), 229 );
+    BOOST_CHECK( !settings.Contains( "window.pos_x" ) );
+}
+
+BOOST_AUTO_TEST_CASE( SavedLegacyOrModernLayoutIsPreserved )
+{
+    APP_SETTINGS_BASE settings( "saved-layout-test", 0 );
+    settings.Load();
+    settings.Set<wxString>( "window.perspective", "layout2|custom" );
+    settings.Load();
+    CIRCUITALIVE::ApplyDefaultEditorLayout( settings, true );
+    BOOST_CHECK_EQUAL( settings.m_Window.perspective, "layout2|custom" );
+    BOOST_CHECK( !settings.Contains( "appearance.used_components_preview_height" ) );
+
+    settings.Set<wxString>( "window.perspective", "" );
+    settings.Set<nlohmann::json>( "window.aui_state", { { "custom", true } } );
+    settings.Load();
+    CIRCUITALIVE::ApplyDefaultEditorLayout( settings, false );
+    BOOST_CHECK( settings.m_Window.perspective.IsEmpty() );
+    BOOST_CHECK( !settings.Contains( "circuitalive.pending_visible" ) );
+}
+
+BOOST_AUTO_TEST_CASE( DefaultsKeepExistingPanelPreferencesAndAreAppliedOnce )
+{
+    APP_SETTINGS_BASE settings( "partial-layout-test", 0 );
+    settings.Set<bool>( "circuitalive.pending_visible", false );
+    settings.Set<int>( "circuitalive.pending_sash", 123 );
+    settings.Load();
+    CIRCUITALIVE::ApplyDefaultEditorLayout( settings, false );
+    BOOST_CHECK( !settings.Get<bool>( "circuitalive.pending_visible" ).value() );
+    BOOST_CHECK_EQUAL( settings.Get<int>( "circuitalive.pending_sash" ).value(), 123 );
+    settings.Set<int>( "aui.right_panel_width", 333 );
+    CIRCUITALIVE::ApplyDefaultEditorLayout( settings, false );
+    BOOST_CHECK_EQUAL( settings.Get<int>( "aui.right_panel_width" ).value(), 333 );
 }
 
 BOOST_AUTO_TEST_SUITE_END()

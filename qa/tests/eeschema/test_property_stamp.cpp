@@ -243,6 +243,37 @@ BOOST_FIXTURE_TEST_CASE( PinConnectionTargetsUseOnlyVisibleEndpointsOfTheDisplay
     }
 }
 
+BOOST_FIXTURE_TEST_CASE( PinLabelsExtendAwayFromRotatedAndMirroredSymbols, STAMP_FIXTURE )
+{
+    LIB_SYMBOL lib( "PinDirection" );
+    auto* terminal = new SCH_PIN( &lib );
+    terminal->SetNumber( "1" ); terminal->SetUnit( 1 ); terminal->SetBodyStyle( 1 );
+    terminal->SetPosition( VECTOR2I( -schIUScale.mmToIU( 5.08 ), 0 ) );
+    terminal->SetLength( schIUScale.mmToIU( 2.54 ) );
+    lib.AddDrawItem( terminal );
+    SCH_SYMBOL symbol( lib, LIB_ID( "Test", "PinDirection" ), &path, 1, 1,
+                       VECTOR2I( schIUScale.mmToIU( 40 ), schIUScale.mmToIU( 40 ) ), schematic.get() );
+    for( int rotation : { SYM_ORIENT_0, SYM_ORIENT_90, SYM_ORIENT_180, SYM_ORIENT_270 } )
+    for( int mirror : std::vector<int>{ 0, SYM_MIRROR_X, SYM_MIRROR_Y } )
+    {
+        symbol.SetOrientation( rotation + mirror );
+        const auto* pin = symbol.GetPins( &path ).front();
+        const auto end = pin->GetPosition(), outward = end - pin->GetPinRoot();
+        SCH_LABEL local( end, "Address_012345" );
+        SCH_GLOBALLABEL global( end, "Address_012345" );
+        SCH_HIERLABEL hierarchical( end, "Address_012345" );
+        for( SCH_LABEL_BASE* label : std::vector<SCH_LABEL_BASE*>{ &local, &global, &hierarchical } )
+        {
+            label->SetParent( root->GetScreen() );
+            label->SetTextSize( VECTOR2I( schIUScale.mmToIU( 1.27 ), schIUScale.mmToIU( 1.27 ) ) );
+            label->SetSpinStyle( LabelSpinAwayFromPin( *pin ) );
+            const auto textCenter = label->GetBodyBoundingBox( nullptr ).GetCenter() - end;
+            BOOST_CHECK_GT( double( textCenter.x ) * outward.x + double( textCenter.y ) * outward.y, 0 );
+            BOOST_CHECK( label->GetPosition() == end );
+        }
+    }
+}
+
 BOOST_FIXTURE_TEST_CASE( MultiunitEditsSynchronizeOnlyTheChosenField, STAMP_FIXTURE )
 {
     auto* first = Symbol( "U1", 1, 2 ); auto* second = Symbol( "U1", 2, 2 );

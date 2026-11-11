@@ -22,6 +22,11 @@ namespace CIRCUITALIVE
 
 enum class SIM_SESSION_STATE { STOPPED, RUNNING, PAUSED, COMPLETED, FAILED };
 
+// Bus diagnostics need both pin voltages and output-stage monitors. Keep the
+// history budget fixed when allowing larger multi-page digital schematics.
+constexpr std::size_t MAX_SESSION_SIGNALS = 1024;
+constexpr std::size_t MAX_SESSION_HISTORY_VALUES = 65536;
+
 struct SIM_PARAMETER_CHANGE
 {
     std::string reference, parameter;

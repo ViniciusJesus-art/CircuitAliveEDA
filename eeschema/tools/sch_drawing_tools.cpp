@@ -456,6 +456,7 @@ int SCH_DRAWING_TOOLS::PlaceSymbol( const TOOL_EVENT& aEvent )
                 {
                     DisplayError( m_frame, wxString::FromUTF8( error.what() ) );
                 }
+                CIRCUITALIVE::RememberUsedSymbolDefaults( m_frame, *symbol );
                 addSymbol( symbol );
                 annotate();
 

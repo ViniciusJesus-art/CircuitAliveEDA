@@ -372,7 +372,12 @@ BOOST_FIXTURE_TEST_CASE( ComposedDigitalBlockKeepsFloatingInputsAndDriverState, 
     for( const auto& p : c.logicPins ) if( p.component == 1 )
     {
         if( p.pin == "2" ) BOOST_CHECK( PinLogicLevel( p, sample ) == LOGIC_LEVEL::HIGH_Z );
-        if( p.pin == "3" ) BOOST_CHECK( PinLogicLevel( p, sample ) == LOGIC_LEVEL::UNKNOWN );
+        if( p.pin == "3" )
+        {
+            BOOST_CHECK( PinDriveLevel( p, sample ) == LOGIC_LEVEL::UNKNOWN );
+            // The model's X stage is weak; the 10k pull-up resolves the actual wire.
+            BOOST_CHECK( PinLogicLevel( p, sample ) == LOGIC_LEVEL::HIGH );
+        }
     }
 }
 BOOST_FIXTURE_TEST_CASE( Visual555PresetOscillatesAndResetDominatesItsLatch, DESIGN_FILES )

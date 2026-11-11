@@ -41,7 +41,8 @@ def main():
                "#if 0\n")
     content += "".join("wxTRANSLATE( " + json.dumps(s, ensure_ascii=False) + " );\n" for s in sorted(strings))
     content += "#endif\n"
-    diagnostics = {"Overcurrent: ", "Logic supply out of range: "}
+    diagnostics = {"Overcurrent: ", "Logic supply out of range: ", "Bus contention: ",
+                   "Pause the simulation to inspect memory"}
     sources = list((ROOT / "eeschema/circuitalive").glob("*.cpp"))
     sources += [ROOT / "eeschema/sim" / name for name in
                 ("interactive_sim_session.cpp", "interactive_sim_worker.cpp", "memory_image.cpp", "runtime_memory.cpp", "programmable_runtime.cpp")]
