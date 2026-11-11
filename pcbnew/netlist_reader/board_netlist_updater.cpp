@@ -133,10 +133,29 @@ BOARD_NETLIST_UPDATER::BuildFootprintAssociations( BOARD& aBoard, NETLIST& aNetl
         }
     }
 
+    // References are the default link method. Preserve a renamed component's identity
+    // when its new reference has no footprint yet, without taking an existing reference link.
+    if( !aLookupByTimestamp )
+    {
+        std::set<COMPONENT*> claimed;
+        for( const auto& [footprint, component] : result.matches )
+            claimed.insert( component );
+        for( FOOTPRINT* footprint : aBoard.Footprints() )
+        {
+            if( footprint->IsBoardOnly() || result.matches.count( footprint ) )
+                continue;
+            const auto it = paths.find( footprint->GetPath() );
+            if( it != paths.end() && it->second.size() == 1 && !claimed.count( *it->second.begin() ) )
+                result.matches[footprint] = *it->second.begin();
+        }
+    }
+
     // Repeated instances of a shared sheet reuse symbol UUIDs. Recover by UUID only when
     // both the schematic component and the old PCB instance are unambiguous.
-    if( aLookupByTimestamp )
     {
+        std::set<COMPONENT*> claimed;
+        for( const auto& [footprint, component] : result.matches )
+            claimed.insert( component );
         for( FOOTPRINT* footprint : aBoard.Footprints() )
         {
             if( footprint->IsBoardOnly() || result.matches.count( footprint )
@@ -145,7 +164,8 @@ BOARD_NETLIST_UPDATER::BuildFootprintAssociations( BOARD& aBoard, NETLIST& aNetl
 
             const KIID& uuid = footprint->GetPath().back();
             const auto it = uuids.find( uuid );
-            if( it != uuids.end() && it->second.size() == 1 && boardInstances[uuid].size() == 1 )
+            if( it != uuids.end() && it->second.size() == 1 && boardInstances[uuid].size() == 1
+                && ( aLookupByTimestamp || !claimed.count( *it->second.begin() ) ) )
             {
                 COMPONENT* component = *it->second.begin();
                 result.matches[footprint] = component;
@@ -231,6 +251,8 @@ FOOTPRINT* BOARD_NETLIST_UPDATER::addNewFootprint( COMPONENT* aComponent )
 
 FOOTPRINT* BOARD_NETLIST_UPDATER::addNewFootprint( COMPONENT* aComponent, const LIB_ID& aFootprintId )
 {
+    if( m_newFootprintFilter && !m_newFootprintFilter( *aComponent, aFootprintId ) )
+        return nullptr;
     wxString msg;
 
     if( aFootprintId.empty() )
@@ -279,12 +301,15 @@ FOOTPRINT* BOARD_NETLIST_UPDATER::addNewFootprint( COMPONENT* aComponent, const 
 
         footprint->SetParent( m_board );
         footprint->SetPosition( estimateFootprintInsertionPosition() );
+        if( m_newFootprintInitializer )
+            m_newFootprintInitializer( *footprint );
 
         // This flag is used to prevent connectivity from considering the footprint during its
         // initial build after the footprint is committed, because we're going to immediately start
         // a move operation on the footprint and don't want its pads to drive nets onto vias/tracks
         // it happens to land on at the initial position.
-        footprint->SetAttributes( footprint->GetAttributes() | FP_JUST_ADDED );
+        if( !m_newFootprintInitializer )
+            footprint->SetAttributes( footprint->GetAttributes() | FP_JUST_ADDED );
 
         m_addedFootprints.push_back( footprint );
         m_commit.Add( footprint );

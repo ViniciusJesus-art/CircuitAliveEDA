@@ -23,7 +23,10 @@ são adicionados. Folhas que já fazem parte de uma hierarquia mantêm essa
 hierarquia, sem aparecer uma segunda vez como página principal.
 
 Todas as páginas do projeto alimentam a mesma PCB. A lista explícita de páginas
-tem prioridade sobre um projeto antigo com o nome de uma página. Veja os
+tem prioridade sobre um projeto antigo com o nome de uma página. Ao retornar ao
+editor de PCB no modo de projeto, os componentes já posicionados são sincronizados
+com todas essas páginas. O painel **Pending Footprints** também se atualiza e reúne
+os componentes de todas elas que ainda precisam ser posicionados. Veja os
 [vínculos entre esquemático e PCB](PCB_LINKS.md) para renomeações, mudanças de
 página e tratamento de footprints cujo símbolo foi excluído.
 

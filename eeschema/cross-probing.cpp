@@ -1026,7 +1026,10 @@ void SCH_EDIT_FRAME::KiwayMailIn( KIWAY_MAIL_EVENT& mail )
 
     case MAIL_SCH_GET_NETLIST:
     {
-        if( !payload.empty() )
+        const bool automaticPcbSync = payload == "circuitalive:pcb-auto-sync";
+        if( automaticPcbSync && ( !IsEnabled() || !ToolStackIsEmpty() ) )
+            return;
+        if( !automaticPcbSync && !payload.empty() )
         {
             wxString annotationMessage( payload );
 

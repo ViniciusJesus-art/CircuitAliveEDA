@@ -47,6 +47,12 @@ DIALOG_UPDATE_PCB::DIALOG_UPDATE_PCB( PCB_EDIT_FRAME* aParent, NETLIST* aNetlist
     m_messagePanel->SetFileName( Prj().GetProjectPath() + wxT( "report.txt" ) );
     m_messagePanel->SetLazyUpdate( true );
     m_netlist->SortByReference();
+    // Dialog control persistence can otherwise restore the old identity-only default.
+    OptOut( m_cbRelinkFootprints );
+    m_cbRelinkFootprints->SetValue( true );
+    m_cbRelinkFootprints->SetToolTip( _(
+            "Link by Reference. If a reference was renamed and has no footprint yet, "
+            "retain its existing symbol identity and placement. Uncheck to link by identity only." ) );
     m_cbDeleteExtraFootprints->SetToolTip( _(
             "Remove unlocked footprints without a schematic symbol. When unchecked, keep them "
             "marked 'Missing schematic symbol' and disconnect their pads. Board-only footprints "

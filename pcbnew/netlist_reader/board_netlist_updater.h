@@ -43,6 +43,7 @@ class PCB_GROUP;
 #include <board_commit.h>
 #include <map>
 #include <set>
+#include <functional>
 
 /**
  * Update the #BOARD with a new netlist.
@@ -99,9 +100,9 @@ public:
         std::set<wxString> ambiguousReferences;
     };
 
-    /** Resolve the complete board before changing references or paths. Stable instance paths
-     * take priority, followed by unique symbol UUIDs (page moves). The existing reference-only
-     * mode remains an explicit override. Board-only footprints are never claimed.
+    /** Resolve the complete board before changing references or paths. Reference links take
+     * priority in reference mode; unclaimed identities recover reference renames/page moves.
+     * Identity mode uses instance paths, then unique UUIDs. Board-only footprints are never claimed.
      */
     static FOOTPRINT_ASSOCIATIONS BuildFootprintAssociations( BOARD& aBoard, NETLIST& aNetlist,
                                                              bool aLookupByTimestamp );
@@ -126,6 +127,13 @@ public:
     void SetUpdateFields( bool aEnabled ) { m_updateFields = aEnabled; }
 
     void SetRemoveExtraFields( bool aEnabled ) { m_removeExtraFields = aEnabled; }
+
+    // Automatic synchronization updates placed components only. Interactive placement can
+    // allow exactly one pending reference/footprint and initialize its final geometry.
+    void SetNewFootprintFilter( std::function<bool( const COMPONENT&, const LIB_ID& )> aFilter )
+    { m_newFootprintFilter = std::move( aFilter ); }
+    void SetNewFootprintInitializer( std::function<void( FOOTPRINT& )> aInitializer )
+    { m_newFootprintInitializer = std::move( aInitializer ); }
 
     std::vector<FOOTPRINT*> GetAddedFootprints() const { return m_addedFootprints; }
 
@@ -191,6 +199,8 @@ private:
     bool m_overrideLocks;
     bool m_updateFields;
     bool m_removeExtraFields;
+    std::function<bool( const COMPONENT&, const LIB_ID& )> m_newFootprintFilter;
+    std::function<void( FOOTPRINT& )> m_newFootprintInitializer;
 
     int m_warningCount;
     int m_errorCount;

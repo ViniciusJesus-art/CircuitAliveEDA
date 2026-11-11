@@ -7,30 +7,43 @@ essa associação, mesmo que exista um arquivo de projeto antigo com o nome da
 página. O editor de PCB também pode abrir as páginas declaradas quando não existe
 um esquemático com o nome do projeto.
 
-Use **Tools > Update PCB from Schematic** para revisar e aplicar as mudanças.
-No modo normal, por identidade, o vínculo usa:
+## Vínculo por Reference
 
-1. O caminho da instância e o UUID do símbolo, preservando renomeações de referência.
-2. Um UUID de símbolo único, para recuperar movimentos entre páginas.
+A opção **Re-link footprints ... based on their reference designators** fica
+marcada por padrão na janela **Tools > Update PCB from Schematic**. A associação
+é resolvida para a placa inteira antes de aplicar mudanças:
 
-O vínculo é resolvido para a placa inteira antes de alterar referências. Assim,
-trocar U1/U2 por U12/U13 ou permutar U1 e U2 atualiza os footprints correspondentes.
+1. A **Reference** tem prioridade: o U1 do esquema usa o U1 já existente na PCB.
+2. Se a nova referência ainda não tiver um footprint associado, o caminho da
+   instância e o UUID do símbolo recuperam a posição anterior após uma renomeação.
+3. Um UUID de símbolo único também permite recuperar movimentos entre páginas.
+
+Assim, renomear U1/U2 para U12/U13 atualiza as peças existentes quando U12/U13
+não estão na placa. Ao permutar referências que já existem na PCB, prevalece o
+vínculo por Reference. Desmarque a opção de revincular por referência para usar
+somente a identidade do símbolo, inclusive ao permutar referências.
+
 Símbolos com várias unidades continuam sendo um único encapsulamento, inclusive
 quando suas unidades estão em páginas diferentes. Instâncias repetidas de uma
-folha compartilhada mantêm seus vínculos individuais.
+folha compartilhada mantêm seus vínculos individuais. Referências duplicadas e
+múltiplos footprints indistinguíveis impedem a atualização e aparecem no relatório.
+Variantes explicitamente configuradas podem ter footprints diferentes com a mesma
+referência.
 
-Editar valor, referência, campos ou conexões não cria outro footprint. A posição,
-a orientação e as trilhas existentes continuam na placa. Alterar o footprint
-atribuído segue a opção de substituição da janela de atualização. Componentes
-novos recebem footprints novos, desde que tenham uma atribuição válida.
+## Atualização ao retornar à PCB
 
-A opção já existente **Re-link footprints ... based on their reference designators**
-mantém a associação exclusivamente por referência. Use-a para recuperar associações
-antigas ou vincular símbolos recriados aos footprints com a mesma referência.
-Para renomear referências preservando a identidade, mantenha essa opção desmarcada.
-Referências duplicadas e múltiplos
-footprints indistinguíveis impedem a atualização e aparecem no relatório. Variantes
-explicitamente configuradas podem ter footprints diferentes com a mesma referência.
+Abra a PCB pelo projeto para usar a comunicação entre os editores. Trazer o
+editor de PCB para o foco sincroniza automaticamente os componentes já
+posicionados: conexões, referências, valores, campos e footprints atribuídos.
+São consideradas todas as páginas e as edições atuais do esquemático, mesmo
+antes de salvar. A sincronização aguarda ferramentas e diálogos ativos terminarem;
+símbolos novos precisam estar anotados com referências válidas.
+
+Essa atualização mantém a posição e a orientação das peças, usa a substituição
+normal quando a atribuição de footprint muda e não insere componentes novos.
+As mudanças entram no histórico de desfazer da PCB. A placa continua precisando
+ser salva normalmente. A janela **Update PCB from Schematic** permanece disponível
+para revisar o relatório, escolher opções e adicionar componentes em lote.
 
 Se um símbolo desaparecer do esquema ou for excluído da placa, a próxima atualização
 mantém seu footprint, acrescenta o campo visível `CA.LinkStatus` com o texto
@@ -44,6 +57,33 @@ não remove uma ligação física de cobre. Revise o roteamento e execute o DRC 
 alterar conexões ou remover componentes. A opção **Delete footprints with no symbols**
 remove os footprints sem símbolo; os bloqueios continuam sendo respeitados.
 Footprints com o atributo **Board only** conservam seus campos e suas conexões.
+
+## Painel Pending Footprints
+
+O painel reúne os componentes de todas as páginas que vão para a PCB e ainda
+não estão posicionados. Cada linha mostra **Reference** e **Value**, com uma prévia
+do footprint selecionado. Componentes excluídos da placa não entram na lista.
+Uma atribuição ausente aparece como **(no footprint)**; atribua o footprint no
+esquemático antes de tentar posicioná-lo.
+
+1. Selecione uma linha no painel.
+2. Clique em uma área vazia da PCB para trazer o footprint ao ponteiro.
+3. Mova a prévia e clique novamente para posicionar. Rotação e troca de lado
+   também funcionam durante a prévia.
+4. O item sai da lista, e o próximo clique vazio traz o componente seguinte,
+   sem precisar voltar ao painel.
+
+Clicar sobre um footprint, trilha, texto ou outro objeto existente mantém a
+seleção normal do editor. **Esc** cancela a prévia sem inserir o componente;
+um segundo **Esc** encerra a escolha. Trocar de janela também cancela a prévia,
+permitindo atualizar o esquema antes de continuar. Desfazer um posicionamento
+devolve o componente à lista, e refazer o remove novamente.
+
+A lista se atualiza junto com a PCB ao retornar ao editor, incluindo componentes
+adicionados ou excluídos no esquema e mudanças em referência, valor e footprint.
+Ela também acompanha alterações locais e posicionamentos na placa. O botão
+**Float / dock** alterna entre painel acoplado e janela flutuante; a disposição
+é salva. **View > Panels > Pending Footprints** mostra ou oculta o painel.
 
 Criar uma página encerra ferramentas e prévias na folha original antes da troca.
 Os comandos do menu **Pages** aguardam o fechamento do menu antes de abrir diálogos

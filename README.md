@@ -147,7 +147,11 @@ See [schematic pages](docs/circuitalive/PAGES.md).
 
 ### Schematic and PCB associations
 
-All project pages feed the same project PCB. **Update PCB from Schematic** preserves symbol identity when references change (for example, U1 to U12), units are spread across pages, or a symbol moves to another page. The existing option to re-link by reference remains available for recovering old associations. Existing footprint positions and routing are retained; changing the assigned footprint uses the normal footprint replacement process.
+All project pages feed the same project PCB. Linking by **Reference** is enabled by default: a schematic U1 uses the PCB's U1. If a reference changes (for example, U1 to U12) and the new reference has no footprint yet, the existing symbol identity recovers its placement. Units spread across pages still belong to one package. Existing footprint positions and routing are retained; changing the assigned footprint uses the normal footprint replacement process. The update dialog also offers linking by identity only.
+
+In project mode, bringing the PCB editor into focus automatically synchronizes the components already placed: connections, references, values, fields, and assigned footprints. New schematic components are listed without being added automatically. **Update PCB from Schematic** remains available for reviewing changes and adding components in bulk.
+
+The dockable **Pending Footprints** panel shows each unplaced component's **Reference**, **Value**, and footprint preview. Select a row, click empty PCB space to bring the footprint to the pointer, then click again to place it. The placed item leaves the list; the next empty click picks the next row automatically. Clicking an existing footprint, track, or text keeps the normal selection behavior. **Esc** cancels the preview. Placement supports undo/redo, and the list refreshes when returning to the PCB, including schematic additions, removals, and property edits. Use **View > Panels > Pending Footprints** to show or hide the panel; its docked/floating layout is saved.
 
 When a symbol is deleted, the next PCB update keeps its footprint with a **Missing schematic symbol** warning on the comments layer and clears the pads' net assignments. The update dialog can instead remove unused footprints. Board-only footprints are preserved. Duplicate references or ambiguous recovery candidates are reported before applying changes. See [schematic and PCB links](docs/circuitalive/PCB_LINKS.md).
 

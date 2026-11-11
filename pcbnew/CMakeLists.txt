@@ -358,6 +358,7 @@ set( PCBNEW_DRC_SRCS
 
 set( PCBNEW_NETLIST_SRCS
     netlist_reader/board_netlist_updater.cpp
+    widgets/pending_footprints.cpp
     netlist_reader/netlist.cpp
     )
 

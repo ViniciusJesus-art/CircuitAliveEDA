@@ -141,21 +141,21 @@ void PCB_EDIT_FRAME::OnNetlistChanged( BOARD_NETLIST_UPDATER& aUpdater, bool* aR
                 return 0;
             } );
 
-    // Spread new footprints.
-    std::vector<FOOTPRINT*> newFootprints = aUpdater.GetAddedFootprints();
-
-    GetToolManager()->RunAction( ACTIONS::selectionClear );
-
-    SpreadFootprints( &newFootprints, { 0, 0 }, true );
-
-    // Start drag command for new footprints
-    if( !newFootprints.empty() )
+    // A null drag result finalizes automatic synchronization or an already positioned
+    // footprint without spreading items or clearing the user's selection.
+    if( aRunDragCommand )
     {
-        EDA_ITEMS items;
-        std::copy( newFootprints.begin(), newFootprints.end(), std::back_inserter( items ) );
-        GetToolManager()->RunAction<EDA_ITEMS*>( ACTIONS::selectItems, &items );
+        std::vector<FOOTPRINT*> newFootprints = aUpdater.GetAddedFootprints();
+        GetToolManager()->RunAction( ACTIONS::selectionClear );
+        SpreadFootprints( &newFootprints, { 0, 0 }, true );
 
-        *aRunDragCommand = true;
+        if( !newFootprints.empty() )
+        {
+            EDA_ITEMS items;
+            std::copy( newFootprints.begin(), newFootprints.end(), std::back_inserter( items ) );
+            GetToolManager()->RunAction<EDA_ITEMS*>( ACTIONS::selectItems, &items );
+            *aRunDragCommand = true;
+        }
     }
 
     Compile_Ratsnest( true );

@@ -46,6 +46,7 @@
 #include <teardrop/teardrop.h>
 #include <pcb_board_outline.h>
 
+#include <algorithm>
 #include <functional>
 #include <unordered_set>
 #include <project/project_file.h>
@@ -215,6 +216,15 @@ void BOARD_COMMIT::Push( const wxString& aMessage, int aCommitFlags )
 
     if( Empty() )
         return;
+
+    // Nets must exist before the items that use them. Undo visits entries in reverse:
+    // remove the new pads before removing their nets, since BOARD::Remove(net) clears
+    // assignments on every live pad. Redo then restores the nets before those pads.
+    std::stable_partition( m_entries.begin(), m_entries.end(), []( const COMMIT_LINE& entry )
+    {
+        return entry.m_item && entry.m_item->Type() == PCB_NETINFO_T
+               && ( entry.m_type & CHT_TYPE ) == CHT_ADD;
+    } );
 
     undoList.SetDescription( aMessage );
 

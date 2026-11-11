@@ -28,6 +28,7 @@
 #include <board.h>
 #include <footprint.h>
 #include <netlist_reader/pcb_netlist.h>
+#include <widgets/pending_footprints.h>
 
 
 BOOST_AUTO_TEST_SUITE( UpdatePcbLegacyFpidDnp )
@@ -94,6 +95,8 @@ BOOST_AUTO_TEST_CASE( QualifiedSchematicFpidComparesExactly )
 
 
 BOOST_AUTO_TEST_SUITE_END()
+
+
 
 
 BOOST_AUTO_TEST_SUITE( SchematicPcbAssociations )
@@ -241,7 +244,7 @@ BOOST_FIXTURE_TEST_CASE( DuplicateLinkedFootprintsCannotSilentlyRepresentOneComp
     BOOST_CHECK_EQUAL( links.ambiguousReferences.count( "U1" ), 1u );
 }
 
-BOOST_FIXTURE_TEST_CASE( ReferenceOnlyRemainsAnExplicitOverride, LINK_FIXTURE )
+BOOST_FIXTURE_TEST_CASE( ReferenceMatchesTakePriorityOverIdentityRecovery, LINK_FIXTURE )
 {
     const KIID sheet, a, b;
     auto* footprint = Footprint( "U1", { sheet, a } );
@@ -249,6 +252,71 @@ BOOST_FIXTURE_TEST_CASE( ReferenceOnlyRemainsAnExplicitOverride, LINK_FIXTURE )
     auto* replacement = Component( "U1", { sheet }, { b } );
     const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, false );
     BOOST_CHECK( links.matches.at( footprint ) == replacement );
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_FIXTURE_TEST_SUITE( PendingFootprints, SchematicPcbAssociations::LINK_FIXTURE )
+
+BOOST_AUTO_TEST_CASE( ReferenceModeRetainsRenamedFootprintsWithoutClaimingExistingReferences )
+{
+    const KIID sheet, symbol;
+    auto* footprint = Footprint( "U1", { sheet, symbol } );
+    auto* component = Component( "U12", { sheet }, { symbol } );
+    const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, false );
+    BOOST_CHECK( links.matches.at( footprint ) == component );
+    BOOST_CHECK( CIRCUITALIVE::BuildPendingFootprints( board, netlist ).empty() );
+}
+
+BOOST_AUTO_TEST_CASE( PendingListContainsEveryEligibleUnplacedComponentInReferenceOrder )
+{
+    Component( "U1", {}, { KIID() } );
+    Component( "R10", {}, { KIID() } );
+    Component( "R2", {}, { KIID() } )->SetValue( "10k" );
+    Component( "#PWR01", {}, { KIID() } );
+    Component( "U?", {}, { KIID() } );
+    Component( "J1", {}, { KIID() } )->SetProperties( { { "exclude_from_board", "" } } );
+    const auto pending = CIRCUITALIVE::BuildPendingFootprints( board, netlist );
+    BOOST_REQUIRE_EQUAL( pending.size(), 3u );
+    BOOST_CHECK_EQUAL( pending[0].reference, "R2" );
+    BOOST_CHECK_EQUAL( pending[0].value, "10k" );
+    BOOST_CHECK_EQUAL( pending[1].reference, "R10" );
+    BOOST_CHECK_EQUAL( pending[2].reference, "U1" );
+}
+
+BOOST_AUTO_TEST_CASE( PlacementAndRemovalRefreshPendingListWithoutChangingTheSchematic )
+{
+    Component( "U1", {}, { KIID() } );
+    Component( "U2", {}, { KIID() } );
+    auto* placed = Footprint( "U1", {} );
+    auto* mechanical = Footprint( "U2", {} );
+    mechanical->SetBoardOnly( true );
+    auto pending = CIRCUITALIVE::BuildPendingFootprints( board, netlist );
+    BOOST_REQUIRE_EQUAL( pending.size(), 1u );
+    BOOST_CHECK_EQUAL( pending[0].reference, "U2" );
+    board.Remove( placed );
+    delete placed;
+    pending = CIRCUITALIVE::BuildPendingFootprints( board, netlist );
+    BOOST_REQUIRE_EQUAL( pending.size(), 2u );
+    BOOST_CHECK_EQUAL( netlist.GetCount(), 2u );
+}
+
+BOOST_AUTO_TEST_CASE( MissingAssignmentsStayVisibleAndVariantFootprintsHaveSeparateSlots )
+{
+    auto* component = Component( "U1", {}, { KIID() } );
+    COMPONENT_VARIANT variant( "SMD" );
+    variant.m_fields[GetCanonicalFieldName( FIELD_T::FOOTPRINT )] = "Test:SOIC-16";
+    component->AddVariant( variant );
+    Footprint( "U1", {} );
+    Component( "R1", {}, { KIID() } )->SetFPID( LIB_ID() );
+    auto pending = CIRCUITALIVE::BuildPendingFootprints( board, netlist );
+    BOOST_REQUIRE_EQUAL( pending.size(), 2u );
+    BOOST_CHECK( pending[0].footprint.empty() );
+    BOOST_CHECK_EQUAL( pending[1].footprint.Format(), "Test:SOIC-16" );
+    Footprint( "U1", {}, "SOIC-16" );
+    pending = CIRCUITALIVE::BuildPendingFootprints( board, netlist );
+    BOOST_REQUIRE_EQUAL( pending.size(), 1u );
+    BOOST_CHECK_EQUAL( pending[0].reference, "R1" );
 }
 
 BOOST_AUTO_TEST_SUITE_END()

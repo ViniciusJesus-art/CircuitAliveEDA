@@ -43,6 +43,8 @@ using namespace std::placeholders;
 #include <pcb_generator.h>
 #include <pcb_group.h>
 #include <pcb_base_edit_frame.h>
+#include <pcb_edit_frame.h>
+#include <widgets/pending_footprints.h>
 #include <zone.h>
 #include <collectors.h>
 #include <dialog_filter_selection.h>
@@ -325,6 +327,20 @@ int PCB_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
         }
         else if( evt->IsClick( BUT_LEFT ) )
         {
+            if( brd_editor && m_frame->ToolStackIsEmpty() && !hasModifier() )
+            {
+                GENERAL_COLLECTOR occupied;
+                occupied.Collect( board(), GENERAL_COLLECTOR::AllBoardItems,
+                                  evt->Position(), getCollectorsGuide() );
+                if( occupied.GetCount() == 0
+                    && CIRCUITALIVE::BeginPendingFootprint( static_cast<PCB_EDIT_FRAME*>( frame ),
+                                                          evt->Position() ) )
+                {
+                    m_disambiguateTimer.Stop();
+                    ClearSelection();
+                    continue;
+                }
+            }
             // If there is no disambiguation, this routine is still running and will
             // register a `click` event when released
             if( m_disambiguateTimer.IsRunning() )

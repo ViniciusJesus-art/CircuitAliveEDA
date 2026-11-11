@@ -26,6 +26,7 @@
 
 #include <advanced_config.h>
 #include <bitmaps.h>
+#include <widgets/pending_footprints.h>
 #include <file_history.h>
 #include <kiface_base.h>
 #include <pcb_edit_frame.h>
@@ -220,6 +221,7 @@ void PCB_EDIT_FRAME::doReCreateMenuBar()
     showHidePanels->Add( PCB_ACTIONS::showSearch,                 ACTION_MENU::CHECK );
     showHidePanels->Add( PCB_ACTIONS::showLayersManager,          ACTION_MENU::CHECK );
     showHidePanels->Add( PCB_ACTIONS::showNetInspector,           ACTION_MENU::CHECK );
+    showHidePanels->Add( CIRCUITALIVE::PENDING_FOOTPRINT_ACTIONS::showPanel, ACTION_MENU::CHECK );
 
     if( ADVANCED_CFG::GetCfg().m_EnablePcbDesignBlocks )
         showHidePanels->Add( PCB_ACTIONS::showDesignBlockPanel, ACTION_MENU::CHECK, _( "Design Blocks" ) );
