@@ -1022,9 +1022,20 @@ BOOST_FIXTURE_TEST_CASE( NativeExcludedInstanceBypassesBrokenModelAndPersistsWit
     BOOST_CHECK_THROW( ReadSymbolModelSettings( *led, m_schematic->CurrentSheet(), "", "" ), std::runtime_error );
     BOOST_CHECK_NO_THROW( ReadSymbolModelSettings( *led, m_schematic->CurrentSheet(), "", "", true ) );
     led->SetExcludedFromSim( true, &m_schematic->CurrentSheet(), "" );
-    const auto excluded = CaptureSchematic( *m_schematic );
+    const auto excluded = CaptureSchematic( *m_schematic, true );
     BOOST_CHECK( excluded.circuit.leds.empty() );
     for( const auto& location : excluded.locations ) BOOST_CHECK( location.reference != "D1" );
+    std::size_t observedPins = 0;
+    for( const auto& pin : excluded.circuit.logicPins )
+        if( pin.reference == "D1" )
+        {
+            ++observedPins;
+            BOOST_CHECK( pin.observer );
+            BOOST_CHECK( !pin.output );
+            BOOST_CHECK( std::any_of( excluded.pins.begin(), excluded.pins.end(),
+                [&]( const auto& location ) { return location.component == pin.component && location.pin == pin.pin; } ) );
+        }
+    BOOST_CHECK_EQUAL( observedPins, 2u );
     struct TEMP_PROJECT
     {
         std::filesystem::path path = std::filesystem::temp_directory_path()
@@ -1046,6 +1057,35 @@ BOOST_FIXTURE_TEST_CASE( NativeExcludedInstanceBypassesBrokenModelAndPersistsWit
     BOOST_CHECK( session.Snapshot().state == SIM_SESSION_STATE::PAUSED );
     led->SetExcludedFromSim( false, &m_schematic->CurrentSheet(), "" );
     BOOST_CHECK_THROW( CaptureSchematic( *m_schematic ), std::runtime_error );
+}
+
+BOOST_FIXTURE_TEST_CASE( NativeExcludedSheetKeepsTerminalIndicatorsWithoutSimulatingItsComponents,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "standard_library_led.kicad_sch" );
+    LoadSchematic( file );
+    m_schematic->CurrentSheet().Last()->SetExcludedFromSim( true, &m_schematic->CurrentSheet(), "" );
+    BOOST_REQUIRE( m_schematic->CurrentSheet().GetExcludedFromSim( "" ) );
+    const auto snapshot = CaptureSchematic( *m_schematic, true );
+    BOOST_CHECK( snapshot.locations.empty() );
+    BOOST_CHECK( snapshot.circuit.leds.empty() );
+    BOOST_CHECK( snapshot.circuit.switches.empty() );
+    BOOST_CHECK( snapshot.circuit.adjustments.empty() );
+    BOOST_CHECK( snapshot.circuit.config.programmableDevices.empty() );
+    BOOST_REQUIRE( !snapshot.pins.empty() );
+    BOOST_CHECK_EQUAL( snapshot.pins.size(), snapshot.circuit.logicPins.size() );
+    for( const auto& location : snapshot.pins )
+    {
+        BOOST_CHECK_EQUAL( location.sheet, m_schematic->CurrentSheet().Path().AsString() );
+        BOOST_CHECK( std::any_of( snapshot.circuit.logicPins.begin(), snapshot.circuit.logicPins.end(),
+            [&]( const auto& pin ) { return pin.observer && pin.component == location.component
+                                           && pin.pin == location.pin; } ) );
+    }
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config );
+    session.AdvanceTo( 1e-6 );
+    for( const auto& pin : snapshot.circuit.logicPins )
+        BOOST_CHECK( PinDriveLevel( pin, session.Snapshot().latest ) == LOGIC_LEVEL::HIGH_Z );
 }
 
 BOOST_FIXTURE_TEST_CASE( CircuitAliveDemoSchematicsAllRunInteractively, KI_TEST::SCHEMATIC_TEST_FIXTURE )

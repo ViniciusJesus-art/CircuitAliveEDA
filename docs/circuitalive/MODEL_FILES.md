@@ -34,6 +34,14 @@ símbolo, conectar blocos e configurar parâmetros sem escrever o JSON abaixo.
    `20mA`, `470R` e `100uF`.
 5. Confirme e salve o esquema. Play cria uma sessão usando os arquivos atuais.
 
+Marcar **Exclude this component from simulation** mantém as bolinhas digitais
+nos terminais quando a indicação de níveis está habilitada. O componente excluído
+não carrega seu modelo nem cria cargas, fontes, drivers, memórias ou controles.
+Seus terminais apenas observam a rede: mostram 0/1/X conforme os outros drivers e
+retornam a Z quando ninguém a controla. Pinos soltos também permanecem em Z.
+Isso vale para modelos ausentes ou inválidos e para folhas excluídas. Os campos
+de configuração continuam salvos para quando o componente voltar à simulação.
+
 A associação e os parâmetros ficam em campos ocultos do próprio símbolo:
 
 | Campo | Conteúdo |

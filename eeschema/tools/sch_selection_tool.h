@@ -381,12 +381,20 @@ private:
 
     void filterCollectedItems( SCH_COLLECTOR& aCollector, bool aMultiSelect );
 
+    /// Extend a plain wire click, without changing hover/drag or box selection.
+    void selectClickedWireSegment();
+
+    /// A click-expanded run is edited as one pressed line during a direct drag.
+    void trimClickedWireSegmentForDrag( const VECTOR2I& aOrigin );
+
     ///< Set up handlers for various events.
     void setTransitions() override;
 
 private:
     SCH_BASE_FRAME* m_frame;     // Pointer to the parent frame
     SCH_SELECTION   m_selection; // Current state of selection
+
+    std::set<KIID> m_clickedWireSegment; // UUIDs avoid stale pointers after undo/reload.
 
     KICURSOR m_nonModifiedCursor; // Cursor in the absence of shift/ctrl/alt
 

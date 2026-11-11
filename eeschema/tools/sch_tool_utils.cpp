@@ -36,6 +36,8 @@
 #include <sch_sheet.h>
 #include <sch_screen.h>
 #include <sch_group.h>
+#include <sch_line.h>
+#include <sch_sheet_pin.h>
 #include <kiid.h>
 
 #include <limits>
@@ -60,6 +62,80 @@ SCH_PIN* FindPinConnectionAt( SCH_SCREEN& aScreen, const SCH_SHEET_PATH* aSheet,
             { closest = pin; distance = candidate; }
         }
     return closest;
+}
+
+std::set<SCH_LINE*> CollectWireSegment( SCH_SCREEN& aScreen, const SCH_SHEET_PATH* aSheet,
+                                       SCH_LINE& aStart )
+{
+    std::set<SCH_LINE*> result;
+
+    if( !aStart.IsWire() )
+        return result;
+
+    std::vector<SCH_LINE*> pending{ &aStart };
+
+    while( !pending.empty() )
+    {
+        SCH_LINE* line = pending.back();
+        pending.pop_back();
+
+        if( !result.insert( line ).second )
+            continue;
+
+        for( const VECTOR2I& point : { line->GetStartPoint(), line->GetEndPoint() } )
+        {
+            bool terminal = false;
+            unsigned exits = 0;
+            std::vector<SCH_LINE*> neighbors;
+
+            for( SCH_ITEM* item : aScreen.Items().Overlapping( point ) )
+            {
+                if( item->HasFlag( STRUCT_DELETED ) )
+                    continue;
+
+                if( auto* other = dynamic_cast<SCH_LINE*>( item ) )
+                {
+                    if( !other->IsWire() || other->GetStartPoint() == other->GetEndPoint() )
+                        continue;
+
+                    if( other->IsEndPoint( point ) )
+                    {
+                        ++exits;
+                        neighbors.push_back( other );
+                    }
+                    else if( other->GetSeg().Contains( point ) )
+                    {
+                        // An endpoint on the middle of another wire is a T, even
+                        // before cleanup has split the through wire or added a dot.
+                        exits += 2;
+                    }
+                }
+                else if( auto* symbol = dynamic_cast<SCH_SYMBOL*>( item ) )
+                {
+                    for( SCH_PIN* pin : symbol->GetPins( aSheet ) )
+                        terminal |= pin->GetPosition() == point;
+                }
+                else if( auto* sheet = dynamic_cast<SCH_SHEET*>( item ) )
+                {
+                    terminal |= sheet->GetPin( point ) != nullptr;
+                }
+                else if( item->Type() == SCH_JUNCTION_T || item->Type() == SCH_BUS_WIRE_ENTRY_T
+                         || item->Type() == SCH_BUS_BUS_ENTRY_T || item->Type() == SCH_SHEET_PIN_T )
+                {
+                    terminal |= item->IsConnected( point );
+                }
+            }
+
+            if( !terminal && exits == 2 && neighbors.size() == 2 )
+            {
+                for( SCH_LINE* neighbor : neighbors )
+                    if( neighbor != line && !result.count( neighbor ) )
+                        pending.push_back( neighbor );
+            }
+        }
+    }
+
+    return result;
 }
 
 wxString GetSchItemAsText( const SCH_ITEM& aItem )

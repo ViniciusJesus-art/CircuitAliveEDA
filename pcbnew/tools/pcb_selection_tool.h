@@ -376,6 +376,9 @@ private:
                       bool* aSelectionCancelledFlag = nullptr,
                       CLIENT_SELECTION_FILTER aClientFilter = nullptr );
 
+    /// Narrow a click-expanded track run to the track under the mouse press for dragging.
+    void trimClickedTrackSegmentForDrag( const VECTOR2I& aOrigin );
+
     /**
      * Select an item under the cursor unless there is something already selected.
      *

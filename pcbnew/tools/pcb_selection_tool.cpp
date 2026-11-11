@@ -117,6 +117,8 @@ class PCB_SELECTION_TOOL::PRIV
 public:
     DIALOG_FILTER_SELECTION::OPTIONS m_filterOpts;
     std::unique_ptr<CIRCUITALIVE::RIGHT_CLICK_GESTURE> m_rightClickGesture;
+    std::set<KIID> m_clickedTrackSegment;
+    bool m_areaSelection = false;
 };
 
 
@@ -356,6 +358,9 @@ int PCB_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
         }
         else if( evt->IsClick( BUT_LEFT ) )
         {
+            m_priv->m_clickedTrackSegment.clear();
+            m_priv->m_areaSelection = false;
+
             if( brd_editor && m_frame->ToolStackIsEmpty() && !hasModifier() )
             {
                 GENERAL_COLLECTOR occupied;
@@ -390,6 +395,20 @@ int PCB_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
                     if( !extendTableCellSelectionTo( evt->Position() ) )
                     {
                         selectPoint( evt->Position() );
+
+                        // A normal click starts at the first native U expansion
+                        // stage. U still expands onward to pads and the full net.
+                        if( brd_editor && !hasModifier() && m_selection.Size() == 1
+                            && m_selection.Front()->IsType( { PCB_TRACE_T, PCB_ARC_T } ) )
+                        {
+                            auto* track = static_cast<BOARD_CONNECTED_ITEM*>( m_selection.Front() );
+                            selectAllConnectedTracks( { track }, STOP_AT_JUNCTION );
+
+                            for( EDA_ITEM* item : m_selection.GetItems() )
+                                m_priv->m_clickedTrackSegment.insert( item->m_Uuid );
+
+                            m_toolMgr->ProcessEvent( EVENTS::SelectedEvent );
+                        }
 
                         // Anchor for a subsequent shift+click or shift+drag whose IsClick
                         // jitter could otherwise promote into IsDrag, collapsing the range
@@ -596,6 +615,11 @@ int PCB_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
 
                 if( doDrag )
                 {
+                    // A click highlights a connected run for selection/deletion, but a
+                    // mouse drag still targets the particular track that was pressed.
+                    // Area selections and explicit U expansions keep their full set.
+                    trimClickedTrackSegmentForDrag( evt->DragOrigin() );
+
                     size_t segs = m_selection.CountType( PCB_TRACE_T );
                     size_t arcs = m_selection.CountType( PCB_ARC_T );
                     size_t vias = m_selection.CountType( PCB_VIA_T );
@@ -603,7 +627,9 @@ int PCB_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
                     bool   routable = ( segs >= 1 || arcs >= 1 || vias == 1 )
                                         && ( segs + arcs + vias == m_selection.GetSize() );
 
-                    if( routable && trackDragAction == TRACK_DRAG_ACTION::DRAG )
+                    if( m_priv->m_areaSelection )
+                        m_toolMgr->RunAction( PCB_ACTIONS::move );
+                    else if( routable && trackDragAction == TRACK_DRAG_ACTION::DRAG )
                         m_toolMgr->RunAction( PCB_ACTIONS::drag45Degree );
                     else if( routable && trackDragAction == TRACK_DRAG_ACTION::DRAG_FREE_ANGLE )
                         m_toolMgr->RunAction( PCB_ACTIONS::dragFreeAngle );
@@ -1000,6 +1026,48 @@ bool PCB_SELECTION_TOOL::selectPoint( const VECTOR2I& aWhere, bool aOnDrag, bool
     }
 
     return false;
+}
+
+
+void PCB_SELECTION_TOOL::trimClickedTrackSegmentForDrag( const VECTOR2I& aOrigin )
+{
+    const std::set<KIID>& clickedSegment = m_priv->m_clickedTrackSegment;
+
+    if( clickedSegment.empty() || clickedSegment.size() != m_selection.GetItems().size() )
+        return;
+
+    // UUIDs avoid retaining pointers across undo/reload. A changed selection must not
+    // inherit the special handling of the preceding plain click.
+    for( EDA_ITEM* item : m_selection.GetItems() )
+    {
+        if( !clickedSegment.count( item->m_Uuid ) )
+            return;
+    }
+
+    GENERAL_COLLECTOR collector;
+    collector.Collect( board(), GENERAL_COLLECTOR::AllBoardItems, aOrigin, getCollectorsGuide() );
+
+    for( int i = collector.GetCount() - 1; i >= 0; --i )
+    {
+        if( !collector[i]->IsSelected()
+            || !collector[i]->IsType( { PCB_TRACE_T, PCB_ARC_T } )
+            || !Selectable( collector[i] ) )
+        {
+            collector.Remove( i );
+        }
+    }
+
+    FilterCollectedItems( collector, false );
+    FilterCollectorForHierarchy( collector, false );
+    ROUTER_TOOL::NeighboringSegmentFilter( aOrigin, collector, this );
+
+    if( collector.GetCount() != 1 )
+        return;
+
+    ClearSelection( true );
+    select( collector[0] );
+    m_selection.SetIsHover( false );
+    m_toolMgr->ProcessEvent( EVENTS::PointSelectedEvent );
 }
 
 
@@ -1539,6 +1607,9 @@ int PCB_SELECTION_TOOL::SelectPolyArea( const TOOL_EVENT& aEvent )
 void PCB_SELECTION_TOOL::SelectMultiple( KIGFX::PREVIEW::SELECTION_AREA& aArea, bool aSubtractive,
                                          bool aExclusiveOr )
 {
+    m_priv->m_clickedTrackSegment.clear();
+    m_priv->m_areaSelection = true;
+
     KIGFX::VIEW* view = getView();
 
     bool anyAdded = false;
@@ -2102,6 +2173,9 @@ int PCB_SELECTION_TOOL::unrouteSegment( const TOOL_EVENT& aEvent )
 
 int PCB_SELECTION_TOOL::expandConnection( const TOOL_EVENT& aEvent )
 {
+    m_priv->m_clickedTrackSegment.clear();
+    m_priv->m_areaSelection = false;
+
     // expandConnection will get called no matter whether the user selected a connected item or a
     // non-connected shape (graphic on a non-copper layer). The algorithm for expanding to connected
     // items is different from graphics, so they need to be handled separately.
@@ -3616,6 +3690,9 @@ bool PCB_SELECTION_TOOL::itemPassesFilter( BOARD_ITEM* aItem, bool aMultiSelect,
 
 void PCB_SELECTION_TOOL::ClearSelection( bool aQuietMode )
 {
+    m_priv->m_clickedTrackSegment.clear();
+    m_priv->m_areaSelection = false;
+
     // Drop any table-cell range anchor along with the selection itself (do this even when the
     // selection is already empty so that the cached pointer is not left stranded)
     m_previousFirstCell = nullptr;
@@ -3642,6 +3719,9 @@ void PCB_SELECTION_TOOL::ClearSelection( bool aQuietMode )
 
 void PCB_SELECTION_TOOL::RebuildSelection()
 {
+    m_priv->m_clickedTrackSegment.clear();
+    m_priv->m_areaSelection = false;
+
     // Drop the table-cell range anchor; the board may have been reloaded and any cached
     // pointer is no longer guaranteed to be valid.
     m_previousFirstCell = nullptr;

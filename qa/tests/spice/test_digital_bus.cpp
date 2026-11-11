@@ -62,6 +62,85 @@ CIRCUIT_COMPONENT Buffer( const std::string& ref, const std::string& enable, con
 }
 }
 
+BOOST_AUTO_TEST_CASE( ExcludedPinIndicatorsObserveBusOwnershipAndNeverDrive )
+{
+    CIRCUIT_COMPONENT observer{ "U_EXCLUDED", "Unsupported:Device", "", {
+        { "1", "bus" }, { "2", "" }, { "3", "observer_only" }, { "4", "vcc" } } };
+    observer.modelFile = "does-not-exist.casim";
+    observer.modelParameters = { { "invalid", "not a number" } };
+    const std::vector<CIRCUIT_COMPONENT> parts = { Supply( "VS", "vcc", "5" ),
+        Supply( "VOE1", "oe1", "0" ), Supply( "VOE2", "oe2", "5" ),
+        Buffer( "U1", "oe1", "vcc" ), Buffer( "U2", "oe2", "0" ) };
+    const auto active = BuildCircuitSnapshot( parts, {}, true );
+    auto circuit = BuildCircuitSnapshot( parts, {}, true, {}, {}, { observer } );
+    BOOST_CHECK_EQUAL( circuit.netlist, active.netlist );
+    BOOST_CHECK_EQUAL( circuit.drivenNets.size(), active.drivenNets.size() );
+    BOOST_CHECK_EQUAL( circuit.openPins, active.openPins );
+    BOOST_CHECK_EQUAL( circuit.floatingIslands.size(), active.floatingIslands.size() );
+    BOOST_CHECK_EQUAL( circuit.automaticReferences.size(), active.automaticReferences.size() );
+    ConfigureVisualSignals( circuit );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    const auto& observed = Pin( circuit, "U_EXCLUDED", "1" );
+    BOOST_CHECK( observed.observer );
+    BOOST_CHECK( !observed.output );
+    auto check = [&]( double time, LOGIC_LEVEL expected, std::size_t conflicts = 0 )
+    {
+        const auto view = View( circuit, session, time );
+        BOOST_CHECK( PinLogicLevel( observed, view.sample.latest ) == expected );
+        BOOST_CHECK( PinDriveLevel( observed, view.sample.latest ) == LOGIC_LEVEL::HIGH_Z );
+        for( const auto* pin : { "2", "3" } )
+            BOOST_CHECK( PinLogicLevel( Pin( circuit, "U_EXCLUDED", pin ), view.sample.latest ) == LOGIC_LEVEL::HIGH_Z );
+        BOOST_CHECK_EQUAL( Conflicts( view ), conflicts );
+    };
+    check( 1e-6, LOGIC_LEVEL::HIGH );
+    session.SetSourceValue( "Vca2", 5 );
+    check( 2e-6, LOGIC_LEVEL::HIGH_Z );
+    session.SetSourceValue( "Vca3", 0 );
+    check( 3e-6, LOGIC_LEVEL::LOW );
+    session.SetSourceValue( "Vca2", 0 );
+    check( 4e-6, LOGIC_LEVEL::UNKNOWN, 1 );
+    session.SetSourceValue( "Vca3", 5 );
+    check( 5e-6, LOGIC_LEVEL::HIGH );
+    session.SetSourceValue( "Vca2", 5 );
+    check( 6e-6, LOGIC_LEVEL::HIGH_Z );
+    BOOST_CHECK( PinLogicLevel( Pin( circuit, "U_EXCLUDED", "4" ), session.Snapshot().latest ) == LOGIC_LEVEL::HIGH );
+}
+
+BOOST_AUTO_TEST_CASE( ExcludedPinIndicatorsDoNotConnectTerminalsOrCreatePassiveDrivePaths )
+{
+    const std::vector<CIRCUIT_COMPONENT> parts = { Supply( "VS", "vcc", "5" ),
+        Buffer( "U1", "vcc", "0" ) };
+    CIRCUIT_COMPONENT resistor{ "R_EXCLUDED", "Device:R", "0", {
+        { "1", "vcc" }, { "2", "bus" } } };
+    auto circuit = BuildCircuitSnapshot( parts, {}, true, {}, {}, { resistor } );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    const auto view = View( circuit, session, 1e-6 );
+    BOOST_CHECK( PinLogicLevel( Pin( circuit, "R_EXCLUDED", "1" ), view.sample.latest ) == LOGIC_LEVEL::HIGH );
+    BOOST_CHECK( PinLogicLevel( Pin( circuit, "R_EXCLUDED", "2" ), view.sample.latest ) == LOGIC_LEVEL::HIGH_Z );
+    BOOST_CHECK( PinLogicLevel( Pin( circuit, "U1", "3" ), view.sample.latest ) == LOGIC_LEVEL::HIGH_Z );
+}
+
+BOOST_AUTO_TEST_CASE( ExcludedPinIndicatorsCanObserveAnOtherwiseEmptySchematic )
+{
+    CIRCUIT_COMPONENT observer{ "J?", "NoModel:Connector", "", {
+        { "1", "floating" }, { "2", "floating" }, { "3", "" } } };
+    auto circuit = BuildCircuitSnapshot( {}, {}, true, {}, {}, { observer } );
+    BOOST_REQUIRE_EQUAL( circuit.logicPins.size(), 3u );
+    BOOST_CHECK( circuit.drivenNets.empty() );
+    BOOST_CHECK( circuit.automaticReferences.empty() );
+    ConfigureVisualSignals( circuit );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    const auto view = View( circuit, session, 1e-6 );
+    for( const auto& pin : circuit.logicPins )
+    {
+        BOOST_CHECK( PinLogicLevel( pin, view.sample.latest ) == LOGIC_LEVEL::HIGH_Z );
+        BOOST_CHECK( PinDriveLevel( pin, view.sample.latest ) == LOGIC_LEVEL::HIGH_Z );
+    }
+}
+
 BOOST_AUTO_TEST_CASE( DigitalBusDisabledEpromReadsRamAndFloatingBusReturnsToZ )
 {
     auto circuit = BuildCircuitSnapshot( { Supply( "VS", "vcc", "5" ),

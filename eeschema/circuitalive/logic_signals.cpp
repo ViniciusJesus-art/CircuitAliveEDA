@@ -14,7 +14,7 @@ LOGIC_LEVEL PinLogicLevel( const LOGIC_PIN& pin, const SIM_SAMPLE& sample )
         [&]( auto i ) { return value( i ) > .5; } );
     // Indicators read the shared electrical node, independently of the local output enable.
     if( pin.digital && !pin.externalDrive && !driven ) return LOGIC_LEVEL::HIGH_Z;
-    const double ground = value( pin.ground ), supply = value( pin.vcc, pin.digital ? 0 : 5 ) - ground;
+    const double ground = value( pin.ground ), supply = value( pin.vcc, pin.digital && !pin.observer ? 0 : 5 ) - ground;
     if( !std::isfinite( supply ) || supply < pin.minSupply || supply > pin.maxSupply ) return LOGIC_LEVEL::UNKNOWN;
     bool known = pin.externalDrive, unknown = false;
     for( const auto& driver : pin.drivers )

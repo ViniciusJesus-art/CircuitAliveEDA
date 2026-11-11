@@ -141,6 +141,8 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
 {
     SCHEMATIC_SNAPSHOT result;
     std::vector<CIRCUIT_COMPONENT> components;
+    std::vector<CIRCUIT_COMPONENT> pinObservers;
+    std::vector<SCHEMATIC_SNAPSHOT::PIN_LOCATION> observerLocations;
     std::vector<CIRCUIT_PROBE> probes;
     std::vector<POWER_SYMBOL> powerSymbols;
     std::map<std::string, std::size_t> packages;
@@ -149,15 +151,32 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
     // Use the complete instance path for overlays and hit testing across pages.
     for( SCH_SHEET_PATH& sheet : aSchematic.Hierarchy() )
     {
-        if( sheet.GetExcludedFromSim( variant ) )
-            continue;
         // Text, text boxes and titles are annotations. Interactive decks come
         // exclusively from model files; legacy SPICE text stays with the native simulator.
         for( SCH_ITEM* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
         {
             auto* symbol = static_cast<SCH_SYMBOL*>( item );
-            if( symbol->ResolveExcludedFromSim( &sheet, variant ) || symbol->GetFullPinCount() == 0 )
+            if( symbol->GetFullPinCount() == 0 )
                 continue;
+            if( sheet.GetExcludedFromSim( variant ) || symbol->ResolveExcludedFromSim( &sheet, variant ) )
+            {
+                if( aPinIndicators )
+                {
+                    // Do not read model fields: excluded instances may deliberately have
+                    // unsupported models, invalid parameters or no simulation model at all.
+                    CIRCUIT_COMPONENT observer;
+                    observer.reference = symbol->GetRef( &sheet ).ToStdString();
+                    for( const SCH_PIN* pin : symbol->GetPins( &sheet ) )
+                    {
+                        const auto number = pin->GetShownNumber().ToStdString();
+                        observer.pins[number] = SimulationNet( *pin, sheet );
+                        observerLocations.push_back( { pinObservers.size(), number,
+                                                       sheet.Path().AsString(), pin->GetPosition() } );
+                    }
+                    pinObservers.push_back( std::move( observer ) );
+                }
+                continue;
+            }
             std::string lib = symbol->GetLibId().Format().c_str();
             auto* probeField = symbol->GetField( "CA.Probe" );
             if( probeField )
@@ -247,7 +266,14 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
                 result.pins.push_back( { index, pin->GetShownNumber().ToStdString(), sheet.Path().AsString(), pin->GetPosition() } );
         }
     }
-    result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators, powerSymbols, aPreferences );
+    result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators, powerSymbols,
+                                          aPreferences, pinObservers );
+    const std::size_t observerStart = result.circuit.pinNodes.size() - pinObservers.size();
+    for( auto& location : observerLocations )
+    {
+        location.component += observerStart;
+        result.pins.push_back( std::move( location ) );
+    }
     std::map<std::string, std::string> netNodes;
     for( std::size_t i = 0; i < components.size(); ++i )
         for( const auto& [pin, net] : components[i].pins )

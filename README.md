@@ -270,7 +270,7 @@ See [schematic pages](docs/circuitalive/PAGES.md).
 
 
 <h3 align="center">
-  Schematic and PCB associations
+  Automatic Schematic and PCB Associations with Pending Footprint List
 </h3>
 
 <p align="center">

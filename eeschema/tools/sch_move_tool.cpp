@@ -1401,7 +1401,14 @@ void SCH_MOVE_TOOL::initializeMoveOperation( const TOOL_EVENT& aEvent, SCH_SELEC
         m_breakPos.reset();
     }
 
-    if( aEvent.IsAction( &SCH_ACTIONS::restartMove ) )
+    if( aEvent.HasParameter()
+        && ( aEvent.IsAction( &SCH_ACTIONS::move ) || aEvent.IsAction( &SCH_ACTIONS::drag ) ) )
+    {
+        // Mouse drags carry their press point. Keep that grab position instead
+        // of snapping the held selection to its nearest endpoint/corner.
+        m_anchorPos = grid.Align( aEvent.Parameter<VECTOR2I>(), aSnapLayer );
+    }
+    else if( aEvent.IsAction( &SCH_ACTIONS::restartMove ) )
     {
         wxASSERT_MSG( m_anchorPos, "Should be already set from previous cmd" );
     }

@@ -1,0 +1,370 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "74ls157",
+  "name": "74LS157 quad 2-to-1 multiplexer",
+  "description": "Nominal mixed-signal combinational logic; see docs/circuitalive/COMBINATIONAL_LOGIC_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "role": "power",
+      "default_pin": "16"
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "8"
+    },
+    {
+      "id": "select",
+      "label": "SELECT",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "disable",
+      "label": "DISABLE",
+      "role": "input",
+      "default_pin": "15"
+    },
+    {
+      "id": "d0_0",
+      "label": "D0_0",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "d0_1",
+      "label": "D0_1",
+      "role": "input",
+      "default_pin": "3"
+    },
+    {
+      "id": "y0",
+      "label": "Y0",
+      "role": "output",
+      "default_pin": "4"
+    },
+    {
+      "id": "d1_0",
+      "label": "D1_0",
+      "role": "input",
+      "default_pin": "5"
+    },
+    {
+      "id": "d1_1",
+      "label": "D1_1",
+      "role": "input",
+      "default_pin": "6"
+    },
+    {
+      "id": "y1",
+      "label": "Y1",
+      "role": "output",
+      "default_pin": "7"
+    },
+    {
+      "id": "d2_0",
+      "label": "D2_0",
+      "role": "input",
+      "default_pin": "11"
+    },
+    {
+      "id": "d2_1",
+      "label": "D2_1",
+      "role": "input",
+      "default_pin": "10"
+    },
+    {
+      "id": "y2",
+      "label": "Y2",
+      "role": "output",
+      "default_pin": "9"
+    },
+    {
+      "id": "d3_0",
+      "label": "D3_0",
+      "role": "input",
+      "default_pin": "14"
+    },
+    {
+      "id": "d3_1",
+      "label": "D3_1",
+      "role": "input",
+      "default_pin": "13"
+    },
+    {
+      "id": "y3",
+      "label": "Y3",
+      "role": "output",
+      "default_pin": "12"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Low input threshold / reference voltage",
+      "default": ".16",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "High input threshold / reference voltage",
+      "default": ".4",
+      "unit": "",
+      "min": 0.1,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Vmin",
+      "default": "4.75",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Vmax",
+      "default": "5.25",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "rise_delay",
+      "label": "Rise delay",
+      "default": "7n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "fall_delay",
+      "label": "Fall delay",
+      "default": "7n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Transition",
+      "default": "2n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "25",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Cin",
+      "default": "3.5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Iq",
+      "default": "10m",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "high_drop",
+      "label": "High drop",
+      "unit": "V",
+      "default": "1.6",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Low drop",
+      "unit": "V",
+      "default": ".2",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "vref",
+      "label": "Absolute input threshold reference",
+      "default": "5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "74xx:74LS157"
+    ],
+    "symbol_names": [
+      "74LS157"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "behavioral": {
+    "version": 1,
+    "supply": {
+      "vcc": "vcc",
+      "gnd": "gnd"
+    },
+    "blocks": [
+      {
+        "type": "and",
+        "inputs": [
+          "d0_0",
+          "!select",
+          "!disable"
+        ],
+        "out": "selected0_term0"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "d0_1",
+          "select",
+          "!disable"
+        ],
+        "out": "selected0_term1"
+      },
+      {
+        "type": "or",
+        "inputs": [
+          "selected0_term0",
+          "selected0_term1"
+        ],
+        "out": "selected0"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "d1_0",
+          "!select",
+          "!disable"
+        ],
+        "out": "selected1_term0"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "d1_1",
+          "select",
+          "!disable"
+        ],
+        "out": "selected1_term1"
+      },
+      {
+        "type": "or",
+        "inputs": [
+          "selected1_term0",
+          "selected1_term1"
+        ],
+        "out": "selected1"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "d2_0",
+          "!select",
+          "!disable"
+        ],
+        "out": "selected2_term0"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "d2_1",
+          "select",
+          "!disable"
+        ],
+        "out": "selected2_term1"
+      },
+      {
+        "type": "or",
+        "inputs": [
+          "selected2_term0",
+          "selected2_term1"
+        ],
+        "out": "selected2"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "d3_0",
+          "!select",
+          "!disable"
+        ],
+        "out": "selected3_term0"
+      },
+      {
+        "type": "and",
+        "inputs": [
+          "d3_1",
+          "select",
+          "!disable"
+        ],
+        "out": "selected3_term1"
+      },
+      {
+        "type": "or",
+        "inputs": [
+          "selected3_term0",
+          "selected3_term1"
+        ],
+        "out": "selected3"
+      }
+    ],
+    "outputs": {
+      "y0": {
+        "signal": "selected0"
+      },
+      "y1": {
+        "signal": "selected1"
+      },
+      "y2": {
+        "signal": "selected2"
+      },
+      "y3": {
+        "signal": "selected3"
+      }
+    },
+    "electrical": {
+      "threshold_reference": "vref"
+    }
+  },
+  "sources": [
+    "https://www.ti.com/lit/ds/symlink/sn74ls157.pdf"
+  ],
+  "category": "Digital/Multiplexers",
+  "family": "74LS",
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own event-driven circuit; no manufacturer SPICE source copied. Pin mappings and Boolean functions follow the referenced datasheet.",
+    "Nominal 25 C approximation near 5 V. Propagation delay is per internal logic block, not a characterized package timing matrix. Different logic paths may have different total delays.",
+    "Finite output resistance, input capacitance and fixed package quiescent current are represented. Output load affects voltage and settling.",
+    "No DC input current/fan-out calibration, input clamps, back-powering, switching power, thermal effects or destructive failure. Output resistance does not implement a current limiter.",
+    "Undriven inputs convert to X; outputs release outside the recommended supply window. Undefined logic states are weak analog midpoints, not a transistor-level metastability model.",
+    "TTL input levels are absolute 0.8 V / 2 V relative to local GND; the 5 V reference does not scale with supply.",
+    "Pin 1 selects the second input when HIGH; pin 15 HIGH forces all outputs LOW."
+  ],
+  "measurement_ports": {
+    "positive": "vcc",
+    "negative": "gnd"
+  }
+}

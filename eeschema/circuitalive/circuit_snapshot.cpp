@@ -82,7 +82,8 @@ double LedBrightness( double aForwardCurrent, double aBrightnessCurrent )
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents,
                                      const std::vector<CIRCUIT_PROBE>& aProbes, bool aPinIndicators,
                                      const std::vector<POWER_SYMBOL>& aPowerSymbols,
-                                     const SIMULATION_PREFERENCES& aPreferences )
+                                     const SIMULATION_PREFERENCES& aPreferences,
+                                     const std::vector<CIRCUIT_COMPONENT>& aPinObservers )
 {
     CIRCUIT_SNAPSHOT result;
     result.config.accelerateExpressions = true;
@@ -547,13 +548,15 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             errors.push_back( c.reference + ": " + e.what() );
         }
     }
-    if( aComponents.empty() && powerRails.empty() )
+    const bool observersOnly = aPinIndicators && !aPinObservers.empty()
+                               && aComponents.empty() && powerRails.empty();
+    if( aComponents.empty() && powerRails.empty() && !observersOnly )
         errors.push_back( "The schematic has no supported components" );
     std::string voltageSignal;
     for( const auto& pins : topology.nodes )
         for( const auto& [pin, name] : pins )
             if( name != "0" && voltageSignal.empty() ) voltageSignal = "v(" + name + ")";
-    if( voltageSignal.empty() )
+    if( voltageSignal.empty() && !observersOnly )
         errors.push_back( "Connect at least one non-ground net" );
     std::set<std::string> probeNames;
     for( std::size_t i = 0; i < aProbes.size(); ++i )
@@ -625,7 +628,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             message += error + '\n';
         throw std::runtime_error( message );
     }
-    if( result.config.signals.empty() )
+    if( result.config.signals.empty() && !observersOnly )
         result.config.signals.push_back( voltageSignal );
     for( auto& [name, warning] : warnings )
     { warning.signal = signal( name ); result.currentWarnings.push_back( warning ); }
@@ -672,6 +675,74 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 result.logicPins.push_back( std::move( channel ) );
             }
         }
+    if( aPinIndicators && !aPinObservers.empty() )
+    {
+        // Observers never enter model resolution or topology. In particular, they
+        // cannot join islands, create ground references, load a net or enable a driver.
+        std::map<std::string, std::string> netNodes;
+        for( std::size_t i = 0; i < allComponents.size(); ++i )
+            for( const auto& [port, pin] : models[i].pins )
+            {
+                const auto& net = allComponents[i].pins.at( pin );
+                if( !net.empty() ) netNodes[net] = topology.nodes[i].at( pin );
+            }
+
+        const std::size_t activePins = result.logicPins.size();
+        for( const auto& observer : aPinObservers )
+        {
+            const auto index = result.pinNodes.size();
+            result.pinNodes.emplace_back();
+            for( const auto& [pin, net] : observer.pins )
+            {
+                std::string node;
+                if( !net.empty() && ( IsSimulationGround( net ) || groundNets.contains( net ) ) )
+                    node = "0";
+                else if( const auto found = netNodes.find( net ); !net.empty() && found != netNodes.end() )
+                    node = found->second;
+                result.pinNodes.back()[pin] = node;
+
+                LOGIC_PIN channel;
+                // Reuse the existing bus thresholds and supply when a digital pin
+                // already monitors it; otherwise use the standard 5 V indication.
+                for( std::size_t i = 0; !node.empty() && i < activePins; ++i )
+                {
+                    const auto& peer = result.logicPins[i];
+                    if( peer.digital && result.pinNodes[peer.component].at( peer.pin ) == node )
+                    {
+                        channel = peer;
+                        break;
+                    }
+                }
+                channel.component = index; channel.pin = pin; channel.reference = observer.reference;
+                channel.observer = channel.digital = true;
+                channel.output = false;
+                channel.driverEnable = channel.driverValue = NO_SIGNAL;
+                channel.voltage = node.empty() ? NO_SIGNAL : voltage( node );
+                channel.externalDrive = false;
+                channel.enables.clear(); channel.drivers.clear();
+                if( const auto drive = drives.find( node ); drive != drives.end() )
+                {
+                    channel.externalDrive = drive->second.external;
+                    for( const auto& enabled : drive->second.enables )
+                        channel.enables.push_back( expressionSignal( enabled ) );
+                    for( const auto& [enabled, code] : drive->second.drivers )
+                        channel.drivers.push_back( { expressionSignal( enabled ), expressionSignal( code ) } );
+                }
+                result.logicPins.push_back( std::move( channel ) );
+            }
+        }
+    }
+    if( result.config.signals.empty() )
+    {
+        if( observersOnly )
+        {
+            // A solver heartbeat for an entirely excluded schematic. This internal
+            // node is isolated from every observed terminal, which remains Z.
+            deck << "Bca_observer_clock ca_observer_clock 0 V=0\n";
+            voltageSignal = "v(ca_observer_clock)";
+        }
+        result.config.signals.push_back( voltageSignal );
+    }
     if( result.config.signals.size() > MAX_SESSION_SIGNALS )
         throw std::runtime_error( "Too many saved signals; reduce the circuit or measurements" );
     result.config.historyCapacity = std::min<std::size_t>( 256, MAX_SESSION_HISTORY_VALUES / result.config.signals.size() );

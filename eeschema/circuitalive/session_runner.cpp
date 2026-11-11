@@ -419,7 +419,8 @@ void SESSION_RUNNER::run()
                     for( const auto& [name, warning] : latchedWarnings ) view.warnings.push_back( warning );
                 std::set<std::size_t> checkedSupplies;
                 for( const auto& pin : circuit.logicPins )
-                    if( preferences.warnSupply && pin.digital && checkedSupplies.insert( pin.component ).second )
+                    if( preferences.warnSupply && pin.digital && !pin.observer
+                        && checkedSupplies.insert( pin.component ).second )
                     {
                         auto v = [&]( std::size_t index ) { return index == NO_SIGNAL ? 0.0 : view.sample.latest.values.at( index ); };
                         const double supply = v( pin.vcc ) - v( pin.ground );

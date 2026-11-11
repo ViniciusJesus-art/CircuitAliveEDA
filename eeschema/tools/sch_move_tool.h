@@ -78,6 +78,7 @@ public:
 
     /**
      * Run an interactive move of the selected items, or the item under the cursor.
+     * Mouse-started move/drag actions may carry a VECTOR2I press position as their parameter.
      */
     int Main( const TOOL_EVENT& aEvent );
 

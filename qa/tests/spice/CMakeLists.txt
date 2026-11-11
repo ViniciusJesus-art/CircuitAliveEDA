@@ -128,6 +128,7 @@ if( TARGET circuitalive_sim_session )
         test_passive_bridge_relay_models.cpp
         test_jfet_diode_driver_models.cpp test_schmitt_electrical_models.cpp
         test_standard_symbol_associations.cpp
+        test_combinational_logic_models.cpp
         test_diode_reverse_bias.cpp
         test_live_controls.cpp test_source_probes.cpp test_digital_pipeline.cpp test_digital_bus.cpp test_memory_resources.cpp test_memory_viewer.cpp test_visual_signals.cpp
         test_programmable_devices.cpp test_compiled_expressions.cpp )
@@ -154,7 +155,8 @@ if( TARGET circuitalive_sim_session )
     kicad_add_boost_test( qa_memory_viewer qa_memory_viewer )
     setup_qa_env( qa_memory_viewer )
     add_test( NAME qa_interactive_sim COMMAND qa_interactive_sim --log_level=test_suite )
-    set_tests_properties( qa_interactive_sim PROPERTIES TIMEOUT 240 )
+    # Full catalog truth-table sweeps need several minutes on slower runners.
+    set_tests_properties( qa_interactive_sim PROPERTIES TIMEOUT 600 )
     # Exercise the desktop JSON imports as well as the standalone worker build.
     # A static-only test cannot expose collisions with kicommon's import library.
     add_executable( qa_circuitalive_json_link test_circuitalive_json_link.cpp )

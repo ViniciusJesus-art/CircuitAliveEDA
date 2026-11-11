@@ -94,12 +94,14 @@ struct CIRCUIT_SNAPSHOT
     std::vector<MEMORY_LOCATION> memories;
 };
 
-/// Resolve model files, parameters and physical pins, then freeze a component deck.
+/// Resolve models and freeze a component deck. aPinObservers contributes only terminal
+/// indicators; its models/settings are ignored and its pin maps are appended to pinNodes.
 CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aComponents,
                                      const std::vector<CIRCUIT_PROBE>& aProbes = {},
                                      bool aPinIndicators = false,
                                      const std::vector<POWER_SYMBOL>& aPowerSymbols = {},
-                                     const SIMULATION_PREFERENCES& aPreferences = {} );
+                                     const SIMULATION_PREFERENCES& aPreferences = {},
+                                     const std::vector<CIRCUIT_COMPONENT>& aPinObservers = {} );
 double ParseComponentValue( const std::string& aValue );
 double LedBrightness( double aForwardCurrent, double aBrightnessCurrent = 0.01 );
 }

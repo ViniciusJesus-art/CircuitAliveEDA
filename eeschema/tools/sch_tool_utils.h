@@ -35,6 +35,7 @@ class SCH_REFERENCE_LIST;
 class SCH_SCREEN;
 class SCH_SYMBOL;
 class SCH_PIN;
+class SCH_LINE;
 class SCH_SHEET_PATH;
 class SCHEMATIC;
 class LIB_ID;
@@ -42,6 +43,11 @@ class LIB_ID;
 /// Find a visible pin's electrical endpoint, respecting the displayed unit and symbol transform.
 SCH_PIN* FindPinConnectionAt( SCH_SCREEN& aScreen, const SCH_SHEET_PATH* aSheet,
                               const VECTOR2I& aPosition, int aTolerance );
+
+/// Follow physical wire corners, stopping at pins, entries, junctions and branches.
+/// Labels and unconnected crossings do not join otherwise separate wire runs.
+std::set<SCH_LINE*> CollectWireSegment( SCH_SCREEN& aScreen, const SCH_SHEET_PATH* aSheet,
+                                       SCH_LINE& aStart );
 
 wxString GetSchItemAsText( const SCH_ITEM& aItem );
 

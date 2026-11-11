@@ -1,0 +1,349 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "74hc688",
+  "name": "74HC688 8-bit equality comparator with active-low enable and result",
+  "description": "Nominal mixed-signal combinational logic; see docs/circuitalive/COMBINATIONAL_LOGIC_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "role": "power",
+      "default_pin": "20"
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "10"
+    },
+    {
+      "id": "disable",
+      "label": "DISABLE",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "a0",
+      "label": "A0",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "b0",
+      "label": "B0",
+      "role": "input",
+      "default_pin": "3"
+    },
+    {
+      "id": "a1",
+      "label": "A1",
+      "role": "input",
+      "default_pin": "4"
+    },
+    {
+      "id": "b1",
+      "label": "B1",
+      "role": "input",
+      "default_pin": "5"
+    },
+    {
+      "id": "a2",
+      "label": "A2",
+      "role": "input",
+      "default_pin": "6"
+    },
+    {
+      "id": "b2",
+      "label": "B2",
+      "role": "input",
+      "default_pin": "7"
+    },
+    {
+      "id": "a3",
+      "label": "A3",
+      "role": "input",
+      "default_pin": "8"
+    },
+    {
+      "id": "b3",
+      "label": "B3",
+      "role": "input",
+      "default_pin": "9"
+    },
+    {
+      "id": "a4",
+      "label": "A4",
+      "role": "input",
+      "default_pin": "11"
+    },
+    {
+      "id": "b4",
+      "label": "B4",
+      "role": "input",
+      "default_pin": "12"
+    },
+    {
+      "id": "a5",
+      "label": "A5",
+      "role": "input",
+      "default_pin": "13"
+    },
+    {
+      "id": "b5",
+      "label": "B5",
+      "role": "input",
+      "default_pin": "14"
+    },
+    {
+      "id": "a6",
+      "label": "A6",
+      "role": "input",
+      "default_pin": "15"
+    },
+    {
+      "id": "b6",
+      "label": "B6",
+      "role": "input",
+      "default_pin": "16"
+    },
+    {
+      "id": "a7",
+      "label": "A7",
+      "role": "input",
+      "default_pin": "17"
+    },
+    {
+      "id": "b7",
+      "label": "B7",
+      "role": "input",
+      "default_pin": "18"
+    },
+    {
+      "id": "neq",
+      "label": "NEQ",
+      "role": "output",
+      "default_pin": "19"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Low input threshold / reference voltage",
+      "default": ".3",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "High input threshold / reference voltage",
+      "default": ".7",
+      "unit": "",
+      "min": 0.1,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Vmin",
+      "default": "2",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Vmax",
+      "default": "6",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "rise_delay",
+      "label": "Rise delay",
+      "default": "12n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "fall_delay",
+      "label": "Fall delay",
+      "default": "12n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Transition",
+      "default": "3n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Rout",
+      "default": "45",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Cin",
+      "default": "3.5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Iq",
+      "default": "8u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "high_drop",
+      "label": "High drop",
+      "unit": "V",
+      "default": "0",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Low drop",
+      "unit": "V",
+      "default": "0",
+      "min": 0,
+      "max": 5
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "74xx:74HC688"
+    ],
+    "symbol_names": [
+      "74HC688"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "behavioral": {
+    "version": 1,
+    "supply": {
+      "vcc": "vcc",
+      "gnd": "gnd"
+    },
+    "blocks": [
+      {
+        "type": "xnor",
+        "inputs": [
+          "a0",
+          "b0"
+        ],
+        "out": "eq0"
+      },
+      {
+        "type": "xnor",
+        "inputs": [
+          "a1",
+          "b1"
+        ],
+        "out": "eq1"
+      },
+      {
+        "type": "xnor",
+        "inputs": [
+          "a2",
+          "b2"
+        ],
+        "out": "eq2"
+      },
+      {
+        "type": "xnor",
+        "inputs": [
+          "a3",
+          "b3"
+        ],
+        "out": "eq3"
+      },
+      {
+        "type": "xnor",
+        "inputs": [
+          "a4",
+          "b4"
+        ],
+        "out": "eq4"
+      },
+      {
+        "type": "xnor",
+        "inputs": [
+          "a5",
+          "b5"
+        ],
+        "out": "eq5"
+      },
+      {
+        "type": "xnor",
+        "inputs": [
+          "a6",
+          "b6"
+        ],
+        "out": "eq6"
+      },
+      {
+        "type": "xnor",
+        "inputs": [
+          "a7",
+          "b7"
+        ],
+        "out": "eq7"
+      },
+      {
+        "type": "nand",
+        "inputs": [
+          "!disable",
+          "eq0",
+          "eq1",
+          "eq2",
+          "eq3",
+          "eq4",
+          "eq5",
+          "eq6",
+          "eq7"
+        ],
+        "out": "result"
+      }
+    ],
+    "outputs": {
+      "neq": {
+        "signal": "result"
+      }
+    }
+  },
+  "sources": [
+    "https://www.ti.com/lit/ds/symlink/sn74hc688.pdf"
+  ],
+  "category": "Digital/Comparators",
+  "family": "74HC",
+  "nominal_temperature_c": 25,
+  "model_notes": [
+    "Own event-driven circuit; no manufacturer SPICE source copied. Pin mappings and Boolean functions follow the referenced datasheet.",
+    "Nominal 25 C approximation near 5 V. Propagation delay is per internal logic block, not a characterized package timing matrix. Different logic paths may have different total delays.",
+    "Finite output resistance, input capacitance and fixed package quiescent current are represented. Output load affects voltage and settling.",
+    "No DC input current/fan-out calibration, input clamps, back-powering, switching power, thermal effects or destructive failure. Output resistance does not implement a current limiter.",
+    "Undriven inputs convert to X; outputs release outside the recommended supply window. Undefined logic states are weak analog midpoints, not a transistor-level metastability model.",
+    "CMOS input thresholds scale with local VCC-GND. No Schmitt hysteresis is claimed.",
+    "Pin 19 is LOW only when both words match and pin 1 is LOW. Disabling forces HIGH; the result is a totem-pole output, not open collector or tri-state."
+  ],
+  "measurement_ports": {
+    "positive": "vcc",
+    "negative": "gnd"
+  }
+}

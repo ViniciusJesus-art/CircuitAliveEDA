@@ -424,6 +424,7 @@ void SCH_SELECTION_TOOL::Reset( RESET_REASON aReason )
 
     if( aReason != TOOL_BASE::REDRAW )
     {
+        m_clickedWireSegment.clear();
         if( m_enteredGroup )
             ExitGroup();
 
@@ -581,13 +582,22 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
             SCH_SELECTION_FILTER_OPTIONS rejected;
 
             CollectHits( collector, evt->Position() );
+            // The first empty-space click only dismisses an existing selection.
+            // Repeating the last tool/used component starts on a later click.
+            if( collector.GetCount() == 0 && !hasModifier() && !m_selection.Empty() )
+            {
+                ClearSelection();
+                continue;
+            }
+
             const bool onlyWires = collector.GetCount() > 0
                     && std::all_of( collector.begin(), collector.end(), []( const EDA_ITEM* item )
                     {
                         return item->Type() == SCH_LINE_T
                                 && static_cast<const SCH_LINE*>( item )->GetLayer() == LAYER_WIRE;
                     } );
-            if( ( collector.GetCount() == 0 || onlyWires ) && !hasModifier() )
+            if( ( collector.GetCount() == 0 || onlyWires ) && !hasModifier()
+                && m_selection.Empty() )
             {
                 if( auto* editor = dynamic_cast<SCH_EDIT_FRAME*>( m_frame ) )
                 {
@@ -685,6 +695,11 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
 
                 selectPoint( collector, evt->Position(), nullptr, nullptr, m_additive, m_subtractive, m_exclusive_or );
                 m_selection.SetIsHover( false );
+
+                if( !hasModifier() )
+                    selectClickedWireSegment();
+                else
+                    m_clickedWireSegment.clear();
             }
         }
         else if( evt->IsDblClick( BUT_RIGHT ) && !m_isSymbolEditor && !m_isSymbolViewer
@@ -816,7 +831,9 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
                 else
                     selectMultiple();
             }
-            else if( m_selection.Empty() && drag_action != MOUSE_DRAG_ACTION::DRAG_ANY )
+            else if( m_selection.Empty() && drag_action != MOUSE_DRAG_ACTION::DRAG_ANY
+                     && ( m_isSymbolEditor
+                          || !CollectHits( collector, evt->DragOrigin(), { SCH_ITEM_LOCATE_WIRE_T } ) ) )
             {
                 if( m_selectionMode == SELECTION_MODE::INSIDE_LASSO
                         || m_selectionMode == SELECTION_MODE::TOUCHING_LASSO )
@@ -843,6 +860,16 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
                 }
                 else
                 {
+                    trimClickedWireSegmentForDrag( evt->DragOrigin() );
+
+                    // A drag starts at the press point, which may already be away
+                    // from the current cursor when RequestSelection is reached.
+                    if( m_selection.Empty() )
+                    {
+                        SelectPoint( evt->DragOrigin(), SCH_COLLECTOR::MovableItems );
+                        m_selection.SetIsHover( true );
+                    }
+
                     m_selection = RequestSelection( SCH_COLLECTOR::MovableItems );
 
                     // Pins aren't movable in the schematic editor, so if someone starts a drag on a
@@ -870,9 +897,14 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
                     // drag_is_move option exists only in schematic editor, not in symbol editor
                     // (m_frame->eeconfig() returns nullptr in Symbol Editor)
                     if( m_isSymbolEditor || m_frame->eeconfig()->m_Input.drag_is_move )
-                        m_toolMgr->RunAction( SCH_ACTIONS::move );
+                    {
+                        if( m_isSymbolEditor )
+                            m_toolMgr->RunAction( SCH_ACTIONS::move );
+                        else
+                            m_toolMgr->RunAction( SCH_ACTIONS::move, VECTOR2I( evt->DragOrigin() ) );
+                    }
                     else
-                        m_toolMgr->RunAction( SCH_ACTIONS::drag );
+                        m_toolMgr->RunAction( SCH_ACTIONS::drag, VECTOR2I( evt->DragOrigin() ) );
                 }
                 else
                 {
@@ -2546,6 +2578,7 @@ bool SCH_SELECTION_TOOL::selectLasso()
 void SCH_SELECTION_TOOL::SelectMultiple( KIGFX::PREVIEW::SELECTION_AREA& aArea, bool aSubtractive,
                                          bool aExclusiveOr )
 {
+    m_clickedWireSegment.clear();
     KIGFX::VIEW* view = getView();
 
     SELECTION_MODE selectionMode = aArea.GetMode();
@@ -3835,8 +3868,62 @@ bool SCH_SELECTION_TOOL::Selectable( const EDA_ITEM* aItem, const VECTOR2I* aPos
 }
 
 
+void SCH_SELECTION_TOOL::selectClickedWireSegment()
+{
+    m_clickedWireSegment.clear();
+
+    if( m_isSymbolEditor || m_isSymbolViewer || m_selection.Size() != 1 )
+        return;
+
+    auto* line = dynamic_cast<SCH_LINE*>( m_selection.Front() );
+    auto* editor = dynamic_cast<SCH_EDIT_FRAME*>( m_frame );
+
+    if( !line || !line->IsWire() || !editor )
+        return;
+
+    for( SCH_LINE* member : CollectWireSegment( *m_frame->GetScreen(),
+                                               &editor->GetCurrentSheet(), *line ) )
+    {
+        if( !Selectable( member ) || !itemPassesFilter( member )
+            || ( m_enteredGroup ? !SCH_GROUP::WithinScope( member, m_enteredGroup, false )
+                                : member->GetParentGroup() != nullptr ) )
+            continue;
+
+        member->SetFlags( STARTPOINT | ENDPOINT );
+        select( member );
+        m_clickedWireSegment.insert( member->m_Uuid );
+    }
+
+    getView()->Update( &m_selection );
+    m_toolMgr->ProcessEvent( EVENTS::SelectedEvent );
+}
+
+
+void SCH_SELECTION_TOOL::trimClickedWireSegmentForDrag( const VECTOR2I& aOrigin )
+{
+    if( m_clickedWireSegment.empty() || m_clickedWireSegment.size() != m_selection.GetItems().size() )
+        return;
+
+    for( EDA_ITEM* item : m_selection )
+        if( !m_clickedWireSegment.count( item->m_Uuid ) )
+            return;
+
+    SCH_COLLECTOR collector;
+    CollectHits( collector, aOrigin, { SCH_ITEM_LOCATE_WIRE_T } );
+    narrowSelection( collector, aOrigin, false, true, nullptr );
+
+    if( collector.GetCount() != 1 )
+        return;
+
+    // Use the normal point selection to retain endpoint flags and edit events.
+    selectPoint( collector, aOrigin, nullptr, nullptr, false, false, false );
+    m_selection.SetIsHover( false );
+}
+
+
 void SCH_SELECTION_TOOL::ClearSelection( bool aQuietMode )
 {
+    m_clickedWireSegment.clear();
     if( m_selection.Empty() )
         return;
 

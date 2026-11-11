@@ -281,7 +281,7 @@ Veja [páginas do esquemático](docs/circuitalive/PAGES.md).
 
 
 <h3 align="center">
-  Vínculos entre esquemático e PCB
+  Vínculos entre esquemático e PCB Automatico com Lista de Footprints pendentes
 </h3>
 
 <p align="center">

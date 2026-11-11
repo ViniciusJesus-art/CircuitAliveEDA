@@ -5,9 +5,9 @@ contém comportamento, parâmetros, pinagem e suas associações em `matches`.
 O catálogo e o relatório abaixo são derivados desses arquivos: não há uma
 lista paralela de componentes autorizados na simulação.
 
-O catálogo atual tem **396 arquivos `.casim`** e **617 associações automáticas
+O catálogo atual tem **419 arquivos `.casim`** e **642 associações automáticas
 com pinagem compatível** nas 21.029 entradas eletrônicas da biblioteca local.
-Restam **20.412 entradas sem associação explícita** (cobertura de **2,934%**).
+Restam **20.387 entradas sem associação explícita** (cobertura de **3,053%**).
 Conectores e outros itens não eletrônicos são excluídos. As etapas abaixo registram
 os lotes; os números incluem variantes de desenho e encapsulamento.
 
@@ -156,6 +156,25 @@ chaves de dois terminais em `Switch` estão vinculadas, com seus estados iniciai
 Os vínculos são distribuídos nos `.casim`, sem exigir perfis pessoais ou
 configuração por instância. Pinagens, limites, exemplos e verificação estão em
 [Vínculos revisados com a biblioteca padrão](STANDARD_LIBRARY_ASSOCIATIONS.md).
+
+## Nona etapa: multiplexadores, comparadores, decodificadores e buffers
+
+Foram acrescentados **20 arquivos e 25 associações**, sobre o estado de
+399 arquivos e 617 associações encontrado antes deste lote:
+
+| Grupo | Componentes | Arquivos | Associações |
+|---|---|---:|---:|
+| Multiplexadores | 74LS151/153/157/158/251/253/257/258 | 8 | 10 |
+| Comparadores | 85 e 688 em LS/HC/HCT | 6 | 7 |
+| Decodificadores ativos em HIGH | 74HC238 e 74HCT238 | 2 | 3 |
+| Buffers de oito canais | 541 em LS/HCT/AHC/AHCT | 4 | 5 |
+
+Os modelos distinguem desabilitação com nível fixo de saída e alta impedância,
+preservam os controles independentes e incluem a tabela de expansão dos 85.
+As cinco variantes IEEE recebem vínculos explícitos. Apenas CIs reais com
+função elétrica foram adicionados; conectores e itens sem função de simulação
+continuam excluídos. Veja [Lógica combinacional](COMBINATIONAL_LOGIC_MODELS.md)
+para pinagens, parâmetros, referências e validação.
 
 ## Uso e atualização
 

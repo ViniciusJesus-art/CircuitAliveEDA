@@ -21,6 +21,7 @@ struct LOGIC_PIN
     std::vector<std::size_t> enables;
     std::vector<LOGIC_DRIVER_STATE> drivers;
     double thresholdReference = 0; // Zero follows VCC; positive values give absolute input thresholds.
+    bool observer = false; // Excluded symbol: reads the net, never supplies or drives it.
 };
 LOGIC_LEVEL PinLogicLevel( const LOGIC_PIN& aPin, const SIM_SAMPLE& aSample );
 /// The local output stage can be Z while PinLogicLevel reads another device's 0/1.
