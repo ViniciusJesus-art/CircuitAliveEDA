@@ -597,14 +597,16 @@ void PCB_EDIT_FRAME::KiwayMailIn( KIWAY_MAIL_EVENT& mail )
         try
         {
             NETLIST netlist;
-            FetchNetlistFromSchematic( netlist, wxEmptyString );
+            if( !FetchNetlistFromSchematic( netlist, wxEmptyString ) )
+                break;
 
             BOARD_NETLIST_UPDATER updater( this, GetBoard() );
             updater.SetLookupByTimestamp( false );
             updater.SetDeleteUnusedFootprints( false );
             updater.SetReplaceFootprints( false );
             updater.SetTransferGroups( false );
-            updater.UpdateNetlist( netlist );
+            if( !updater.UpdateNetlist( netlist ) )
+                break;
 
             bool dummy;
             OnNetlistChanged( updater, &dummy );

@@ -10,11 +10,13 @@
 #include <sch_field.h>
 #include <sch_text.h>
 #include <sch_textbox.h>
+#include <sch_label.h>
 #include <sch_io/kicad_sexpr/sch_io_kicad_sexpr.h>
 #include <sch_sheet_path.h>
 #include <sch_sheet.h>
 #include <sch_screen.h>
 #include <circuitalive/probe_placement.h>
+#include <tools/sch_tool_utils.h>
 #include <circuitalive/model_profiles.h>
 #include <circuitalive/simulation_model.h>
 #include <circuitalive/visual_signals.h>
@@ -29,9 +31,61 @@
 #include <sim/interactive_sim_protocol.h>
 #include <connection_graph.h>
 #include <sch_pin.h>
+#include <sch_line.h>
+#include <sch_connection.h>
 #include <base_units.h>
 
 using namespace CIRCUITALIVE;
+
+// Opt-in diagnostic: capture the same connected circuit as the editor without changing its files.
+BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_FIXTURE,
+                         *boost::unit_test::disabled() )
+{
+    const char* path = std::getenv( "CIRCUITALIVE_AUDIT_SCHEMATIC" );
+    const char* destination = std::getenv( "CIRCUITALIVE_AUDIT_REPORT" );
+    BOOST_REQUIRE( path ); BOOST_REQUIRE( destination );
+    LoadSchematic( wxFileName( wxString::FromUTF8( path ) ) );
+    SCH_IO_KICAD_SEXPR plugin;
+    EESCHEMA_HELPERS::LoadProjectSheets( plugin, *m_schematic, wxString::FromUTF8( path ) );
+    for( auto& sheet : m_schematic->Hierarchy() )
+    {
+        sheet.LastScreen()->UpdateLocalLibSymbolLinks();
+        sheet.UpdateAllScreenReferences();
+    }
+    m_schematic->ConnectionGraph()->Recalculate( m_schematic->Hierarchy(), true );
+    auto snapshot = CaptureSchematic( *m_schematic, true );
+    const auto& circuit = snapshot.circuit;
+    const auto& cfg = circuit.config;
+    using JSON = nlohmann::json;
+    JSON report = { { "op", "configure" }, { "netlist", circuit.netlist },
+        { "step", cfg.step }, { "max_step", cfg.maxStep }, { "horizon", cfg.horizon },
+        { "uic", cfg.useInitialConditions }, { "capacity", cfg.historyCapacity },
+        { "signals", cfg.signals }, { "accelerate_expressions", cfg.accelerateExpressions },
+        { "mutable_elements", cfg.mutableElements }, { "memories", JSON::array() },
+        { "programmable_devices", JSON::array() }, { "components", JSON::array() } };
+    for( const auto& region : cfg.memories )
+        report["memories"].push_back( { { "id", region.id }, { "label", region.label },
+            { "word_bits", region.wordBits }, { "writable", region.writable },
+            { "data", MemoryHex( region.initial.data ) }, { "known", MemoryHex( region.initial.known ) } } );
+    for( const auto& device : cfg.programmableDevices )
+        report["programmable_devices"].push_back( PROTOCOL::SerializeProgrammableDevice( device ) );
+    for( std::size_t i = 0; i < snapshot.locations.size(); ++i )
+        report["components"].push_back( { { "reference", snapshot.locations[i].reference.ToStdString() },
+            { "sheet", snapshot.locations[i].sheet.ToStdString() }, { "nodes", circuit.pinNodes[i] } } );
+    auto save = [&] { std::ofstream output( std::filesystem::path( reinterpret_cast<const char8_t*>( destination ) ) );
+                     BOOST_REQUIRE( output ); output << report.dump( 2 ) << '\n'; };
+    save();
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    try
+    {
+        session.Configure( circuit.netlist, cfg );
+        session.AdvanceTo( std::getenv( "CIRCUITALIVE_AUDIT_UNTIL" )
+                ? std::stod( std::getenv( "CIRCUITALIVE_AUDIT_UNTIL" ) ) : .01 );
+        report["result_time"] = session.Snapshot().latest.time;
+        save();
+    }
+    catch( const std::exception& error ) { report["error"] = error.what(); save(); BOOST_FAIL( error.what() ); }
+}
 
 BOOST_FIXTURE_TEST_CASE( NativeUnoFirmwareDemoReadsThePotentiometerAndDrivesItsProbe,
                          KI_TEST::SCHEMATIC_TEST_FIXTURE )
@@ -404,6 +458,51 @@ BOOST_FIXTURE_TEST_CASE( NativeProbeSymbolsConnectAndKeepPhysicalPinOrientation,
     }
 }
 
+BOOST_FIXTURE_TEST_CASE( NativeProbesAttachDirectlyToBareComponentPinsWithoutAddingWires,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file(CIRCUITALIVE_TEST_SCHEMATIC);file.SetFullName("standard_library_led.kicad_sch");LoadSchematic(file);
+    auto& sheet=m_schematic->CurrentSheet();auto* screen=m_schematic->RootScreen();
+    SCH_PIN* terminal=nullptr;
+    for(auto* item:screen->Items().OfType(SCH_SYMBOL_T))
+    {
+        auto* symbol=static_cast<SCH_SYMBOL*>(item);
+        if(symbol->GetRef(&sheet)!="R1")continue;
+        for(auto* pin:symbol->GetPins(&sheet))if(pin->GetShownNumber()=="1")terminal=pin;
+    }
+    BOOST_REQUIRE(terminal);const auto at=terminal->GetPosition();
+    std::vector<SCH_LINE*> remove;
+    for(auto* item:screen->Items().OfType(SCH_LINE_T))
+        if(auto* wire=static_cast<SCH_LINE*>(item);wire->IsWire()&&wire->HitTest(at,0))remove.push_back(wire);
+    for(auto* wire:remove){screen->Remove(wire);delete wire;}
+    const int tolerance=schIUScale.mmToIU(.1);
+    for(auto kind:{PROBE_KIND::VOLTAGE,PROBE_KIND::OSCILLOSCOPE,PROBE_KIND::LOGIC,
+                   PROBE_KIND::PWM,PROBE_KIND::SINE,PROBE_KIND::SQUARE})
+    {
+        const auto plan=PlanProbePlacement(*screen,at+VECTOR2I(tolerance/2,0),tolerance,kind,&sheet);
+        BOOST_CHECK(plan.pin==terminal);BOOST_CHECK(!plan.wire);BOOST_CHECK(plan.anchor==at);
+    }
+    BOOST_CHECK_THROW(PlanProbePlacement(*screen,at,tolerance,PROBE_KIND::CURRENT,&sheet),std::runtime_error);
+    SOURCE_PROBE_SETTINGS settings;settings.initialHigh=true;
+    screen->Append(MakeProbeSymbol(PROBE_KIND::LOGIC,sheet,at,false,1,"Drive bare pin",settings).release());
+    screen->Append(MakeProbeSymbol(PROBE_KIND::VOLTAGE,sheet,at,false,2,"Bare pin").release());
+    auto* label=new SCH_LABEL(at,"DirectPin");screen->Append(label);
+    m_schematic->ConnectionGraph()->Recalculate(m_schematic->Hierarchy(),true);
+    const auto snapshot=CaptureSchematic(*m_schematic);
+    BOOST_REQUIRE_EQUAL(snapshot.circuit.switches.size(),1u);
+    BOOST_REQUIRE_EQUAL(snapshot.circuit.measurements.size(),1u);
+    const auto source=snapshot.circuit.switches[0].component;
+    BOOST_CHECK_EQUAL(terminal->Connection(&sheet)->Name(),label->Connection(&sheet)->Name());
+    for(std::size_t i=0;i<snapshot.locations.size();++i)
+        if(snapshot.locations[i].reference=="R1")
+            BOOST_CHECK_EQUAL(snapshot.circuit.pinNodes[source].at("1"),snapshot.circuit.pinNodes[i].at("1"));
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(snapshot.circuit.netlist,snapshot.circuit.config);
+    session.AdvanceTo(.001);
+    BOOST_CHECK_GT(MeasurementValue(snapshot.circuit.measurements[0],session.Snapshot().latest),4.9);
+    session.SetSourceValue(snapshot.circuit.switches[0].controlSource,0);session.AdvanceTo(.002);
+    BOOST_CHECK_SMALL(MeasurementValue(snapshot.circuit.measurements[0],session.Snapshot().latest),1e-6);
+}
+
 BOOST_FIXTURE_TEST_CASE( SavedOscilloscopeProbeCapturesCapacitorCharge, KI_TEST::SCHEMATIC_TEST_FIXTURE )
 {
     wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC );
@@ -611,6 +710,33 @@ BOOST_FIXTURE_TEST_CASE( NativePowerSymbolsGenerateSuppliesAndKeepGlobalNetConne
     BOOST_CHECK_EQUAL( s.circuit.currentWarnings.size(), 3 );
     v = voltages( s ); BOOST_CHECK_CLOSE( v.at( "R2" ), 5, 1e-6 );
     BOOST_CHECK_EQUAL( s.circuit.pinNodes[parts.at( "R1" )].at( "1" ), s.circuit.pinNodes[parts.at( "R2" )].at( "1" ) );
+}
+
+BOOST_FIXTURE_TEST_CASE( NativeGroundWithGlobalLabelKeepsItsElectricalReference,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "power_symbol_sources.kicad_sch" );
+    LoadSchematic( file );
+    auto& sheet = m_schematic->CurrentSheet();
+    SCH_PIN* groundPin = nullptr;
+    for( auto* item : sheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
+    {
+        auto* symbol = static_cast<SCH_SYMBOL*>( item );
+        if( symbol->GetLibId().Format() == "power:GND" )
+        { groundPin = symbol->GetPins( &sheet ).front(); break; }
+    }
+    BOOST_REQUIRE( groundPin );
+    sheet.LastScreen()->Append( new SCH_GLOBALLABEL( groundPin->GetPosition(), "CARD_DETECT" ) );
+    m_schematic->ConnectionGraph()->Recalculate( m_schematic->Hierarchy(), true );
+    BOOST_CHECK_EQUAL( groundPin->Connection( &sheet )->LocalName(), "CARD_DETECT" );
+    const auto snapshot = CaptureSchematic( *m_schematic, true );
+    for( std::size_t i = 0; i < snapshot.locations.size(); ++i )
+        BOOST_CHECK_EQUAL( snapshot.circuit.pinNodes[i].at( "2" ), "0" );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( snapshot.circuit.netlist, snapshot.circuit.config ); session.AdvanceTo( .02 );
+    for( const auto& channel : snapshot.circuit.measurements )
+        if( channel.name == "R1" && channel.quantity == MEASURE_QUANTITY::VOLTAGE )
+            BOOST_CHECK_CLOSE( MeasurementValue( channel, session.Snapshot().latest ), 5, 1e-6 );
 }
 
 namespace
@@ -1018,4 +1144,64 @@ BOOST_FIXTURE_TEST_CASE( MemoryResourceFieldsPersistAndNativeDemoLoadsBothImages
     INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(c.netlist,c.config);session.AdvanceTo(1e-6);
     BOOST_CHECK_EQUAL(session.ReadMemory(c.config.memories[rom].id,0,1).image.data[0],0x43);
     BOOST_CHECK_EQUAL(session.ReadMemory(c.config.memories[ram].id,0,1).image.data[0],0x49);
+}
+
+BOOST_FIXTURE_TEST_CASE( NativeSourceProbesPersistSettingsAndDriveTheirWireWithInternalGround,
+                         KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file(CIRCUITALIVE_TEST_SCHEMATIC);file.SetFullName("standard_library_led.kicad_sch");LoadSchematic(file);
+    auto& sheet=m_schematic->CurrentSheet();auto* screen=m_schematic->RootScreen();
+    VECTOR2I supply;
+    for(auto* item:screen->Items().OfType(SCH_SYMBOL_T))
+    {
+        auto* symbol=static_cast<SCH_SYMBOL*>(item);
+        if(!symbol->GetRef(&sheet).StartsWith("V"))continue;
+        for(const auto* pin:symbol->GetPins(&sheet))if(pin->GetShownNumber()=="1")supply=pin->GetPosition();
+        screen->Remove(symbol);delete symbol;break;
+    }
+    BOOST_REQUIRE(supply!=VECTOR2I(0,0));
+    SOURCE_PROBE_SETTINGS settings;settings.initialHigh=true;settings.high=3.3;settings.frequency=2500;settings.duty=.37;
+    std::size_t sequence=1;
+    for(auto kind:{PROBE_KIND::LOGIC,PROBE_KIND::PWM,PROBE_KIND::SINE,PROBE_KIND::SQUARE})
+    {
+        auto position=supply+VECTOR2I(0,schIUScale.mmToIU(10*int(sequence-1)));
+        auto probe=MakeProbeSymbol(kind,sheet,position,false,sequence,"Stimulus",settings);
+        BOOST_REQUIRE_EQUAL(probe->GetPins(&sheet).size(),1u);
+        BOOST_CHECK(probe->GetExcludedFromBOM());BOOST_CHECK(probe->GetExcludedFromBoard());
+        BOOST_CHECK_EQUAL(ReadSourceProbeSettings(*probe).frequency,2500);
+        BOOST_CHECK(probe->GetField("CA.ProbeState")->IsVisible());
+        if(kind==PROBE_KIND::SQUARE)probe->SetOrientation(SYM_ROTATE_COUNTERCLOCKWISE);
+        screen->Append(probe.release());++sequence;
+    }
+    screen->Append(MakeProbeSymbol(PROBE_KIND::VOLTAGE,sheet,supply,false,sequence,"Driven").release());
+    m_schematic->ConnectionGraph()->Recalculate(m_schematic->Hierarchy(),true);
+    auto snapshot=CaptureSchematic(*m_schematic);
+    BOOST_REQUIRE_EQUAL(snapshot.circuit.sourceProbes.size(),4u);
+    BOOST_REQUIRE_EQUAL(snapshot.circuit.switches.size(),1u);
+    BOOST_REQUIRE_EQUAL(snapshot.circuit.adjustments.size(),2u);
+    BOOST_REQUIRE_EQUAL(snapshot.probes.size(),1u);
+    for(const auto& [index,kind]:snapshot.circuit.sourceProbes)
+    {
+        BOOST_CHECK_EQUAL(snapshot.circuit.pinNodes[index].at("2"),"0");
+        BOOST_CHECK(snapshot.locations[index].reference.StartsWith("#P"));
+        if(kind==PROBE_KIND::SQUARE)BOOST_CHECK(snapshot.locations[index].axisX!=VECTOR2I(1,0));
+    }
+    SIMULATION_OVERLAY overlay;const auto index=snapshot.circuit.switches[0].component;
+    BOOST_CHECK_EQUAL(overlay.SwitchAt(snapshot,sheet.Path().AsString(),snapshot.locations[index].body.Centre()),0);
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);
+    session.Configure(snapshot.circuit.netlist,snapshot.circuit.config);session.AdvanceTo(.001);
+    BOOST_CHECK_GT(MeasurementValue(snapshot.circuit.measurements[0],session.Snapshot().latest),3.2);
+    session.SetSourceValue(snapshot.circuit.switches[0].controlSource,0);session.AdvanceTo(.002);
+    BOOST_CHECK_SMALL(MeasurementValue(snapshot.circuit.measurements[0],session.Snapshot().latest),1e-5);
+    const auto saved=std::filesystem::temp_directory_path()/("ca-source-"+std::to_string(ProcessId())+".kicad_sch");
+    SCH_IO_KICAD_SEXPR().SaveSchematicFile(wxString::FromUTF8(saved.string()),m_schematic->GetTopLevelSheet(0),m_schematic.get());
+    LoadSchematic(wxFileName(wxString::FromUTF8(saved.string())));
+    snapshot=CaptureSchematic(*m_schematic);
+    BOOST_REQUIRE_EQUAL(snapshot.circuit.sourceProbes.size(),4u);
+    BOOST_CHECK(snapshot.circuit.switches[0].initiallyClosed);
+    for(const auto& adjustment:snapshot.circuit.adjustments)BOOST_CHECK_EQUAL(adjustment.initial,.37);
+    if( const char* demo = std::getenv("CIRCUITALIVE_SOURCE_PROBE_DEMO") )
+        std::filesystem::copy_file(saved,std::filesystem::path(reinterpret_cast<const char8_t*>(demo)),
+                                    std::filesystem::copy_options::overwrite_existing);
+    std::filesystem::remove(saved);
 }

@@ -2,6 +2,7 @@
 #include "property_stamp.h"
 #include <tools/sch_actions.h>
 #include <tools/sch_tool_base.h>
+#include <tools/sch_tool_utils.h>
 #include <tools/ee_grid_helper.h>
 #include <widgets/used_symbols.h>
 #include <dialog_shim.h>
@@ -14,6 +15,7 @@
 #include <sch_field.h>
 #include <sch_label.h>
 #include <sch_line.h>
+#include <sch_pin.h>
 #include <sch_screen.h>
 #include <sch_sheet.h>
 #include <sch_symbol.h>
@@ -105,7 +107,7 @@ public:
         row( _( "Step (negative to decrement):" ), m_step );
         m_create = new wxCheckBox( this, wxID_ANY, _( "Create missing custom fields" ) );
         m_create->SetValue( settings.createFields ); row( "", m_create );
-        m_wireLabels = new wxCheckBox( this, wxID_ANY, _( "Create labels when clicking wires" ) );
+        m_wireLabels = new wxCheckBox( this, wxID_ANY, _( "Create labels on wires or pin endpoints" ) );
         m_wireLabels->SetValue( settings.wireLabels ); row( "", m_wireLabels );
         m_labelKind = new wxChoice( this, wxID_ANY );
         m_labelKind->Append( _( "Local label" ) ); m_labelKind->Append( _( "Global label" ) );
@@ -115,7 +117,7 @@ public:
         layout->Add( form, 0, wxEXPAND | wxALL, 12 );
         auto* help = new wxStaticText( this, wxID_ANY,
             _( "Example: Digital_D# or Digital_D?. The number changes only after an accepted click.\n"
-               "On wires, the generated value is used as the label's name.\n"
+               "On wires or pin endpoints, the generated value is used as the label's name.\n"
                "For numeric properties, use a number and units; for yes/no properties, use true/false." ) );
         layout->Add( help, 0, wxEXPAND | wxLEFT | wxRIGHT, 12 );
         m_preview = new wxStaticText( this, wxID_ANY, "" );
@@ -184,14 +186,11 @@ public:
 private:
     void setTransitions() override { Go( &SCH_PROPERTY_STAMP_TOOL::Main, SCH_ACTIONS::propertyStamp.MakeEvent() ); }
 
-    bool stampWire( SCH_LINE& wire, VECTOR2I cursor, const wxString& value )
+    bool stampLabel( const VECTOR2I& position, bool vertical, const wxString& value )
     {
         if( !m_settings.wireLabels ) throw std::runtime_error( "Wire labels are disabled for this tool" );
         if( value.IsEmpty() || value.Contains( '\n' ) || value.Contains( '\r' ) )
             throw std::runtime_error( "Enter a nonempty, single-line label name" );
-        EE_GRID_HELPER grid( m_toolMgr );
-        const auto position = SEG( wire.GetStartPoint(), wire.GetEndPoint() ).NearestPoint(
-                grid.Align( cursor, GRID_CONNECTABLE ) );
         SCH_COMMIT commit( m_toolMgr );
         for( SCH_ITEM* item : m_frame->GetScreen()->Items() )
             if( auto* existing = dynamic_cast<SCH_LABEL_BASE*>( item ); existing && existing->GetPosition() == position )
@@ -208,11 +207,11 @@ private:
         label->SetParent( m_frame->GetScreen() );
         const int size = m_frame->Schematic().Settings().m_DefaultTextSize;
         label->SetTextSize( VECTOR2I( size, size ) );
-        label->SetSpinStyle( wire.GetStartPoint().x == wire.GetEndPoint().x ? SPIN_STYLE::UP : SPIN_STYLE::RIGHT );
+        label->SetSpinStyle( vertical ? SPIN_STYLE::UP : SPIN_STYLE::RIGHT );
         label->SetFlags( IS_NEW );
         label->AutoplaceFields( nullptr, AUTOPLACE_AUTO );
         commit.Add( label.release(), m_frame->GetScreen() );
-        commit.Push( _( "Label Wire by Click" ) ); return true;
+        commit.Push( _( "Label Connection by Click" ) ); return true;
     }
 
     int Main( const TOOL_EVENT& action )
@@ -249,15 +248,28 @@ private:
                 m_toolMgr->RunAction( ACTIONS::selectionClear );
                 EDA_ITEM* picked = nullptr;
                 const auto position = controls->GetMousePosition();
-                if( !m_selectionTool->SelectPoint( position, SCH_COLLECTOR::EditableItems, &picked ) || !picked )
+                auto* pin = m_settings.wireLabels ? FindPinConnectionAt( *m_frame->GetScreen(),
+                        &m_frame->GetCurrentSheet(), position,
+                        std::max( 1, int( getView()->ToWorld( 8.0 ) ) ) ) : nullptr;
+                if( !pin && ( !m_selectionTool->SelectPoint( position, SCH_COLLECTOR::EditableItems, &picked ) || !picked ) )
                 { update(); continue; }
                 try
                 {
                     auto* item = dynamic_cast<SCH_ITEM*>( picked );
                     bool accepted = false;
                     const auto value = sequence.Current();
-                    if( auto* wire = dynamic_cast<SCH_LINE*>( item ); wire && wire->IsWire() && m_settings.wireLabels )
-                        accepted = stampWire( *wire, position, value );
+                    if( pin )
+                    {
+                        const auto end = pin->GetPosition(), root = pin->GetPinRoot();
+                        accepted = stampLabel( end, root.x == end.x && root.y != end.y, value );
+                    }
+                    else if( auto* wire = dynamic_cast<SCH_LINE*>( item ); wire && wire->IsWire() && m_settings.wireLabels )
+                    {
+                        EE_GRID_HELPER grid( m_toolMgr );
+                        const auto anchor = SEG( wire->GetStartPoint(), wire->GetEndPoint() ).NearestPoint(
+                                grid.Align( position, GRID_CONNECTABLE ) );
+                        accepted = stampLabel( anchor, wire->GetStartPoint().x == wire->GetEndPoint().x, value );
+                    }
                     else if( item )
                     {
                         auto plan = PlanPropertyStamp( *item, m_frame->GetCurrentSheet(), m_settings, value, m_frame );

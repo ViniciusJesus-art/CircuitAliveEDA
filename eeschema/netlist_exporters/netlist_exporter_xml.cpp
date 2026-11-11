@@ -597,22 +597,41 @@ XNODE* NETLIST_EXPORTER_XML::makeSymbols( unsigned aCtl )
             auto     range = extra_units.equal_range( symbol );
             wxString uuid;
 
-            // Output a series of children with all UUIDs associated with the REFDES
+            std::vector<std::pair<SCH_SYMBOL*, const SCH_SHEET_PATH*>> placedUnits;
             for( auto it = range.first; it != range.second; ++it )
+                placedUnits.emplace_back( *it, &sheet );
+            // Keep the leading UUID on this component's exported sheet path.
+            placedUnits.emplace_back( symbol, &sheet );
+
+            // A package can span independent project pages or hierarchical sheets. Export
+            // every unit's identity so changing the first page/unit does not lose the PCB link.
+            if( symbol->GetUnitCount() > 1 )
             {
-                uuid = ( *it )->m_Uuid.AsString();
+                for( const SCH_SHEET_PATH& otherSheet : sheetList )
+                {
+                    if( otherSheet == sheet )
+                        continue;
+                    for( SCH_ITEM* otherItem : otherSheet.LastScreen()->Items().OfType( SCH_SYMBOL_T ) )
+                    {
+                        auto* other = static_cast<SCH_SYMBOL*>( otherItem );
+                        if( other->GetRef( &otherSheet ) == symbol->GetRef( &sheet ) )
+                            placedUnits.emplace_back( other, &otherSheet );
+                    }
+                }
+            }
+
+            // Output a series of children with all UUIDs associated with the REFDES
+            for( std::size_t index = 0; index < placedUnits.size(); ++index )
+            {
+                uuid = placedUnits[index].first->m_Uuid.AsString();
 
                 // Add a space between UUIDs, if not in KICAD mode (i.e.
                 // using wxXmlDocument::Save()).  KICAD MODE has its own XNODE::Format function.
-                if( !( aCtl & GNL_OPT_KICAD ) )     // i.e. for .xml format
+                if( !( aCtl & GNL_OPT_KICAD ) && index + 1 < placedUnits.size() )
                     uuid += ' ';
 
                 xunits->AddChild( new XNODE( wxXML_TEXT_NODE, wxEmptyString, uuid ) );
             }
-
-            // Output the primary UUID
-            uuid = symbol->m_Uuid.AsString();
-            xunits->AddChild( new XNODE( wxXML_TEXT_NODE, wxEmptyString, uuid ) );
 
             // Emit unit information (per-unit name and pins) after tstamps
             XNODE* xunitInfo;
@@ -635,25 +654,19 @@ XNODE* NETLIST_EXPORTER_XML::makeSymbols( unsigned aCtl )
                 std::map<int, SCH_SYMBOL*>                    symbolByUnit;
 
                 auto addUnitSymbol =
-                        [&]( SCH_SYMBOL* aUnitSymbol )
+                        [&]( SCH_SYMBOL* aUnitSymbol, const SCH_SHEET_PATH* aUnitSheet )
                         {
                             if( !aUnitSymbol )
                                 return;
 
-                            int unit = aUnitSymbol->GetUnitSelection( &sheet );
+                            int unit = aUnitSymbol->GetUnitSelection( aUnitSheet );
 
                             if( unit > 0 )
                                 symbolByUnit.try_emplace( unit, aUnitSymbol );
                         };
 
-                addUnitSymbol( symbol );
-
-                auto extraUnitRange = extra_units.equal_range( symbol );
-
-                // Collect the other placed units that share this reference so each unit number
-                // can be resolved back to the specific SCH_SYMBOL instance on the sheet.
-                for( auto it = extraUnitRange.first; it != extraUnitRange.second; ++it )
-                    addUnitSymbol( *it );
+                for( const auto& [unitSymbol, unitSheet] : placedUnits )
+                    addUnitSymbol( unitSymbol, unitSheet );
 
                 // Emit every unit slot from the default library symbol, but override that slot's
                 // metadata with the placed unit's resolved library symbol when one exists.

@@ -243,12 +243,12 @@ void DIALOG_IMPORT_NETLIST::loadNetlist( bool aDryRun )
     updater.SetTransferGroups( m_cbTransferGroups->GetValue() );
     updater.SetOverrideLocks( m_cbOverrideLocks->GetValue() );
     updater.SetUpdateFields( true );
-    updater.UpdateNetlist( netlist );
+    const bool success = updater.UpdateNetlist( netlist );
 
     // The creation of the report was made without window update: the full page must be displayed
     m_MessageWindow->Flush( true );
 
-    if( aDryRun )
+    if( aDryRun || !success )
         return;
 
     m_parent->OnNetlistChanged( updater, &m_runDragCommand );

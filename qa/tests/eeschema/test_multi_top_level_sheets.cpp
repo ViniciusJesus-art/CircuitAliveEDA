@@ -43,6 +43,12 @@
 #include <sch_io/kicad_sexpr/sch_io_kicad_sexpr.h>
 #include <wx/ffile.h>
 #include <wx/filename.h>
+#include <netlist_exporters/netlist_exporter_kicad.h>
+#include <netlist_reader/netlist.h>
+#include <netlist_reader/netlist_reader.h>
+#include <richio.h>
+#include <sch_pin.h>
+#include <connection_graph.h>
 
 static SCH_SHEET* createTopLevelSheet( SCHEMATIC& aSchematic, const wxString& aName,
                                        const wxString& aFileName )
@@ -455,6 +461,74 @@ BOOST_FIXTURE_TEST_CASE( DirectPageFindsOwningProjectWithDifferentBasename, PROJ
     other.Write( "{}" );
     other.Close();
     BOOST_CHECK_EQUAL( EESCHEMA_HELPERS::FindProjectForSchematic( Path( "second.kicad_sch" ) ), project );
+    // A stale independent project for that page must not select another PCB.
+    wxFFile stale( Path( "second.kicad_pro" ), "w" );
+    stale.Write( "{}" );
+    stale.Close();
+    BOOST_CHECK_EQUAL( EESCHEMA_HELPERS::FindProjectForSchematic( Path( "second.kicad_sch" ) ), project );
+}
+
+BOOST_FIXTURE_TEST_CASE( PcbNetlistContainsAllPagesAndEveryUnitIdentity, PROJECT_PAGES_FIXTURE )
+{
+    LIB_SYMBOL lib( "Decoder" );
+    lib.GetReferenceField().SetText( "U" );
+    lib.SetUnitCount( 3, false );
+    for( int unit = 1; unit <= 3; ++unit )
+    {
+        auto* pin = new SCH_PIN( &lib );
+        pin->SetUnit( unit );
+        pin->SetNumber( wxString::Format( "%d", unit ) );
+        lib.AddDrawItem( pin );
+    }
+    std::vector<KIID> uuids;
+    for( int unit = 1; unit <= 3; ++unit )
+    {
+        SCH_SHEET_PATH path;
+        path.push_back( unit == 1 ? first : second );
+        auto* symbol = new SCH_SYMBOL( lib, LIB_ID( "Test", "Decoder" ), &path, unit, 0,
+                                      VECTOR2I( unit * 10000, 0 ), schematic.get() );
+        symbol->SetRef( &path, "U1" );
+        symbol->SetUnitSelection( &path, unit );
+        symbol->GetField( FIELD_T::FOOTPRINT )->SetText( "Test:DIP-16" );
+        path.LastScreen()->Append( symbol );
+        path.LastScreen()->Append( new SCH_GLOBALLABEL( symbol->GetPosition(), "SHARED" ) );
+        uuids.push_back( symbol->m_Uuid );
+    }
+    LIB_SYMBOL resistor( "R" );
+    resistor.GetReferenceField().SetText( "R" );
+    SCH_SHEET_PATH secondPath;
+    secondPath.push_back( second );
+    auto* r1 = new SCH_SYMBOL( resistor, LIB_ID( "Device", "R" ), &secondPath, 1, 0,
+                              VECTOR2I( 0, 10000 ), schematic.get() );
+    r1->SetRef( &secondPath, "R1" );
+    second->GetScreen()->Append( r1 );
+    // Populate the native screen library caches as in a save/reopen cycle.
+    first->GetScreen()->UpdateLocalLibSymbolLinks();
+    second->GetScreen()->UpdateLocalLibSymbolLinks();
+    schematic->ConnectionGraph()->Recalculate( schematic->Hierarchy(), true );
+
+    for( const auto& selected : schematic->Hierarchy() )
+    {
+        schematic->SetCurrentSheet( selected );
+        NETLIST_EXPORTER_KICAD exporter( schematic.get() );
+        STRING_FORMATTER formatter;
+        exporter.Format( &formatter, GNL_ALL | GNL_OPT_KICAD );
+        // Parse the same format sent to the PCB editor, not a screen-specific export.
+        NETLIST netlist;
+        KICAD_NETLIST_READER reader( new STRING_LINE_READER( formatter.GetString(), "pages" ), &netlist );
+        reader.LoadNetlist();
+        BOOST_REQUIRE_EQUAL( netlist.GetCount(), 2u );
+        COMPONENT* component = netlist.GetComponentByReference( "U1" );
+        BOOST_REQUIRE( component );
+        BOOST_REQUIRE_EQUAL( component->GetKIIDs().size(), 3u );
+        for( const wxString& pin : { wxString( "1" ), wxString( "2" ), wxString( "3" ) } )
+            BOOST_CHECK_EQUAL( component->GetNet( pin ).GetNetName(), "SHARED" );
+        for( const KIID& uuid : uuids )
+            BOOST_CHECK( std::find( component->GetKIIDs().begin(), component->GetKIIDs().end(), uuid )
+                         != component->GetKIIDs().end() );
+        BOOST_REQUIRE( netlist.GetComponentByReference( "R1" ) );
+        BOOST_CHECK( schematic->CurrentSheet() == selected );
+    }
 }
 
 BOOST_AUTO_TEST_CASE( TestVirtualRootCreation )

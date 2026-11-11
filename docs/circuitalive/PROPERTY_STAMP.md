@@ -42,13 +42,13 @@ com várias unidades são sincronizados sem alterar os outros campos. Edições 
 campos respeitam a variante ativa. Reabrir a ferramenta conserva sua configuração
 durante a sessão e inicia a sequência novamente no início configurado.
 
-## Rótulos em fios
+## Rótulos em fios e pinos
 
-Com **Create labels when clicking wires** habilitado, clicar diretamente em um
-fio cria um rótulo conectado usando o valor gerado, independentemente do campo
-selecionado. É possível escolher rótulo local, global ou hierárquico. O ponto
-de conexão fica sobre o segmento; um rótulo já ancorado nesse ponto é atualizado
-em vez de receber uma cópia sobreposta. Rótulos com o mesmo nome seguem as regras
+Com **Create labels on wires or pin endpoints** habilitado, clicar diretamente em um
+fio ou na ponta de conexão de um pino cria um rótulo conectado usando o valor
+gerado, independentemente do campo selecionado. É possível escolher rótulo local, global ou hierárquico. O ponto
+de conexão fica exatamente sobre o segmento ou na ponta elétrica do pino; um
+rótulo já ancorado nesse ponto é atualizado em vez de receber uma cópia sobreposta. Rótulos com o mesmo nome seguem as regras
 normais de conexão e escopo do esquemático.
 
 Desative essa opção para aplicar propriedades do próprio fio, como largura,

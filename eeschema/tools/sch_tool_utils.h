@@ -35,8 +35,13 @@ class SCH_REFERENCE_LIST;
 class SCH_SCREEN;
 class SCH_SYMBOL;
 class SCH_PIN;
+class SCH_SHEET_PATH;
 class SCHEMATIC;
 class LIB_ID;
+
+/// Find a visible pin's electrical endpoint, respecting the displayed unit and symbol transform.
+SCH_PIN* FindPinConnectionAt( SCH_SCREEN& aScreen, const SCH_SHEET_PATH* aSheet,
+                              const VECTOR2I& aPosition, int aTolerance );
 
 wxString GetSchItemAsText( const SCH_ITEM& aItem );
 

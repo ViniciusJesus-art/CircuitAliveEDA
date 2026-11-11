@@ -11,6 +11,7 @@
 #include "simulation_model.h"
 #include "instrument_panel.h"
 #include "probe_placement.h"
+#include "source_probe_dialog.h"
 #include "live_control_popup.h"
 #include "control_references.h"
 #include <tool/actions.h>
@@ -110,6 +111,7 @@ private:
     std::unique_ptr<SIMULATION_OVERLAY> m_overlay;
     std::unique_ptr<INSTRUMENT_PANEL> m_instruments;
     std::optional<PROBE_KIND> m_placing;
+    std::map<PROBE_KIND, SOURCE_PROBE_SETTINGS> m_sourceSettings;
     SCHEMATIC_SNAPSHOT m_circuit;
     EDITOR_SESSION_VIEW m_session;
     SIMULATION_PREFERENCES m_preferences;
@@ -462,6 +464,20 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
     {
         if( symbol->GetField( "CA.Probe" ) )
         {
+            const auto kind = ParseProbeKind( symbol->GetField( "CA.Probe" )->GetText().ToStdString() );
+            if( IsSourceProbe( kind ) )
+            {
+                auto settings = ReadSourceProbeSettings( *symbol );
+                auto name = symbol->GetField( FIELD_T::VALUE )->GetText().ToStdString();
+                if( EditSourceProbe( m_frame, kind, settings, name ) )
+                {
+                    SCH_COMMIT commit( m_frame ); commit.Modify( symbol, m_frame->GetScreen() );
+                    WriteSourceProbeSettings( *symbol, kind, settings );
+                    symbol->GetField( FIELD_T::VALUE )->SetText( wxString::FromUTF8( name ) );
+                    commit.Push( _( "Configure source probe" ) ); Invalidate();
+                }
+                return 0;
+            }
             wxTextEntryDialog dialog( m_frame, _( "Probe name (blank uses the net label or A, B, C...)" ),
                 _( "Probe properties" ), symbol->GetField( FIELD_T::VALUE )->GetText() );
             if( dialog.ShowModal() == wxID_OK )
@@ -508,9 +524,10 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
         {
             const auto position = m_frame->GetCanvas()->GetView()->ToWorld( VECTOR2D( aEvent.GetPosition().x, aEvent.GetPosition().y ) );
             PlaceProbe( *m_frame, *m_placing, m_instruments->ProbeName(), VECTOR2I( position ),
-                        std::max( 1, int( m_frame->GetCanvas()->GetView()->ToWorld( 12.0 ) ) ) );
+                        std::max( 1, int( m_frame->GetCanvas()->GetView()->ToWorld( 12.0 ) ) ),
+                        m_sourceSettings[*m_placing] );
             m_instruments->ClearProbeName();
-            setStatus( _( "Probe placed — click another wire or press Esc" ) );
+            setStatus( _( "Probe placed — click another wire or pin endpoint, or press Esc" ) );
         }
         catch( const std::exception& e ) { setStatus( DiagnosticText( e.what() ) ); }
         return;
@@ -560,9 +577,18 @@ void EDITOR_SIMULATION_TOOL::dismissControl()
 
 void EDITOR_SIMULATION_TOOL::chooseProbe( PROBE_KIND kind )
 {
+    if( IsSourceProbe( kind ) )
+    {
+        auto name = m_instruments->ProbeName();
+        auto settings = m_sourceSettings[kind];
+        if( !EditSourceProbe( m_frame, kind, settings, name ) )
+        { m_instruments->SetPlacement( m_placing ); return; }
+        m_sourceSettings[kind] = settings;
+        m_instruments->SetProbeName( name );
+    }
     m_toolMgr->RunAction( ACTIONS::cancelInteractive );
     m_placing = kind; m_instruments->SetPlacement( kind );
-    setStatus( _( "Click a wire to place the probe; Esc finishes placement" ) );
+    setStatus( _( "Click a wire or pin endpoint to place the probe; Esc finishes placement" ) );
     m_frame->GetCanvas()->SetFocus();
 }
 

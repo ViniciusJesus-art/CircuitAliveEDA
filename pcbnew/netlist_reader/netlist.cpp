@@ -172,12 +172,24 @@ void PCB_EDIT_FRAME::LoadFootprints( NETLIST& aNetlist, REPORTER& aReporter )
     LIB_ID     lastFPID;
     COMPONENT* component;
     FOOTPRINT* footprint = nullptr;
-    FOOTPRINT* fpOnBoard = nullptr;
 
     if( aNetlist.IsEmpty() || PROJECT_PCB::FootprintLibAdapter( &Prj() )->Rows().empty() )
         return;
 
     aNetlist.SortByFPID();
+
+    const auto associations = BOARD_NETLIST_UPDATER::BuildFootprintAssociations(
+            *m_pcb, aNetlist, aNetlist.IsFindByTimeStamp() );
+    if( !associations.ambiguousReferences.empty() )
+        return; // The updater reports the conflicts before applying any board changes.
+
+    std::map<COMPONENT*, FOOTPRINT*> existingFootprints;
+    for( const auto& [existing, associated] : associations.matches )
+    {
+        if( !existingFootprints.count( associated )
+            || BOARD_NETLIST_UPDATER::fpidsEquivalent( existing->GetFPID(), associated->GetFPID() ) )
+            existingFootprints[associated] = existing;
+    }
 
     for( unsigned ii = 0; ii < aNetlist.GetCount(); ii++ )
     {
@@ -195,19 +207,8 @@ void PCB_EDIT_FRAME::LoadFootprints( NETLIST& aNetlist, REPORTER& aReporter )
 
         // Check if component footprint is already on BOARD and only load the footprint from
         // the library if it's needed.  Nickname can be blank.
-        if( aNetlist.IsFindByTimeStamp() )
-        {
-            for( const KIID& uuid : component->GetKIIDs() )
-            {
-                KIID_PATH path = component->GetPath();
-                path.push_back( uuid );
-
-                if( ( fpOnBoard = m_pcb->FindFootprintByPath( path ) ) != nullptr )
-                    break;
-            }
-        }
-        else
-            fpOnBoard = m_pcb->FindFootprintByReference( component->GetReference() );
+        FOOTPRINT* fpOnBoard = existingFootprints.count( component )
+                                      ? existingFootprints.at( component ) : nullptr;
 
         // When the schematic-side FPID has no library nickname (legacy format), match
         // only by item name so we don't flag a mismatch against a fully qualified board FPID.

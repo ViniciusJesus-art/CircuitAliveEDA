@@ -2263,6 +2263,24 @@ int PCB_EDIT_FRAME::TestStandalone()
         wxFileName fn( Prj().GetProjectPath(), Prj().GetProjectName(),
                        FILEEXT::KiCadSchematicFileExtension );
 
+        // A project can consist entirely of independently named top-level pages. Open an
+        // explicit project page instead of requiring a project-named schematic file.
+        if( !fn.FileExists() )
+        {
+            for( const TOP_LEVEL_SHEET_INFO& page : Prj().GetProjectFile().GetTopLevelSheets() )
+            {
+                wxFileName candidate( page.filename );
+                candidate.MakeAbsolute( Prj().GetProjectPath() );
+                if( ( candidate.GetExt() == FILEEXT::KiCadSchematicFileExtension
+                      || candidate.GetExt() == FILEEXT::LegacySchematicFileExtension )
+                    && candidate.FileExists() )
+                {
+                    fn = candidate;
+                    break;
+                }
+            }
+        }
+
         // Maybe the file hasn't been converted to the new s-expression file format so
         // see if the legacy schematic file is still in play.
         if( !fn.FileExists() )
@@ -2276,7 +2294,8 @@ int PCB_EDIT_FRAME::TestStandalone()
             }
         }
 
-        frame->OpenProjectFiles( std::vector<wxString>( 1, fn.GetFullPath() ) );
+        if( !frame->OpenProjectFiles( std::vector<wxString>( 1, fn.GetFullPath() ) ) )
+            return -2;
 
         // we show the schematic editor frame, because do not show is seen as
         // a not yet opened schematic by Kicad manager, which is not the case

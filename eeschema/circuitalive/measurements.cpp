@@ -64,14 +64,25 @@ std::string ProbeKindName( PROBE_KIND kind )
     case PROBE_KIND::CURRENT: return "current";
     case PROBE_KIND::POWER: return "power";
     case PROBE_KIND::OSCILLOSCOPE: return "oscilloscope";
+    case PROBE_KIND::LOGIC: return "logic";
+    case PROBE_KIND::PWM: return "pwm";
+    case PROBE_KIND::SINE: return "sine";
+    case PROBE_KIND::SQUARE: return "square";
     }
     throw std::runtime_error( "Unknown probe kind" );
 }
 
 PROBE_KIND ParseProbeKind( const std::string& text )
 {
-    for( auto kind : { PROBE_KIND::VOLTAGE, PROBE_KIND::CURRENT, PROBE_KIND::POWER, PROBE_KIND::OSCILLOSCOPE } )
+    for( auto kind : { PROBE_KIND::VOLTAGE, PROBE_KIND::CURRENT, PROBE_KIND::POWER, PROBE_KIND::OSCILLOSCOPE,
+                      PROBE_KIND::LOGIC, PROBE_KIND::PWM, PROBE_KIND::SINE, PROBE_KIND::SQUARE } )
         if( text == ProbeKindName( kind ) ) return kind;
     throw std::runtime_error( "Unknown probe kind: " + text );
+}
+
+bool IsSourceProbe( PROBE_KIND kind )
+{
+    return kind == PROBE_KIND::LOGIC || kind == PROBE_KIND::PWM
+            || kind == PROBE_KIND::SINE || kind == PROBE_KIND::SQUARE;
 }
 }

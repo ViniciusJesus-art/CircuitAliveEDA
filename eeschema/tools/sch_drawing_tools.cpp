@@ -191,6 +191,9 @@ int SCH_DRAWING_TOOLS::PlaceSymbol( const TOOL_EVENT& aEvent )
     auto addSymbol =
             [this]( SCH_SYMBOL* aSymbol )
             {
+                // Repeat templates are detached. Selection/property inspection of a preview
+                // still needs the current schematic (variants, DNP and instance properties).
+                aSymbol->SetParent( m_frame->GetScreen() );
                 m_toolMgr->RunAction( ACTIONS::selectionClear );
                 m_selectionTool->AddItemToSel( aSymbol );
 

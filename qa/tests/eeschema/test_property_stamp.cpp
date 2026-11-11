@@ -1,9 +1,12 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include <boost/test/unit_test.hpp>
 #include <tools/property_stamp.h>
+#include <tools/sch_tool_utils.h>
+#include <base_units.h>
 #include <lib_symbol.h>
 #include <sch_field.h>
 #include <sch_label.h>
+#include <sch_pin.h>
 #include <sch_screen.h>
 #include <sch_sheet.h>
 #include <sch_sheet_pin.h>
@@ -210,6 +213,34 @@ BOOST_FIXTURE_TEST_CASE( FieldsAndSheetPinsUseTheirUndoOwner, STAMP_FIXTURE )
     auto pinPlan = PlanPropertyStamp( pin, path, settings, "DATA" );
     BOOST_CHECK( pinPlan.owner == &sheet ); BOOST_CHECK( pinPlan.apply( nullptr ) );
     BOOST_CHECK_EQUAL( pin.GetText(), "DATA" );
+}
+
+BOOST_FIXTURE_TEST_CASE( PinConnectionTargetsUseOnlyVisibleEndpointsOfTheDisplayedUnit, STAMP_FIXTURE )
+{
+    LIB_SYMBOL lib("PinTargets");lib.SetUnitCount(3,false);
+    auto addPin = [&]( const char* number, int unit, VECTOR2I point, bool visible = true )
+    {
+        auto* pin=new SCH_PIN(&lib);pin->SetNumber(number);pin->SetUnit(unit);pin->SetBodyStyle(1);
+        pin->SetPosition(point);pin->SetLength(schIUScale.mmToIU(2.54));pin->SetVisible(visible);
+        lib.AddDrawItem(pin);
+    };
+    const int pitch=schIUScale.mmToIU(5.08), tolerance=schIUScale.mmToIU(.2);
+    addPin("1",1,{-pitch,0});addPin("2",2,{-pitch,pitch});addPin("3",0,{0,0},false);
+    auto* symbol=new SCH_SYMBOL(lib,LIB_ID("Test","PinTargets"),&path,1,1,
+                                VECTOR2I(schIUScale.mmToIU(20.03),schIUScale.mmToIU(18.17)),schematic.get());
+    root->GetScreen()->Append(symbol);
+    for(int orientation:std::vector<int>{SYM_ORIENT_0,SYM_ORIENT_90,SYM_ORIENT_0+SYM_MIRROR_X})
+    {
+        root->GetScreen()->Remove(symbol);symbol->SetOrientation(orientation);root->GetScreen()->Append(symbol);
+        SCH_PIN* pin=nullptr;
+        for(auto* candidate:symbol->GetPins(&path))if(candidate->GetShownNumber()=="1")pin=candidate;
+        BOOST_REQUIRE(pin);
+        BOOST_CHECK(FindPinConnectionAt(*root->GetScreen(),&path,pin->GetPosition()+VECTOR2I(tolerance/2,0),tolerance)==pin);
+        BOOST_CHECK(!FindPinConnectionAt(*root->GetScreen(),&path,pin->GetPinRoot(),tolerance));
+        BOOST_CHECK(!FindPinConnectionAt(*root->GetScreen(),&path,symbol->GetPosition(),tolerance));
+        const auto inactive=symbol->GetPosition()+symbol->GetTransform().TransformCoordinate(VECTOR2I(-pitch,pitch));
+        BOOST_CHECK(!FindPinConnectionAt(*root->GetScreen(),&path,inactive,tolerance));
+    }
 }
 
 BOOST_FIXTURE_TEST_CASE( MultiunitEditsSynchronizeOnlyTheChosenField, STAMP_FIXTURE )

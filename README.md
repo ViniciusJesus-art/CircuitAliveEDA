@@ -68,7 +68,8 @@ Build the circuit, press **Play**, and follow its behavior in the same editor wh
 - Click supported switches to change their state during simulation.
 - Adjust supported potentiometers and trimmers without restarting the session or losing the circuit's stored state.
 - Watch LED brightness and logic indicators for `0`, `1`, `Z` (high impedance), and `X` (unknown).
-- Place voltage, current, power, and oscilloscope probes on wires, or enable measurements on a component.
+- Place voltage and oscilloscope probes on wires or directly on component pin endpoints; current and power probes use a wire section for their series sensor. You can also enable measurements on a component.
+- Drive digital inputs with a clickable **0/1 probe** (blue/red), or place configurable **PWM, square-wave, and sine-wave generators**, referenced to GND. PWM duty cycle can be adjusted during simulation.
 - Inspect waveforms with oscilloscope cursors and triggering, and export samples as CSV.
 
 See [measurements and oscilloscope](docs/circuitalive/MEASUREMENTS.md) and [live controls](docs/circuitalive/LIVE_CONTROLS.md).
@@ -122,7 +123,7 @@ The placement workflow has been standardized for components, power symbols, labe
 
 Invoking the shortcut or command again opens a new choice. Items attached directly to wires keep their direct placement behavior. Multi-unit components can continue through the available units, keeping references such as U1A/U1B together.
 
-The **Used Components** panel lists the component types already on the current page, with a symbol preview. Select a type and use the same pair of clicks to place another instance with a new reference. The panel can be docked, floated, and resized; its layout preferences are retained between projects.
+The **Used Components** panel lists the component types already on the current page, with a symbol preview. Select a type and use the same pair of clicks to place another instance with a new reference. For multi-unit parts, it places every unit, including power units, before starting the next package (for example, U2:A → U2:B → U2:C → U3:A). The panel can be docked, floated, and resized; its layout preferences are retained between projects.
 
 See the [placement workflow](docs/circuitalive/PLACEMENT_WORKFLOW.md) and [Used Components panel](docs/circuitalive/USED_COMPONENTS.md).
 
@@ -132,7 +133,7 @@ The **Apply Properties by Click...** tool is available on the top toolbar and in
 
 Enable automatic numbering to replace `#` or `?` in a pattern. For example, `Digital_D#`, starting at `10` with a step of `2`, applies `Digital_D10`, `Digital_D12`, `Digital_D14`, and so on. A negative step counts down. Empty or rejected clicks do not consume a number, and the cursor shows the next value.
 
-With wire labeling enabled, clicking a wire creates a connected local, global, or hierarchical label using the generated name. Disable that option to edit properties of the wire itself. Common edits support undo/redo, component fields respect the active variant, and related units are kept in sync. **Esc** exits the tool.
+With wire labeling enabled, clicking a wire or a component pin endpoint creates a connected local, global, or hierarchical label using the generated name. Disable that option to edit properties of the wire itself. Common edits support undo/redo, component fields respect the active variant, and related units are kept in sync. **Esc** exits the tool.
 
 See [applying properties by click](docs/circuitalive/PROPERTY_STAMP.md).
 
@@ -143,6 +144,12 @@ The **Pages** menu lets you create, rename, reorder, remove, and navigate schema
 A **double right-click** deletes the item under the pointer through the editor's normal delete action, with undo support. A single right-click still opens the context menu. For symbol fields, the normal delete behavior hides the field.
 
 See [schematic pages](docs/circuitalive/PAGES.md).
+
+### Schematic and PCB associations
+
+All project pages feed the same project PCB. **Update PCB from Schematic** preserves symbol identity when references change (for example, U1 to U12), units are spread across pages, or a symbol moves to another page. The existing option to re-link by reference remains available for recovering old associations. Existing footprint positions and routing are retained; changing the assigned footprint uses the normal footprint replacement process.
+
+When a symbol is deleted, the next PCB update keeps its footprint with a **Missing schematic symbol** warning on the comments layer and clears the pads' net assignments. The update dialog can instead remove unused footprints. Board-only footprints are preserved. Duplicate references or ambiguous recovery candidates are reported before applying changes. See [schematic and PCB links](docs/circuitalive/PCB_LINKS.md).
 
 ### Libraries included with the installation
 

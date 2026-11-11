@@ -41,6 +41,8 @@ class PCB_EDIT_FRAME;
 class PCB_GROUP;
 
 #include <board_commit.h>
+#include <map>
+#include <set>
 
 /**
  * Update the #BOARD with a new netlist.
@@ -90,6 +92,19 @@ public:
      * non-base variant (which gets flagged 'Do not place').
      */
     static bool fpidsEquivalent( const LIB_ID& aBoardFpid, const LIB_ID& aSchematicFpid );
+
+    struct FOOTPRINT_ASSOCIATIONS
+    {
+        std::map<FOOTPRINT*, COMPONENT*> matches;
+        std::set<wxString> ambiguousReferences;
+    };
+
+    /** Resolve the complete board before changing references or paths. Stable instance paths
+     * take priority, followed by unique symbol UUIDs (page moves). The existing reference-only
+     * mode remains an explicit override. Board-only footprints are never claimed.
+     */
+    static FOOTPRINT_ASSOCIATIONS BuildFootprintAssociations( BOARD& aBoard, NETLIST& aNetlist,
+                                                             bool aLookupByTimestamp );
 
     void SetReporter( REPORTER* aReporter ) { m_reporter = aReporter; }
 

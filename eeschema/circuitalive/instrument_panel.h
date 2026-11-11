@@ -24,6 +24,7 @@ public:
         std::function<void( double )> aSpeed, std::function<void()> aStep );
     ~INSTRUMENT_PANEL() override;
     std::string ProbeName() const;
+    void SetProbeName( const std::string& aName );
     void ClearProbeName();
     void SetPlacement( std::optional<PROBE_KIND> aKind );
     void UpdateSession( const SCHEMATIC_SNAPSHOT& aCircuit, const EDITOR_SESSION_VIEW& aSession, bool aActive );

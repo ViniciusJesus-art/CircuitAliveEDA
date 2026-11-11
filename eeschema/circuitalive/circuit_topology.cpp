@@ -7,7 +7,8 @@
 namespace CIRCUITALIVE
 {
 CIRCUIT_TOPOLOGY BuildCircuitTopology( const std::vector<CIRCUIT_COMPONENT>& aComponents,
-                                     const std::vector<RESOLVED_MODEL>& aModels )
+                                     const std::vector<RESOLVED_MODEL>& aModels,
+                                     const std::set<std::string>& aGroundNets )
 {
     CIRCUIT_TOPOLOGY result;
     result.nodes.resize( aComponents.size() );
@@ -19,7 +20,7 @@ CIRCUIT_TOPOLOGY BuildCircuitTopology( const std::vector<CIRCUIT_COMPONENT>& aCo
         for( const auto& [pin, rawName] : c.pins )
         {
             std::string name = rawName;
-            if( IsSimulationGround( name ) ) name = "0";
+            if( IsSimulationGround( name ) || aGroundNets.contains( name ) ) name = "0";
             std::string key = "net:" + name;
             if( name.empty() )
             {

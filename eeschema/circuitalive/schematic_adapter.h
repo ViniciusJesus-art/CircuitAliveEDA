@@ -16,6 +16,7 @@ struct SYMBOL_LOCATION
     wxString reference;
     BOX2I body;
     VECTOR2I position;
+    VECTOR2I axisX = {1,0}, axisY = {0,1};
 };
 
 struct SCHEMATIC_SNAPSHOT

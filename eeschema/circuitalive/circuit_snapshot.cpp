@@ -104,6 +104,12 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             auto model = repository.Resolve( component );
             if( !preferences.pushButtonsReleased ) model.controlInitiallyClosed = true;
             const auto componentIndex = models.size();
+            if( component.sourceProbe )
+            {
+                result.sourceProbes.emplace( componentIndex, *component.sourceProbe );
+                if( *component.sourceProbe == PROBE_KIND::LOGIC )
+                    model.controlInitiallyClosed = model.parameters.at( "initial" ) != 0;
+            }
             for( auto region : InitialModelMemories( component, model.model ) )
             {
                 memoryBytes += region.initial.data.size();
@@ -147,7 +153,10 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         model.model.electricalGroups = { { "p", "n" } }; model.model.referencePin = "n";
         allComponents.push_back( std::move( c ) ); models.push_back( std::move( model ) );
     }
-    const auto topology = BuildCircuitTopology( allComponents, models );
+    std::set<std::string> groundNets;
+    for( const auto& symbol : aPowerSymbols )
+        if( !symbol.net.empty() && IsSimulationGround( symbol.value ) ) groundNets.insert( symbol.net );
+    const auto topology = BuildCircuitTopology( allComponents, models, groundNets );
     struct NET_DRIVE { bool external = false; std::vector<std::string> enables; };
     std::map<std::string, NET_DRIVE> drives;
     for( std::size_t i = 0; i < aComponents.size(); ++i )

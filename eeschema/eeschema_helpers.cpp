@@ -56,14 +56,12 @@ wxString EESCHEMA_HELPERS::FindProjectForSchematic( const wxString& aFileName )
     wxFileName selected( aFileName );
     wxFileName sameName( selected );
     sameName.SetExt( FILEEXT::ProjectFileExtension );
-    if( sameName.FileExists() )
-        return sameName.GetFullPath();
-
     wxDir directory( selected.GetPath() );
     if( !directory.IsOpened() )
         return sameName.GetFullPath();
     wxString name;
     std::vector<wxString> projects;
+    std::set<wxString> owners;
     for( bool found = directory.GetFirst( &name, "*.kicad_pro", wxDIR_FILES ); found;
          found = directory.GetNext( &name ) )
     {
@@ -82,7 +80,7 @@ wxString EESCHEMA_HELPERS::FindProjectForSchematic( const wxString& aFileName )
                 wxFileName page( wxString::FromUTF8( sheet.at( "filename" ).get<std::string>() ) );
                 page.MakeAbsolute( selected.GetPath() );
                 if( page.SameAs( selected ) )
-                    return candidate.GetFullPath();
+                    owners.insert( candidate.GetFullPath() );
             }
         }
         catch( const nlohmann::json::exception& )
@@ -90,6 +88,12 @@ wxString EESCHEMA_HELPERS::FindProjectForSchematic( const wxString& aFileName )
             // Projects without a page manifest can still be identified by their directory.
         }
     }
+    // An old page-named project must not split a page from the project that explicitly
+    // owns it. Every page of that project targets the same project-named PCB.
+    if( owners.size() == 1 )
+        return *owners.begin();
+    if( sameName.FileExists() )
+        return sameName.GetFullPath();
     return projects.size() == 1 ? projects.front() : sameName.GetFullPath();
 }
 

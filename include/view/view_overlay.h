@@ -106,6 +106,8 @@ public:
     void SetStrokeColor( const COLOR4D& aColor );
     void SetGlyphSize( const VECTOR2I& aSize );
     void SetLineWidth( double aLineWidth );
+    /// Offset from the front overlay plane, for backgrounds behind text or other primitives.
+    void SetDepthOffset( double aOffset );
 
     const COLOR4D& GetStrokeColor() const { return m_strokeColor; }
     const COLOR4D& GetFillColor() const { return m_fillColor; }

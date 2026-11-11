@@ -1,6 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #pragma once
-#include "measurements.h"
+#include "source_probe.h"
 #include <math/vector2d.h>
 #include <memory>
 
@@ -9,19 +9,26 @@ class SCH_SCREEN;
 class SCH_SYMBOL;
 class SCH_SHEET_PATH;
 class SCH_LINE;
+class SCH_PIN;
 namespace CIRCUITALIVE
 {
 struct PROBE_PLACEMENT
 {
     SCH_LINE* wire = nullptr;
+    SCH_PIN* pin = nullptr;
     VECTOR2I anchor, first, second;
     bool vertical = false;
 };
 
 PROBE_PLACEMENT PlanProbePlacement( SCH_SCREEN& aScreen, const VECTOR2I& aPosition,
-                                   int aTolerance, PROBE_KIND aKind );
+                                   int aTolerance, PROBE_KIND aKind,
+                                   const SCH_SHEET_PATH* aSheet = nullptr );
 std::unique_ptr<SCH_SYMBOL> MakeProbeSymbol( PROBE_KIND aKind, SCH_SHEET_PATH& aSheet,
-        const VECTOR2I& aPosition, bool aVertical, std::size_t aSequence, const std::string& aName );
+        const VECTOR2I& aPosition, bool aVertical, std::size_t aSequence, const std::string& aName,
+        const SOURCE_PROBE_SETTINGS& aSettings = {} );
+SOURCE_PROBE_SETTINGS ReadSourceProbeSettings( const SCH_SYMBOL& aSymbol );
+void WriteSourceProbeSettings( SCH_SYMBOL& aSymbol, PROBE_KIND aKind,
+                               const SOURCE_PROBE_SETTINGS& aSettings );
 void PlaceProbe( SCH_EDIT_FRAME& aFrame, PROBE_KIND aKind, const std::string& aName,
-                 const VECTOR2I& aPosition, int aTolerance );
+                 const VECTOR2I& aPosition, int aTolerance, const SOURCE_PROBE_SETTINGS& aSettings = {} );
 }

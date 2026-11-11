@@ -11,6 +11,7 @@
 #include <wx/listctrl.h>
 #include <wx/notebook.h>
 #include <wx/sizer.h>
+#include <wx/scrolwin.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 #include <wx/tglbtn.h>
@@ -41,16 +42,30 @@ INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_
     m_step->Disable(); time->Add( m_step );
     layout->Add( time, 0, wxEXPAND | wxALL, 6 );
     m_tabs = new wxNotebook( this, wxID_ANY );
-    auto* tools = new wxPanel( m_tabs );
+    auto* tools = new wxScrolledWindow( m_tabs ); tools->SetScrollRate( 0, FromDIP( 10 ) );
     auto* contents = new wxBoxSizer( wxVERTICAL );
-    contents->Add( new wxStaticText( tools, wxID_ANY, _( "Place a measurement probe on a wire" ) ), 0, wxALL, 8 );
+    contents->Add( new wxStaticText( tools, wxID_ANY, _( "Place probes on wires or pin endpoints" ) ), 0, wxALL, 8 );
     auto* buttons = new wxGridSizer( 2, 6, 6 );
-    const wxString labels[] = { _( "Voltage (V)" ), _( "Current (A)" ), _( "Power (W)" ), _( "Oscilloscope" ) };
-    const char* letters[] = { "V", "A", "W", "~" };
-    for( int i = 0; i < 4; ++i )
+    auto* measurementsGrid = buttons;
+    const wxString labels[] = { _( "Voltage (V)" ), _( "Current (A)" ), _( "Power (W)" ), _( "Oscilloscope" ),
+                                _( "Digital 0 / 1" ), _( "PWM" ), _( "Sine wave" ), _( "Square wave" ) };
+    const char* letters[] = { "V", "A", "W", "~", "0/1", "P", "~", "S" };
+    for( int i = 0; i < 8; ++i )
     {
+        if( i == 4 )
+        {
+            contents->Add( buttons, 0, wxEXPAND | wxALL, 8 );
+            contents->Add( new wxStaticText( tools, wxID_ANY, _( "Digital debug and signal sources (GND)" ) ), 0, wxALL, 8 );
+            buttons = new wxGridSizer( 2, 6, 6 );
+        }
         auto* button = new wxToggleButton( tools, wxID_ANY, labels[i], wxDefaultPosition, wxSize( 145, 42 ) );
-        const std::string svg = "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>"
+        const std::string svg = i >= 4
+            ? "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>"
+              "<path d='M2 4H15L22 12L15 20H2Z' fill='" + std::string(i == 4 ? "#d82927" : "#318fd8") + "'/>"
+              "<path d='" + std::string( i == 4 ? "M8 9L12 6V18M8 18H16"
+                  : i == 6 ? "M4 12C6 4 9 4 11 12S16 20 18 12" : "M4 16H8V8H13V16H18" )
+                  + "' stroke='white' stroke-width='1.8' fill='none'/></svg>"
+            : "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>"
             "<path d='M3 21L18 6M9 6H18V15' stroke='#318fd8' stroke-width='2' fill='none'/>"
             "<text x='1' y='10' font-size='10' fill='#318fd8'>" + std::string( letters[i] ) + "</text></svg>";
         button->SetBitmap( wxBitmapBundle::FromSVG( svg.c_str(), wxSize( 24, 24 ) ) );
@@ -58,14 +73,24 @@ INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_
         buttons->Add( button, 1, wxEXPAND ); m_buttons.push_back( button );
     }
     contents->Add( buttons, 0, wxEXPAND | wxALL, 8 );
+    tools->Bind( wxEVT_SIZE, [tools, measurementsGrid, buttons]( wxSizeEvent& event )
+    {
+        const int columns = tools->GetClientSize().x < tools->FromDIP(360) ? 1 : 2;
+        if( buttons->GetCols() != columns )
+        {
+            measurementsGrid->SetCols(columns); buttons->SetCols(columns);
+            tools->Layout(); tools->FitInside();
+        }
+        event.Skip();
+    } );
     contents->Add( new wxStaticText( tools, wxID_ANY, _( "Probe name (optional)" ) ), 0, wxLEFT | wxRIGHT | wxTOP, 8 );
     m_name = new wxTextCtrl( tools, wxID_ANY ); contents->Add( m_name, 0, wxEXPAND | wxALL, 8 );
-    m_help = new wxStaticText( tools, wxID_ANY, _( "Choose a tool, click a wire. Esc finishes placement." ) );
+    m_help = new wxStaticText( tools, wxID_ANY, _( "Choose a tool, click a wire or pin endpoint. Esc finishes placement." ) );
     m_help->Wrap( 300 ); contents->Add( m_help, 0, wxEXPAND | wxALL, 8 );
     auto* description = new wxStaticText( tools, wxID_ANY,
-        _( "V and scope use the circuit reference.\nA and W insert an ideal series sensor.\nCurrent: left → right or top → bottom.\nWire power: V(reference) × I.\n\nComponent V / I / P: Simulation model..." ) );
+        _( "V and scope use the circuit reference.\nA and W insert an ideal series sensor.\nCurrent: left → right or top → bottom.\nWire power: V(reference) × I.\n\nSources drive the connected wire relative to GND.\nDuring simulation: click 0/1 to toggle; click PWM/square to adjust duty cycle.\nEsc finishes placement before interacting.\nSelect a probe, Ctrl+Alt+M: edit its settings.\n\nComponent V / I / P: Simulation model..." ) );
     description->Wrap( 300 ); contents->Add( description, 0, wxALL, 8 );
-    tools->SetSizer( contents ); m_tabs->AddPage( tools, _( "Probes" ), true );
+    tools->SetSizer( contents ); tools->FitInside(); m_tabs->AddPage( tools, _( "Probes" ), true );
     m_measurePage = new wxPanel( m_tabs );
     auto* measurements = new wxBoxSizer( wxVERTICAL );
     m_values = new wxListCtrl( m_measurePage, wxID_ANY, wxDefaultPosition, wxDefaultSize,
@@ -119,6 +144,7 @@ INSTRUMENT_PANEL::~INSTRUMENT_PANEL()
 }
 
 std::string INSTRUMENT_PANEL::ProbeName() const { return m_name->GetValue().ToStdString(); }
+void INSTRUMENT_PANEL::SetProbeName( const std::string& name ) { m_name->ChangeValue( wxString::FromUTF8( name ) ); }
 void INSTRUMENT_PANEL::ClearProbeName() { m_name->Clear(); }
 void INSTRUMENT_PANEL::tabChanged( wxBookCtrlEvent& event )
 {
@@ -133,7 +159,7 @@ void INSTRUMENT_PANEL::tabChanged( wxBookCtrlEvent& event )
 void INSTRUMENT_PANEL::SetPlacement( std::optional<PROBE_KIND> kind )
 {
     for( std::size_t i = 0; i < m_buttons.size(); ++i ) m_buttons[i]->SetValue( kind && static_cast<std::size_t>( *kind ) == i );
-    m_help->SetLabel( kind ? _( "Click a wire to place the probe. Esc finishes placement." ) : _( "Choose a tool, click a wire. Esc finishes placement." ) );
+    m_help->SetLabel( kind ? _( "Click a wire to place the probe. Esc finishes placement." ) : _( "Choose a tool, click a wire or pin endpoint. Esc finishes placement." ) );
     m_help->Wrap( 300 );
 }
 

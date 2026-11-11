@@ -47,6 +47,10 @@ DIALOG_UPDATE_PCB::DIALOG_UPDATE_PCB( PCB_EDIT_FRAME* aParent, NETLIST* aNetlist
     m_messagePanel->SetFileName( Prj().GetProjectPath() + wxT( "report.txt" ) );
     m_messagePanel->SetLazyUpdate( true );
     m_netlist->SortByReference();
+    m_cbDeleteExtraFootprints->SetToolTip( _(
+            "Remove unlocked footprints without a schematic symbol. When unchecked, keep them "
+            "marked 'Missing schematic symbol' and disconnect their pads. Board-only footprints "
+            "are preserved." ) );
 
     m_messagePanel->GetSizer()->SetSizeHints( this );
     m_messagePanel->Layout();
@@ -110,11 +114,11 @@ void DIALOG_UPDATE_PCB::PerformUpdate( bool aDryRun )
     updater.SetOverrideLocks( m_cbOverrideLocks->GetValue() );
     updater.SetUpdateFields( m_cbUpdateFields->GetValue() );
     updater.SetRemoveExtraFields( m_cbRemoveExtraFields->GetValue() );
-    updater.UpdateNetlist( *m_netlist );
+    const bool success = updater.UpdateNetlist( *m_netlist );
 
     m_messagePanel->Flush( true );
 
-    if( aDryRun )
+    if( aDryRun || !success )
         return;
 
     m_frame->OnNetlistChanged( updater, &m_runDragCommand );

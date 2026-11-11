@@ -79,6 +79,89 @@ BOARD_NETLIST_UPDATER::~BOARD_NETLIST_UPDATER()
 }
 
 
+BOARD_NETLIST_UPDATER::FOOTPRINT_ASSOCIATIONS
+BOARD_NETLIST_UPDATER::BuildFootprintAssociations( BOARD& aBoard, NETLIST& aNetlist,
+                                                 bool aLookupByTimestamp )
+{
+    FOOTPRINT_ASSOCIATIONS result;
+    std::map<KIID_PATH, std::set<COMPONENT*>> paths;
+    std::map<KIID, std::set<COMPONENT*>> uuids;
+    std::map<wxString, std::set<COMPONENT*>> references;
+    std::map<KIID, std::set<KIID_PATH>> boardInstances;
+
+    for( unsigned i = 0; i < aNetlist.GetCount(); ++i )
+    {
+        COMPONENT* component = aNetlist.GetComponent( i );
+        references[component->GetReference().Upper()].insert( component );
+
+        for( const KIID& uuid : component->GetKIIDs() )
+        {
+            KIID_PATH path = component->GetPath();
+            path.push_back( uuid );
+            paths[path].insert( component );
+            uuids[uuid].insert( component );
+        }
+    }
+
+    for( const auto& [reference, components] : references )
+        if( components.size() > 1 )
+            result.ambiguousReferences.insert( reference );
+
+    for( FOOTPRINT* footprint : aBoard.Footprints() )
+    {
+        if( footprint->IsBoardOnly() )
+            continue;
+
+        if( !footprint->GetPath().empty() )
+            boardInstances[footprint->GetPath().back()].insert( footprint->GetPath() );
+
+        if( aLookupByTimestamp )
+        {
+            const auto it = paths.find( footprint->GetPath() );
+            if( it != paths.end() && it->second.size() == 1 )
+            {
+                COMPONENT* component = *it->second.begin();
+                result.matches[footprint] = component;
+            }
+        }
+        else
+        {
+            // Preserve the existing user-selected reference-based link method.
+            const auto it = references.find( footprint->GetReference().Upper() );
+            if( it != references.end() && it->second.size() == 1 )
+                result.matches[footprint] = *it->second.begin();
+        }
+    }
+
+    // Repeated instances of a shared sheet reuse symbol UUIDs. Recover by UUID only when
+    // both the schematic component and the old PCB instance are unambiguous.
+    if( aLookupByTimestamp )
+    {
+        for( FOOTPRINT* footprint : aBoard.Footprints() )
+        {
+            if( footprint->IsBoardOnly() || result.matches.count( footprint )
+                || footprint->GetPath().empty() )
+                continue;
+
+            const KIID& uuid = footprint->GetPath().back();
+            const auto it = uuids.find( uuid );
+            if( it != uuids.end() && it->second.size() == 1 && boardInstances[uuid].size() == 1 )
+            {
+                COMPONENT* component = *it->second.begin();
+                result.matches[footprint] = component;
+            }
+        }
+    }
+
+    std::map<COMPONENT*, std::set<LIB_ID>> matchedIds;
+    for( const auto& [footprint, component] : result.matches )
+        if( !matchedIds[component].insert( footprint->GetFPID() ).second )
+            result.ambiguousReferences.insert( component->GetReference() );
+
+    return result;
+}
+
+
 // These functions allow inspection of pad nets during dry runs by keeping a cache of
 // current pad netnames indexed by pad.
 
@@ -422,6 +505,22 @@ bool BOARD_NETLIST_UPDATER::updateFootprintParameters( FOOTPRINT* aFootprint, CO
     }
 
     bool       changed = false;
+
+    // Clear our persistent orphan warning even when copying ordinary fields is disabled.
+    if( PCB_FIELD* status = aFootprint->GetField( wxS( "CA.LinkStatus" ) ) )
+    {
+        m_reporter->Report( wxString::Format(
+                _( "Restore %s schematic link and clear its missing-symbol warning." ),
+                aNetlistComponent->GetReference() ), RPT_SEVERITY_ACTION );
+        if( !m_isDryRun )
+        {
+            changed = true;
+            aFootprint->Remove( status );
+            if( m_frame )
+                m_frame->GetCanvas()->GetView()->Remove( status );
+            delete status;
+        }
+    }
 
     // Test for reference designator field change.
     if( aFootprint->GetReference() != aNetlistComponent->GetReference() )
@@ -2045,7 +2144,6 @@ bool BOARD_NETLIST_UPDATER::testConnectivity( NETLIST& aNetlist,
 
 bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
 {
-    FOOTPRINT* lastPreexistingFootprint = nullptr;
     COMPONENT* component = nullptr;
     wxString   msg;
     std::unordered_set<wxString> sheetPaths;
@@ -2057,8 +2155,20 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
 
     std::map<COMPONENT*, FOOTPRINT*> footprintMap;
 
-    if( !m_board->Footprints().empty() )
-        lastPreexistingFootprint = m_board->Footprints().back();
+    const FOOTPRINT_ASSOCIATIONS associations =
+            BuildFootprintAssociations( *m_board, aNetlist, m_lookupByTimestamp );
+
+    if( !associations.ambiguousReferences.empty() )
+    {
+        for( const wxString& reference : associations.ambiguousReferences )
+        {
+            m_reporter->Report( wxString::Format(
+                    _( "Ambiguous symbol/footprint association for %s. Resolve duplicate references "
+                       "or footprints before updating the PCB. No changes were applied." ), reference ),
+                    RPT_SEVERITY_ERROR );
+        }
+        return false;
+    }
 
     cacheCopperZoneConnections();
 
@@ -2113,38 +2223,9 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
 
         std::vector<FOOTPRINT*> matchingFootprints;
 
-        for( FOOTPRINT* footprint : m_board->Footprints() )
-        {
-            bool match = false;
-
-            if( m_lookupByTimestamp )
-            {
-                for( const KIID& uuid : component->GetKIIDs() )
-                {
-                    KIID_PATH base = component->GetPath();
-                    base.push_back( uuid );
-
-                    if( footprint->GetPath() == base )
-                    {
-                        match = true;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                match = footprint->GetReference().CmpNoCase( component->GetReference() ) == 0;
-            }
-
-            if( match )
+        for( const auto& [footprint, associated] : associations.matches )
+            if( associated == component )
                 matchingFootprints.push_back( footprint );
-
-            if( footprint == lastPreexistingFootprint )
-            {
-                // No sense going through the newly-created footprints: end of loop
-                break;
-            }
-        }
 
         std::vector<LIB_ID> expectedFpids;
         std::unordered_set<wxString> expectedFpidKeys;
@@ -2328,11 +2409,17 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
     //
     for( FOOTPRINT* footprint : m_board->Footprints() )
     {
+        if( footprint->IsBoardOnly() )
+        {
+            if( !m_isDryRun )
+                for( PAD* pad : footprint->Pads() )
+                    if( pad->GetNet() )
+                        pad->GetNet()->SetIsCurrent( true );
+            continue;
+        }
+
         bool matched = false;
         bool doDelete = m_deleteUnusedFootprints;
-
-        if( ( footprint->GetAttributes() & FP_BOARD_ONLY ) > 0 )
-            doDelete = false;
 
         bool isStaleVariantFootprint = false;
 
@@ -2342,10 +2429,8 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
         }
         else
         {
-            if( m_lookupByTimestamp )
-                component = aNetlist.GetComponentByPath( footprint->GetPath() );
-            else
-                component = aNetlist.GetComponentByReference( footprint->GetReference() );
+            const auto association = associations.matches.find( footprint );
+            component = association != associations.matches.end() ? association->second : nullptr;
 
             if( component && component->GetProperties().count( wxT( "exclude_from_board" ) ) == 0 )
             {
@@ -2403,10 +2488,42 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
 
             m_reporter->Report( msg, RPT_SEVERITY_ACTION );
         }
+        else if( !matched )
+        {
+            m_reporter->Report( wxString::Format(
+                    _( "%s has no schematic symbol. Keep the footprint marked and disconnect its pads." ),
+                    footprint->GetReference() ), RPT_SEVERITY_WARNING );
+            ++m_warningCount;
+
+            if( !m_isDryRun )
+            {
+                m_commit.Modify( footprint );
+                PCB_FIELD* status = footprint->GetField( wxS( "CA.LinkStatus" ) );
+                if( !status )
+                {
+                    status = new PCB_FIELD( footprint, FIELD_T::USER, wxS( "CA.LinkStatus" ) );
+                    status->SetTextSize( footprint->Reference().GetTextSize() );
+                    status->SetTextThickness( footprint->Reference().GetTextThickness() );
+                    status->SetPosition( footprint->Reference().GetPosition()
+                                         - VECTOR2I( 0, pcbIUScale.mmToIU( 2 ) ) );
+                    status->SetLayer( Cmts_User );
+                    status->SetVisible( true );
+                    footprint->Add( status );
+                }
+                status->SetText( _( "Missing schematic symbol" ) );
+
+                // Retain the historical UUID path so an undo/reintroduced symbol can recover
+                // its original placement. The pads must no longer retain live schematic nets.
+                for( PAD* pad : footprint->Pads() )
+                {
+                    pad->SetNetCode( 0 );
+                    pad->SetPinFunction( wxEmptyString );
+                    pad->SetPinType( wxEmptyString );
+                }
+            }
+        }
         else if( !m_isDryRun )
         {
-            if( !matched )
-                footprint->SetPath( KIID_PATH() );
 
             for( PAD* pad : footprint->Pads() )
             {

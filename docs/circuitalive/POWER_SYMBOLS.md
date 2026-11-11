@@ -32,6 +32,13 @@ para probes e sinais digitais. Não é preciso acrescentar uma label GND quando 
 símbolo já está presente. Esses símbolos são referências, não fontes negativas.
 Para uma alimentação negativa, use, por exemplo, uma seta com Value `-12V`.
 
+A referência é reconhecida pelo símbolo de terra e sua conexão, mesmo quando
+outro rótulo faz o grafo do KiCad nomear a rede como `CARD_DETECT`, por exemplo.
+Esse nome permanece no esquema, mas todos os terminais conectados ao GND usam
+o nó 0 no solver. Isso evita deixar o retorno flutuante e provocar erros de
+convergência como `TRAN: Timestep too small` na partida. Não é necessário
+remover o rótulo nem renomear a rede para que o terra seja respeitado.
+
 Nomes como `+5VA` e `+5VD` fornecem 5 V e continuam sendo redes diferentes, a menos
 que haja uma conexão no esquema. Outros nomes de terra, como `GNDA`/`GNDD`, não
 são unidos automaticamente a `GND` por esta mudança. Conecte o domínio à referência
@@ -73,7 +80,26 @@ invalida a sessão em curso normalmente.
 
 ## Verificação
 
-71 testes em `qa_interactive_sim` e 67 em `qa_spice` aprovados, incluindo valores
+Os testes `GroundPowerSymbolsRemainReferenceWhenTheNetIsRenamed` e
+`SupplyShortToAliasedGroundFailsBeforeStartingTheSolver` conferem referências
+com outro nome, tensões medidas, uma bateria com retorno comum e detecção de
+curto antes de iniciar o solver. O teste nativo
+`NativeGroundWithGlobalLabelKeepsItsElectricalReference` acrescenta um rótulo
+global ao GND e verifica a captura e a simulação do esquema.
+
+Para diagnosticar outro arquivo sem editá-lo, o teste opcional
+`AuditSavedInteractiveCircuit` em `qa_spice` aceita `CIRCUITALIVE_AUDIT_SCHEMATIC`
+e `CIRCUITALIVE_AUDIT_REPORT`. Ele grava o deck, a configuração e o mapa de pinos
+antes de iniciar o solver, preservando o relatório mesmo em caso de falha.
+`CIRCUITALIVE_AUDIT_UNTIL` ajusta o tempo de simulação, em segundos.
+
+Validação da correção de referências com outro nome: **316 testes interativos
+e 121.436 verificações aprovados**, além de seis casos nativos, incluindo a
+captura de um projeto completo até um segundo simulado. Logs locais em
+`.circuitalive/experiments/projetos-startup/`.
+
+Na validação inicial deste suporte, 71 testes em `qa_interactive_sim` e 67 em
+`qa_spice` foram aprovados, incluindo valores
 com sinal/decimal/unidade, nomes sem tensão, repetição de setas, tensões bipolares,
 fontes DC explícitas normais/invertidas/em série, conflitos e curtos, probes de
 corrente, capacitor diretamente ligado à alimentação, entradas/CI digital e captura do esquema nativo com Value

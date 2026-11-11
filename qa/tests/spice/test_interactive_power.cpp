@@ -58,6 +58,35 @@ BOOST_AUTO_TEST_CASE( BipolarPowerSymbolsProduceTheirVoltagesAgainstCommonGround
     BOOST_CHECK_CLOSE( MeasurementValue( c.measurements[3], sample ), 12, 1e-6 );
     BOOST_CHECK_CLOSE( MeasurementValue( c.measurements[4], sample ), -12, 1e-6 );
 }
+
+BOOST_AUTO_TEST_CASE( GroundPowerSymbolsRemainReferenceWhenTheNetIsRenamed )
+{
+    for( const auto* ground : { "GND", "GNDREF", "0" } )
+    {
+        auto load = Load( "rail", "/CARD_DETECT" );
+        CIRCUIT_COMPONENT battery{ "BT1", "Device:Battery_Cell", "+3.3V",
+            { { "1", "backup" }, { "2", "/CARD_DETECT" } } };
+        const auto circuit = BuildCircuitSnapshot( { load, battery },
+            { { PROBE_KIND::VOLTAGE, "Ground", "", { { "1", "/CARD_DETECT" } } },
+              { PROBE_KIND::VOLTAGE, "Backup", "", { { "1", "backup" } } } }, false,
+            { { "#PWR1", "+5V", "rail" }, { "#PWR2", ground, "/CARD_DETECT" } } );
+        BOOST_REQUIRE_EQUAL( circuit.pinNodes[0].at( "2" ), "0" );
+        BOOST_CHECK_EQUAL( circuit.pinNodes[1].at( "2" ), "0" );
+        BOOST_CHECK( circuit.automaticReferences.empty() );
+        const auto sample = Run( circuit );
+        BOOST_CHECK_CLOSE( MeasurementValue( circuit.measurements[0], sample ), 5, 1e-6 );
+        BOOST_CHECK_CLOSE( MeasurementValue( circuit.measurements[1], sample ), .005, 1e-6 );
+        BOOST_CHECK_SMALL( MeasurementValue( circuit.measurements[3], sample ), 1e-12 );
+        BOOST_CHECK_CLOSE( MeasurementValue( circuit.measurements[4], sample ), 3.3, 1e-6 );
+    }
+}
+
+BOOST_AUTO_TEST_CASE( SupplyShortToAliasedGroundFailsBeforeStartingTheSolver )
+{
+    BOOST_CHECK_THROW( BuildCircuitSnapshot( { Load( "rail", "/CARD_DETECT" ) }, {}, false,
+        { { "#PWR1", "+5V", "/CARD_DETECT" }, { "#PWR2", "GND", "/CARD_DETECT" } } ),
+        std::runtime_error );
+}
 BOOST_AUTO_TEST_CASE( ExistingDcSourceIsReusedIncludingReversePolarityAndSeriesSources )
 {
     CIRCUIT_COMPONENT source{ "V1", "Simulation_SPICE:VDC", "5", { { "1", "rail" }, { "2", "0" } } };

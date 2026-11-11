@@ -869,7 +869,26 @@ private:
                 if( !expression.empty() ) expression += " ";
                 expression += "(" + value + ")";
             }
-            if( values.size() > 1 ) expression = "[ " + expression + " ]";
+            if( values.size() > 1 )
+            {
+                // The alter vector parser accepts numeric literals, but does not evaluate
+                // arithmetic separately for each element. Resolve each scalar first; otherwise
+                // a calculated PULSE width can silently turn into a non-periodic source.
+                expression.clear();
+                for( const auto& value : values )
+                {
+                    Command( "let ca_parameter_value = (" + value + ")" ); CheckError();
+                    char name[] = "ca_parameter_value";
+                    const auto* vector = ngGet_Vec_Info( name );
+                    if( !vector || vector->v_length != 1 || !vector->v_realdata
+                        || !std::isfinite( vector->v_realdata[0] ) )
+                        throw std::runtime_error( "Parameter update must evaluate to a finite scalar" );
+                    if( !expression.empty() ) expression += " ";
+                    expression += Number( vector->v_realdata[0] );
+                    Command( "unlet ca_parameter_value" );
+                }
+                expression = "[ " + expression + " ]";
+            }
             commands.push_back( std::string( change.value( "model", false ) ? "altermod " : "alter " )
                     + reference + " " + parameter + " = " + expression );
         }

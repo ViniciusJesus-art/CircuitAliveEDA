@@ -242,6 +242,16 @@ struct VIEW_OVERLAY::COMMAND_GLYPH_SIZE : public VIEW_OVERLAY::COMMAND
 };
 
 
+struct COMMAND_OVERLAY_DEPTH : public VIEW_OVERLAY::COMMAND
+{
+    explicit COMMAND_OVERLAY_DEPTH( double aOffset ) : offset( aOffset ) {}
+    void Execute( VIEW* aView ) const override
+    {
+        auto* gal = aView->GetGAL(); gal->SetLayerDepth( gal->GetMinDepth() + offset );
+    }
+    double offset;
+};
+
 struct VIEW_OVERLAY::COMMAND_BITMAP_TEXT : public VIEW_OVERLAY::COMMAND
 {
     COMMAND_BITMAP_TEXT( const wxString& aText, const VECTOR2I& aPosition,
@@ -403,6 +413,11 @@ void VIEW_OVERLAY::BitmapText( const wxString& aText, const VECTOR2I& aPosition,
                                const EDA_ANGLE& aAngle )
 {
     m_commands.push_back( new COMMAND_BITMAP_TEXT( aText, aPosition, aAngle ) );
+}
+
+void VIEW_OVERLAY::SetDepthOffset( double aOffset )
+{
+    m_commands.push_back( new COMMAND_OVERLAY_DEPTH( aOffset ) );
 }
 
 

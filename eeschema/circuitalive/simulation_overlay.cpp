@@ -96,6 +96,28 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
         if( location.sheet != aCurrentSheet )
             continue;
         bool closed = i < aSession.switches.size() && aSession.switches[i];
+        if( auto probe = aCircuit.circuit.sourceProbes.find( control.component );
+            probe != aCircuit.circuit.sourceProbes.end() && probe->second == PROBE_KIND::LOGIC )
+        {
+            const auto color = closed ? KIGFX::COLOR4D( .95,.12,.08,1 ) : KIGFX::COLOR4D( .08,.35,1,1 );
+            auto point = [&]( double x, double y )
+            {
+                return location.position + location.axisX * schIUScale.mmToIU(x)
+                        + location.axisY * schIUScale.mmToIU(y);
+            };
+            std::deque<VECTOR2D> points;
+            for( const auto& p : { point(-5,-1.8), point(-1.8,-1.8), point(-.6,0), point(-1.8,1.8), point(-5,1.8) } )
+                points.emplace_back( p );
+            // Keep the background behind the number in both OpenGL and software rendering.
+            SetDepthOffset( 1 );
+            SetIsFill( true ); SetIsStroke( true ); SetStrokeColor( color ); SetFillColor( color );
+            Polygon( points ); Line( point(-.6,0), location.position );
+            SetDepthOffset( 0 );
+            SetIsFill( false ); SetStrokeColor( KIGFX::COLOR4D(1,1,1,1) );
+            SetGlyphSize( VECTOR2I( schIUScale.mmToIU(1.3), schIUScale.mmToIU(1.3) ) );
+            BitmapText( closed ? "1" : "0", point(-3.2,0), ANGLE_0 );
+            continue;
+        }
         SetIsFill( false );
         SetIsStroke( true );
         SetStrokeColor( closed ? KIGFX::COLOR4D( 0.05, 0.8, 0.25, 1 )

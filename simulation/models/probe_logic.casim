@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "license": "GPL-3.0-or-later",
+  "category": "Sources/Debug probes",
+  "family": "Ground-referenced stimulus probes",
+  "pins": [
+    {
+      "id": "out",
+      "label": "Output",
+      "role": "output",
+      "default_pin": "1"
+    },
+    {
+      "id": "gnd",
+      "label": "Internal GND",
+      "role": "reference",
+      "default_pin": "2"
+    }
+  ],
+  "reference_pin": "gnd",
+  "measurement_ports": {
+    "positive": "out",
+    "negative": "gnd"
+  },
+  "matches": {
+    "library_ids": [],
+    "symbol_names": []
+  },
+  "current_warning": {
+    "signal": "i(Vsense${id})",
+    "limit_parameter": "current_warning"
+  },
+  "id": "probe_logic",
+  "name": "Interactive logic stimulus probe",
+  "description": "Ground-referenced 0/1 debug source with configurable voltage levels and finite output resistance. Click the probe during simulation to toggle.",
+  "parameters": [
+    {
+      "id": "resistance",
+      "label": "Output resistance",
+      "default": "1",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "current_warning",
+      "label": "Current warning (0 disables)",
+      "default": "1",
+      "unit": "A",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "low",
+      "label": "Low voltage",
+      "default": "0",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "high",
+      "label": "High voltage",
+      "default": "5",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "initial",
+      "label": "Initial high state",
+      "default": "0",
+      "unit": "",
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "control": {
+    "source": "Vset${id}",
+    "on": 1,
+    "off": 0
+  },
+  "spice": {
+    "instance": [
+      "Vset${id} set${id} ${pin:gnd} ${control:initial}",
+      "Bdrive${id} drive${id} ${pin:gnd} V={${param:low}+(${param:high}-${param:low})*v(set${id},${pin:gnd})}",
+      "Rout${id} drive${id} sense${id} ${param:resistance}",
+      "Vsense${id} sense${id} ${pin:out} 0"
+    ],
+    "definitions": []
+  }
+}

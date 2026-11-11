@@ -39,8 +39,28 @@
 #include <kiid.h>
 
 #include <limits>
+#include <cmath>
 
 #include <wx/arrstr.h>
+
+SCH_PIN* FindPinConnectionAt( SCH_SCREEN& aScreen, const SCH_SHEET_PATH* aSheet,
+                              const VECTOR2I& aPosition, int aTolerance )
+{
+    const int tolerance = std::max( 0, aTolerance );
+    BOX2I area( aPosition, VECTOR2I(0,0) ); area.Inflate( tolerance );
+    SCH_PIN* closest = nullptr;
+    double distance = tolerance + 1.;
+    for( SCH_ITEM* item : aScreen.Items().Overlapping( SCH_SYMBOL_T, area ) )
+        for( SCH_PIN* pin : static_cast<SCH_SYMBOL*>( item )->GetPins( aSheet ) )
+        {
+            if( !pin->IsVisible() ) continue;
+            const auto delta = pin->GetPosition() - aPosition;
+            const double candidate = std::hypot( delta.x, delta.y );
+            if( candidate <= tolerance && candidate < distance )
+            { closest = pin; distance = candidate; }
+        }
+    return closest;
+}
 
 wxString GetSchItemAsText( const SCH_ITEM& aItem )
 {

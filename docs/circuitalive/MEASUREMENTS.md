@@ -3,7 +3,9 @@
 O painel **Simulation** inicia recolhido. Abra-o pela seta diagonal no final
 da barra direita; outro clique cancela a colocação e recolhe o painel.
 Ele contém as abas **Probes**, **Measurements** e **Oscilloscope**.
-Escolha Voltage, Current, Power ou Oscilloscope e clique em um fio elétrico.
+Escolha Voltage ou Oscilloscope e clique em um fio elétrico ou na ponta de
+conexão de um pino do componente, mesmo sem fio. Current e Power continuam
+exigindo um trecho de fio para inserir o sensor em série.
 O símbolo é uma seta diagonal para cima e para a direita, com V, A, W ou ~.
 É possível colocar várias probes seguidas; **Esc** encerra a ferramenta.
 
@@ -43,6 +45,49 @@ preserva desenho, conexão, nome e tipo. Não entram em BOM, placa ou arquivos d
 posição. Inserir uma probe é uma única operação de desfazer. Excluir uma probe
 A/W pelo Delete normal deixa o espaço entre seus dois terminais: reconecte o
 fio ou desfaça a inserção para recuperar o trecho original.
+
+## Probes de estímulo digital e geradores
+
+Na mesma aba **Probes**, a seção **Digital debug and signal sources (GND)** oferece:
+
+| Ferramenta | Funcionamento e configuração |
+| --- | --- |
+| **Digital 0 / 1** | Fonte lógica ativa. Configure tensões de 0 e 1 (padrão 0 V e 5 V) e o estado inicial. Durante a simulação, clique no corpo para alternar: azul = 0, vermelho = 1, com o número no próprio símbolo. |
+| **PWM** | Ajuste frequência, duty cycle de 0 a 100%, níveis baixo/alto, atraso e tempos de subida/descida. Clique no corpo durante a simulação para ajustar o duty cycle sem reiniciar o circuito. |
+| **Square wave** | Mesmo gerador de pulsos, inicialmente com 50% de duty cycle; os mesmos ajustes estão disponíveis. |
+| **Sine wave** | Configure frequência, amplitude de pico, offset DC, fase em graus e atraso. Por exemplo, amplitude 2,5 V e offset 2,5 V produzem uma senoide de 0 a 5 V sem carga. |
+
+Escolha a ferramenta, preencha a janela e confirme. Clique diretamente em um fio
+ou na ponta de conexão de um pino, mesmo sem fio, para conectar a saída. **Esc** encerra a colocação e libera os cliques para operar
+as probes. Para alterar as configurações de uma probe existente, selecione-a e
+use **Simulation model… / Ctrl+Alt+M**. Cancelar a janela preserva a configuração.
+Alterações de propriedades reiniciam a sessão; alternar 0/1 ou ajustar o duty
+cycle pelo controle interativo preserva o tempo e o estado elétrico do circuito.
+Depois de Stop/Play, a fonte volta ao estado/duty configurado no esquema.
+
+As fontes têm um único terminal visível e referência interna ao **GND / nó 0**;
+não precisam de um fio de retorno desenhado para o instrumento. Os componentes
+alimentados por elas continuam precisando de sua alimentação e retorno corretos.
+As configurações ficam no `.kicad_sch`, junto com o símbolo incorporado, e são
+preservadas ao salvar/reabrir, copiar e desfazer. As fontes são excluídas da placa,
+BOM e arquivos de posição, assim como as probes de medição.
+
+A resistência de saída é configurável, de 0,01 Ω a 1 GΩ (padrão **1 Ω**).
+Assim a fonte impõe o nível configurado através dessa resistência e a tensão
+real no fio depende da carga, incluindo fan-out, capacitância e outros drivers.
+Uma fonte não sobrepõe idealmente outra alimentação ou um curto ao GND.
+O limite padrão de aviso de corrente destes instrumentos é 1 A; não representa
+proteção ou limitação ativa de corrente. Eles são instrumentos de estímulo,
+sem um modelo de fabricante específico.
+
+A frequência configurável vai de 1 mHz a 10 MHz; a simulação também depende dos
+limites dos componentes conectados. O solver limita o passo em função da
+frequência e usa os pontos de transição dos pulsos. PWM de 0% e 100% gera nível
+constante baixo e alto, respectivamente; nesses extremos o atraso não se aplica.
+Os tempos de subida e descida juntos devem ser menores que um período. Pulsos
+muito curtos reduzem os tempos das bordas para caber no intervalo disponível;
+o duty cycle corresponde ao tempo alto medido no ponto médio das bordas.
+Uma probe de osciloscópio no mesmo fio permite observar o sinal efetivo sob carga.
 
 ## Medir no componente
 

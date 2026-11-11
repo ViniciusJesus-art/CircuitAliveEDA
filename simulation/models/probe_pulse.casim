@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "license": "GPL-3.0-or-later",
+  "category": "Sources/Debug probes",
+  "family": "Ground-referenced stimulus probes",
+  "pins": [
+    {
+      "id": "out",
+      "label": "Output",
+      "role": "output",
+      "default_pin": "1"
+    },
+    {
+      "id": "gnd",
+      "label": "Internal GND",
+      "role": "reference",
+      "default_pin": "2"
+    }
+  ],
+  "reference_pin": "gnd",
+  "measurement_ports": {
+    "positive": "out",
+    "negative": "gnd"
+  },
+  "matches": {
+    "library_ids": [],
+    "symbol_names": []
+  },
+  "current_warning": {
+    "signal": "i(Vsense${id})",
+    "limit_parameter": "current_warning"
+  },
+  "id": "probe_pulse",
+  "name": "PWM / square stimulus probe",
+  "description": "Ground-referenced pulse generator with finite edges and resistance. Duty cycle is the high-time fraction measured at the middle of the edges. Short pulses shorten their edges; 0/100% produce constant low/high.",
+  "parameters": [
+    {
+      "id": "resistance",
+      "label": "Output resistance",
+      "default": "1",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "current_warning",
+      "label": "Current warning (0 disables)",
+      "default": "1",
+      "unit": "A",
+      "min": 0,
+      "max": 1000000.0
+    },
+    {
+      "id": "low",
+      "label": "Low voltage",
+      "default": "0",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "high",
+      "label": "High voltage",
+      "default": "5",
+      "unit": "V",
+      "min": -1000000.0,
+      "max": 1000000.0
+    },
+    {
+      "id": "frequency",
+      "label": "Frequency",
+      "default": "1000",
+      "unit": "Hz",
+      "min": 0.001,
+      "max": 10000000.0
+    },
+    {
+      "id": "delay",
+      "label": "Start delay",
+      "default": "0",
+      "unit": "s",
+      "min": 0,
+      "max": 3600
+    },
+    {
+      "id": "period",
+      "label": "Period",
+      "default": "0.001",
+      "unit": "s",
+      "min": 1e-07,
+      "max": 1000
+    },
+    {
+      "id": "duty",
+      "label": "Duty cycle",
+      "default": "0.5",
+      "unit": "%",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "rise",
+      "label": "Rise time",
+      "default": "1e-08",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 3600
+    },
+    {
+      "id": "fall",
+      "label": "Fall time",
+      "default": "1e-08",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 3600
+    }
+  ],
+  "frequency_parameter": "frequency",
+  "adjustments": [
+    {
+      "id": "duty",
+      "label": "Duty cycle",
+      "source": "Vduty${id}",
+      "parameter": "duty",
+      "unit": "%",
+      "min": 0,
+      "max": 1,
+      "step": 0.001
+    }
+  ],
+  "live_updates": [
+    {
+      "reference": "Vwave${id}",
+      "parameter": "pulse",
+      "expressions": [
+        "0",
+        "1",
+        "${param:delay}",
+        "${param:rise}*(((1)+((2*(((#0#)+(1-(#0#))-ABS((#0#)-(1-(#0#))))/2)*${param:period})/(${param:rise}+${param:fall}))-ABS((1)-((2*(((#0#)+(1-(#0#))-ABS((#0#)-(1-(#0#))))/2)*${param:period})/(${param:rise}+${param:fall}))))/2)",
+        "${param:fall}*(((1)+((2*(((#0#)+(1-(#0#))-ABS((#0#)-(1-(#0#))))/2)*${param:period})/(${param:rise}+${param:fall}))-ABS((1)-((2*(((#0#)+(1-(#0#))-ABS((#0#)-(1-(#0#))))/2)*${param:period})/(${param:rise}+${param:fall}))))/2)",
+        "(#0#)*${param:period}-((${param:rise}*(((1)+((2*(((#0#)+(1-(#0#))-ABS((#0#)-(1-(#0#))))/2)*${param:period})/(${param:rise}+${param:fall}))-ABS((1)-((2*(((#0#)+(1-(#0#))-ABS((#0#)-(1-(#0#))))/2)*${param:period})/(${param:rise}+${param:fall}))))/2))+(${param:fall}*(((1)+((2*(((#0#)+(1-(#0#))-ABS((#0#)-(1-(#0#))))/2)*${param:period})/(${param:rise}+${param:fall}))-ABS((1)-((2*(((#0#)+(1-(#0#))-ABS((#0#)-(1-(#0#))))/2)*${param:period})/(${param:rise}+${param:fall}))))/2)))/2",
+        "${param:period}"
+      ],
+      "sources": [
+        "Vduty${id}"
+      ],
+      "initials": [
+        "${param:duty}"
+      ]
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vduty${id} duty${id} 0 ${param:duty}",
+      "Vwave${id} wave${id} 0 PULSE(0 1 ${param:delay} {${param:rise}*(MIN(1,(2*(MIN(${param:duty},1-(${param:duty})))*${param:period})/(${param:rise}+${param:fall})))} {${param:fall}*(MIN(1,(2*(MIN(${param:duty},1-(${param:duty})))*${param:period})/(${param:rise}+${param:fall})))} {(${param:duty})*${param:period}-((${param:rise}*(MIN(1,(2*(MIN(${param:duty},1-(${param:duty})))*${param:period})/(${param:rise}+${param:fall}))))+(${param:fall}*(MIN(1,(2*(MIN(${param:duty},1-(${param:duty})))*${param:period})/(${param:rise}+${param:fall})))))/2} ${param:period})",
+      "Bdrive${id} drive${id} ${pin:gnd} V={${param:low}+(${param:high}-${param:low})*(v(duty${id})<=0?0:(v(duty${id})>=1?1:v(wave${id})))}",
+      "Rout${id} drive${id} sense${id} ${param:resistance}",
+      "Vsense${id} sense${id} ${pin:out} 0"
+    ],
+    "definitions": []
+  },
+  "model_notes": [
+    "Duty is the fraction above the midpoint voltage, including half of each edge. Preserve configured edges when rise+fall <= 2*min(duty,1-duty)*period; otherwise scale both edges proportionally to fit.",
+    "Live coefficient expressions use ABS identities for scalar min, because the ngspice command interpreter and netlist evaluator have different MIN arities. The worker evaluates vector elements before alter."
+  ]
+}

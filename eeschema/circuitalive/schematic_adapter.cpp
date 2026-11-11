@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "schematic_adapter.h"
+#include "probe_placement.h"
 #include "model_profiles.h"
 #include <nlohmann/json.hpp>
 #include <project.h>
@@ -160,6 +161,22 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
             auto* probeField = symbol->GetField( "CA.Probe" );
             if( probeField )
             {
+                const auto kind = ParseProbeKind( probeField->GetText().ToStdString() );
+                if( IsSourceProbe( kind ) )
+                {
+                    std::string net;
+                    for( const auto* pin : symbol->GetPins( &sheet ) )
+                        if( pin->GetShownNumber() == "1" ) net = SimulationNet( *pin, sheet );
+                    auto component = SourceProbeComponent( kind, ReadSourceProbeSettings( *symbol ),
+                            symbol->GetRef( &sheet ).ToStdString(), net );
+                    component.value = symbol->GetField( FIELD_T::VALUE )->GetText().ToStdString();
+                    components.push_back( std::move( component ) );
+                    result.locations.push_back( { sheet.Path().AsString(), symbol->m_Uuid.AsString(),
+                        symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition(),
+                        symbol->GetTransform().TransformCoordinate( VECTOR2I(1,0) ),
+                        symbol->GetTransform().TransformCoordinate( VECTOR2I(0,1) ) } );
+                    continue;
+                }
                 CIRCUIT_PROBE probe;
                 probe.kind = ParseProbeKind( probeField->GetText().ToStdString() );
                 probe.name = symbol->GetField( FIELD_T::VALUE )->GetText().ToStdString();

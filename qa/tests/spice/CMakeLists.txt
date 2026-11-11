@@ -129,7 +129,7 @@ if( TARGET circuitalive_sim_session )
         test_jfet_diode_driver_models.cpp test_schmitt_electrical_models.cpp
         test_standard_symbol_associations.cpp
         test_diode_reverse_bias.cpp
-        test_live_controls.cpp test_digital_pipeline.cpp test_memory_resources.cpp test_visual_signals.cpp
+        test_live_controls.cpp test_source_probes.cpp test_digital_pipeline.cpp test_memory_resources.cpp test_visual_signals.cpp
         test_programmable_devices.cpp test_compiled_expressions.cpp )
     target_link_libraries( qa_interactive_sim PRIVATE
         circuitalive_interactive circuitalive_sim_session circuitalive_programmable_runtime

@@ -25,6 +25,9 @@
 #include <lib_id.h>
 #include <netlist_reader/board_netlist_updater.h>
 #include <qa_utils/wx_utils/unit_test_utils.h>
+#include <board.h>
+#include <footprint.h>
+#include <netlist_reader/pcb_netlist.h>
 
 
 BOOST_AUTO_TEST_SUITE( UpdatePcbLegacyFpidDnp )
@@ -89,5 +92,163 @@ BOOST_AUTO_TEST_CASE( QualifiedSchematicFpidComparesExactly )
     BOOST_CHECK( !BOARD_NETLIST_UPDATER::fpidsEquivalent( otherLibBoardFpid, schematicFpid ) );
 }
 
+
+BOOST_AUTO_TEST_SUITE_END()
+
+
+BOOST_AUTO_TEST_SUITE( SchematicPcbAssociations )
+
+using UpdatePcbLegacyFpidDnp::makeFpid;
+
+struct LINK_FIXTURE
+{
+    FOOTPRINT* Footprint( const wxString& reference, std::initializer_list<KIID> path,
+                          const wxString& name = "DIP-16" )
+    {
+        auto* footprint = new FOOTPRINT( &board );
+        footprint->SetReference( reference );
+        KIID_PATH instance;
+        instance.insert( instance.end(), path.begin(), path.end() );
+        footprint->SetPath( instance );
+        footprint->SetFPID( makeFpid( "Test", name ) );
+        footprint->SetPosition( VECTOR2I( 123000, 456000 ) );
+        board.Add( footprint );
+        return footprint;
+    }
+
+    COMPONENT* Component( const wxString& reference, std::initializer_list<KIID> path,
+                          const std::vector<KIID>& uuids )
+    {
+        KIID_PATH instance;
+        instance.insert( instance.end(), path.begin(), path.end() );
+        auto* component = new COMPONENT( makeFpid( "Test", "DIP-16" ), reference, "74LS139", instance, uuids );
+        netlist.AddComponent( component );
+        return component;
+    }
+
+    BOARD board;
+    NETLIST netlist;
+};
+
+BOOST_FIXTURE_TEST_CASE( IdentitySurvivesReferenceSwapsAndDifferentProcessingOrder, LINK_FIXTURE )
+{
+    const KIID sheet, a, b;
+    auto* u1 = Footprint( "U1", { sheet, a } );
+    auto* u2 = Footprint( "U2", { sheet, b } );
+    auto* renamedB = Component( "U1", { sheet }, { b } );
+    auto* renamedA = Component( "U2", { sheet }, { a } );
+    const auto associations = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, true );
+    BOOST_CHECK( associations.ambiguousReferences.empty() );
+    BOOST_CHECK( associations.matches.at( u1 ) == renamedA );
+    BOOST_CHECK( associations.matches.at( u2 ) == renamedB );
+    BOOST_CHECK( u1->GetPosition() == VECTOR2I( 123000, 456000 ) );
+    BOOST_CHECK_EQUAL( u1->GetReference(), "U1" ); // Resolver/dry-run does not mutate the board.
+}
+
+BOOST_FIXTURE_TEST_CASE( PageMoveAndReferenceRenameRecoverTheOriginalFootprint, LINK_FIXTURE )
+{
+    const KIID oldSheet, newSheet, symbol;
+    auto* u1 = Footprint( "U1", { oldSheet, symbol } );
+    auto* u12 = Component( "U12", { newSheet }, { symbol } );
+    const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, true );
+    BOOST_CHECK( links.matches.at( u1 ) == u12 );
+}
+
+BOOST_FIXTURE_TEST_CASE( IdentityModeDoesNotStealAReferenceReusedByANewSymbol, LINK_FIXTURE )
+{
+    const KIID sheet, oldA, oldB, newB, newC;
+    auto* u1 = Footprint( "U1", { sheet, oldA } );
+    auto* u2 = Footprint( "U2", { sheet, oldB } );
+    auto* u12 = Component( "U12", { sheet }, { oldA } );
+    auto* recreated = Component( "u2", { sheet }, { newB } );
+    Component( "U1", { sheet }, { newC } );
+    const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, true );
+    BOOST_REQUIRE_EQUAL( links.matches.size(), 1u );
+    BOOST_CHECK( links.matches.at( u1 ) == u12 );
+    BOOST_CHECK_EQUAL( links.matches.count( u2 ), 0u );
+    const auto byReference = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, false );
+    BOOST_CHECK( byReference.matches.at( u2 ) == recreated );
+}
+
+BOOST_FIXTURE_TEST_CASE( SharedSheetInstancesDoNotLinkBySymbolUuidAlone, LINK_FIXTURE )
+{
+    const KIID oldSheet, sheetA, sheetB, sharedSymbol;
+    auto* u1 = Footprint( "U1", { oldSheet, sharedSymbol } );
+    auto* u2 = Footprint( "U2", { sheetB, sharedSymbol } );
+    auto* first = Component( "U1", { sheetA }, { sharedSymbol } );
+    auto* second = Component( "U2", { sheetB }, { sharedSymbol } );
+    const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, true );
+    BOOST_CHECK_EQUAL( links.matches.count( u1 ), 0u );
+    BOOST_CHECK( links.matches.at( u2 ) == second );
+    const auto byReference = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, false );
+    BOOST_CHECK( byReference.matches.at( u1 ) == first );
+    BOOST_CHECK( byReference.matches.at( u2 ) == second );
+}
+
+BOOST_FIXTURE_TEST_CASE( AnyUnitOfAMultiPagePackageCanRetainTheAssociation, LINK_FIXTURE )
+{
+    const KIID sheetA, sheetB, a, b, power;
+    auto* footprint = Footprint( "U1", { sheetB, power } );
+    auto* component = Component( "U13", { sheetA }, { a, b, power } );
+    const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, true );
+    BOOST_CHECK( links.matches.at( footprint ) == component );
+}
+
+BOOST_FIXTURE_TEST_CASE( BoardOnlyAndDeletedComponentsStayUnassociated, LINK_FIXTURE )
+{
+    auto* mechanical = Footprint( "U1", {} );
+    mechanical->SetBoardOnly( true );
+    Footprint( "U2", { KIID(), KIID() } );
+    Component( "U1", { KIID() }, { KIID() } );
+    const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, true );
+    BOOST_CHECK( links.matches.empty() );
+}
+
+BOOST_FIXTURE_TEST_CASE( DuplicateReferencesAndUnlinkedCopiesAreReportedAsAmbiguous, LINK_FIXTURE )
+{
+    Component( "U1", { KIID() }, { KIID() } );
+    Component( "u1", { KIID() }, { KIID() } );
+    Component( "U2", { KIID() }, { KIID() } );
+    Footprint( "U2", {} );
+    Footprint( "U2", {} );
+    const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, false );
+    BOOST_CHECK_EQUAL( links.ambiguousReferences.count( "U1" ), 1u );
+    BOOST_CHECK_EQUAL( links.ambiguousReferences.count( "U2" ), 1u );
+    BOOST_CHECK_EQUAL( links.matches.size(), 2u );
+}
+
+BOOST_FIXTURE_TEST_CASE( ExplicitVariantFootprintsMayShareAReference, LINK_FIXTURE )
+{
+    auto* component = Component( "U1", { KIID() }, { KIID() } );
+    COMPONENT_VARIANT variant( "SMD" );
+    variant.m_fields[GetCanonicalFieldName( FIELD_T::FOOTPRINT )] = "Test:SOIC-16";
+    component->AddVariant( variant );
+    auto* dip = Footprint( "U1", {} );
+    auto* soic = Footprint( "U1", {}, "SOIC-16" );
+    const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, false );
+    BOOST_CHECK( links.ambiguousReferences.empty() );
+    BOOST_CHECK( links.matches.at( dip ) == component );
+    BOOST_CHECK( links.matches.at( soic ) == component );
+}
+
+BOOST_FIXTURE_TEST_CASE( DuplicateLinkedFootprintsCannotSilentlyRepresentOneComponent, LINK_FIXTURE )
+{
+    const KIID sheet, symbol;
+    Component( "U1", { sheet }, { symbol } );
+    Footprint( "U1", { sheet, symbol } );
+    Footprint( "U1", { sheet, symbol } );
+    const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, true );
+    BOOST_CHECK_EQUAL( links.ambiguousReferences.count( "U1" ), 1u );
+}
+
+BOOST_FIXTURE_TEST_CASE( ReferenceOnlyRemainsAnExplicitOverride, LINK_FIXTURE )
+{
+    const KIID sheet, a, b;
+    auto* footprint = Footprint( "U1", { sheet, a } );
+    Component( "U12", { sheet }, { a } );
+    auto* replacement = Component( "U1", { sheet }, { b } );
+    const auto links = BOARD_NETLIST_UPDATER::BuildFootprintAssociations( board, netlist, false );
+    BOOST_CHECK( links.matches.at( footprint ) == replacement );
+}
 
 BOOST_AUTO_TEST_SUITE_END()

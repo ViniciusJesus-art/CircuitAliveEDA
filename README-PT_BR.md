@@ -68,7 +68,8 @@ Monte o circuito, aperte **Play** e acompanhe seu comportamento no mesmo editor 
 - Clique nas chaves compatíveis para mudar seu estado durante a simulação.
 - Ajuste potenciômetros e trimpots compatíveis sem reiniciar a sessão nem perder o estado armazenado no circuito.
 - Acompanhe o brilho dos LEDs e os indicadores lógicos de `0`, `1`, `Z` (alta impedância) e `X` (indefinido).
-- Coloque sondas de tensão, corrente, potência e osciloscópio nos fios, ou habilite medições no próprio componente.
+- Coloque sondas de tensão e osciloscópio nos fios ou diretamente nas pontas dos pinos dos componentes; sondas de corrente e potência usam um trecho de fio para seu sensor em série. Você também pode habilitar medições no próprio componente.
+- Acione entradas digitais com uma **probe 0/1** clicável (azul/vermelha), ou coloque **geradores de PWM, onda quadrada e senoide** configuráveis, referenciados ao GND. O duty cycle do PWM pode ser ajustado durante a simulação.
 - Examine as formas de onda com cursores e disparo do osciloscópio e exporte as amostras em CSV.
 
 Veja [medições e osciloscópio](docs/circuitalive/MEASUREMENTS.md) e [ajustes durante a simulação](docs/circuitalive/LIVE_CONTROLS.md).
@@ -122,7 +123,7 @@ O fluxo de inserção foi padronizado para componentes, símbolos de alimentaç�
 
 Acionar o atalho ou comando novamente abre uma nova escolha. Os itens ligados diretamente aos fios mantêm a inserção direta. Componentes com várias unidades podem continuar pelas unidades disponíveis, mantendo referências como U1A/U1B juntas.
 
-O painel **Used Components** lista os tipos de componentes já presentes na página atual, com uma prévia do símbolo. Selecione um tipo e use o mesmo par de cliques para inserir outra instância com uma referência nova. O painel pode ser encaixado, deixado flutuante e redimensionado; suas preferências de disposição são mantidas entre projetos.
+O painel **Used Components** lista os tipos de componentes já presentes na página atual, com uma prévia do símbolo. Selecione um tipo e use o mesmo par de cliques para inserir outra instância com uma referência nova. Para componentes com várias unidades, ele coloca todas elas, incluindo as de alimentação, antes de iniciar o próximo encapsulamento (por exemplo, U2:A → U2:B → U2:C → U3:A). O painel pode ser encaixado, deixado flutuante e redimensionado; suas preferências de disposição são mantidas entre projetos.
 
 Veja o [fluxo de inserção](docs/circuitalive/PLACEMENT_WORKFLOW.md) e o [painel de componentes usados](docs/circuitalive/USED_COMPONENTS.md).
 
@@ -132,7 +133,7 @@ A ferramenta **Apply Properties by Click...** está na barra superior e no menu 
 
 Ative a numeração automática para substituir `#` ou `?` em um padrão. Por exemplo, `Digital_D#`, começando em `10` com passo `2`, aplica `Digital_D10`, `Digital_D12`, `Digital_D14` e assim por diante. Um passo negativo faz a contagem decrescer. Cliques vazios ou recusados não consomem um número, e o cursor mostra o próximo valor.
 
-Com a criação de rótulos em fios habilitada, clicar no fio cria um rótulo local, global ou hierárquico conectado, usando o nome gerado. Desative essa opção para editar propriedades do próprio fio. As edições comuns têm desfazer/refazer, os campos dos componentes respeitam a variante ativa e as unidades relacionadas são mantidas em sincronia. **Esc** encerra a ferramenta.
+Com a criação de rótulos em fios habilitada, clicar em um fio ou na ponta de um pino de componente cria um rótulo local, global ou hierárquico conectado, usando o nome gerado. Desative essa opção para editar propriedades do próprio fio. As edições comuns têm desfazer/refazer, os campos dos componentes respeitam a variante ativa e as unidades relacionadas são mantidas em sincronia. **Esc** encerra a ferramenta.
 
 Veja [aplicação de propriedades por clique](docs/circuitalive/PROPERTY_STAMP.md).
 
@@ -143,6 +144,12 @@ O menu **Pages** permite criar, renomear, reordenar, remover e navegar pelas pá
 Um **duplo clique direito** exclui o item sob o ponteiro pela ação normal de exclusão do editor, com suporte a desfazer. Um clique direito simples continua abrindo o menu de contexto. Nos campos de símbolos, o comportamento normal de exclusão oculta o campo.
 
 Veja [páginas do esquemático](docs/circuitalive/PAGES.md).
+
+### Vínculos entre esquemático e PCB
+
+Todas as páginas do projeto alimentam a mesma PCB do projeto. **Update PCB from Schematic** preserva a identidade do símbolo quando as referências mudam (por exemplo, U1 para U12), as unidades ficam distribuídas entre páginas ou um símbolo muda de página. A opção existente de revincular por referência continua disponível para recuperar associações antigas. As posições dos footprints e o roteamento existentes são preservados; mudar o footprint atribuído usa o processo normal de substituição de footprints.
+
+Quando um símbolo é excluído, a próxima atualização da PCB mantém seu footprint com um aviso **Missing schematic symbol** na camada de comentários e limpa as atribuições de rede dos pads. A janela de atualização permite remover os footprints sem símbolos. Footprints exclusivos da PCB são preservados. Referências duplicadas ou candidatos ambíguos de recuperação são informados antes de aplicar mudanças. Veja [vínculos entre esquemático e PCB](docs/circuitalive/PCB_LINKS.md).
 
 ### Bibliotecas incluídas na instalação
 

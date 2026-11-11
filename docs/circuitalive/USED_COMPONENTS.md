@@ -19,7 +19,13 @@ alimentação e sondas de simulação não entram na lista.
 
 1. Selecione um componente na lista para ver seu símbolo na prévia superior.
 2. Clique em uma área vazia do esquema para trazer a cópia ao cursor.
-3. Posicione e clique novamente para inserir uma única cópia, com referência nova.
+3. Posicione e clique novamente para inserir a unidade.
+
+Para componentes com várias unidades, a lista começa na unidade A e percorre
+todas as unidades do mesmo encapsulamento, incluindo a alimentação. Por exemplo:
+**U2:A → U2:B → U2:C → U3:A** no 74LS139. Cada unidade usa o mesmo ciclo de dois
+cliques. A referência só muda depois da última unidade; a continuação não depende
+da opção de colocar todas as unidades na janela de escolha de símbolos.
 
 Depois da inserção, o símbolo sai do cursor. A escolha na lista continua ativa:
 cada novo par de cliques em espaço vazio permite inserir outra cópia. Clicar em

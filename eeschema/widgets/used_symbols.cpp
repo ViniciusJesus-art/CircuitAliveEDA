@@ -236,9 +236,16 @@ public:
         EE_GRID_HELPER grid( m_toolMgr );
         auto symbol = CopyUsedSymbol( *source, m_frame->GetCurrentSheet(),
                 grid.Align( aPosition, GRID_HELPER_GRIDS::GRID_CONNECTABLE ) );
+        symbol->SetUnit( 1 );
+        symbol->SetUnitSelection( &m_frame->GetCurrentSheet(), 1 );
+        // Arm the repeat template before entering PlaceSymbol. Its completion updates an
+        // existing template, including the next unit and the package reference just assigned.
+        m_lastItems = CopyPlacementItems( { symbol.get() } );
+        m_continueUnits = symbol->IsMultiUnit();
         m_pending = symbol->m_Uuid;
         SCH_ACTIONS::PLACE_SYMBOL_PARAMS parameters;
         parameters.m_Symbol = symbol.release();
+        parameters.m_ContinueUnits = m_continueUnits;
         m_toolMgr->PostAction( SCH_ACTIONS::placeSymbol, parameters );
         return true;
     }
@@ -404,7 +411,7 @@ private:
             preview.GetValueField().SetText( symbol->GetValue( true, &m_frame->GetCurrentSheet(),
                     true, m_frame->Schematic().GetCurrentVariant() ) );
             preview.GetReferenceField().SetText( symbol->GetPrefix() + "?" );
-            m_preview->DisplayPart( &preview, symbol->GetUnit(), symbol->GetBodyStyle() );
+            m_preview->DisplayPart( &preview, 1, symbol->GetBodyStyle() );
         }
         else
             cancel();

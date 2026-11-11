@@ -43,6 +43,7 @@
 #include <advanced_config.h>
 #include <sch_commit.h>
 #include <sch_screen.h>
+#include <sch_draw_panel.h>
 #include <sch_sheet.h>
 #include <dialog_shim.h>
 #include <project.h>
@@ -79,9 +80,13 @@ public:
         m_deleteId = wxWindow::NewControlId();
         Append( m_deleteId, _( "Delete Page..." ) );
         AppendSeparator();
-        Bind( wxEVT_MENU, [this]( wxCommandEvent& ) { m_frame->NewPage(); }, newId );
-        Bind( wxEVT_MENU, [this]( wxCommandEvent& ) { m_frame->EditPage(); }, editId );
-        Bind( wxEVT_MENU, [this]( wxCommandEvent& ) { CIRCUITALIVE::DeleteCurrentPage( *m_frame ); }, m_deleteId );
+        // Let the native menu close before opening dialogs or rebuilding its page items.
+        Bind( wxEVT_MENU, [frame = m_frame]( wxCommandEvent& )
+              { frame->CallAfter( [frame] { frame->NewPage(); } ); }, newId );
+        Bind( wxEVT_MENU, [frame = m_frame]( wxCommandEvent& )
+              { frame->CallAfter( [frame] { frame->EditPage(); } ); }, editId );
+        Bind( wxEVT_MENU, [frame = m_frame]( wxCommandEvent& )
+              { frame->CallAfter( [frame] { CIRCUITALIVE::DeleteCurrentPage( *frame ); } ); }, m_deleteId );
         update();
     }
 
@@ -133,16 +138,20 @@ private:
         const auto at = std::find( m_ids.begin(), m_ids.end(), aEvent.GetId() );
         if( at == m_ids.end() )
             return;
-        const auto& path = m_paths[at - m_ids.begin()];
-        for( auto sheet : m_frame->Schematic().Hierarchy() )
+        const auto path = m_paths[at - m_ids.begin()];
+        m_frame->CallAfter( [frame = m_frame, path]
         {
-            if( sheet.Path() == path )
+            for( auto sheet : frame->Schematic().Hierarchy() )
             {
-                m_frame->GetToolManager()->RunAction<SCH_SHEET_PATH*>(
-                        SCH_ACTIONS::changeSheet, &sheet );
-                return;
+                if( sheet.Path() == path )
+                {
+                    frame->GetToolManager()->RunAction<SCH_SHEET_PATH*>(
+                            SCH_ACTIONS::changeSheet, &sheet );
+                    frame->GetCanvas()->SetFocus();
+                    return;
+                }
             }
-        }
+        } );
     }
 
     SCH_EDIT_FRAME* m_frame;
@@ -169,10 +178,19 @@ void UpdatePagesMenu( SCH_EDIT_FRAME& aFrame )
 
 void SCH_EDIT_FRAME::NewPage()
 {
-    wxTextEntryDialog dlg( this, _( "Page name:" ), _( "New Page" ), _( "Untitled" ) );
-    if( dlg.ShowModal() != wxID_OK )
-        return;
-    wxString name = dlg.GetValue().Trim().Trim( false );
+    // Finish previews/moves on their original screen, before resetting connectivity or
+    // switching screens. A tool must never retain an item from the previous page.
+    m_toolManager->RunAction( ACTIONS::cancelInteractive );
+    CIRCUITALIVE::CancelUsedSymbolPlacement( this );
+    m_toolManager->RunAction( ACTIONS::selectionClear );
+
+    wxString name;
+    {
+        wxTextEntryDialog dlg( this, _( "Page name:" ), _( "New Page" ), _( "Untitled" ) );
+        if( dlg.ShowModal() != wxID_OK )
+            return;
+        name = dlg.GetValue().Trim().Trim( false );
+    }
     if( name.IsEmpty() )
         return;
 
@@ -231,6 +249,8 @@ void SCH_EDIT_FRAME::NewPage()
     UpdateHierarchyNavigator();
     m_toolManager->RunAction<SCH_SHEET_PATH*>( SCH_ACTIONS::changeSheet, &path );
     OnModify();
+    GetCanvas()->SetFocus();
+    m_toolManager->PostAction( ACTIONS::selectionActivate );
 }
 
 
