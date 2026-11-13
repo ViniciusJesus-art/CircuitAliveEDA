@@ -245,6 +245,7 @@ void INTERACTIVE_SIM_SESSION::Configure( const std::string& aNetlist,
                       { "max_step", aConfig.maxStep }, { "uic", aConfig.useInitialConditions },
                       { "capacity", aConfig.historyCapacity }, { "signals", aConfig.signals } };
     request["accelerate_expressions"] = aConfig.accelerateExpressions;
+    request["synchronize_advances"] = aConfig.synchronizeAdvances;
     request["mutable_elements"] = aConfig.mutableElements;
     if( aConfig.historySignals )
         request["history_signals"] = *aConfig.historySignals;

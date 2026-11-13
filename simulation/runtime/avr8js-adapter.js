@@ -237,7 +237,8 @@
     function advance(time,inputs,adaptive) {
         if(!Number.isFinite(time)||time<confirmed)throw new Error('Invalid AVR simulated time');
         apply(inputs,confirmed);
-        if(adaptive && active && inputSensitive())time=Math.min(time,confirmed+config.quantumSeconds);
+        let sampling=!!(adaptive && active && inputSensitive());
+        if(sampling)time=Math.min(time,confirmed+config.quantumSeconds);
         if(active) {
           let instructions=0;
           let revision=clockRevision;
@@ -252,6 +253,7 @@
                 cpu.nextClockEvent ? cpu.nextClockEvent.cycles : Infinity);
               if(deadline>cpu.cycles+8) {
                 const counter=timer0.divider && !timer0.tcntUpdated && !timer0.updateDivider
+                  && !cpu.readHooks[0x35]
                   && timer0.TOP===255 && (timer0.timerMode===0 || timer0.timerMode===3);
                 const block=global.__circuitaliveAvrRun(cpu.data,cpu.progBytes,cpu.pc,cpu.cycles,deadline,
                   counter ? timer0.tcnt : -1,timer0.lastCycle,timer0.divider);
@@ -260,14 +262,20 @@
             }
             if(++instructions>1000000)throw new Error('AVR instruction budget exceeded; use smaller windows');
             const opcode=cpu.progMem[cpu.pc];
-            if(adaptive && observesInput(opcode) && at()>confirmed+1e-15) { time=Math.min(time,at());break; }
+            const observes=adaptive && observesInput(opcode);
+            if(observes && at()>confirmed+1e-15) { time=Math.min(time,at());break; }
             if(opcode===0xffff)throw new Error('Execution reached erased AVR flash at byte '+(cpu.pc*2));
             if(opcode===0x9588)throw new Error('SLEEP mode is not implemented in this backend');
             if(opcode===0x95e8 || opcode===0x95f8)throw new Error('Self-programming flash is not implemented in this backend');
             AVR.avrInstruction(cpu);
             if(cpu.nextInterrupt>=0 || (cpu.nextClockEvent && cpu.nextClockEvent.cycles<=cpu.cycles))cpu.tick();
             if(txQueue.length || rx || (cpu.data[0x55]&0x10)!==previousPud)peripherals();
-            if(revision!==clockRevision) {
+            // Enabling RX, ADC or an external interrupt can happen at the very
+            // first instruction after an input barrier. Bound this window now,
+            // rather than keeping its previously autonomous deadline.
+            const startedSampling=!!(observes && !sampling && inputSensitive());
+            if(startedSampling){sampling=true;time=Math.min(time,confirmed+config.quantumSeconds);}
+            if(revision!==clockRevision || startedSampling) {
               revision=clockRevision;
               scaledTime=(time-origin)*clock.frequency;
               limit=scaledTime-clock.cyclesDelta;

@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "session_runner.h"
+#include "analog_partition.h"
 #include "visual_signals.h"
 #include "control_references.h"
 #include <algorithm>
@@ -17,9 +18,10 @@ std::chrono::steady_clock::time_point NextPlaybackDeadline(
         std::chrono::steady_clock::duration interval )
 {
     const auto deadline = previous + interval;
-    // Discard accumulated lag; an overdue batch has already spent its time
-    // budget. Adding another full wait here halves playback under sustained load.
-    return std::max( deadline, now );
+    // Preserve short overruns so the next cheap batches can recover the real
+    // cadence. Reset long stalls (startup, debugger, suspend) instead of
+    // accumulating an unbounded catch-up debt. Commands are checked per batch.
+    return now - deadline > std::chrono::milliseconds( 100 ) ? now : deadline;
 }
 
 double NextPlaybackAdvance( double maximum, double previousAdvance, double previousWorkSeconds,
@@ -165,7 +167,7 @@ EDITOR_SESSION_VIEW SESSION_RUNNER::View() const
 
 void SESSION_RUNNER::run()
 {
-    std::unique_ptr<INTERACTIVE_SIM_SESSION> session;
+    std::unique_ptr<ANALOG_SIM_SESSION> session;
     CIRCUIT_SNAPSHOT circuit;
     std::map<std::string,double> controlValues;
     EDITOR_SESSION_VIEW view;
@@ -232,7 +234,7 @@ void SESSION_RUNNER::run()
                             if( led.ratedCurrent > 0 ) retain( led.signal );
                         circuit.config.historySignals = std::vector<std::size_t>( selected.begin(), selected.end() );
                     }
-                    session = std::make_unique<INTERACTIVE_SIM_SESSION>( m_worker,
+                    session = std::make_unique<ANALOG_SIM_SESSION>( m_worker,
                             std::chrono::milliseconds( std::lround( preferences.workerTimeoutSeconds * 1000 ) ) );
                     session->Configure( circuit.netlist, circuit.config );
                     session->AdvanceTo( circuit.config.step );

@@ -145,6 +145,8 @@ INSTRUMENT_PANEL::~INSTRUMENT_PANEL()
 std::string INSTRUMENT_PANEL::ProbeName() const { return m_name->GetValue().ToStdString(); }
 void INSTRUMENT_PANEL::SetProbeName( const std::string& name ) { m_name->ChangeValue( wxString::FromUTF8( name ) ); }
 void INSTRUMENT_PANEL::ClearProbeName() { m_name->Clear(); }
+void INSTRUMENT_PANEL::ShowProbeSelection() { m_tabs->SetSelection( 0 ); }
+bool INSTRUMENT_PANEL::IsSelectingProbe() const { return m_tabs->GetSelection() == 0; }
 void INSTRUMENT_PANEL::tabChanged( wxBookCtrlEvent& event )
 {
     if( auto* cfg = GetAppSettings<EESCHEMA_SETTINGS>( "eeschema" ) )

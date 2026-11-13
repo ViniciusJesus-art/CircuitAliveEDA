@@ -161,6 +161,7 @@ private:
         cfg.historyCapacity = aRequest.at( "capacity" );
         cfg.signals = aRequest.at( "signals" ).get<std::vector<std::string>>();
         cfg.accelerateExpressions = aRequest.value( "accelerate_expressions", false );
+        cfg.synchronizeAdvances = aRequest.value( "synchronize_advances", false );
         cfg.mutableElements = aRequest.value( "mutable_elements", std::vector<std::string>{} );
         if( cfg.mutableElements.size() > 4096 )
             throw std::runtime_error( "Too many mutable elements" );
@@ -577,6 +578,7 @@ private:
 
     void AdvanceAnalog( double aTime, bool exact = false )
     {
+        m_analogTarget = aTime;
         if( !m_configured || !std::isfinite( aTime ) || aTime <= 0 || aTime > m_config.horizon )
             throw std::runtime_error( "Target must be positive and within the configured horizon" );
         if( m_state == SIM_SESSION_STATE::RUNNING )
@@ -607,7 +609,8 @@ private:
         // Do not add a second permanent breakpoint here: a rounded stop just
         // before it would leave a femtosecond remainder to solve on resume.
         // Only actual pin transitions need permanent breakpoints.
-        const double bias = exact ? ProgrammableStopMargin( aTime ) : 0;
+        const double bias = exact ? ProgrammableStopMargin( aTime )
+                : m_config.synchronizeAdvances ? std::min( aTime * 1e-9, 1e-11 ) : 0;
         const double threshold = StopThreshold( aTime, bias );
         Command( "stop when time >= " + Number( threshold ) );
         Run( fresh, false );
@@ -625,7 +628,7 @@ private:
     void ConfigureProgrammable( const SIM_SESSION_CONFIG& config )
     {
         m_programInputs.clear();m_programOutputs.clear();m_external.clear();m_externalCache.clear();m_programDrivers.clear();
-        m_programPlaying=false;m_programReady=false;m_programBoundary=0;m_programQuantum=1e-3;
+        m_programPlaying=false;m_programReady=false;m_programInputRefresh=false;m_programBoundary=0;m_programQuantum=1e-3;
         for( const auto& device : config.programmableDevices )
         {
             if(!std::isfinite(device.quantumSeconds)||device.quantumSeconds<1e-9||device.quantumSeconds>1e-3)
@@ -667,7 +670,7 @@ private:
 
     void ResetProgrammableSources()
     {
-        m_programReady=false;m_programBoundary=0;
+        m_programReady=false;m_programBoundary=0;m_programInputRefresh=false;
         m_externalCache.clear();
         for(auto& [source,history]:m_external)history={{0,0}};
         for(auto& history:m_programDrivers)if(!history.empty())history={{0,0}};
@@ -753,15 +756,22 @@ private:
         for(const auto& binding:m_programInputs)
             inputs.push_back({binding.device,binding.pin,binding.signal==std::numeric_limits<std::size_t>::max()
                 ? 0. : m_latest.values.at(binding.signal)});
-        const double window=m_config.programmableDevices.size()==1
-            ? std::max(m_programQuantum,m_config.programmableDevices.front().autonomousWindowSeconds) : m_programQuantum;
+        double window=m_programQuantum;
+        for(const auto& device:m_config.programmableDevices)
+            window=std::max(window,device.autonomousWindowSeconds);
+        // alter changes the solver, but m_latest still contains the previous
+        // accepted voltages. Resolve one sampling interval before allowing
+        // lookahead/prefetch from the new electrical input snapshot.
+        const bool refresh=m_programInputRefresh;
+        m_programInputRefresh=false;
+        if(refresh)window=m_programQuantum;
         double boundary=std::min(m_programTarget,m_programmable.Time()+window);
         // Do not let accumulated floating point additions create a second
         // breakpoint just below the exact stop-condition value.
         if(m_programTarget-boundary<tolerance)boundary=m_programTarget;
         if(boundary<=now+tolerance)
             throw std::runtime_error("Programmable device clock did not advance");
-        const auto events=m_programmable.AdvanceTo(boundary,inputs,m_programTarget);
+        const auto events=m_programmable.AdvanceTo(boundary,inputs,refresh?boundary:m_programTarget);
         boundary=m_programmable.Time();
         ProgrammableEvents(events,now,boundary);
         m_programBoundary=boundary;m_programReady=true;
@@ -808,8 +818,12 @@ private:
                    self.ProgrammableTolerance() );
         }
         else
+        {
+            if( self.m_config.synchronizeAdvances )
+                limit( self.m_analogTarget, std::min( self.m_analogTarget * 1e-9, 1e-11 ) );
             limit( self.m_config.horizon,
                    8 * std::numeric_limits<double>::epsilon() * self.m_config.horizon );
+        }
         return 0;
     }
 
@@ -908,6 +922,7 @@ private:
         std::lock_guard lock( m_mutex );
         ++m_events;
         m_eventTime = m_latest.time;
+        m_programInputRefresh = true;
     }
 
     JSON Memory( const JSON& request )
@@ -1092,7 +1107,8 @@ private:
     std::map<std::string,std::vector<EXTERNAL_VALUE>> m_external;
     std::map<const char*,const std::vector<EXTERNAL_VALUE>*> m_externalCache;
     double m_programQuantum=1e-6,m_programBoundary=0,m_programTarget=0;
-    bool m_programPlaying=false,m_programReady=false;
+    double m_analogTarget = 0;
+    bool m_programPlaying=false,m_programReady=false,m_programInputRefresh=false;
     int m_engineId=0;
     RUNTIME_MEMORY m_memory;
     void* m_memoryModule = nullptr; // Kept loaded for the physical worker lifetime.

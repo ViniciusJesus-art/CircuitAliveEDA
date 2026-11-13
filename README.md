@@ -67,7 +67,7 @@ These are the additions and workflow changes developed for CircuitAliveEDA on to
 
 <p align="center">
   <img
-    src="resources/screenshot/Montando_Led_com_SW+Medir.webp"
+    src="resources/screenshot/Apresentação_de_simulação.webp"
     alt="Circuit with an LED, switch, and measurements during simulation"
     width="850"
   >

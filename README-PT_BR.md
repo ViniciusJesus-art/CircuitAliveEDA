@@ -67,7 +67,7 @@ Estas são as adições e mudanças de fluxo desenvolvidas no CircuitAliveEDA so
 
 <p align="center">
   <img
-    src="resources/screenshot/Montando_Led_com_SW+Medir.webp"
+    src="resources/screenshot/Apresentação_de_simulação.webp"
     alt="Circuito com LED, chave e medições durante a simulação"
     width="850"
   >

@@ -87,6 +87,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
 {
     CIRCUIT_SNAPSHOT result;
     result.config.accelerateExpressions = true;
+    result.config.partitionable = true;
     auto preferences = aPreferences;
     preferences.Normalize();
     result.config.step = result.config.maxStep = preferences.maxTimeStepUs * 1e-6;
@@ -361,6 +362,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     for( std::size_t i = 0; i < aComponents.size(); ++i )
     {
         const auto& c = aComponents[i];
+        const auto expansionStart = static_cast<std::size_t>( deck.tellp() );
         try
         {
             if( c.reference.empty() || c.reference.find( '?' ) != std::string::npos
@@ -547,6 +549,8 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         {
             errors.push_back( c.reference + ": " + e.what() );
         }
+        result.config.analogCouplings.emplace_back( expansionStart,
+                static_cast<std::size_t>( deck.tellp() ) );
     }
     const bool observersOnly = aPinIndicators && !aPinObservers.empty()
                                && aComponents.empty() && powerRails.empty();
@@ -616,7 +620,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             fixed = fixed && ( connection == component->pins.end() || connection->second.empty()
                 || supplies.Difference( nodes.at( physical ), ground ).has_value() );
         }
-        if( fixed && result.config.programmableDevices.size() == 1 ) runtime.autonomousWindowSeconds = .001;
+        if( fixed ) runtime.autonomousWindowSeconds = .001;
         const auto window = std::max( runtime.quantumSeconds, runtime.autonomousWindowSeconds );
         result.config.step = result.config.maxStep = std::min( result.config.maxStep, window );
         result.config.horizon = std::min( result.config.horizon, result.config.maxStep * 9e7 );

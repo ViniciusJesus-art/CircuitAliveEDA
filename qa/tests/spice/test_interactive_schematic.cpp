@@ -20,6 +20,7 @@
 #include <circuitalive/model_profiles.h>
 #include <circuitalive/simulation_model.h>
 #include <circuitalive/visual_signals.h>
+#include <circuitalive/analog_partition.h>
 #include <eeschema_settings.h>
 #include <filesystem>
 #include <fstream>
@@ -27,6 +28,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstdlib>
+#include <set>
 #include <sim/platform_runtime.h>
 #include <sim/interactive_sim_protocol.h>
 #include <connection_graph.h>
@@ -144,6 +146,7 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
     }
     m_schematic->ConnectionGraph()->Recalculate( m_schematic->Hierarchy(), true );
     auto snapshot = CaptureSchematic( *m_schematic, true );
+    if( std::getenv( "CIRCUITALIVE_AUDIT_NO_PARTITIONS" ) ) snapshot.circuit.config.partitionable = false;
     const auto& circuit = snapshot.circuit;
     const auto& cfg = circuit.config;
     using JSON = nlohmann::json;
@@ -159,12 +162,57 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
             { "data", MemoryHex( region.initial.data ) }, { "known", MemoryHex( region.initial.known ) } } );
     for( const auto& device : cfg.programmableDevices )
         report["programmable_devices"].push_back( PROTOCOL::SerializeProgrammableDevice( device ) );
+    report["analog_couplings"] = cfg.analogCouplings;
+    report["partitions"] = JSON::array();
+    for( const auto& part : BuildAnalogPartitions( circuit.netlist, cfg ) )
+        report["partitions"].push_back( { { "netlist", part.netlist }, { "signals", part.signals },
+            { "devices", part.config.programmableDevices.size() }, { "memories", part.memories } } );
     for( std::size_t i = 0; i < snapshot.locations.size(); ++i )
         report["components"].push_back( { { "reference", snapshot.locations[i].reference.ToStdString() },
             { "sheet", snapshot.locations[i].sheet.ToStdString() }, { "nodes", circuit.pinNodes[i] } } );
     auto save = [&] { std::ofstream output( std::filesystem::path( reinterpret_cast<const char8_t*>( destination ) ) );
                      BOOST_REQUIRE( output ); output << report.dump( 2 ) << '\n'; };
     save();
+    if( const auto* compare = std::getenv( "CIRCUITALIVE_AUDIT_PARTITIONS_UNTIL" ) )
+    {
+        const double until = std::stod( compare );
+        std::vector<SIM_SAMPLE> reference;
+        report["partition_benchmark"] = JSON::array();
+        auto benchmarkConfig = cfg;
+        std::set<std::size_t> selected;
+        for( const auto& warning : circuit.currentWarnings ) selected.insert( warning.signal );
+        for( const auto& led : circuit.leds ) selected.insert( led.signal );
+        for( const auto& channel : circuit.measurements ) if( channel.scope )
+            for( auto index : { channel.positive, channel.negative, channel.current } )
+                if( index != NO_SIGNAL ) selected.insert( index );
+        benchmarkConfig.historySignals = std::vector<std::size_t>( selected.begin(), selected.end() );
+        for( int repeat = 0; repeat < 3; ++repeat ) for( bool parallel : { false, true } )
+        {
+            ANALOG_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+            session.Configure( circuit.netlist, benchmarkConfig, parallel );
+            session.AdvanceTo( cfg.step ); session.Snapshot( true );
+            const auto started = std::chrono::steady_clock::now();
+            double error = 0, currentError = 0, last = 0;
+            std::size_t frame = 0;
+            for( double time = cfg.step + .008; time <= until + 1e-12; time += .008, ++frame )
+            {
+                session.AdvanceTo( time ); auto sample = session.Snapshot( true ); last = sample.latest.time;
+                if( repeat == 0 && !parallel ) reference.push_back( sample.latest );
+                else for( std::size_t n = 0; n < cfg.signals.size(); ++n )
+                {
+                    const double difference = std::abs( sample.latest.values[n] - reference.at( frame ).values[n] );
+                    if( cfg.signals[n].starts_with( "i(" ) || cfg.signals[n].starts_with( '@' ) ) currentError = std::max( currentError, difference );
+                    else error = std::max( error, difference );
+                }
+            }
+            report["partition_benchmark"].push_back( { { "repeat", repeat }, { "parallel", parallel },
+                { "workers", session.PartitionCount() }, { "wall_seconds", std::chrono::duration<double>(
+                    std::chrono::steady_clock::now() - started ).count() }, { "simulated_seconds", last - cfg.step },
+                { "max_voltage_error", error }, { "max_current_error", currentError } } );
+            save();
+        }
+        return;
+    }
     if( const auto* live = std::getenv( "CIRCUITALIVE_AUDIT_LIVE_UNTIL" ) )
     {
         const double until = std::stod( live );
@@ -172,9 +220,12 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
         runner.Start( circuit );
         const auto started = std::chrono::steady_clock::now();
         auto lastUpdate = started;
+        auto activeStarted = started, rateStarted = started;
+        double activeTime = 0, rateTime = 0;
         double lastTime = -1, maxGap = 0;
         std::size_t updates = 0;
         JSON changes = JSON::array();
+        JSON rates = JSON::array();
         std::vector<LOGIC_LEVEL> previous;
         for( ;; )
         {
@@ -186,6 +237,13 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
             }
             if( view.sample.latest.time > lastTime && !view.logicLevels.empty() )
             {
+                if( updates == 0 )
+                { activeStarted = rateStarted = now; activeTime = rateTime = view.sample.latest.time; }
+                else if( now - rateStarted >= std::chrono::milliseconds( 500 ) )
+                {
+                    rates.push_back( ( view.sample.latest.time - rateTime ) / std::chrono::duration<double>( now - rateStarted ).count() );
+                    rateStarted = now; rateTime = view.sample.latest.time;
+                }
                 if( updates > 1 ) maxGap = std::max( maxGap,
                     std::chrono::duration<double>( now - lastUpdate ).count() );
                 ++updates; lastTime = view.sample.latest.time; lastUpdate = now;
@@ -205,6 +263,8 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
         }
         report["live"] = { { "time", lastTime }, { "wall_seconds",
             std::chrono::duration<double>( std::chrono::steady_clock::now() - started ).count() },
+            { "steady_speed", ( lastTime - activeTime ) / std::chrono::duration<double>( lastUpdate - activeStarted ).count() },
+            { "rate_windows", rates },
             { "updates", updates }, { "max_update_gap_ms", maxGap * 1000 }, { "pb5_changes", changes } };
         save();
         return;

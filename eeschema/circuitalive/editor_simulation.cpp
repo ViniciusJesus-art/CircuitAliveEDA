@@ -137,7 +137,7 @@ private:
     SIMULATION_PREFERENCES m_preferences;
     bool m_active = false;
     bool m_errorShown = false;
-    bool m_probePanel = false, m_logicLevels = false, m_instrumentsVisible = false;
+    bool m_logicLevels = false, m_instrumentsVisible = false;
     bool m_resultOpened = false;
     std::optional<wxAuiPaneInfo> m_instrumentLayout;
     wxString m_instrumentLayoutKey;
@@ -292,7 +292,7 @@ void EDITOR_SIMULATION_TOOL::Invalidate()
     m_session = {};
     m_circuit = {};
     m_resultOpened = false;
-    showInstruments( m_probePanel );
+    showInstruments( m_instrumentsVisible && m_instruments && m_instruments->IsSelectingProbe() );
     if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, false );
     redraw();
     setStatus( _( "Circuit changed — press Play to rebuild" ) );
@@ -306,7 +306,11 @@ int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
         return 0;
     const auto state = m_runner->View().state;
     if( m_active && state == EDITOR_SESSION_STATE::PAUSED )
+    {
         m_runner->Resume();
+        if( m_circuit.circuit.measurements.empty() )
+            showInstruments( false );
+    }
     else if( state != EDITOR_SESSION_STATE::RUNNING && state != EDITOR_SESSION_STATE::PREPARING )
     {
         try
@@ -322,6 +326,8 @@ int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
             m_resultOpened = false;
             m_active = true;
             m_errorShown = false;
+            if( m_circuit.circuit.measurements.empty() )
+                showInstruments( false );
         }
         catch( const std::exception& e )
         {
@@ -394,11 +400,13 @@ void EDITOR_SIMULATION_TOOL::saveInstrumentLayout()
 
 int EDITOR_SIMULATION_TOOL::ToggleProbes( const TOOL_EVENT& )
 {
-    m_probePanel = !m_instrumentsVisible;
+    const bool visible = !m_instrumentsVisible;
     m_placing.reset(); m_instruments->SetPlacement( {} );
     m_toolMgr->RunAction( ACTIONS::cancelInteractive );
     m_toolMgr->RunAction( ACTIONS::selectionTool );
-    showInstruments( m_probePanel );
+    if( visible && !m_active )
+        m_instruments->ShowProbeSelection();
+    showInstruments( visible );
     m_frame->GetCanvas()->SetFocus();
     return 0;
 }
@@ -429,7 +437,7 @@ int EDITOR_SIMULATION_TOOL::Stop( const TOOL_EVENT& )
     m_session = {};
     m_circuit = {};
     m_resultOpened = false;
-    showInstruments( m_probePanel );
+    showInstruments( m_instrumentsVisible && m_instruments && m_instruments->IsSelectingProbe() );
     if( m_instruments ) m_instruments->UpdateSession( m_circuit, m_session, false );
     redraw();
     setStatus( _( "Stopped — t = 0 s" ) );

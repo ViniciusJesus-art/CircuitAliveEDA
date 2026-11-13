@@ -9,11 +9,19 @@
 #include <quickjs.h>
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cmath>
+#include <condition_variable>
+#include <exception>
+#include <functional>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <set>
 #include <stdexcept>
+#include <thread>
+#include <unordered_map>
 
 namespace CIRCUITALIVE
 {
@@ -23,6 +31,80 @@ using JSON = nlohmann::json;
 constexpr std::size_t MAX_SOURCE = 4 * 1024 * 1024;
 constexpr std::size_t MAX_EVENTS = 100000;
 constexpr int MAX_INTERRUPTS = 5000;
+
+// A bounded executor, shared by the contexts of one simulation. The caller
+// participates; no task, thread or future is allocated per instruction/sample.
+class EXECUTOR
+{
+public:
+    explicit EXECUTOR( unsigned count )
+    {
+        try
+        {
+            for( unsigned i = 0; i < count; ++i )
+                m_threads.emplace_back( [this]
+                {
+                    std::size_t generation = 0;
+                    std::unique_lock lock( m_mutex );
+                    for( ;; )
+                    {
+                        m_wake.wait( lock, [&] { return m_quit || generation != m_generation; } );
+                        if( m_quit ) return;
+                        generation = m_generation;
+                        lock.unlock();
+                        Drain();
+                        lock.lock();
+                        if( --m_active == 0 ) m_done.notify_one();
+                    }
+                } );
+        }
+        catch( ... ) { Stop(); throw; }
+    }
+
+    ~EXECUTOR() { Stop(); }
+
+    void Run( std::size_t count, std::function<void( std::size_t )> job )
+    {
+        {
+            std::lock_guard lock( m_mutex );
+            m_job = std::move( job );
+            m_count = count;
+            m_next = 0;
+            m_active = m_threads.size();
+            ++m_generation;
+        }
+        m_wake.notify_all();
+        Drain();
+        std::unique_lock lock( m_mutex );
+        m_done.wait( lock, [&] { return m_active == 0; } );
+        m_job = {};
+    }
+
+private:
+    void Drain()
+    {
+        for( std::size_t index; ( index = m_next.fetch_add( 1 ) ) < m_count; )
+            m_job( index ); // The coordinator captures exceptions per device.
+    }
+
+    void Stop()
+    {
+        {
+            std::lock_guard lock( m_mutex );
+            m_quit = true;
+        }
+        m_wake.notify_all();
+        for( auto& thread : m_threads ) thread.join();
+    }
+
+    std::vector<std::thread> m_threads;
+    std::mutex m_mutex;
+    std::condition_variable m_wake, m_done;
+    bool m_quit = false;
+    std::size_t m_generation = 0, m_active = 0, m_count = 0;
+    std::atomic<std::size_t> m_next{ 0 };
+    std::function<void( std::size_t )> m_job;
+};
 
 struct VALUE
 {
@@ -51,11 +133,17 @@ struct DEVICE
     JSValue object = JS_UNDEFINED;
     JSValue inputCache = JS_UNDEFINED;
     std::vector<PROGRAMMABLE_PIN_INPUT> cachedInputs;
+    std::vector<PROGRAMMABLE_PIN_INPUT> inputSnapshot;
     int interrupts = 0;
     double next = 0.0;
     std::set<std::string> pins;
     std::map<std::string, PROGRAMMABLE_PIN_STATE> states;
     bool needsInputs = true;
+    bool cooperative = false;
+    double frontier = 0, cost = 1e-4;
+    std::vector<PROGRAMMABLE_PIN_STATE> pending;
+    std::size_t consumed = 0;
+    std::exception_ptr failure;
 
     explicit DEVICE( const PROGRAMMABLE_DEVICE_CONFIG& c ) : config( c ) {}
     ~DEVICE()
@@ -120,8 +208,7 @@ struct DEVICE
         for( const auto& input : inputs )
         {
             if( input.device != config.id ) continue;
-            if( !pins.count( input.pin ) || !std::isfinite( input.voltage ) )
-                Error( "unknown pin or non-finite electrical input" );
+            // The coordinator validates all pins before dispatching any job.
             same = same && count < cachedInputs.size()
                 && input.pin == cachedInputs[count].pin && input.voltage == cachedInputs[count].voltage;
             ++count;
@@ -224,6 +311,8 @@ struct DEVICE
         Check( object );
         if( !JS_IsObject( object ) )
             Error( "factory must return a synchronous runtime object" );
+        VALUE prepare( context, JS_GetPropertyStr( context, object, "prepareWindow" ) );
+        cooperative = config.autonomousWindowSeconds > 0 && JS_IsFunction( context, prepare.value );
         UpdateNext( 0.0 );
     }
 
@@ -241,8 +330,10 @@ struct DEVICE
             double from, double& to, const std::vector<PROGRAMMABLE_PIN_INPUT>& inputs )
     {
         JS_UpdateStackTop( runtime );
-        VALUE cooperative( context, JS_GetPropertyStr( context, object, "prepareWindow" ) );
-        const bool adaptive = config.autonomousWindowSeconds > 0 && JS_IsFunction( context, cooperative.value );
+        VALUE prepareMethod( context, JS_GetPropertyStr( context, object, "prepareWindow" ) );
+        const bool adaptive = config.autonomousWindowSeconds > 0 && JS_IsFunction( context, prepareMethod.value );
+        this->cooperative = adaptive;
+        if( !adaptive ) needsInputs = true;
         if( adaptive ) to = std::min( to, from + config.autonomousWindowSeconds );
         if( config.autonomousWindowSeconds > 0 && !adaptive ) to = std::min( to, from + config.quantumSeconds );
         VALUE time( context, JS_NewFloat64( context, to ) );
@@ -287,7 +378,6 @@ struct DEVICE
             at = std::clamp( at, from, to );
             previous = at;
             PROGRAMMABLE_PIN_STATE state{ config.id, name, static_cast<PROGRAMMABLE_DRIVE>( mode ), at };
-            states[name] = state;
             events.push_back( std::move( state ) );
         }
         UpdateNext( to );
@@ -299,27 +389,44 @@ struct DEVICE
 struct PROGRAMMABLE_RUNTIME::IMPL
 {
     std::vector<std::unique_ptr<DEVICE>> devices;
+    std::unordered_map<std::string, DEVICE*> byId;
+    std::vector<DEVICE*> ready;
     double time = 0.0;
+    bool cooperative = false, failed = false;
+    unsigned maxWorkers = 0;
+    STATISTICS statistics;
+    std::unique_ptr<EXECUTOR> executor;
 };
 
 PROGRAMMABLE_RUNTIME::PROGRAMMABLE_RUNTIME() : m_impl( std::make_unique<IMPL>() ) {}
 PROGRAMMABLE_RUNTIME::~PROGRAMMABLE_RUNTIME() = default;
 
-void PROGRAMMABLE_RUNTIME::Configure( const std::vector<PROGRAMMABLE_DEVICE_CONFIG>& configs )
+void PROGRAMMABLE_RUNTIME::Configure( const std::vector<PROGRAMMABLE_DEVICE_CONFIG>& configs,
+                                      unsigned maxWorkers )
 {
     if( configs.size() > 32 )
         throw std::runtime_error( "Too many programmable devices (maximum 32)" );
     auto impl = std::make_unique<IMPL>();
+    impl->maxWorkers = maxWorkers;
     std::set<std::string> names;
     for( const auto& config : configs )
     {
         if( !names.insert( config.id ).second )
             throw std::runtime_error( "Duplicate programmable device ID: " + config.id );
         auto device = std::make_unique<DEVICE>( config );
-        if( configs.size() != 1 ) device->config.autonomousWindowSeconds = 0;
         device->Initialize();
+        impl->cooperative |= config.autonomousWindowSeconds > 0;
+        impl->byId.emplace( config.id, device.get() );
         impl->devices.push_back( std::move( device ) );
     }
+    impl->ready.reserve( configs.size() );
+    const unsigned available = std::thread::hardware_concurrency();
+    // Leave capacity for the editor/analog solver; never pin a context to a CPU.
+    const unsigned limit = maxWorkers ? maxWorkers : available > 2 ? available - 2 : 1;
+    impl->statistics.workerThreads = configs.empty() ? 0
+            : std::min<unsigned>( configs.size(), limit ) - 1;
+    if( impl->statistics.workerThreads )
+        impl->executor = std::make_unique<EXECUTOR>( impl->statistics.workerThreads );
     m_impl = std::move( impl );
 }
 
@@ -328,7 +435,7 @@ void PROGRAMMABLE_RUNTIME::Reset()
     std::vector<PROGRAMMABLE_DEVICE_CONFIG> configs;
     for( const auto& device : m_impl->devices )
         configs.push_back( device->config );
-    Configure( configs );
+    Configure( configs, m_impl->maxWorkers );
 }
 
 std::vector<PROGRAMMABLE_PIN_STATE> PROGRAMMABLE_RUNTIME::AdvanceTo(
@@ -336,16 +443,87 @@ std::vector<PROGRAMMABLE_PIN_STATE> PROGRAMMABLE_RUNTIME::AdvanceTo(
 {
     if( !std::isfinite( time ) || time < m_impl->time )
         throw std::runtime_error( "Programmable runtime time must be finite and monotonic" );
+    if( m_impl->failed ) throw std::runtime_error( "Reset the failed programmable runtime before continuing" );
+    auto& ready = m_impl->ready;
+    ready.clear();
+    unsigned expensive = 0;
+    for( const auto& device : m_impl->devices )
+        if( device->frontier == m_impl->time )
+        {
+            ready.push_back( device.get() );
+            device->inputSnapshot.clear();
+            if( device->cost >= 20e-6 && time - device->frontier > device->config.quantumSeconds * 8 )
+                ++expensive;
+        }
     for( const auto& input : inputs )
-        if( std::none_of( m_impl->devices.begin(), m_impl->devices.end(), [&]( const auto& d ) {
-            return d->config.id == input.device;
-        } ) )
+    {
+        const auto found = m_impl->byId.find( input.device );
+        if( found == m_impl->byId.end() )
             throw std::runtime_error( "Unknown programmable input device: " + input.device );
+        auto& device = *found->second;
+        if( !device.pins.count( input.pin ) || !std::isfinite( input.voltage ) )
+            device.Error( "unknown pin or non-finite electrical input" );
+        if( m_impl->devices.size() > 1 && device.frontier == m_impl->time )
+            device.inputSnapshot.push_back( input );
+    }
+    auto advance = [&]( std::size_t index )
+    {
+        auto& device = *ready[index];
+        double to = time;
+        // Fixed-rate backends still sample on their own quantum when another
+        // context has cooperative lookahead. Legacy fixed-only calls retain
+        // their explicit caller-supplied interval.
+        if( m_impl->cooperative && m_impl->devices.size() > 1 && !device.cooperative )
+            to = std::min( to, device.frontier + device.config.quantumSeconds );
+        const auto start = std::chrono::steady_clock::now();
+        try
+        {
+            device.pending = device.Advance( device.frontier, to,
+                    m_impl->devices.size() == 1 ? inputs : device.inputSnapshot );
+            device.consumed = 0;
+            device.frontier = to;
+        }
+        catch( ... ) { device.failure = std::current_exception(); }
+        device.cost = std::chrono::duration<double>( std::chrono::steady_clock::now() - start ).count();
+    };
+    if( m_impl->executor && expensive >= 2 )
+    {
+        m_impl->executor->Run( ready.size(), advance );
+        ++m_impl->statistics.parallelBatches;
+    }
+    else
+        for( std::size_t i = 0; i < ready.size(); ++i ) advance( i );
+    m_impl->statistics.windows += ready.size();
+    // Drain every task before propagating the first error in configuration order.
+    for( const auto* device : ready )
+        if( device->failure )
+        {
+            m_impl->failed = true;
+            std::rethrow_exception( device->failure );
+        }
+
+    // A fast context can be ahead of a peer's input barrier. Keep its private
+    // window and publish only through the common, causally confirmed frontier.
+    // At most one bounded window is retained for each device.
+    for( const auto& device : m_impl->devices ) time = std::min( time, device->frontier );
+    // Coincident independently accumulated deadlines can differ by a few ULPs.
+    // Coalesce arithmetic roundoff, without using the much larger electrical
+    // sampling tolerance or moving real firmware edges to another sample.
+    const double roundoff = std::max( 1e-15, 8 * std::numeric_limits<double>::epsilon() * std::abs( time ) );
+    for( const auto& device : m_impl->devices )
+        if( device->frontier - time <= roundoff ) device->frontier = time;
     std::vector<PROGRAMMABLE_PIN_STATE> events;
     for( const auto& device : m_impl->devices )
     {
-        auto changes = device->Advance( m_impl->time, time, inputs );
-        events.insert( events.end(), changes.begin(), changes.end() );
+        while( device->consumed < device->pending.size()
+               && device->pending[device->consumed].time <= time + roundoff )
+        {
+            auto event = device->pending[device->consumed++];
+            event.time = std::min( event.time, time );
+            if( std::abs( event.time - m_impl->time ) <= roundoff ) event.time = m_impl->time;
+            device->states[event.pin] = event;
+            events.push_back( event );
+        }
     }
     std::stable_sort( events.begin(), events.end(), []( const auto& a, const auto& b ) {
         return a.time < b.time;
@@ -367,14 +545,24 @@ double PROGRAMMABLE_RUNTIME::NextEventTime() const
 {
     double next = std::numeric_limits<double>::infinity();
     for( const auto& device : m_impl->devices )
-        next = std::min( next, device->next );
+    {
+        next = std::min( next, device->frontier > m_impl->time ? device->frontier : device->next );
+        if( device->consumed < device->pending.size() )
+            next = std::min( next, device->pending[device->consumed].time );
+    }
     return next;
 }
 
 double PROGRAMMABLE_RUNTIME::Time() const { return m_impl->time; }
 bool PROGRAMMABLE_RUNTIME::NeedsInputs() const
 {
-    return m_impl->devices.size()!=1 || m_impl->devices.front()->needsInputs;
+    return m_impl->devices.empty() || std::any_of( m_impl->devices.begin(), m_impl->devices.end(),
+            [&]( const auto& device )
+            {
+                return device->frontier == m_impl->time && ( !device->cooperative || device->needsInputs );
+            } );
 }
+
+PROGRAMMABLE_RUNTIME::STATISTICS PROGRAMMABLE_RUNTIME::Statistics() const { return m_impl->statistics; }
 
 } // namespace CIRCUITALIVE

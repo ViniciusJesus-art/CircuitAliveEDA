@@ -2,7 +2,7 @@
 if( TARGET circuitalive_sim_session )
     set( CIRCUITALIVE_INTERACTIVE_SOURCES
         circuit_snapshot.cpp circuit_topology.cpp model_catalog_index.cpp model_pin_mapping.cpp simulation_model.cpp model_profiles.cpp behavioral_model.cpp led_appearance.cpp control_references.cpp
-        session_runner.cpp simulation_preferences.cpp visual_signals.cpp measurements.cpp source_probe.cpp scope_history.cpp scope_waveform.cpp scope_acquisition.cpp logic_signals.cpp power_rails.cpp model_design.cpp model_routing.cpp model_design_presets.cpp )
+        session_runner.cpp analog_partition.cpp simulation_preferences.cpp visual_signals.cpp measurements.cpp source_probe.cpp scope_history.cpp scope_waveform.cpp scope_acquisition.cpp logic_signals.cpp power_rails.cpp model_design.cpp model_routing.cpp model_design_presets.cpp )
     function( circuitalive_add_interactive_library target session_target )
         add_library( ${target} STATIC ${CIRCUITALIVE_INTERACTIVE_SOURCES} )
         target_compile_definitions( ${target} PRIVATE

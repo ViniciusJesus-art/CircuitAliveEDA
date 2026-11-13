@@ -92,11 +92,17 @@ bool PeripheralAccess( CPU& cpu, int opcode )
             + ( ( opcode & 7 ) | ( ( opcode & 0xc00 ) >> 7 ) | ( ( opcode & 0x2000 ) >> 8 ) );
     else if( ( opcode & 0xfe0c ) == 0x9204 )
         address = cpu.dataView.getUint16( 30, true );
-    // SP and SREG have no hooks in the ATmega adapter. Everything else is
-    // dispatched by the reference engine, including counter reads.
+    // Timer0 flags are plain read-only observations until the next scheduled
+    // clock event. Arduino micros()/delay() polls them with SBIS; handing every
+    // poll back to JS defeats native execution of an otherwise quiet loop.
+    // The adapter only supplies counterBase when this register has no read hook.
+    const bool read = ( opcode & 0xf800 ) == 0xb000 || ( opcode & 0xfe00 ) == 0x9000
+                      || ( opcode & 0xd200 ) == 0x8000 || ( opcode & 0xfd00 ) == 0x9900;
     const bool counterRead = address == 0x46 && cpu.counterBase >= 0
         && ( ( opcode & 0xf800 ) == 0xb000 || ( opcode & 0xd200 ) == 0x8000 );
-    return address >= 32 && address < 256 && !( address >= 93 && address <= 95 ) && !counterRead;
+    const bool timerFlagRead = address == 0x35 && cpu.counterBase >= 0 && read;
+    return address >= 32 && address < 256 && !( address >= 93 && address <= 95 )
+           && !counterRead && !timerFlagRead;
 }
 
 bool Instruction( CPU& cpu, int opcode )

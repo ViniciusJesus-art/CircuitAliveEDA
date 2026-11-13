@@ -9,7 +9,8 @@
 
 namespace CIRCUITALIVE
 {
-/** One bounded CPU job overlaps the analog solver. Inputs are refreshed at
+/** One bounded coordinator job overlaps the analog solver; its runtime may use
+ * a bounded pool for independent device windows. Inputs are refreshed at
  * explicit firmware barriers; speculative execution never passes a user-visible
  * batch boundary. Stop/reset discard the job before touching its context.
  */

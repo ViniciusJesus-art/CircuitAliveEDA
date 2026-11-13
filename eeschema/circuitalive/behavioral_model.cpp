@@ -3,11 +3,73 @@
 #include "simulation_model.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <map>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 namespace CIRCUITALIVE
 {
 using JSON = nlohmann::json;
+
+namespace
+{
+// Equal-width adc_bridge/dac_bridge vectors are independent bit channels.
+// One instance per model avoids repeating XSPICE's generic instance setup for
+// every pin at every Newton iteration. Multi-bit converters are left intact.
+void GroupPinBridges( std::vector<std::string>& lines )
+{
+    struct GROUP { std::size_t index, width = 0; std::string name, inputs, outputs; };
+    std::map<std::string, std::vector<GROUP>> groups;
+    std::vector<std::string> result;
+    for( auto& line : lines )
+    {
+        std::istringstream words( line );
+        std::string name, inputs, outputs, model, extra;
+        words >> name >> std::ws;
+        bool bridge = !name.empty() && name.front() == 'A' && words.get() == '[';
+        if( bridge )
+        {
+            std::getline( words, inputs, ']' ); words >> std::ws;
+            bridge = words.get() == '[';
+            if( bridge )
+            {
+                std::getline( words, outputs, ']' ); words >> model;
+                bridge = ( model == "bh_adc_${id}" || model == "bh_dac_${id}" )
+                         && !( words >> extra );
+            }
+        }
+        auto width = []( const std::string& pins )
+        {
+            std::istringstream tokens( pins ); std::string pin; std::size_t n = 0;
+            while( tokens >> pin ) ++n;
+            return n;
+        };
+        const auto count = bridge ? width( inputs ) : 0;
+        if( count && count == width( outputs ) )
+        {
+            auto& batches = groups[model];
+            // The generic DAC loader clears a matrix of port partials. Bound
+            // its width so very wide packages do not incur quadratic work.
+            const auto limit = model == "bh_dac_${id}" ? 16u : 64u;
+            if( batches.empty() || batches.back().width + count > limit )
+            {
+                batches.push_back( { result.size(), 0, name, {}, {} } );
+                result.emplace_back();
+            }
+            auto& group = batches.back();
+            group.inputs += " " + inputs; group.outputs += " " + outputs;
+            group.width += count;
+        }
+        else
+            result.push_back( std::move( line ) );
+    }
+    for( const auto& [model, batches] : groups )
+        for( const auto& group : batches )
+            result[group.index] = group.name + " [" + group.inputs + "] [" + group.outputs + "] " + model;
+    lines = std::move( result );
+}
+}
+
 void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
 {
     if( b.at( "version" ) != 1 ) throw std::runtime_error( "Unsupported behavioral block version" );
@@ -316,5 +378,6 @@ void CompileBehavioralModel( const JSON& b, SIMULATION_MODEL& m )
     for( const auto& name : references )
         if( !defined.contains( name ) ) throw std::runtime_error( "Undriven behavioral signal: " + name );
     if( m.measurePositive.empty() ) { m.measurePositive = m.logicVcc; m.measureNegative = m.logicGround; }
+    GroupPinBridges( m.instance );
 }
 }

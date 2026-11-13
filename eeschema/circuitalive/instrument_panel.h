@@ -27,6 +27,8 @@ public:
     void SetProbeName( const std::string& aName );
     void ClearProbeName();
     void SetPlacement( std::optional<PROBE_KIND> aKind );
+    void ShowProbeSelection();
+    bool IsSelectingProbe() const;
     void UpdateSession( const SCHEMATIC_SNAPSHOT& aCircuit, const EDITOR_SESSION_VIEW& aSession, bool aActive );
 
 private:

@@ -2,6 +2,7 @@
 #include "programmable_pipeline.h"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace CIRCUITALIVE
@@ -50,11 +51,13 @@ void PROGRAMMABLE_PIPELINE::Configure( const std::vector<PROGRAMMABLE_DEVICE_CON
     m_runtime.Configure( devices );
     m_time = m_window = m_requested = 0;
     m_tolerance = 1e-12;
-    if( devices.size() == 1 )
+    double quantum = std::numeric_limits<double>::infinity();
+    for( const auto& device : devices )
     {
-        m_window = devices.front().autonomousWindowSeconds;
-        m_tolerance = std::max( 1e-12, devices.front().quantumSeconds * 1e-3 );
+        m_window = std::max( m_window, device.autonomousWindowSeconds );
+        quantum = std::min( quantum, device.quantumSeconds );
     }
+    if( !devices.empty() ) m_tolerance = std::max( 1e-12, quantum * 1e-3 );
 }
 
 void PROGRAMMABLE_PIPELINE::Reset()

@@ -120,6 +120,17 @@ kicad_add_boost_test( qa_spice qa_spice )
 setup_qa_env( qa_spice )
 
 if( TARGET circuitalive_sim_session )
+    # Explicitly requested developer benchmark; never installed or run by ctest.
+    add_executable( circuitalive-benchmark-programmable EXCLUDE_FROM_ALL
+        benchmark_programmable_runtime.cpp )
+    target_link_libraries( circuitalive-benchmark-programmable PRIVATE
+        circuitalive_sim_session circuitalive_programmable_runtime )
+    target_include_directories( circuitalive-benchmark-programmable PRIVATE
+        ${PROJECT_SOURCE_DIR}/eeschema )
+    target_include_directories( circuitalive-benchmark-programmable SYSTEM PRIVATE
+        ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann_json )
+    target_compile_definitions( circuitalive-benchmark-programmable PRIVATE
+        CIRCUITALIVE_BENCH_AVR_RUNTIME="${PROJECT_SOURCE_DIR}/simulation/runtime/avr8js.js" )
     add_executable( qa_interactive_sim test_interactive_sim_session.cpp test_interactive_windows_headers.cpp test_interactive_circuit.cpp
         test_interactive_models.cpp test_interactive_measurements.cpp test_interactive_devices.cpp
         test_interactive_complex.cpp test_interactive_power.cpp test_model_design.cpp
@@ -132,7 +143,7 @@ if( TARGET circuitalive_sim_session )
         test_small_logic_models.cpp
         test_diode_reverse_bias.cpp
         test_live_controls.cpp test_source_probes.cpp test_digital_pipeline.cpp test_digital_bus.cpp test_memory_resources.cpp test_memory_viewer.cpp test_visual_signals.cpp
-        test_programmable_devices.cpp test_compiled_expressions.cpp )
+        test_programmable_devices.cpp test_compiled_expressions.cpp test_analog_partition.cpp )
     target_link_libraries( qa_interactive_sim PRIVATE
         circuitalive_interactive circuitalive_sim_session circuitalive_programmable_runtime
         Boost::unit_test_framework )

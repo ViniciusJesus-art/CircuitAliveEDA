@@ -26,6 +26,7 @@ normal do componente no esquema.
 
 - [Como configurar firmware, pinagem e novos modelos](PROGRAMMABLE_MODEL_FILES.md).
 - [Contrato JavaScript e capacidades de cada motor](../../simulation/runtime/README.md).
+- [Avaliação de threads, eventos e partições da simulação](SIMULATION_PARALLELISM.md).
 
 O instalador Windows e os pacotes Linux incluem interpretador, motores, modelos e
 licenças. Não é necessário instalar Node.js, Python, emuladores ou compiladores
@@ -62,19 +63,25 @@ Stop/Play reinicia as imagens congeladas.
 
 O período padrão de amostragem é 1 µs e pode ser configurado no componente.
 O AVR possui um acelerador de instruções nativo incorporado, com a mesma semântica
-do AVR8js, e temporizadores agendados por comparação/overflow. Com um único micro e
+do AVR8js, e temporizadores agendados por comparação/overflow. Com
 alimentação/reset constantes, a execução avança entre eventos e entrega o controle
 ao solver antes de ler um GPIO ou iniciar uma operação dependente de entradas.
 Interrupções externas, recepção UART, ADC ativo e clocks externos retomam a
-amostragem configurada. Alimentação variável e múltiplos micros usam a sincronização
+amostragem configurada, inclusive quando essa função é habilitada durante uma
+janela. Alimentação variável e backends sem janelas cooperativas usam a sincronização
 conservadora. Os drivers GPIO são condutâncias finitas em um modelo XSPICE incluído
 no aplicativo, sem fontes auxiliares por pino.
 
-O cálculo cooperativo do micro usa uma thread própria e uma fila limitada a uma
-janela, enquanto o ngspice resolve o circuito a partir dos eventos dos pinos.
-A thread para antes de observar entradas novas; operações de pausa e alteração
+Cada micro mantém um contexto e uma janela privados. Um coordenador distribui
+janelas caras a um pool de threads persistentes limitado à capacidade da CPU;
+trechos curtos continuam sequenciais. O cálculo cooperativo pode se sobrepor ao
+ngspice, que resolve o circuito a partir dos eventos dos pinos. Resultados futuros
+de um micro aguardam seus pares, preservando o tempo confirmado das medições.
+Os contextos param antes de observar entradas novas; operações de pausa e alteração
 dos controles permanecem nos limites confirmados do circuito. O editor segue
 um relógio absoluto para incluir o processamento no intervalo das atualizações.
+Depois de alterar uma fonte ou parâmetro, o solver resolve um intervalo de
+amostragem antes de permitir novo avanço cooperativo com as tensões atualizadas.
 
 Fontes comportamentais compatíveis são avaliadas por um grafo compilado, com
 derivadas analíticas. Fontes alteráveis durante a execução e expressões fora do

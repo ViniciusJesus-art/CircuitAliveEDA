@@ -53,6 +53,14 @@ de perfis está em `model_profiles.*`. Nenhum deles depende de desenhos específ
 Os arquivos dos componentes ficam em `simulation/models/`. Novos componentes
 expressáveis pelos blocos ou pelo SPICE existente não exigem recompilar o editor.
 
+As pontes ADC/DAC geradas são agrupadas por modelo em vetores de canais
+independentes: até 64 entradas por ADC e 16 canais por DAC. Isso reduz as chamadas
+repetidas ao adaptador XSPICE a cada iteração elétrica. Conversores com larguras
+diferentes de entrada e saída permanecem separados. A lógica continua usando os
+eventos XSPICE; limiares, atrasos, rampas, impedâncias, cargas e medições elétricas
+permanecem nos mesmos modelos. A largura do DAC é limitada porque o carregador
+genérico prepara uma matriz de derivadas entre portas.
+
 ## Contrato behavioral v1
 
 Um exemplo do núcleo de um flip-flop é:

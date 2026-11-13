@@ -9,7 +9,7 @@ namespace CIRCUITALIVE::PROTOCOL
 {
 using JSON = nlohmann::json;
 constexpr std::size_t MAX_MESSAGE = 8 * 1024 * 1024;
-constexpr int VERSION = 3;
+constexpr int VERSION = 4;
 
 inline JSON SerializeProgrammableDevice( const PROGRAMMABLE_DEVICE_CONFIG& config )
 {

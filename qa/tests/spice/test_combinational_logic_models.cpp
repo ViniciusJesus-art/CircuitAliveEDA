@@ -4,6 +4,8 @@
 #include <circuitalive/simulation_model.h>
 #include <map>
 #include <memory>
+#include <regex>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -114,6 +116,62 @@ const std::vector<int> quad0{2,5,11,14}, quad1{3,6,10,13}, quadOut{4,7,9,12};
 const std::vector<int> a4{10,12,13,15}, b4{9,11,14,1};
 const std::vector<int> a8{2,4,6,8,11,13,15,17}, b8{3,5,7,9,12,14,16,18};
 const std::vector<int> octalIn{2,3,4,5,6,7,8,9}, octalOut{18,17,16,15,14,13,12,11};
+
+std::string ScalarPinBridges( const std::string& deck )
+{
+    const std::regex bridge( R"(^(A\S+)\s+\[([^\]]+)\]\s+\[([^\]]+)\]\s+(bh_(?:adc|dac)_\S+)\s*$)" );
+    std::istringstream lines( deck ); std::string line, result;
+    for( ; std::getline( lines, line ); )
+    {
+        std::smatch match;
+        if( std::regex_match( line, match, bridge ) )
+        {
+            std::istringstream inputs( match[2] ), outputs( match[3] );
+            std::string input, output; unsigned bit = 0;
+            while( inputs >> input && outputs >> output )
+                result += match[1].str() + "_bit" + std::to_string( bit++ ) + " [" + input
+                          + "] [" + output + "] " + match[4].str() + '\n';
+        }
+        else
+            result += line + '\n';
+    }
+    return result;
+}
+}
+
+BOOST_AUTO_TEST_CASE( GroupedPinBridgesMatchScalarVoltagesCurrentsAndTransitionTimes )
+{
+    BENCH bench( "74xx:74LS541", 20, 10, Inputs( octalIn, {{1,0},{19,0}} ), octalOut );
+    auto config = bench.circuit.config;
+    config.signals.push_back( "i(Vca1)" );
+    config.step = config.maxStep = .1e-9;
+    config.historyCapacity = 1;
+    config.horizon = .001;
+    const auto scalar = ScalarPinBridges( bench.circuit.netlist );
+    BOOST_REQUIRE( scalar != bench.circuit.netlist );
+    INTERACTIVE_SIM_SESSION original( CIRCUITALIVE_TEST_WORKER ), grouped( CIRCUITALIVE_TEST_WORKER );
+    original.Configure( scalar, config ); grouped.Configure( bench.circuit.netlist, config );
+    double time = 0;
+    for( const auto [pin, voltage] : std::vector<std::pair<int,double>>{
+            {20,5},{2,5},{3,5},{4,5},{1,5},{1,0},{4,1.3},{4,0},{20,0},{20,5},{19,5},{19,0}} )
+    {
+        // Include independent data, enables, X and power cycling. Compare the
+        // actual transition samples and supply current, not just settled bits.
+        if( time > 0 ) // First interval establishes the initial operating state.
+        {
+            original.SetSourceValue( bench.sources.at( pin ), voltage );
+            grouped.SetSourceValue( bench.sources.at( pin ), voltage );
+        }
+        for( int sample = 0; sample < 120; ++sample )
+        {
+            time += 1e-9;
+            original.AdvanceTo( time ); grouped.AdvanceTo( time );
+            const auto a = original.Snapshot( true ).latest, b = grouped.Snapshot( true ).latest;
+            BOOST_REQUIRE_SMALL( a.time - b.time, .11e-9 );
+            for( std::size_t i = 0; i < a.values.size(); ++i )
+                BOOST_REQUIRE_SMALL( a.values[i] - b.values[i], 2e-5 );
+        }
+    }
 }
 
 BOOST_AUTO_TEST_CASE( CombinationalCatalogEightWayMuxChecksEveryDataPinAndComplement )

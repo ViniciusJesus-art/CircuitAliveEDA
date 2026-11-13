@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 #include "memory_image.h"
 #include "signal_activity.h"
@@ -50,6 +51,12 @@ struct SIM_SESSION_CONFIG
     /// Compile supported immutable behavioral sources once instead of walking their syntax per iteration.
     bool accelerateExpressions = false;
     std::vector<std::string> mutableElements;
+    /// Host-only provenance from the schematic compiler. Never inferred for arbitrary SPICE.
+    bool partitionable = false;
+    /// Cap the analog step at each requested barrier (used by independent solver partitions).
+    bool synchronizeAdvances = false;
+    /// Byte ranges of indivisible component expansions in the original deck.
+    std::vector<std::pair<std::size_t, std::size_t>> analogCouplings;
 };
 
 struct SIM_SAMPLE

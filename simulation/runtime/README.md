@@ -34,17 +34,34 @@ also limits the next boundary to `quantumSeconds` so inputs are sampled regularl
 
 An optional `prepareWindow(deadline, inputs)` returns `{time, events, needsInputs}` and may
 yield before the requested deadline to observe an electrical input. The host
-uses this only for one component with fixed power/reset, in windows of at most
+uses this for components with fixed power/reset, in windows of at most
 1 ms. Ordinary backends retain their configured input quantum. The AVR backend
 yields before GPIO reads and input-dependent configuration; enabled external
 interrupts, ADC, RX and external clocks retain the input quantum. Output edges
 always keep instruction-cycle timestamps and electrical breakpoints.
 When `needsInputs` is explicitly false, the host may compute one further window
-on a dedicated thread while the analog solver processes the returned events.
+while the analog solver processes the returned events. Independent contexts
+can execute concurrently in a persistent CPU-bounded pool. Small sampling jobs
+stay sequential; context access is always exclusive.
 The backend must yield before observing a new input, including an observation
 exactly at a deadline. Omitted `needsInputs` conservatively disables this overlap.
-At most one window is queued, and it never passes the current editor batch;
+At most one private window per instance is queued. Contexts may reach different
+input barriers; only events through the common confirmed time are published.
+Future pin states remain private, and a context receives fresh electrical inputs
+when the solver reaches its own barrier. Events at equal times are ordered by
+device configuration and backend order, independently of worker completion order.
+No window passes the current editor batch;
 Pause, Stop and interactive changes therefore wait for a confirmed circuit time.
+After a live source/parameter change, one normal sampling interval resolves the
+new voltages before lookahead or prefetch is allowed again.
+
+The editor can also run compiler-certified independent analog domains in separate
+persistent solver processes. Shared grounded ideal DC sources are replicated and
+their observed currents are added; coupled components stay together. Every domain
+must reach the editor's common barrier before a snapshot is published. This does
+not change the JavaScript backend contract. The process IPC protocol is version 4
+and requires the application and solver worker to be updated together. See
+`docs/circuitalive/SIMULATION_PARALLELISM.md` for decomposition and history semantics.
 
 Only synchronous methods are supported. There are no operating-system modules,
 filesystem/network callbacks, timers, wall-clock, random source, shared memory
@@ -72,6 +89,10 @@ the JavaScript instruction path remains the reference and fallback. Timer events
 are scheduled at compares, overflow and PWM turns instead of every counter tick.
 `qa_interactive_sim` differentially checks native instructions and timer output
 timestamps against the vendored reference. No extra installed dependency is used.
+Read-only observations of Timer0 flags may also run natively while its simple
+counter snapshot is valid and no custom TIFR0 read hook is installed. Writes still
+return to JavaScript. Native blocks retain the original clock/interrupt deadline;
+polling optimizations do not advance past an overflow or skip GPIO timestamps.
 
 Supported exact targets are `atmega48p`, `atmega88p`, `atmega168p`, `atmega328p`.
 The adapter selects each device's Flash, SRAM, EEPROM and interrupt-vector

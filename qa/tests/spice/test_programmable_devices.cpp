@@ -3,6 +3,7 @@
 #include <circuitalive/circuit_snapshot.h>
 #include <circuitalive/simulation_model.h>
 #include <circuitalive/session_runner.h>
+#include <circuitalive/analog_partition.h>
 #include <sim/platform_runtime.h>
 #include <sim/memory_image.h>
 #include <sim/programmable_runtime.h>
@@ -105,6 +106,15 @@ std::vector<std::uint16_t> PwmOutput()
              Ldi( 16, 128 ), Out( 0x27, 16 ), Ldi( 16, 3 ), Out( 0x25, 16 ), Rjmp( -1 ) };
 }
 
+std::vector<std::uint16_t> TimerFlagPollingOutput()
+{
+    // Poll Timer0 overflow with SBIS, clear it with OUT, then toggle PB5.
+    // Reads can run natively; writes and overflow events must retain their cycles.
+    return { Ldi(16,0x20), Out(0x04,16), Ldi(16,1), Out(0x25,16),
+             std::uint16_t(0x9b00 | (0x15 << 3)), Rjmp(-2),
+             Out(0x15,16), Ldi(17,0x20), Out(0x03,17), Rjmp(-6) };
+}
+
 std::vector<std::uint16_t> TimerInterruptOutput()
 {
     // ATmega328P vector 16 at word 32: Timer0 overflow. Toggle PINB.PB5
@@ -127,6 +137,37 @@ std::vector<std::uint16_t> AdcToOutput()
              0xfd06, Rjmp( -4 ), 0x9110, 0x0078, 0x9100, 0x0079,
              0xff01, Rjmp( 2 ), Sbi( 0x05, 5 ), Rjmp( -15 ),
              Cbi( 0x05, 5 ), Rjmp( -17 ) };
+}
+
+std::vector<std::uint16_t> UartTransmit()
+{
+    // USART0, 9600 baud / 8N1, send 0x55 once. Polling stays in an idle loop.
+    std::vector<std::uint16_t> program = { Ldi(16,103), 0x9300, 0x00c4, Ldi(16,6), 0x9300, 0x00c2,
+             Ldi(16,8), 0x9300, 0x00c1, Ldi(16,0x55), 0x9300, 0x00c6, Rjmp(-1) };
+    // Hold idle long enough for the peer to enable RX and sample the line.
+    program.insert( program.begin()+9, 64, 0 );
+    return program;
+}
+
+std::vector<std::uint16_t> UartReceive()
+{
+    // Wait for RXC0, read the byte, then copy its bit 0 to PB5.
+    return { Ldi(16,0x20), Out(0x04,16), Ldi(16,103), 0x9300, 0x00c4,
+             Ldi(16,6), 0x9300, 0x00c2, Ldi(16,16), 0x9300, 0x00c1,
+             0x9100, 0x00c0, 0xff07, Rjmp(-4), 0x9100, 0x00c6,
+             0xff00, Rjmp(2), Sbi(0x05,5), Rjmp(-1), Cbi(0x05,5), Rjmp(-1) };
+}
+
+std::vector<std::uint16_t> ExternalInterruptOutput()
+{
+    std::vector<std::uint16_t> program( 34, 0 );
+    program[0] = Rjmp(33);
+    program[2] = Rjmp(44); // INT0 ISR at word 47.
+    const std::vector<std::uint16_t> code = { Ldi(16,255), Out(0x3d,16), Ldi(16,8), Out(0x3e,16),
+            Ldi(16,0x20), Out(0x04,16), Ldi(16,3), 0x9300, 0x0069,
+            Ldi(16,1), Out(0x1d,16), 0x9478, Rjmp(-1), Sbi(0x05,5), 0x9518 };
+    program.insert( program.end(), code.begin(), code.end() );
+    return program;
 }
 
 std::vector<std::uint16_t> PicDigitalOutput( bool high )
@@ -184,7 +225,7 @@ PROGRAMMABLE_DEVICE_CONFIG AvrConfig( const fs::path& firmware,
     config.id = "U1";
     config.device = device;
     config.source = Text( CIRCUITALIVE_TEST_AVR_RUNTIME );
-    config.pins = { "PB5", "PC0", "PD2", "PD6", "VCC", "AVCC", "GND", "AREF", "RESET" };
+    config.pins = { "PB5", "PC0", "PD0", "PD1", "PD2", "PD6", "VCC", "AVCC", "GND", "AREF", "RESET" };
     auto image = EmptyMemory( device == "atmega48p" ? 4096 : device == "atmega88p" ? 8192
                                     : device == "atmega168p" ? 16384 : 32768, 255 );
     LoadMemoryImage( image, firmware );
@@ -212,7 +253,7 @@ std::vector<PROGRAMMABLE_PIN_INPUT> PicInputs( double input = 5 )
 std::vector<PROGRAMMABLE_PIN_INPUT> AvrInputs( const std::string& id = "U1", double input = 5 )
 {
     return { { id, "VCC", 5 }, { id, "AVCC", 5 }, { id, "GND", 0 }, { id, "AREF", 5 },
-             { id, "RESET", 5 }, { id, "PD2", input }, { id, "PC0", input } };
+             { id, "RESET", 5 }, { id, "PD0", 5 }, { id, "PD2", input }, { id, "PC0", input } };
 }
 
 PROGRAMMABLE_DRIVE PinDrive( const PROGRAMMABLE_RUNTIME& runtime, const std::string& pin,
@@ -371,7 +412,8 @@ BOOST_FIXTURE_TEST_CASE( ProgrammableCooperativeAvrYieldsBeforeReadingInputs, PR
 BOOST_FIXTURE_TEST_CASE( ProgrammablePipelinePreservesEventsAndRefreshesInputsAtBarriers, PROGRAM_FILES )
 {
     for( const auto& firmware : { BlinkOutput(), TimerInterruptOutput(), PwmOutput(),
-                                 InputToOutput(), AdcToOutput() } )
+                                 InputToOutput(), AdcToOutput(), UartTransmit(), UartReceive(),
+                                 ExternalInterruptOutput() } )
     {
         auto config = AvrConfig( Firmware( "pipeline", firmware ) );
         config.autonomousWindowSeconds = .001;
@@ -463,12 +505,200 @@ BOOST_FIXTURE_TEST_CASE( ProgrammablePipelineYieldsForFreshInputsAfterAutonomous
     BOOST_CHECK( !sawHigh );
 }
 
+BOOST_AUTO_TEST_CASE( ProgrammableCoordinatorRetainsFutureEventsUntilPeersReachTheirBarriers )
+{
+    PROGRAMMABLE_DEVICE_CONFIG fast;
+    fast.id = "FAST"; fast.device = "coordinator-audit"; fast.pins = { "IN", "OUT" };
+    fast.autonomousWindowSeconds = .001;
+    fast.source = R"JS(
+        globalThis.createDevice = function(config) {
+            let now=0, sent=false, read=false;
+            function prepare(to,inputs) {
+                const events=[];
+                if(config.options.short) to=Math.min(to,now+50e-6);
+                else {
+                    if(now<.00075) to=Math.min(to,.00075);
+                    if(!sent && to>=.0005) {
+                        sent=true;events.push({pin:'OUT',drive:2,time:.0005});
+                    }
+                    if(now>=.00075 && !read) {
+                        read=true;events.push({pin:'OUT',drive:inputs[0].voltage>2.5?2:1,time:now});
+                    }
+                }
+                now=to;
+                return {time:to,events,needsInputs:!!config.options.short||!read};
+            }
+            return {nextEventTime:()=>Infinity,prepareWindow:prepare,advanceTo:t=>prepare(t,[]).events};
+        };
+    )JS";
+    auto slow = fast; slow.id = "SLOW"; slow.optionsJson = "{\"short\":true}";
+    auto peer = fast; peer.id = "PEER";
+    PROGRAMMABLE_RUNTIME runtime;
+    runtime.Configure( { fast, slow, peer }, 4 );
+    std::vector<PROGRAMMABLE_PIN_STATE> events;
+    while( runtime.Time() < .001 - 1e-15 )
+    {
+        const double from = runtime.Time();
+        const double voltage = from < .0007 - 1e-15 ? 5 : 0;
+        const auto changes = runtime.AdvanceTo( .001, { { "FAST", "IN", voltage },
+                                                       { "PEER", "IN", voltage } } );
+        BOOST_REQUIRE_GT( runtime.Time(), from );
+        for( const auto& event : changes )
+        {
+            BOOST_CHECK_LE( event.time, runtime.Time() );
+            BOOST_CHECK_GE( event.time, from - 1e-15 );
+            events.push_back( event );
+        }
+        const auto expected = runtime.Time() < .0005 - 1e-15 ? PROGRAMMABLE_DRIVE::HIGH_IMPEDANCE
+                : from < .00075 - 1e-15 ? PROGRAMMABLE_DRIVE::HIGH : PROGRAMMABLE_DRIVE::LOW;
+        BOOST_CHECK( PinDrive( runtime, "OUT", "FAST" ) == expected );
+        BOOST_CHECK_GT( runtime.NextEventTime(), runtime.Time() );
+    }
+    BOOST_REQUIRE_EQUAL( events.size(), 4 );
+    BOOST_CHECK_EQUAL( events[0].device, "FAST" );
+    BOOST_CHECK_EQUAL( events[1].device, "PEER" );
+    BOOST_CHECK_SMALL( events[0].time - .0005, 1e-15 );
+    BOOST_CHECK_SMALL( events[2].time - .00075, 1e-15 );
+    BOOST_CHECK( events[2].drive == PROGRAMMABLE_DRIVE::LOW );
+    BOOST_CHECK_LT( runtime.Statistics().windows, 35 ); // Fast contexts were not rerun at every peer barrier.
+    BOOST_CHECK_GT( runtime.Statistics().parallelBatches, 0 );
+    runtime.Reset();
+    BOOST_CHECK_EQUAL( runtime.Time(), 0 );
+    BOOST_CHECK_EQUAL( runtime.Statistics().windows, 0 );
+    BOOST_CHECK( PinDrive( runtime, "OUT", "FAST" ) == PROGRAMMABLE_DRIVE::HIGH_IMPEDANCE );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableParallelCoordinatorMatchesSerialForMixedAvrPeripherals, PROGRAM_FILES )
+{
+    std::vector<PROGRAMMABLE_DEVICE_CONFIG> devices;
+    for( const auto& firmware : { BlinkOutput(), TimerInterruptOutput(), PwmOutput(),
+                                 InputToOutput(), AdcToOutput(), UartTransmit(), UartReceive(),
+                                 ExternalInterruptOutput() } )
+    {
+        auto device = AvrConfig( Firmware( "parallel-" + std::to_string( devices.size() ), firmware ) );
+        device.id = "U" + std::to_string( devices.size()+1 );
+        device.autonomousWindowSeconds = .001;
+        devices.push_back( std::move( device ) );
+    }
+    PROGRAMMABLE_RUNTIME serial, parallel;
+    serial.Configure( devices, 1 ); parallel.Configure( devices, 4 );
+    while( serial.Time() < .002 - 1e-15 )
+    {
+        std::vector<PROGRAMMABLE_PIN_INPUT> inputs;
+        for( const auto& device : devices )
+        {
+            auto pins = AvrInputs( device.id, serial.Time() < .001 ? 5 : 0 );
+            inputs.insert( inputs.end(), pins.begin(), pins.end() );
+        }
+        const double target = std::min( .002, serial.Time() + .001 );
+        const auto a = serial.AdvanceTo( target, inputs );
+        const auto b = parallel.AdvanceTo( target, inputs );
+        BOOST_REQUIRE_SMALL( serial.Time() - parallel.Time(), 1e-15 );
+        BOOST_REQUIRE_EQUAL( a.size(), b.size() );
+        for( std::size_t i = 0; i < a.size(); ++i )
+        {
+            BOOST_CHECK_EQUAL( a[i].device, b[i].device );
+            BOOST_CHECK_EQUAL( a[i].pin, b[i].pin );
+            BOOST_CHECK( a[i].drive == b[i].drive );
+            BOOST_CHECK_SMALL( a[i].time - b[i].time, 1e-15 );
+        }
+        const auto states = parallel.States();
+        for( const auto& state : states ) BOOST_CHECK_LE( state.time, parallel.Time() );
+    }
+    BOOST_CHECK_EQUAL( serial.Statistics().parallelBatches, 0 );
+    BOOST_CHECK_GT( parallel.Statistics().parallelBatches, 0 );
+    BOOST_CHECK_LE( parallel.Statistics().workerThreads, 3 );
+}
+
+BOOST_AUTO_TEST_CASE( ProgrammableParallelFailuresDrainWorkersAndRequireReset )
+{
+    PROGRAMMABLE_DEVICE_CONFIG device;
+    device.id = "FAIL"; device.device = "parallel-error"; device.pins = { "OUT" };
+    device.autonomousWindowSeconds = .001;
+    device.source = R"JS(
+        globalThis.createDevice = config=>({nextEventTime:()=>Infinity,
+            prepareWindow:time=>{if(config.id==='FAIL')throw Error('expected parallel failure');
+                return {time,events:[],needsInputs:false};},advanceTo:()=>[]});
+    )JS";
+    auto peer = device; peer.id = "OK";
+    PROGRAMMABLE_RUNTIME runtime; runtime.Configure( { device, peer }, 2 );
+    BOOST_CHECK_EXCEPTION( runtime.AdvanceTo( .001 ), std::runtime_error, []( const auto& error )
+                          { return std::string( error.what() ).find( "expected parallel failure" ) != std::string::npos; } );
+    BOOST_CHECK_THROW( runtime.AdvanceTo( .001 ), std::runtime_error );
+    runtime.Configure( { peer }, 2 );
+    BOOST_CHECK_NO_THROW( runtime.AdvanceTo( .001 ) );
+    BOOST_CHECK_CLOSE( runtime.Time(), .001, 1e-8 );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammablePipelineHandlesMixedPrivateWindowsAndReset, PROGRAM_FILES )
+{
+    auto a = AvrConfig( Firmware( "parallel-prefetch", BlinkOutput() ) );
+    a.autonomousWindowSeconds = .001;
+    auto b = a; b.id = "U2";
+    PROGRAMMABLE_RUNTIME serial;
+    PROGRAMMABLE_PIPELINE pipeline;
+    serial.Configure( { a, b }, 1 ); pipeline.Configure( { a, b } );
+    auto inputs = AvrInputs(); const auto second = AvrInputs( "U2" );
+    inputs.insert( inputs.end(), second.begin(), second.end() );
+    bool prefetched = false;
+    while( serial.Time() < .003 - 1e-15 )
+    {
+        const auto target = std::min( .003, serial.Time() + .001 );
+        const auto expected = serial.AdvanceTo( target, inputs );
+        const auto actual = pipeline.AdvanceTo( target, inputs, .003 );
+        BOOST_REQUIRE_SMALL( serial.Time() - pipeline.Time(), 1e-15 );
+        BOOST_REQUIRE_EQUAL( expected.size(), actual.size() );
+        for( std::size_t i = 0; i < actual.size(); ++i )
+        {
+            BOOST_CHECK_EQUAL( expected[i].device, actual[i].device );
+            BOOST_CHECK_EQUAL( expected[i].pin, actual[i].pin );
+            BOOST_CHECK( expected[i].drive == actual[i].drive );
+            BOOST_CHECK_SMALL( expected[i].time - actual[i].time, 1e-15 );
+        }
+        prefetched |= pipeline.HasPrefetch();
+    }
+    BOOST_CHECK( prefetched );
+    BOOST_CHECK( !pipeline.HasPrefetch() );
+    pipeline.Reset();
+    BOOST_CHECK_EQUAL( pipeline.Time(), 0 );
+    pipeline.AdvanceTo( .001, inputs, .01 );
+    BOOST_CHECK( pipeline.HasPrefetch() );
+    pipeline.Reset();
+    BOOST_CHECK( !pipeline.HasPrefetch() );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableCoordinatorKeepsNonCooperativeFamiliesOnTheirInputQuantum, PROGRAM_FILES )
+{
+    auto avr = AvrConfig( Firmware( "mixed-family-avr", BlinkOutput() ) );
+    avr.autonomousWindowSeconds = .001;
+    auto pic = PicConfig( Firmware( "mixed-family-pic", PicInputToOutput() ) );
+    pic.id = "U2"; pic.autonomousWindowSeconds = .001;
+    PROGRAMMABLE_RUNTIME runtime; runtime.Configure( { avr, pic } );
+    while( runtime.Time() < .0001 - 1e-15 )
+    {
+        auto inputs = AvrInputs();
+        auto pins = PicInputs( runtime.Time() < 50e-6 ? 5 : 0 );
+        for( auto& pin : pins ) pin.device = "U2";
+        inputs.insert( inputs.end(), pins.begin(), pins.end() );
+        const auto from = runtime.Time();
+        runtime.AdvanceTo( .0001, inputs );
+        BOOST_REQUIRE_GT( runtime.Time(), from );
+        BOOST_REQUIRE_LE( runtime.Time() - from, pic.quantumSeconds + 1e-15 );
+        if( runtime.Time() > 20e-6 && runtime.Time() < 45e-6 )
+            BOOST_CHECK( PinDrive( runtime, "RB0", "U2" ) == PROGRAMMABLE_DRIVE::HIGH );
+        if( runtime.Time() > 70e-6 )
+            BOOST_CHECK( PinDrive( runtime, "RB0", "U2" ) == PROGRAMMABLE_DRIVE::LOW );
+    }
+    BOOST_CHECK_LT( runtime.Statistics().windows, 110 );
+}
+
 BOOST_FIXTURE_TEST_CASE( ProgrammableAcceleratedTimersKeepUpstreamGpioEventTimes, PROGRAM_FILES )
 {
     auto phase=PwmOutput(); phase[2]=Ldi(16,0x81);
     const auto timerSource=Text(fs::path(CIRCUITALIVE_TEST_AVR_RUNTIME).parent_path().parent_path().parent_path()
         / "thirdparty/avr8js/cjs/peripherals/timer.js");
-    for(const auto& firmware : {BlinkOutput(),PwmOutput(),phase,TimerInterruptOutput(),AdcToOutput()})
+    for(const auto& firmware : {BlinkOutput(),PwmOutput(),phase,TimerInterruptOutput(),
+                               TimerFlagPollingOutput(),AdcToOutput()})
     {
         auto config=AvrConfig(Firmware("timer-reference",firmware));
         auto reference=config;
@@ -491,6 +721,40 @@ BOOST_FIXTURE_TEST_CASE( ProgrammableAcceleratedTimersKeepUpstreamGpioEventTimes
                 BOOST_CHECK_SMALL(a[i].time-b[i].time,1e-12);
             }
         }
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableTimerFlagPollingPreservesReadHooksAndCycleTimes, PROGRAM_FILES )
+{
+    for( const bool hooked : { false, true } )
+    {
+        auto config = AvrConfig( Firmware( "poll-overflow", TimerFlagPollingOutput() ) );
+        if( hooked )
+        {
+            const std::string marker = "timer0=new AVR.AVRTimer(cpu,cf(AVR.timer0Config));";
+            const auto at = config.source.find( marker ); BOOST_REQUIRE( at != std::string::npos );
+            config.source.insert( at + marker.size(), "cpu.readHooks[0x35]=()=>0;" );
+        }
+        auto reference = config;
+        const std::string native = "typeof global.__circuitaliveAvrRun==='function'";
+        reference.source.replace( reference.source.find( native ), native.size(), "false" );
+        PROGRAMMABLE_RUNTIME expected, actual; expected.Configure( {reference} ); actual.Configure( {config} );
+        std::size_t highs = 0;
+        for( int step = 1; step <= 100; ++step )
+        {
+            const auto a = expected.AdvanceTo( step * 10e-6, AvrInputs() );
+            const auto b = actual.AdvanceTo( step * 10e-6, AvrInputs() );
+            BOOST_REQUIRE_EQUAL( a.size(), b.size() );
+            for( std::size_t i = 0; i < a.size(); ++i )
+            {
+                BOOST_CHECK_EQUAL( a[i].pin, b[i].pin );
+                BOOST_CHECK( a[i].drive == b[i].drive );
+                BOOST_CHECK_SMALL( a[i].time - b[i].time, 1e-12 );
+                highs += b[i].pin == "PB5" && b[i].drive == PROGRAMMABLE_DRIVE::HIGH;
+            }
+        }
+        if( hooked ) BOOST_CHECK_EQUAL( highs, 0 );
+        else BOOST_CHECK_GT( highs, 10 );
     }
 }
 
@@ -763,6 +1027,104 @@ BOOST_FIXTURE_TEST_CASE( ProgrammableWorkerReadsDigitalInputsAndKeepsTwoSymbolsI
     BOOST_CHECK_LT( session.Snapshot().latest.values[1], .1 );
 }
 
+BOOST_FIXTURE_TEST_CASE( ProgrammableAnalogPartitionsKeepFirmwareAndInputBarriers, PROGRAM_FILES )
+{
+    auto tx = AvrSymbol( Firmware( "partition-blink", BlinkOutput() ) );
+    auto rx = AvrSymbol( Firmware( "partition-input", InputToOutput() ), "U2" );
+    tx.pins["4"] = tx.pins["23"] = tx.pins["12"] = "";
+    rx.pins["12"] = "";
+    // Only constant supply/reset/input rails are shared. GPIO signals remain independent.
+    rx.pins["19"] = "out2";
+    auto circuit = BuildCircuitSnapshot( { Supply( "VCC", "vcc", "5" ),
+        Supply( "VRESET", "reset", "5" ), Supply( "VIN", "input", "5" ),
+        Supply( "VADC", "analog", "1" ), tx, rx,
+        { "RL1", "Device:R", "10k", { { "1", "out" }, { "2", "0" } } },
+        { "RL2", "Device:R", "10k", { { "1", "out2" }, { "2", "0" } } } } );
+    circuit.config.step = circuit.config.maxStep = 1e-6;
+    circuit.config.horizon = .01;
+    SelectSignals( circuit, { "v(" + circuit.pinNodes[4].at( "19" ) + ")",
+                             "v(" + circuit.pinNodes[5].at( "19" ) + ")" } );
+    ANALOG_SIM_SESSION parallel( CIRCUITALIVE_TEST_WORKER ), serial( CIRCUITALIVE_TEST_WORKER );
+    parallel.Configure( circuit.netlist, circuit.config, true, 2 );
+    serial.Configure( circuit.netlist, circuit.config, false );
+    BOOST_REQUIRE_EQUAL( parallel.PartitionCount(), 2 );
+    for( double time : { .0001, .0003, .0005, .0007, .001 } )
+    {
+        parallel.AdvanceTo( time ); serial.AdvanceTo( time );
+        const auto a = parallel.Snapshot( true ), b = serial.Snapshot( true );
+        BOOST_CHECK_SMALL( a.latest.time - b.latest.time, 2e-11 );
+        for( std::size_t n = 0; n < a.latest.values.size(); ++n )
+            BOOST_CHECK_SMALL( a.latest.values[n] - b.latest.values[n], 1e-5 );
+        if( time == .0003 ) { parallel.SetSourceValue( "Vca3", 0 ); serial.SetSourceValue( "Vca3", 0 ); }
+        if( time == .0007 ) { parallel.SetSourceValue( "Vca3", 5 ); serial.SetSourceValue( "Vca3", 5 ); }
+    }
+    // A real GPIO link makes the two components one physical domain again.
+    auto linked = circuit.netlist;
+    linked.insert( linked.find( ".end" ), "Rlink " + circuit.pinNodes[4].at( "19" ) + " "
+            + circuit.pinNodes[5].at( "19" ) + " .01\n" );
+    BOOST_CHECK_EQUAL( BuildAnalogPartitions( linked, circuit.config, 2 ).size(), 1 );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableCoordinatedUartAndInterruptsUseElectricalPeerEvents, PROGRAM_FILES )
+{
+    for( const bool uart : { false, true } ) BOOST_TEST_CONTEXT( "UART=" << uart )
+    {
+        auto transmitter = AvrSymbol( Firmware( "coupled-tx", uart ? UartTransmit() : BlinkOutput() ) );
+        auto receiver = AvrSymbol( Firmware( "coupled-rx", uart ? UartReceive() : ExternalInterruptOutput() ), "U2" );
+        transmitter.pins[uart ? "3" : "19"] = "link";
+        transmitter.pins["19"] = uart ? "unused_output" : "link";
+        receiver.pins[uart ? "2" : "4"] = "link";
+        receiver.pins["19"] = "received";
+        auto circuit = BuildCircuitSnapshot( { Supply( "VCC", "vcc", "5" ),
+            Supply( "VRESET", "reset", "5" ), transmitter, receiver,
+            { "RL", "Device:R", "100k", { { "1", "link" }, { "2", "0" } } },
+            { "RO", "Device:R", "10k", { { "1", "received" }, { "2", "0" } } } } );
+        SelectSignals( circuit, { "v(" + circuit.pinNodes[3].at( "19" ) + ")" } );
+        circuit.config.horizon = .004;
+        for( const auto& device : circuit.config.programmableDevices )
+            BOOST_CHECK_GT( device.autonomousWindowSeconds, 0 );
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+        session.Configure( circuit.netlist, circuit.config );
+        session.AdvanceTo( uart ? .0008 : .0001 );
+        if( uart ) BOOST_CHECK_LT( session.Snapshot().latest.values[0], .1 );
+        session.AdvanceTo( .0014 );
+        BOOST_CHECK_GT( session.Snapshot().latest.values[0], 4.8 );
+        session.SetSourceValue( "Vca2", 0 );
+        session.AdvanceTo( .0015 );
+        BOOST_CHECK_LT( session.Snapshot().latest.values[0], .1 );
+        session.SetSourceValue( "Vca2", 5 );
+        session.AdvanceTo( .0029 );
+        BOOST_CHECK_GT( session.Snapshot().latest.values[0], 4.8 );
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableCoordinatorKeepsVariablePowerSamplingIndependent, PROGRAM_FILES )
+{
+    auto first = AvrSymbol( Firmware( "fixed-power", DigitalOutput( true ) ) );
+    auto second = first; second.reference = "U2";
+    second.pins["7"] = second.pins["20"] = second.pins["21"] = "variable_vcc";
+    second.pins["19"] = "second_out";
+    auto circuit = BuildCircuitSnapshot( { Supply( "VCC", "vcc", "5" ),
+        Supply( "VRESET", "reset", "5" ), Supply( "VVARIABLE", "variable_source", "5" ), first, second,
+        { "RS", "Device:R", "10", { { "1", "variable_source" }, { "2", "variable_vcc" } } },
+        { "R1", "Device:R", "10k", { { "1", "out" }, { "2", "0" } } },
+        { "R2", "Device:R", "10k", { { "1", "second_out" }, { "2", "0" } } } } );
+    BOOST_REQUIRE_EQUAL( circuit.config.programmableDevices.size(), 2 );
+    BOOST_CHECK_GT( circuit.config.programmableDevices[0].autonomousWindowSeconds, 0 );
+    BOOST_CHECK_EQUAL( circuit.config.programmableDevices[1].autonomousWindowSeconds, 0 );
+    SelectSignals( circuit, { "v(" + circuit.pinNodes[3].at( "19" ) + ")",
+                             "v(" + circuit.pinNodes[4].at( "19" ) + ")" } );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    session.AdvanceTo( 20e-6 );
+    BOOST_CHECK_GT( session.Snapshot().latest.values[1], 4.8 );
+    session.SetSourceValue( "Vca3", 0 ); session.AdvanceTo( 40e-6 );
+    BOOST_CHECK_GT( session.Snapshot().latest.values[0], 4.8 );
+    BOOST_CHECK_LT( session.Snapshot().latest.values[1], .1 );
+    session.SetSourceValue( "Vca3", 5 ); session.AdvanceTo( 60e-6 );
+    BOOST_CHECK_GT( session.Snapshot().latest.values[1], 4.8 );
+}
+
 BOOST_FIXTURE_TEST_CASE( ProgrammableWorkerAdcConvertsTheActualElectricalInput, PROGRAM_FILES )
 {
     auto circuit = AvrCircuit( AvrSymbol( Firmware( "adc-worker", AdcToOutput() ) ) );
@@ -771,6 +1133,59 @@ BOOST_FIXTURE_TEST_CASE( ProgrammableWorkerAdcConvertsTheActualElectricalInput, 
     BOOST_CHECK_LT( session.Snapshot().latest.values[0], .1 );
     session.SetSourceValue( "Vca4", 4 ); session.AdvanceTo( .001 );
     BOOST_CHECK_GT( session.Snapshot().latest.values[0], 4.8 );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableCoordinatedGpioHistoryKeepsFirmwarePeriodsAndCausalMeasurements, PROGRAM_FILES )
+{
+    auto tx = AvrSymbol( Firmware( "scope-tx", BlinkOutput() ) ); tx.pins["19"] = "link";
+    auto rx = AvrSymbol( Firmware( "scope-rx", InputToOutput() ), "U2" );
+    rx.pins["4"] = "link"; rx.pins["19"] = "received";
+    auto circuit = BuildCircuitSnapshot( { Supply( "VCC", "vcc", "5" ),
+        Supply( "VRESET", "reset", "5" ), tx, rx,
+        { "RL", "Device:R", "10k", { { "1", "link" }, { "2", "0" } } },
+        { "RO", "Device:R", "10k", { { "1", "received" }, { "2", "0" } } } } );
+    SelectSignals( circuit, { "v(" + circuit.pinNodes[2].at( "19" ) + ")",
+                             "v(" + circuit.pinNodes[3].at( "19" ) + ")" } );
+    circuit.config.historyCapacity = std::min<std::size_t>( 1024, 65536 / circuit.config.signals.size() );
+    circuit.config.historySignals = std::vector<std::size_t>{ 0, 1 };
+    std::vector<std::vector<double>> reference;
+    for( const bool cooperative : { false, true } )
+    {
+        auto config = circuit.config;
+        if( !cooperative ) for( auto& device : config.programmableDevices ) device.autonomousWindowSeconds = 0;
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+        session.Configure( circuit.netlist, config );
+        std::vector<std::vector<double>> edges( 2 );
+        bool previous[2] = { true, true };
+        for( int frame = 1; frame <= 32; ++frame )
+        {
+            session.AdvanceTo( frame * 50e-6 );
+            const auto snapshot = session.Snapshot( true );
+            BOOST_REQUIRE_EQUAL( snapshot.samplesOverwritten, 0 );
+            for( const auto& sample : snapshot.history ) if( sample.time > 5e-6 )
+                for( std::size_t pin = 0; pin < 2; ++pin )
+                {
+                    const bool high = sample.values[pin] > 2.5;
+                    if( previous[pin] != high ) edges[pin].push_back( sample.time );
+                    previous[pin] = high;
+                }
+        }
+        BOOST_REQUIRE_GE( edges[0].size(), 7 );
+        BOOST_REQUIRE_EQUAL( edges[0].size(), edges[1].size() );
+        for( std::size_t i = 0; i < edges[0].size(); ++i )
+        {
+            BOOST_CHECK_GE( edges[1][i] - edges[0][i], -5e-9 ); // The peer cannot see a future edge.
+            BOOST_CHECK_LE( edges[1][i] - edges[0][i], 2e-6 );
+            if( i ) BOOST_CHECK_CLOSE( edges[0][i] - edges[0][i-1], 192.5e-6, 1 );
+        }
+        if( !cooperative ) reference = edges;
+        else
+        {
+            BOOST_REQUIRE_EQUAL( edges[0].size(), reference[0].size() );
+            for( std::size_t i = 0; i < edges[0].size(); ++i )
+                BOOST_CHECK_SMALL( edges[0][i] - reference[0][i], 1e-6 );
+        }
+    }
 }
 
 BOOST_FIXTURE_TEST_CASE( ProgrammableElectricalPullupRespondsToButtonAndHighImpedanceAcceptsExternalVoltage,
@@ -1169,12 +1584,15 @@ BOOST_AUTO_TEST_CASE( ProgrammableStopConditionsKeepPrecisionAcrossLongTimeRange
     SIM_SESSION_CONFIG config;
     config.step = config.maxStep = 100e-6;
     config.horizon = 130;
-    config.signals = { "v(out)" };
-    config.programmableDevices = { device };
+    config.signals = { "v(out)", "v(peer)" };
+    auto peer = device; peer.id = "CLOCK2";
+    peer.bindings = { { "OUT", "v(peer)", "", "", "", 1 } };
+    config.programmableDevices = { device, peer };
     INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
     session.Configure( "Long-time stop precision\nVcc vcc 0 5\n"
         "Aout %gd out 0 %gd out vcc gpio\n.model gpio ca_programmable_pin(slot=0)\n"
-        "Rload out 0 10k\n.end\n", config );
+        "Apeer %gd peer 0 %gd peer vcc gpio_peer\n.model gpio_peer ca_programmable_pin(slot=1)\n"
+        "Rload out 0 10k\nRpeer peer 0 10k\n.end\n", config );
     for( const double origin : { 32., 64., 128. } )
     {
         const double target = origin + .008041666662212;
@@ -1182,10 +1600,12 @@ BOOST_AUTO_TEST_CASE( ProgrammableStopConditionsKeepPrecisionAcrossLongTimeRange
         const auto high = session.Snapshot( true );
         BOOST_REQUIRE_SMALL( high.latest.time - target, 1e-10 );
         BOOST_REQUIRE_GT( high.latest.values[0], 4.9 );
+        BOOST_REQUIRE_GT( high.latest.values[1], 4.9 );
         session.AdvanceTo( origin + .504041666662212 );
         const auto low = session.Snapshot( true );
         BOOST_REQUIRE_SMALL( low.latest.time - origin - .504041666662212, 1e-10 );
         BOOST_REQUIRE_LT( low.latest.values[0], .1 );
+        BOOST_REQUIRE_LT( low.latest.values[1], .1 );
     }
 }
 

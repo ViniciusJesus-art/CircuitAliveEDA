@@ -357,7 +357,26 @@ BOOST_AUTO_TEST_CASE( PlaybackPacingDiscardsStartupLagWithoutBurstingThroughCloc
     }
     // Sustained work above the frame budget must not add another idle interval.
     const auto slowFinished = next + milliseconds( 12 );
-    BOOST_CHECK( NextPlaybackDeadline( next, slowFinished, interval ) == slowFinished );
+    BOOST_CHECK( NextPlaybackDeadline( next, slowFinished, interval ) <= slowFinished );
+}
+
+BOOST_AUTO_TEST_CASE( PlaybackRecoversShortSolverOverrunsWithoutChangingSimulatedTime )
+{
+    using namespace std::chrono;
+    const steady_clock::time_point start{};
+    auto next = start, now = start;
+    // An expensive switching transient is followed by cheap steady-state batches.
+    // Their simulated advances remain exactly 8 ms; only idle waits are removed.
+    for( int cost : { 3, 3, 35, 3, 3, 3, 3, 3, 3, 3, 3, 3 } )
+    {
+        now = std::max( now, next ) + milliseconds( cost );
+        next = NextPlaybackDeadline( next, now, milliseconds( 8 ) );
+        BOOST_CHECK( now - next <= milliseconds( 100 ) );
+    }
+    BOOST_CHECK( next == start + milliseconds( 96 ) );
+    BOOST_CHECK( next > now );
+    const auto suspended = now + seconds( 5 );
+    BOOST_CHECK( NextPlaybackDeadline( next, suspended, milliseconds( 8 ) ) == suspended );
 }
 
 BOOST_AUTO_TEST_CASE( PlaybackBatchSizeAdaptsToSlowSolverWithoutChangingPlaybackRate )
