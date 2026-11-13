@@ -181,6 +181,7 @@ void SYMBOL_CHOOSER_FRAME::OnOK( wxCommandEvent& aEvent )
         symbol.LibId = libId;
 
         AddSymbolToHistory( symbol );
+        m_chooserPanel->RememberSelection();
         DismissModal( true, libId.Format() );
     }
     else

@@ -74,6 +74,7 @@ set( QA_COMMON_SRCS
     test_layer_ids.cpp
     test_lib_id.cpp
     test_lib_tree_model_adapter.cpp
+    test_component_chooser_search.cpp
     test_layer_range.cpp
     test_lset.cpp
     test_markup_parser.cpp

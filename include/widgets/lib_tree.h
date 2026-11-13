@@ -150,6 +150,11 @@ public:
      */
     void SetSearchString( const wxString& aSearchString );
     wxString GetSearchString() const;
+    void SetSearchPreprocessor( std::function<wxString( const wxString& )> aPreprocessor )
+    {
+        m_searchPreprocessor = std::move( aPreprocessor );
+    }
+    void SetCompactDetails( bool aCompact );
 
     /**
      * Save/restore the sorting mode.
@@ -269,6 +274,7 @@ protected:
     bool               m_inTimerEvent;
 
     wxString           m_recentSearchesKey;
+    std::function<wxString( const wxString& )> m_searchPreprocessor;
 
     wxBoxSizer*        m_filtersSizer;
 

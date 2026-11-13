@@ -69,6 +69,9 @@ public:
 
     EDA_DRAW_PANEL_GAL* GetCanvas() override { return this; };
     BOARD* GetBoard() override { return m_dummyBoard.get(); }
+    wxWindow* Create3DPreview( wxWindow* aParent ) override;
+    void Update3DPreview( bool aHasFootprint ) override;
+    void Shutdown3DPreview() override;
 
     void RefreshAll() override;
 
@@ -109,6 +112,8 @@ private:
 
     // Set when a footprint is loaded but the panel hasn't been fitted at its final size yet.
     bool                                        m_pendingFit = false;
+    class PREVIEW_3D;
+    std::unique_ptr<PREVIEW_3D>                   m_preview3D;
 };
 
 #endif

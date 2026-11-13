@@ -82,10 +82,12 @@ public:
     void FilterByFootprintFilters( const wxArrayString& aFilters, bool aZeroFilters );
 
     /**
-     * Set the default footprint for a part. This will be listed at the
-     * top. May be an empty string.
+     * Set the initial footprint for a part, listed after the empty option.
+     * May be an empty string.
      */
     void SetDefaultFootprint( const wxString& aFp );
+    void FilterByPhysicalProperties( const wxString& aMounting, const wxString& aText,
+                                     const wxString& aPackage, double aWidth, double aHeight );
 
     /**
      * Update the contents of the list by fetching filtered footprints from pcbnew.
@@ -99,6 +101,7 @@ public:
      * Set current selection to the default footprint
      */
     void SelectDefault();
+    void SelectPhysicalMatch();
 
     /**
      * Enable or disable the control for input
@@ -111,11 +114,14 @@ private:
 
     int               m_max_items;
     wxString          m_default_footprint;
+    bool              m_defaultMatchesFilters = false;
 
     // Filter parameters
     int               m_pin_count;
     wxArrayString     m_filters;
     bool              m_zero_filter;
+    wxString          m_mounting, m_physicalText, m_package;
+    double            m_maxWidth = 0, m_maxHeight = 0;
 
     KIWAY*            m_kiway;
 

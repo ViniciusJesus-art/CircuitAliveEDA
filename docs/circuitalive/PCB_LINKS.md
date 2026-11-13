@@ -35,9 +35,18 @@ referência.
 Abra a PCB pelo projeto para usar a comunicação entre os editores. Trazer o
 editor de PCB para o foco sincroniza automaticamente os componentes já
 posicionados: conexões, referências, valores, campos e footprints atribuídos.
-São consideradas todas as páginas e as edições atuais do esquemático, mesmo
-antes de salvar. A sincronização aguarda ferramentas e diálogos ativos terminarem;
-símbolos novos precisam estar anotados com referências válidas.
+O primeiro clique ou foco no canvas, nas barras ou nos painéis da PCB solicita
+uma nova sincronização. São recalculadas as conexões de todas as páginas usando
+as edições atuais do esquema, mesmo antes de salvar. Adicionar, renomear, remover,
+desfazer ou refazer labels não exige mover o componente para atualizar seus pads.
+Prévias ainda não colocadas das ferramentas são canceladas para obter um estado
+estável; as edições já confirmadas são mantidas. Diálogos abertos continuam
+adiando a sincronização. Símbolos novos precisam estar anotados com referências válidas.
+
+A sincronização automática usa somente um esquemático já aberto. Abrir a PCB
+ou fechar o esquemático não abre nem reabre a janela do esquema. Para retomar a
+sincronização e a lista de componentes pendentes, abra o esquema pelo projeto.
+Uma comparação sem mudanças não marca a placa como modificada nem exige salvar.
 
 Essa atualização mantém a posição e a orientação das peças, usa a substituição
 normal quando a atribuição de footprint muda e não insere componentes novos.
@@ -70,6 +79,14 @@ não remove uma ligação física de cobre. Revise o roteamento e execute o DRC 
 alterar conexões ou remover componentes. A opção **Delete footprints with no symbols**
 remove os footprints sem símbolo; os bloqueios continuam sendo respeitados.
 Footprints com o atributo **Board only** conservam seus campos e suas conexões.
+
+## Labels ligadas ao GND
+
+O símbolo global de alimentação `GND` tem prioridade sobre labels de sinal para
+nomear a rede. Ao ligar `/CARD_DETECT` ao GND, os pontos alcançados por essa label
+passam a pertencer à rede `GND`; as outras conexões de terra mantêm esse nome.
+O texto `/CARD_DETECT` permanece na label como alias, sem renomear as labels do
+esquema. Ao desfazer essa ligação, `/CARD_DETECT` volta a ser uma rede independente.
 
 ## Painel Pending Footprints
 

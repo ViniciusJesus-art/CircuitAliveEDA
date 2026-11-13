@@ -56,6 +56,7 @@ public:
                            bool aShowFootprints, bool& aCancelled );
 
     ~DIALOG_SYMBOL_CHOOSER();
+    void EndModal( int aCode ) override;
 
     /**
      * To be called after this dialog returns from ShowModal().

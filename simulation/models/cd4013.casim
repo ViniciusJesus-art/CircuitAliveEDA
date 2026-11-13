@@ -191,7 +191,8 @@
   ],
   "matches": {
     "library_ids": [
-      "4xxx:4013"
+      "4xxx:4013",
+      "4xxx_IEEE:4013"
     ],
     "symbol_names": [
       "4013"

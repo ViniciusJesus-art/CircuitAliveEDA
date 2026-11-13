@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "74lvc1g0832",
+  "name": "74LVC1G0832 three-input and_or gate",
+  "description": "Nominal powered small logic with finite output impedance; see docs/circuitalive/SMALL_LOGIC_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "role": "power",
+      "default_pin": "5"
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "2"
+    },
+    {
+      "id": "in_a",
+      "label": "A",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "in_b",
+      "label": "B",
+      "role": "input",
+      "default_pin": "3"
+    },
+    {
+      "id": "in_c",
+      "label": "C",
+      "role": "input",
+      "default_pin": "6"
+    },
+    {
+      "id": "y",
+      "label": "Y",
+      "role": "output",
+      "default_pin": "4"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Low input threshold / reference voltage",
+      "default": ".3",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "High input threshold / reference voltage",
+      "default": ".7",
+      "unit": "",
+      "min": 0.1,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Minimum operating supply",
+      "default": "1.65",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Maximum operating supply",
+      "default": "5.5",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "rise_delay",
+      "label": "Nominal rising propagation delay",
+      "default": "4n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "fall_delay",
+      "label": "Nominal falling propagation delay",
+      "default": "4n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Output transition time",
+      "default": "1n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Nominal output resistance",
+      "default": "25",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Input capacitance",
+      "default": "3p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Nominal quiescent supply current",
+      "default": "1u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "high_drop",
+      "label": "Unloaded HIGH voltage drop",
+      "default": "0",
+      "unit": "V",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Unloaded LOW voltage drop",
+      "default": "0",
+      "unit": "V",
+      "min": 0,
+      "max": 5
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "74xGxx:74LVC1G0832"
+    ],
+    "symbol_names": [
+      "74LVC1G0832"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "behavioral": {
+    "version": 1,
+    "supply": {
+      "vcc": "vcc",
+      "gnd": "gnd"
+    },
+    "blocks": [
+      {
+        "type": "and",
+        "inputs": [
+          "in_a",
+          "in_b"
+        ],
+        "out": "ab"
+      },
+      {
+        "type": "or",
+        "inputs": [
+          "ab",
+          "in_c"
+        ],
+        "out": "q"
+      }
+    ],
+    "outputs": {
+      "y": {
+        "signal": "q"
+      }
+    }
+  },
+  "sources": [
+    "https://www.ti.com/lit/ds/symlink/sn74lvc1g0832.pdf"
+  ],
+  "model_notes": [
+    "Own functional implementation from manufacturer truth tables and package pinouts; no vendor SPICE source copied.",
+    "Only the explicitly named physical symbols are associated; connectors, graphic symbols and parts without an electrical function are not modeled.",
+    "Fixed nominal propagation delay, resistance, input capacitance and quiescent current at room temperature; not calibrated across supply, temperature, package or load.",
+    "No ESD, overvoltage clamps, input leakage, short-circuit limiting, thermal damage or back-powering model. The supply-valid gate releases outputs outside the declared operating range.",
+    "See docs/circuitalive/SMALL_LOGIC_MODELS.md for physical channels, approximations, tests and source references.",
+    "CMOS input thresholds use configurable nominal 0.3/0.7 supply ratios (0.3/0.6 for Schmitt); the piecewise TTL-compatible LVC DC input limits are not reproduced. Rail-to-rail logic is the intended default use."
+  ],
+  "measurement_ports": {
+    "positive": "vcc",
+    "negative": "gnd"
+  },
+  "category": "Digital/Small Logic",
+  "family": "74LVC"
+}

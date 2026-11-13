@@ -657,6 +657,16 @@ EESCHEMA_SETTINGS::EESCHEMA_SETTINGS() :
 
     m_params.emplace_back( new PARAM<int>( "symbol_chooser.sort_mode",
             &m_SymChooserPanel.sort_mode, 0 ) );
+    m_params.emplace_back( new PARAM_LIST<wxString>( "symbol_chooser.favorites",
+            &m_SymChooserPanel.favorites, {} ) );
+    m_params.emplace_back( new PARAM_LIST<wxString>( "symbol_chooser.recent_symbols",
+            &m_SymChooserPanel.recent_symbols, {} ) );
+    m_params.emplace_back( new PARAM_MAP<wxString>( "symbol_chooser.preferred_footprints",
+            &m_SymChooserPanel.preferred_footprints, {} ) );
+    m_params.emplace_back( new PARAM_LIST<wxString>( "symbol_chooser.override_library_footprints",
+            &m_SymChooserPanel.override_library_footprints, {} ) );
+    m_params.emplace_back( new PARAM<bool>( "symbol_chooser.advanced",
+            &m_SymChooserPanel.advanced, false ) );
 
     m_params.emplace_back( new PARAM<bool>( "ERC.crossprobe",
             &m_ERCDialog.crossprobe, true ) );

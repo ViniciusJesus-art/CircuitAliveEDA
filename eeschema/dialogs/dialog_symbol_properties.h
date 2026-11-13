@@ -68,6 +68,7 @@ private:
     bool Validate() override;
 
     // event handlers
+    void OnAcceptKey( wxKeyEvent& aEvent );
     void OnAddField( wxCommandEvent& event ) override;
     void OnDeleteField( wxCommandEvent& event ) override;
     void OnMoveUp( wxCommandEvent& event ) override;

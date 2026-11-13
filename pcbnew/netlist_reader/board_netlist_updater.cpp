@@ -2252,6 +2252,7 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
     wxString   msg;
     std::unordered_set<wxString> sheetPaths;
     std::unordered_set<FOOTPRINT*> usedFootprints;
+    bool settingsChanged = false;
 
     m_errorCount = 0;
     m_warningCount = 0;
@@ -2617,10 +2618,19 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
                     footprint->GetReference() ), RPT_SEVERITY_WARNING );
             ++m_warningCount;
 
-            if( !m_isDryRun )
+            PCB_FIELD* status = footprint->GetField( wxS( "CA.LinkStatus" ) );
+            const wxString statusText = _( "Missing schematic symbol" );
+            const bool needsWarning = !status || status->GetText() != statusText;
+            const bool needsDisconnect = std::any_of( footprint->Pads().begin(), footprint->Pads().end(),
+                    []( const PAD* pad )
+                    {
+                        return pad->GetNetCode() != 0 || !pad->GetPinFunction().empty()
+                               || !pad->GetPinType().empty();
+                    } );
+
+            if( !m_isDryRun && ( needsWarning || needsDisconnect ) )
             {
                 m_commit.Modify( footprint );
-                PCB_FIELD* status = footprint->GetField( wxS( "CA.LinkStatus" ) );
                 if( !status )
                 {
                     status = new PCB_FIELD( footprint, FIELD_T::USER, wxS( "CA.LinkStatus" ) );
@@ -2632,7 +2642,7 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
                     status->SetVisible( true );
                     footprint->Add( status );
                 }
-                status->SetText( _( "Missing schematic symbol" ) );
+                status->SetText( statusText );
 
                 // Retain the historical UUID path so an undo/reintroduced symbol can recover
                 // its original placement. The pads must no longer retain live schematic nets.
@@ -2705,6 +2715,7 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
                 if( actualName.IsEmpty() )
                 {
                     m_board->AddVariant( variantName );
+                    settingsChanged = true;
                     actualName = findBoardVariantName( variantName );
 
                     if( !actualName.IsEmpty() )
@@ -2724,6 +2735,7 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
                 if( newDescription != oldDescription )
                 {
                     m_board->SetVariantDescription( actualName, newDescription );
+                    settingsChanged = true;
                     msg.Printf( _( "Updated description for variant '%s'." ), actualName );
                     m_reporter->Report( msg, RPT_SEVERITY_ACTION );
                 }
@@ -2753,27 +2765,32 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
             for( const wxString& variantName : variantsToRemove )
             {
                 m_board->DeleteVariant( variantName );
+                settingsChanged = true;
                 msg.Printf( _( "Removed variant '%s'." ), variantName );
                 m_reporter->Report( msg, RPT_SEVERITY_ACTION );
             }
 
-            if( !updatedVariantNames.empty() )
+            if( !updatedVariantNames.empty() && updatedVariantNames != m_board->GetVariantNames() )
+            {
                 m_board->SetVariantNames( updatedVariantNames );
+                settingsChanged = true;
+            }
         }
 
         // When new footprints are added, the automatic zone refill is disabled because:
         // * it creates crashes when calculating dynamic ratsnests if auto refill is enabled.
         // (the auto refills rebuild the connectivity with incomplete data)
         // * it is useless because zones will be refilled after placing new footprints
+        const bool itemsChanged = !m_commit.Empty();
         m_commit.Push( _( "Update Netlist" ), m_newFootprintsCount ? ZONE_FILL_OP  : 0 );
 
         // Update net, netcode and netclass data after commiting the netlist
         m_board->SynchronizeNetsAndNetClasses( true );
         m_board->GetConnectivity()->RefreshNetcodeMap( m_board );
 
-        // Although m_commit will probably also set this, it's not guaranteed, and we need to make
-        // sure any modification to netclasses gets persisted to project settings through a save.
-        if( m_frame )
+        // Settings changes do not necessarily have a board-item commit. A successful
+        // comparison alone, however, must not dirty an unchanged board on every focus.
+        if( m_frame && ( itemsChanged || settingsChanged ) )
             m_frame->OnModify();
     }
 

@@ -485,6 +485,8 @@ void LIB_TREE::Regenerate( bool aKeepState )
         current = getState();
 
     wxString filter = m_query_ctrl->GetValue();
+    if( m_searchPreprocessor )
+        filter = m_searchPreprocessor( filter );
     m_adapter->UpdateSearchString( filter, aKeepState );
     postPreselectEvent();
 
@@ -497,6 +499,17 @@ void LIB_TREE::Regenerate( bool aKeepState )
 void LIB_TREE::RefreshLibTree()
 {
     m_adapter->RefreshTree();
+}
+
+void LIB_TREE::SetCompactDetails( bool aCompact )
+{
+    if( m_details_ctrl && m_details_ctrl->GetParent() == this )
+    {
+        GetSizer()->GetItem( m_details_ctrl )->SetProportion( aCompact ? 0 : 2 );
+        m_details_ctrl->SetMinSize( wxSize( -1, FromDIP( aCompact ? 58 : 160 ) ) );
+        m_details_ctrl->ShowScrollbars( wxSHOW_SB_NEVER, wxSHOW_SB_DEFAULT );
+        Layout();
+    }
 }
 
 

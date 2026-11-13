@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "74aup1g02",
+  "name": "74AUP1G02 single nor",
+  "description": "Nominal powered small logic with finite output impedance; see docs/circuitalive/SMALL_LOGIC_MODELS.md.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "role": "power",
+      "default_pin": "5"
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "3"
+    },
+    {
+      "id": "a1_0",
+      "label": "Gate 1 input 1",
+      "role": "input",
+      "default_pin": "1"
+    },
+    {
+      "id": "a1_1",
+      "label": "Gate 1 input 2",
+      "role": "input",
+      "default_pin": "2"
+    },
+    {
+      "id": "y1",
+      "label": "Gate 1 output",
+      "role": "output",
+      "default_pin": "4"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "vil",
+      "label": "Low input threshold / reference voltage",
+      "default": ".3",
+      "unit": "",
+      "min": 0,
+      "max": 0.49
+    },
+    {
+      "id": "vih",
+      "label": "High input threshold / reference voltage",
+      "default": ".7",
+      "unit": "",
+      "min": 0.1,
+      "max": 1
+    },
+    {
+      "id": "vmin",
+      "label": "Minimum operating supply",
+      "default": ".8",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "vmax",
+      "label": "Maximum operating supply",
+      "default": "3.6",
+      "unit": "V",
+      "min": 0.1,
+      "max": 20
+    },
+    {
+      "id": "rise_delay",
+      "label": "Nominal rising propagation delay",
+      "default": "5n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "fall_delay",
+      "label": "Nominal falling propagation delay",
+      "default": "5n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "transition",
+      "label": "Output transition time",
+      "default": "1n",
+      "unit": "s",
+      "min": 1e-12,
+      "max": 1
+    },
+    {
+      "id": "rout",
+      "label": "Nominal output resistance",
+      "default": "100",
+      "unit": "Ohm",
+      "min": 0.01,
+      "max": 1000000000.0
+    },
+    {
+      "id": "cin",
+      "label": "Input capacitance",
+      "default": "1.5p",
+      "unit": "F",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "iq",
+      "label": "Nominal quiescent supply current",
+      "default": ".1u",
+      "unit": "A",
+      "min": 0,
+      "max": 1
+    },
+    {
+      "id": "high_drop",
+      "label": "Unloaded HIGH voltage drop",
+      "default": "0",
+      "unit": "V",
+      "min": 0,
+      "max": 5
+    },
+    {
+      "id": "low_drop",
+      "label": "Unloaded LOW voltage drop",
+      "default": "0",
+      "unit": "V",
+      "min": 0,
+      "max": 5
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "74xGxx:74AUP1G02"
+    ],
+    "symbol_names": [
+      "74AUP1G02"
+    ]
+  },
+  "ignore_legacy_spice_fields": true,
+  "behavioral": {
+    "version": 1,
+    "supply": {
+      "vcc": "vcc",
+      "gnd": "gnd"
+    },
+    "blocks": [
+      {
+        "type": "nor",
+        "inputs": [
+          "a1_0",
+          "a1_1"
+        ],
+        "out": "q1"
+      }
+    ],
+    "outputs": {
+      "y1": {
+        "signal": "q1"
+      }
+    }
+  },
+  "sources": [
+    "https://www.ti.com/lit/ds/symlink/sn74aup1g02.pdf"
+  ],
+  "model_notes": [
+    "Own functional implementation from manufacturer truth tables and package pinouts; no vendor SPICE source copied.",
+    "Only the explicitly named physical symbols are associated; connectors, graphic symbols and parts without an electrical function are not modeled.",
+    "Fixed nominal propagation delay, resistance, input capacitance and quiescent current at room temperature; not calibrated across supply, temperature, package or load.",
+    "No ESD, overvoltage clamps, input leakage, short-circuit limiting, thermal damage or back-powering model. The supply-valid gate releases outputs outside the declared operating range.",
+    "See docs/circuitalive/SMALL_LOGIC_MODELS.md for physical channels, approximations, tests and source references.",
+    "Only 14/17 implement explicit Schmitt retention; the small intrinsic hysteresis of other AUP functions is omitted."
+  ],
+  "measurement_ports": {
+    "positive": "vcc",
+    "negative": "gnd"
+  },
+  "category": "Digital/Small Logic",
+  "family": "74AUP"
+}

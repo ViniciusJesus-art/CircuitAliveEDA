@@ -68,6 +68,7 @@
 #include <wx/log.h>
 #include <tool/right_click_gesture.h>
 #include <circuitalive/probe_symbol.h>
+#include <circuitalive/editor_simulation.h>
 
 #include "symb_transforms_utils.h"
 
@@ -764,6 +765,9 @@ int SCH_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
         else if( evt->IsDblClick( BUT_LEFT ) )
         {
             m_disambiguateTimer.Stop();
+
+            if( CIRCUITALIVE::EditorSimulationRunning( dynamic_cast<SCH_EDIT_FRAME*>( m_frame ) ) )
+                continue;
 
             // double click? Display the properties window
             if( SCH_EDIT_FRAME* schframe = dynamic_cast<SCH_EDIT_FRAME*>( m_frame ) )

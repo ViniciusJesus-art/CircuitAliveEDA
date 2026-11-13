@@ -40,6 +40,7 @@
 #include <paths.h>
 #include <pcbnew_settings.h>
 #include <footprint.h>
+#include <component_chooser_search.h>
 #include <footprint_editor_settings.h>
 #include <settings/settings_manager.h>
 #include <settings/cvpcb_settings.h>
@@ -96,6 +97,8 @@ extern "C" PyObject* PyInit__pcbnew( void );
  *
  * Input JSON format:
  *   {"pin_count": N, "filters": ["pattern1", ...], "zero_filters": bool, "max_results": N}
+ * Optional physical filters: mounting (pth/smd), physical_text, package,
+ * max_width_mm and max_height_mm (footprint extents excluding text).
  *
  * Output JSON format:
  *   ["lib:footprint1", "lib:footprint2", ...]
@@ -114,6 +117,13 @@ static wxString filterFootprints( const wxString& aFilterJson )
         int  pinCount = input.value( "pin_count", 0 );
         bool zeroFilters = input.value( "zero_filters", true );
         int  maxResults = input.value( "max_results", 400 );
+        const auto mounting = input.value( "mounting", std::string{} );
+        const auto physicalText = input.value( "physical_text", std::string{} );
+        const auto package = input.value( "package", std::string{} );
+        const double maxWidth = input.value( "max_width_mm", 0.0 );
+        const double maxHeight = input.value( "max_height_mm", 0.0 );
+        const bool physical = !mounting.empty() || !physicalText.empty() || !package.empty()
+                              || maxWidth > 0 || maxHeight > 0;
 
         std::vector<std::unique_ptr<EDA_PATTERN_MATCH>> filterMatchers;
 
@@ -127,6 +137,13 @@ static wxString filterFootprints( const wxString& aFilterJson )
                     auto     matcher = std::make_unique<EDA_PATTERN_MATCH_WILDCARD_ANCHORED>();
                     matcher->SetPattern( pattern.Lower() );
                     filterMatchers.push_back( std::move( matcher ) );
+                    const auto alias = CIRCUITALIVE::AlternatePackagePattern( pattern.ToStdString( wxConvUTF8 ) );
+                    if( physical && alias != pattern.Lower().ToStdString( wxConvUTF8 ) )
+                    {
+                        auto alternate = std::make_unique<EDA_PATTERN_MATCH_WILDCARD_ANCHORED>();
+                        alternate->SetPattern( wxString::FromUTF8( alias ) );
+                        filterMatchers.push_back( std::move( alternate ) );
+                    }
                 }
             }
         }
@@ -210,6 +227,19 @@ static wxString filterFootprints( const wxString& aFilterJson )
                 }
 
                 wxString libId = fp->GetFPID().Format();
+                if( mounting == "smd" && !( fp->GetAttributes() & FP_SMD ) ) continue;
+                if( mounting == "pth" && !( fp->GetAttributes() & FP_THROUGH_HOLE ) ) continue;
+                if( !package.empty() && !CIRCUITALIVE::MatchesPhysicalText(
+                        libId.ToStdString(), package == "pdip" ? "dip" : package ) ) continue;
+                if( !physicalText.empty() && !CIRCUITALIVE::MatchesPhysicalText(
+                        ( libId + " " + fp->GetLibDescription() + " " + fp->GetKeywords() ).ToStdString(),
+                        physicalText ) ) continue;
+                if( maxWidth > 0 || maxHeight > 0 )
+                {
+                    const auto box = fp->GetBoundingBox( false );
+                    if( maxWidth > 0 && pcbIUScale.IUTomm( box.GetWidth() ) > maxWidth ) continue;
+                    if( maxHeight > 0 && pcbIUScale.IUTomm( box.GetHeight() ) > maxHeight ) continue;
+                }
                 output.push_back( libId.ToStdString() );
 
                 if( ++count >= maxResults )
@@ -220,6 +250,15 @@ static wxString filterFootprints( const wxString& aFilterJson )
                 break;
         }
 
+        if( mounting == "smd" )
+        {
+            // Prefer an SMD component package to an SMD socket for a through-hole
+            // component, while leaving those sockets available in the same list.
+            std::stable_partition( output.begin(), output.end(), []( const json& item )
+            {
+                return !wxString::FromUTF8( item.get<std::string>() ).Lower().Contains( "socket" );
+            } );
+        }
         return wxString::FromUTF8( output.dump() );
     }
     catch( const std::exception& )

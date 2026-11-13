@@ -29,10 +29,18 @@
 #include <symbol_tree_model_adapter.h>
 #include <footprint_info.h>
 #include <widgets/html_window.h>
+#include <component_chooser_search.h>
+#include <optional>
 
 class wxPanel;
 class wxTimer;
 class wxSplitterWindow;
+class wxChoice;
+class wxButton;
+class wxCheckBox;
+class wxSpinCtrl;
+class wxSpinCtrlDouble;
+class wxTextCtrl;
 
 class SYMBOL_LIBRARY_FILTER;
 class SYMBOL_PREVIEW_WIDGET;
@@ -99,8 +107,10 @@ public:
      */
     std::vector<std::pair<FIELD_T, wxString>> GetFields() const
     {
+        RememberSelection();
         return m_field_edits;
     }
+    void RememberSelection() const;
 
     void ShutdownCanvases();
 
@@ -150,6 +160,11 @@ protected:
      * @param aLibId the #LIB_ID of the selection or invalid to clear.
      */
     void populateFootprintSelector( const LIB_ID& aLibId );
+    void buildChoiceTools( wxWindow* aParent, wxBoxSizer* aSizer );
+    wxString prepareSearch( const wxString& aSearch );
+    void updateChoiceTools();
+    void refreshPhysicalFilters();
+    wxString preferredFootprint( const LIB_ID& aSymbol, const wxString& aLibraryFootprint ) const;
 
 public:
     static std::mutex g_Mutex;
@@ -178,7 +193,23 @@ protected:
     bool                      m_showPower;
     bool                      m_allow_field_edits;
     bool                      m_show_footprints;
-    wxString                  m_fp_override;
+    std::optional<wxString>    m_fp_override;
+    wxString                  m_choiceSymbol;
+    bool                      m_keepEmptyFootprint = false;
+    wxString                  m_displayedFootprint;
+    wxChoice*                 m_quickList = nullptr;
+    wxButton*                 m_favorite = nullptr;
+    wxCheckBox*               m_advanced = nullptr;
+    wxChoice*                 m_mounting = nullptr;
+    wxButton*                 m_makeDefault = nullptr;
+    wxSpinCtrl*               m_pinFilter = nullptr;
+    wxSpinCtrlDouble*         m_width = nullptr;
+    wxSpinCtrlDouble*         m_height = nullptr;
+    wxTextCtrl*               m_package = nullptr;
+    CIRCUITALIVE::COMPONENT_QUERY m_query;
+    std::function<bool( LIB_TREE_NODE& )> m_choiceFilter;
+    std::function<bool( LIB_TREE_NODE& )>* m_originalFilter = nullptr;
+    bool                      m_shuttingDown = false;
 
     std::vector<std::pair<FIELD_T, wxString>>  m_field_edits;
 };

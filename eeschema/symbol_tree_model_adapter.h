@@ -57,6 +57,7 @@ public:
     void AddLibrary( wxString const& aLibNickname, bool pinned );
 
     wxString GenerateInfo( LIB_ID const& aLibId, int aUnit ) override;
+    void SetCompactInfo( bool aCompact ) { m_compactInfo = aCompact; }
 
 protected:
     /**
@@ -70,6 +71,7 @@ protected:
 
 private:
     SYMBOL_LIBRARY_ADAPTER*  m_adapter;
+    bool m_compactInfo = false;
 
     std::set<wxString> m_pending_load_libraries;
     std::unique_ptr<wxTimer> m_check_pending_libraries_timer;

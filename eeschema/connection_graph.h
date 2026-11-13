@@ -74,7 +74,8 @@ public:
         LOCAL_LABEL,
         LOCAL_POWER_PIN,
         GLOBAL_POWER_PIN,
-        GLOBAL
+        GLOBAL,
+        GLOBAL_GROUND_PIN
     };
 
     explicit CONNECTION_SUBGRAPH( CONNECTION_GRAPH* aGraph ) :
@@ -154,8 +155,10 @@ public:
      * 2: Hierarchical sheet pin
      * 3: Hierarchical label
      * 4: Local label
-     * 5: Power pin
-     * 6: Global label
+     * 5: Local power pin
+     * 6: Global power pin
+     * 7: Global label
+     * 8: Global GND power pin (keeps ground's canonical name when labels alias it)
      *
      * @param aDriver is the item to inspect
      * @return a PRIORITY

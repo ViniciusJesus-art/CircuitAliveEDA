@@ -31,8 +31,10 @@
 #include <sch_screen.h>
 #include <sch_symbol.h>
 #include <sch_pin.h>
+#include <sch_label.h>
 #include <settings/settings_manager.h>
 #include <locale_io.h>
+#include <string_utils.h>
 
 struct CONNECTIVITY_TEST_FIXTURE
 {
@@ -42,6 +44,86 @@ struct CONNECTIVITY_TEST_FIXTURE
     SETTINGS_MANAGER           m_settingsManager;
     std::unique_ptr<SCHEMATIC> m_schematic;
 };
+
+// Ground keeps its name when a signal label is intentionally tied to it. Other
+// signal labels remain independent, and moving the alias away restores its net.
+BOOST_FIXTURE_TEST_CASE( GroundKeepsCanonicalNameWithSignalAliases, CONNECTIVITY_TEST_FIXTURE )
+{
+    KI_TEST::LoadSchematic( m_settingsManager, "ground_pin_test_ok", m_schematic );
+    SCH_SHEET_LIST sheets = m_schematic->Hierarchy();
+    SCH_SHEET_PATH sheet = sheets.at( 0 );
+    SCH_SCREEN* screen = sheet.LastScreen();
+    std::vector<SCH_PIN*> groundPins;
+
+    for( SCH_ITEM* item : screen->Items().OfType( SCH_SYMBOL_T ) )
+    {
+        auto* symbol = static_cast<SCH_SYMBOL*>( item );
+        for( SCH_PIN* pin : symbol->GetPins() )
+        {
+            if( pin->IsGlobalPower() && symbol->GetValue( false, nullptr, false ) == wxS( "GND" ) )
+                groundPins.push_back( pin );
+        }
+    }
+
+    BOOST_REQUIRE( !groundPins.empty() );
+    auto* alias = new SCH_GLOBALLABEL( groundPins.front()->GetPosition(), wxS( "/CARD_DETECT" ) );
+    auto* remote = new SCH_GLOBALLABEL( VECTOR2I( 10000000, 10000000 ), wxS( "/CARD_DETECT" ) );
+    auto* unrelated = new SCH_GLOBALLABEL( VECTOR2I( 20000000, 10000000 ), wxS( "/OTHER_SIGNAL" ) );
+    screen->Append( alias );
+    screen->Append( remote );
+    screen->Append( unrelated );
+
+    auto* otherSheet = new SCH_SHEET( m_schematic.get() );
+    auto* otherScreen = new SCH_SCREEN( m_schematic.get() );
+    const_cast<KIID&>( otherSheet->m_Uuid ) = otherScreen->GetUuid();
+    otherSheet->SetScreen( otherScreen );
+    otherSheet->GetField( FIELD_T::SHEET_NAME )->SetText( wxS( "Remote" ) );
+    otherScreen->SetFileName( wxS( "remote_ground_alias.kicad_sch" ) );
+    otherScreen->SetPageNumber( wxS( "2" ) );
+    auto* otherAlias = new SCH_GLOBALLABEL( VECTOR2I( 10000000, 10000000 ), wxS( "/CARD_DETECT" ) );
+    otherScreen->Append( otherAlias );
+    auto* otherGround = static_cast<SCH_SYMBOL*>( groundPins.front()->GetParentSymbol()->Clone() );
+    const_cast<KIID&>( otherGround->m_Uuid ) = KIID();
+    otherGround->SetPosition( VECTOR2I( 20000000, 20000000 ) );
+    otherScreen->Append( otherGround );
+    auto topSheets = m_schematic->GetTopLevelSheets();
+    topSheets.push_back( otherSheet );
+    m_schematic->SetTopLevelSheets( topSheets );
+    m_schematic->RefreshHierarchy();
+    sheets = m_schematic->Hierarchy();
+    SCH_SHEET_PATH otherPath;
+    for( const SCH_SHEET_PATH& path : sheets )
+    {
+        if( path.LastScreen() == otherScreen )
+            otherPath = path;
+    }
+    BOOST_REQUIRE( otherPath.LastScreen() == otherScreen );
+
+    m_schematic->ConnectionGraph()->Recalculate( sheets, true );
+
+    for( SCH_PIN* pin : groundPins )
+        BOOST_CHECK_EQUAL( pin->Connection( &sheet )->Name(), wxS( "GND" ) );
+
+    BOOST_CHECK_EQUAL( alias->Connection( &sheet )->Name(), wxS( "GND" ) );
+    BOOST_CHECK_EQUAL( remote->Connection( &sheet )->Name(), wxS( "GND" ) );
+    BOOST_CHECK_EQUAL( otherAlias->Connection( &otherPath )->Name(), wxS( "GND" ) );
+    BOOST_CHECK_EQUAL( otherGround->GetPins().front()->Connection( &otherPath )->Name(), wxS( "GND" ) );
+    BOOST_CHECK_EQUAL( UnescapeString( unrelated->Connection( &sheet )->Name() ), wxS( "/OTHER_SIGNAL" ) );
+    BOOST_CHECK_EQUAL( alias->GetText(), wxS( "/CARD_DETECT" ) );
+    BOOST_CHECK_EQUAL( remote->GetText(), wxS( "/CARD_DETECT" ) );
+
+    alias->SetPosition( VECTOR2I( 10000000, 20000000 ) );
+    m_schematic->ConnectionGraph()->Recalculate( sheets, true );
+
+    for( SCH_PIN* pin : groundPins )
+        BOOST_CHECK_EQUAL( pin->Connection( &sheet )->Name(), wxS( "GND" ) );
+
+    BOOST_CHECK_EQUAL( UnescapeString( alias->Connection( &sheet )->Name() ), wxS( "/CARD_DETECT" ) );
+    BOOST_CHECK_EQUAL( UnescapeString( remote->Connection( &sheet )->Name() ), wxS( "/CARD_DETECT" ) );
+    BOOST_CHECK_EQUAL( UnescapeString( otherAlias->Connection( &otherPath )->Name() ), wxS( "/CARD_DETECT" ) );
+    BOOST_CHECK_EQUAL( otherGround->GetPins().front()->Connection( &otherPath )->Name(), wxS( "GND" ) );
+    BOOST_CHECK_NE( remote->Connection( &sheet )->NetCode(), groundPins.front()->Connection( &sheet )->NetCode() );
+}
 
 BOOST_FIXTURE_TEST_CASE( CheckNetCounts, CONNECTIVITY_TEST_FIXTURE )
 {

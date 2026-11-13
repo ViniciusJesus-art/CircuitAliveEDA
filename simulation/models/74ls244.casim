@@ -228,7 +228,8 @@
   "matches": {
     "library_ids": [
       "74xx:74LS244",
-      "74xx_IEEE:74LS244"
+      "74xx_IEEE:74LS244",
+      "74xx:74LS244_Split"
     ],
     "symbol_names": [
       "74LS244"

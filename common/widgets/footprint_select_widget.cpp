@@ -38,6 +38,7 @@ FOOTPRINT_SELECT_WIDGET::FOOTPRINT_SELECT_WIDGET( EDA_DRAW_FRAME* aFrame, wxWind
 {
     m_sizer = new wxBoxSizer( wxVERTICAL );
     m_fp_sel_ctrl = new FOOTPRINT_CHOICE( this, wxID_ANY );
+    m_fp_sel_ctrl->SetToolTip( _( "Select empty to leave this component without a footprint. Use Make default for this symbol to save a preference." ) );
     m_sizer->Add( m_fp_sel_ctrl, 1, wxEXPAND, 5 );
 
     SetSizer( m_sizer );
@@ -67,7 +68,9 @@ void FOOTPRINT_SELECT_WIDGET::OnComboBox( wxCommandEvent& aEvent )
     wxASSERT( clientdata );
 
     evt.SetString( clientdata->GetData() );
-    wxPostEvent( this, evt );
+    evt.SetEventObject( this );
+    // Complete the selection before OK or Make default can use its value.
+    ProcessWindowEvent( evt );
 }
 
 
@@ -76,7 +79,12 @@ void FOOTPRINT_SELECT_WIDGET::ClearFilters()
     m_pin_count = 0;
     m_filters.Clear();
     m_default_footprint.Clear();
+    m_defaultMatchesFilters = false;
     m_zero_filter = false;
+    m_mounting.clear();
+    m_physicalText.clear();
+    m_package.clear();
+    m_maxWidth = m_maxHeight = 0;
 }
 
 
@@ -108,12 +116,11 @@ bool FOOTPRINT_SELECT_WIDGET::UpdateList()
     wxWindowUpdateLocker lock( m_fp_sel_ctrl );
     m_fp_sel_ctrl->Clear();
 
-    // Add the default footprint entry at the top
-    wxString defaultLabel = m_default_footprint.IsEmpty()
-                                    ? _( "No default footprint" )
-                                    : wxS( "[" ) + _( "Default" ) + wxS( "] " ) + m_default_footprint;
-
-    m_fp_sel_ctrl->Append( defaultLabel, new wxStringClientData( m_default_footprint ) );
+    m_defaultMatchesFilters = false;
+    // Empty is always available, independently of search mode or physical filters.
+    m_fp_sel_ctrl->Append( "empty", new wxStringClientData( wxEmptyString ) );
+    if( !m_default_footprint.IsEmpty() )
+        m_fp_sel_ctrl->Append( m_default_footprint, new wxStringClientData( m_default_footprint ) );
 
     // If zero_filter is set and we have no filters, show no footprints
     if( m_zero_filter && m_filters.IsEmpty() && m_pin_count == 0 )
@@ -128,11 +135,16 @@ bool FOOTPRINT_SELECT_WIDGET::UpdateList()
     request["pin_count"] = m_pin_count;
     request["zero_filters"] = m_zero_filter;
     request["max_results"] = m_max_items;
+    request["mounting"] = m_mounting.ToStdString( wxConvUTF8 );
+    request["physical_text"] = m_physicalText.ToStdString( wxConvUTF8 );
+    request["package"] = m_package.ToStdString( wxConvUTF8 );
+    request["max_width_mm"] = m_maxWidth;
+    request["max_height_mm"] = m_maxHeight;
 
     json filtersArray = json::array();
 
     for( const wxString& filter : m_filters )
-        filtersArray.push_back( filter.ToStdString() );
+        filtersArray.push_back( filter.ToStdString( wxConvUTF8 ) );
 
     request["filters"] = filtersArray;
 
@@ -163,7 +175,7 @@ bool FOOTPRINT_SELECT_WIDGET::UpdateList()
         wxString responseStr = filterFootprints( requestStr );
 
         // Parse the response
-        json response = json::parse( responseStr.ToStdString() );
+        json response = json::parse( responseStr.ToStdString( wxConvUTF8 ) );
 
         if( response.is_array() )
         {
@@ -172,6 +184,11 @@ bool FOOTPRINT_SELECT_WIDGET::UpdateList()
                 if( item.is_string() )
                 {
                     wxString fpName = wxString::FromUTF8( item.get<std::string>() );
+                    if( fpName == m_default_footprint )
+                    {
+                        m_defaultMatchesFilters = true;
+                        continue;
+                    }
                     m_fp_sel_ctrl->Append( fpName, new wxStringClientData( fpName ) );
                 }
             }
@@ -189,7 +206,35 @@ bool FOOTPRINT_SELECT_WIDGET::UpdateList()
 
 void FOOTPRINT_SELECT_WIDGET::SelectDefault()
 {
-    m_fp_sel_ctrl->SetSelection( 0 );
+    m_fp_sel_ctrl->SetSelection( m_default_footprint.IsEmpty() ? 0 : 1 );
+}
+
+void FOOTPRINT_SELECT_WIDGET::SelectPhysicalMatch()
+{
+    if( m_defaultMatchesFilters ) return;
+    if( !m_default_footprint.IsEmpty() )
+        m_fp_sel_ctrl->Delete( 1 );
+    if( m_fp_sel_ctrl->GetCount() == 1 )
+    {
+        m_fp_sel_ctrl->Append( _( "No footprints match these filters" ), new wxStringClientData( wxEmptyString ) );
+    }
+    m_fp_sel_ctrl->SetSelection( 1 );
+    auto* data = static_cast<wxStringClientData*>( m_fp_sel_ctrl->GetClientObject( 1 ) );
+    wxCommandEvent event( EVT_FOOTPRINT_SELECTED );
+    event.SetString( data->GetData() );
+    event.SetInt( 1 ); // Automatic matching; this is not an explicit empty choice.
+    event.SetEventObject( this );
+    ProcessWindowEvent( event );
+}
+
+void FOOTPRINT_SELECT_WIDGET::FilterByPhysicalProperties( const wxString& aMounting,
+        const wxString& aText, const wxString& aPackage, double aWidth, double aHeight )
+{
+    m_mounting = aMounting;
+    m_physicalText = aText;
+    m_package = aPackage;
+    m_maxWidth = aWidth;
+    m_maxHeight = aHeight;
 }
 
 

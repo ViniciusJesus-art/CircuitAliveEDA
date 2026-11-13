@@ -264,6 +264,11 @@ public:
         int  width;
         int  height;
         int  sort_mode;
+        std::vector<wxString> favorites;
+        std::vector<wxString> recent_symbols;
+        std::map<std::string, wxString> preferred_footprints;
+        std::vector<wxString> override_library_footprints;
+        bool advanced = false;
     };
 
     struct DIALOG_ERC

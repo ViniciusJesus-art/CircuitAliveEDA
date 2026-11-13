@@ -179,7 +179,7 @@ bool CONNECTION_SUBGRAPH::ResolveDrivers( bool aCheckMultipleDrivers )
     if( highest_priority >= PRIORITY::HIER_LABEL )
         m_strong_driver = true;
 
-    // Power pins are 5, global labels are 6
+    // Global power pins and labels connect across sheets.
     m_local_driver = ( highest_priority < PRIORITY::GLOBAL_POWER_PIN );
 
     if( !candidates.empty() )
@@ -601,7 +601,14 @@ CONNECTION_SUBGRAPH::PRIORITY CONNECTION_SUBGRAPH::GetDriverPriority( SCH_ITEM* 
         const SCH_SYMBOL* sym = static_cast<SCH_SYMBOL*>( sch_pin->GetParentSymbol() );
 
         if( sch_pin->IsGlobalPower() )
+        {
+            // A signal label on GND is an alias for ground. It must not rename the
+            // ground network, including other ground symbols and remote aliases.
+            if( sym && sym->GetValue( false, nullptr, false ) == wxS( "GND" ) )
+                return PRIORITY::GLOBAL_GROUND_PIN;
+
             return PRIORITY::GLOBAL_POWER_PIN;
+        }
         else if( sch_pin->IsLocalPower() )
             return PRIORITY::LOCAL_POWER_PIN;
         else if( !sym || sym->GetExcludedFromBoard() || libSymbolRef( sym ).StartsWith( '#' ) )

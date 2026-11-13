@@ -26,6 +26,7 @@
 #include <memory>
 
 #include <bitmaps.h>
+#include <wx/stc/stc.h>
 #include <wx/tooltip.h>
 #include <wx/uiaction.h>
 #include <grid_tricks.h>
@@ -400,6 +401,9 @@ DIALOG_SYMBOL_PROPERTIES::DIALOG_SYMBOL_PROPERTIES( SCH_EDIT_FRAME* aParent, SCH
     // wxFormBuilder doesn't include this event...
     m_fieldsGrid->Bind( wxEVT_GRID_CELL_CHANGING, &DIALOG_SYMBOL_PROPERTIES::OnGridCellChanging, this );
     m_pinGrid->Bind( wxEVT_GRID_COL_SORT, &DIALOG_SYMBOL_PROPERTIES::OnPinTableColSort, this );
+    m_fieldsGrid->Bind( wxEVT_CHAR_HOOK, &DIALOG_SYMBOL_PROPERTIES::OnAcceptKey, this );
+    m_pinGrid->Bind( wxEVT_CHAR_HOOK, &DIALOG_SYMBOL_PROPERTIES::OnAcceptKey, this );
+    Bind( wxEVT_CHAR_HOOK, &DIALOG_SYMBOL_PROPERTIES::OnAcceptKey, this );
     Bind( SYMBOL_DELAY_FOCUS, &DIALOG_SYMBOL_PROPERTIES::HandleDelayedFocus, this );
     Bind( SYMBOL_DELAY_SELECTION, &DIALOG_SYMBOL_PROPERTIES::HandleDelayedSelection, this );
 
@@ -435,6 +439,9 @@ DIALOG_SYMBOL_PROPERTIES::~DIALOG_SYMBOL_PROPERTIES()
 
     m_fieldsGrid->Unbind( wxEVT_GRID_CELL_CHANGING, &DIALOG_SYMBOL_PROPERTIES::OnGridCellChanging, this );
     m_pinGrid->Unbind( wxEVT_GRID_COL_SORT, &DIALOG_SYMBOL_PROPERTIES::OnPinTableColSort, this );
+    m_fieldsGrid->Unbind( wxEVT_CHAR_HOOK, &DIALOG_SYMBOL_PROPERTIES::OnAcceptKey, this );
+    m_pinGrid->Unbind( wxEVT_CHAR_HOOK, &DIALOG_SYMBOL_PROPERTIES::OnAcceptKey, this );
+    Unbind( wxEVT_CHAR_HOOK, &DIALOG_SYMBOL_PROPERTIES::OnAcceptKey, this );
     Unbind( SYMBOL_DELAY_FOCUS, &DIALOG_SYMBOL_PROPERTIES::HandleDelayedFocus, this );
     Unbind( SYMBOL_DELAY_SELECTION, &DIALOG_SYMBOL_PROPERTIES::HandleDelayedSelection, this );
 
@@ -447,6 +454,28 @@ DIALOG_SYMBOL_PROPERTIES::~DIALOG_SYMBOL_PROPERTIES()
 SCH_EDIT_FRAME* DIALOG_SYMBOL_PROPERTIES::GetParent()
 {
     return dynamic_cast<SCH_EDIT_FRAME*>( wxDialog::GetParent() );
+}
+
+
+void DIALOG_SYMBOL_PROPERTIES::OnAcceptKey( wxKeyEvent& aEvent )
+{
+    if( ( aEvent.GetKeyCode() == WXK_RETURN || aEvent.GetKeyCode() == WXK_NUMPAD_ENTER )
+        && aEvent.GetModifiers() == wxMOD_NONE )
+    {
+        // Let the field editor finish an autocomplete choice before accepting the dialog.
+        if( auto* editor = dynamic_cast<wxStyledTextCtrl*>( wxWindow::FindFocus() );
+            editor && editor->AutoCompActive() )
+        {
+            aEvent.Skip();
+            return;
+        }
+
+        // Use the OK path so the active grid editor is committed and all validation runs.
+        wxPostEvent( this, wxCommandEvent( wxEVT_BUTTON, wxID_OK ) );
+        return;
+    }
+
+    aEvent.Skip();
 }
 
 

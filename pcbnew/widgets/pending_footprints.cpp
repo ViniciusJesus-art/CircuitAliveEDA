@@ -26,6 +26,7 @@
 #include <string_utils.h>
 #include <wx/aui/aui.h>
 #include <wx/button.h>
+#include <wx/eventfilter.h>
 #include <wx/listbox.h>
 #include <wx/sizer.h>
 #include <wx/splitter.h>
@@ -118,7 +119,7 @@ public:
     int warnings = 0;
 };
 
-class PENDING_FOOTPRINTS_TOOL : public wxEvtHandler, public PCB_TOOL_BASE
+class PENDING_FOOTPRINTS_TOOL : public wxEvtHandler, public PCB_TOOL_BASE, public wxEventFilter
 {
 public:
     PENDING_FOOTPRINTS_TOOL() : PCB_TOOL_BASE( "circuitalive.PendingFootprints" ), m_timer( this ) {}
@@ -190,6 +191,7 @@ public:
         m_frame->Bind( wxEVT_ACTIVATE, &PENDING_FOOTPRINTS_TOOL::onActivate, this );
         m_frame->Bind( wxEVT_CHAR_HOOK, &PENDING_FOOTPRINTS_TOOL::onKey, this );
         m_frame->Bind( wxEVT_AUI_PANE_CLOSE, &PENDING_FOOTPRINTS_TOOL::onPaneClose, this );
+        wxEvtHandler::AddFilter( this );
         Bind( wxEVT_TIMER, &PENDING_FOOTPRINTS_TOOL::onTimer, this );
         m_toolMgr->GetActionManager()->SetConditions( PENDING_FOOTPRINT_ACTIONS::showPanel,
                 ACTION_CONDITIONS().Check( [this]( const SELECTION& )
@@ -213,6 +215,7 @@ public:
     {
         if( !m_panel ) return;
         m_timer.Stop();
+        wxEvtHandler::RemoveFilter( this );
         Save();
         m_frame->Unbind( wxEVT_ACTIVATE, &PENDING_FOOTPRINTS_TOOL::onActivate, this );
         m_frame->Unbind( wxEVT_CHAR_HOOK, &PENDING_FOOTPRINTS_TOOL::onKey, this );
@@ -230,7 +233,6 @@ public:
         if( m_panel && ( reason == MODEL_RELOAD || reason == SUPERMODEL_RELOAD ) )
         {
             m_netlist.reset();
-            m_payload.clear();
             m_armed = false;
             m_choice.clear();
             m_deferredPlacement.reset();
@@ -248,11 +250,39 @@ public:
     }
 
 private:
+    bool ownsWindow( wxWindow* window ) const
+    {
+        for( ; window; window = window->GetParent() )
+        {
+            if( window == m_frame )
+                return true;
+        }
+        return false;
+    }
+    int FilterEvent( wxEvent& event ) override
+    {
+        // Some platforms transfer focus directly between children or floating panes
+        // without activating the main frame. Observe the first focus/click anywhere
+        // in this editor, and let the event continue to its normal handler.
+        if( event.GetEventType() == wxEVT_SET_FOCUS || event.GetEventType() == wxEVT_LEFT_DOWN
+            || event.GetEventType() == wxEVT_RIGHT_DOWN || event.GetEventType() == wxEVT_MIDDLE_DOWN )
+        {
+            if( auto* window = dynamic_cast<wxWindow*>( event.GetEventObject() ) )
+            {
+                const bool focused = ownsWindow( window );
+                if( focused && !m_hasFocus )
+                    m_needsSync = true;
+                m_hasFocus = focused;
+            }
+        }
+        return Event_Skip;
+    }
     void onActivate( wxActivateEvent& event )
     {
         if( !event.GetActive() && m_placing )
             m_toolMgr->RunAction( ACTIONS::cancelInteractive );
-        if( event.GetActive() && !m_syncing ) m_needsSync = true;
+        if( event.GetActive() ) m_needsSync = true;
+        else m_hasFocus = false;
         event.Skip();
     }
     void onKey( wxKeyEvent& event )
@@ -278,19 +308,26 @@ private:
     }
     void onTimer( wxTimerEvent& )
     {
-        if( !m_panel || m_syncing || m_placing || !m_frame->IsEnabled() ) return;
-        if( !m_frame->ToolStackIsEmpty() ) return;
+        if( !m_panel || m_syncing || m_placing || !m_frame->IsEnabled() || m_frame->IsClosing() ) return;
+        const bool focused = m_hasFocus || ownsWindow( wxWindow::FindFocus() ) || m_frame->IsActive();
         const wxString identity = m_frame->Prj().GetProjectFullName() + "\n" + m_frame->GetBoard()->GetFileName();
         if( identity != m_document )
         {
             m_document = identity;
-            m_payload.clear(); m_netlist.reset(); m_armed = false; m_choice.clear();
+            m_netlist.reset(); m_armed = false; m_choice.clear();
             m_deferredPlacement.reset();
             m_needsSync = true;
             rebuildList();
         }
-        if( m_needsSync && m_frame->IsActive() && m_frame->IsShownOnScreen() )
+        if( m_needsSync && focused && m_frame->IsShownOnScreen() )
         {
+            // A suspended drawing/routing tool can otherwise block every retry after
+            // returning to the PCB. Finish cancelling its unplaced preview first.
+            if( !m_frame->ToolStackIsEmpty() )
+            {
+                m_toolMgr->RunAction( ACTIONS::cancelInteractive );
+                return;
+            }
             m_needsSync = false;
             synchronize();
         }
@@ -310,8 +347,20 @@ private:
         struct GUARD { bool& flag; ~GUARD() { flag = false; } } guard{ m_syncing };
         try
         {
-            if( !m_frame->Kiway().Player( FRAME_SCH, false ) && m_frame->TestStandalone() != 1 )
+            // Background synchronization must never create or reopen an editor. In
+            // particular, closing the schematic often activates the PCB window.
+            KIWAY_PLAYER* schematic = m_frame->Kiway().Player( FRAME_SCH, false );
+            if( !schematic || schematic->IsClosing() || schematic->IsBeingDeleted()
+                || !schematic->IsShownOnScreen() )
+            {
+                m_netlist.reset();
+                m_armed = false;
+                m_choice.clear();
+                m_deferredPlacement.reset();
+                rebuildList();
+                m_status->SetLabel( _( "Open the schematic to synchronize with this PCB." ) );
                 return;
+            }
             std::string payload = "circuitalive:pcb-auto-sync";
             m_frame->Kiway().ExpressMail( FRAME_SCH, MAIL_SCH_GET_NETLIST, payload, m_frame );
             if( payload == "circuitalive:pcb-auto-sync" )
@@ -329,9 +378,10 @@ private:
                 }
             }
             netlist->SortByReference();
-            STRING_FORMATTER canonical;
-            netlist->Format( "pcb_sync", &canonical, 0 );
-            if( canonical.GetString() != m_payload || m_syncedStamp != m_frame->GetBoard()->GetTimeStamp() )
+            // Reconcile on every return to the PCB. The debug NETLIST formatter omits
+            // some pin/group/variant metadata and is not a reliable change fingerprint.
+            // The updater already records only actual changes, so an unchanged netlist
+            // leaves the board clean and does not add an undo entry.
             {
                 SYNC_REPORTER reporter;
                 BOARD_NETLIST_UPDATER updater( m_frame, m_frame->GetBoard() );
@@ -347,8 +397,6 @@ private:
                 m_frame->OnNetlistChanged( updater, nullptr );
                 m_frame->GetCanvas()->GetView()->UpdateAllItems( KIGFX::ALL );
                 m_frame->GetCanvas()->Refresh();
-                m_syncedStamp = m_frame->GetBoard()->GetTimeStamp();
-                m_payload = canonical.GetString();
                 if( !reporter.error.empty() )
                     m_status->SetToolTip( reporter.error );
             }
@@ -502,7 +550,6 @@ private:
             } );
             if( updater.UpdateNetlist( *m_netlist ) )
                 m_frame->OnNetlistChanged( updater, nullptr );
-            m_syncedStamp = m_frame->GetBoard()->GetTimeStamp();
             rebuildList();
             if( !reporter.error.empty() ) m_status->SetLabel( reporter.error );
         }
@@ -527,9 +574,9 @@ private:
     std::unique_ptr<NETLIST> m_netlist;
     std::vector<PENDING_FOOTPRINT> m_entries;
     wxString m_choice, m_document;
-    std::string m_payload;
     std::optional<VECTOR2I> m_deferredPlacement;
-    int m_boardStamp = -1, m_syncedStamp = -1;
+    int m_boardStamp = -1;
+    bool m_hasFocus = false;
     bool m_needsSync = false, m_syncing = false, m_placing = false, m_armed = false;
 };
 

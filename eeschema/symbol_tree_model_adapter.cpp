@@ -239,5 +239,16 @@ void SYMBOL_TREE_MODEL_ADAPTER::AddLibrary( wxString const& aLibNickname, bool p
 
 wxString SYMBOL_TREE_MODEL_ADAPTER::GenerateInfo( LIB_ID const& aLibId, int aUnit )
 {
+    if( m_compactInfo )
+    {
+        try
+        {
+            if( LIB_SYMBOL* symbol = m_adapter->LoadSymbol( aLibId ) )
+                return "<b>" + EscapeHTML( symbol->GetName() ) + "</b><br>"
+                       + EscapeHTML( symbol->GetShownDescription() );
+        }
+        catch( const IO_ERROR& ) {}
+        return wxEmptyString;
+    }
     return GenerateAliasInfo( m_adapter, aLibId, aUnit );
 }

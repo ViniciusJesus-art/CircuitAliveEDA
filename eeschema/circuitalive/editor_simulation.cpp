@@ -68,6 +68,10 @@ public:
     void Shutdown();
     void Invalidate();
     void ReloadPreferences();
+    bool Running() const
+    {
+        return m_runner && m_runner->View().state == EDITOR_SESSION_STATE::RUNNING;
+    }
     void Rebind()
     {
         Invalidate();
@@ -867,6 +871,15 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
 void RegisterEditorSimulation( TOOL_MANAGER* aManager )
 {
     aManager->RegisterTool( new EDITOR_SIMULATION_TOOL );
+}
+
+bool EditorSimulationRunning( SCH_EDIT_FRAME* aFrame )
+{
+    if( aFrame && aFrame->GetToolManager() )
+        if( auto* tool = aFrame->GetToolManager()->GetTool<EDITOR_SIMULATION_TOOL>() )
+            return tool->Running();
+
+    return false;
 }
 
 void InstallEditorSimulation( SCH_EDIT_FRAME* aFrame )

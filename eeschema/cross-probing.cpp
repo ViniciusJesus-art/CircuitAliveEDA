@@ -1027,8 +1027,21 @@ void SCH_EDIT_FRAME::KiwayMailIn( KIWAY_MAIL_EVENT& mail )
     case MAIL_SCH_GET_NETLIST:
     {
         const bool automaticPcbSync = payload == "circuitalive:pcb-auto-sync";
-        if( automaticPcbSync && ( !IsEnabled() || !ToolStackIsEmpty() ) )
-            return;
+        if( automaticPcbSync )
+        {
+            if( IsClosing() || !IsEnabled() )
+                return;
+
+            // A placement tool may still be selected after switching editors. Keep
+            // committed labels/wires, discard only the unplaced preview, and retry
+            // until the tool has unwound before exporting a stable snapshot.
+            if( !ToolStackIsEmpty() )
+            {
+                if( !IsActive() )
+                    m_toolManager->RunAction( ACTIONS::cancelInteractive );
+                return;
+            }
+        }
         if( !automaticPcbSync && !payload.empty() )
         {
             wxString annotationMessage( payload );
@@ -1038,7 +1051,7 @@ void SCH_EDIT_FRAME::KiwayMailIn( KIWAY_MAIL_EVENT& mail )
                 return;
         }
 
-        if( ADVANCED_CFG::GetCfg().m_IncrementalConnectivity )
+        if( automaticPcbSync || ADVANCED_CFG::GetCfg().m_IncrementalConnectivity )
             RecalculateConnections( nullptr, GLOBAL_CLEANUP );
 
         NETLIST_EXPORTER_KICAD exporter( &Schematic() );

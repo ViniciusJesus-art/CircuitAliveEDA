@@ -5,9 +5,9 @@ contém comportamento, parâmetros, pinagem e suas associações em `matches`.
 O catálogo e o relatório abaixo são derivados desses arquivos: não há uma
 lista paralela de componentes autorizados na simulação.
 
-O catálogo atual tem **419 arquivos `.casim`** e **642 associações automáticas
+O catálogo atual tem **533 arquivos `.casim`** e **767 associações automáticas
 com pinagem compatível** nas 21.029 entradas eletrônicas da biblioteca local.
-Restam **20.387 entradas sem associação explícita** (cobertura de **3,053%**).
+Restam **20.262 entradas sem associação explícita** (cobertura de **3,647%**).
 Conectores e outros itens não eletrônicos são excluídos. As etapas abaixo registram
 os lotes; os números incluem variantes de desenho e encapsulamento.
 
@@ -175,6 +175,23 @@ As cinco variantes IEEE recebem vínculos explícitos. Apenas CIs reais com
 função elétrica foram adicionados; conectores e itens sem função de simulação
 continuam excluídos. Veja [Lógica combinacional](COMBINATIONAL_LOGIC_MODELS.md)
 para pinagens, parâmetros, referências e validação.
+
+## Décima etapa: portas pequenas e interfaces AHC/AHCT
+
+Foram acrescentados **114 modelos e 126 vínculos explícitos** nas famílias
+AHC, AHCT, AUC, AUP e LVC. O lote cobre portas de um, dois e três canais,
+tri-state, dreno aberto, Schmitt, funções compostas, decodificadores e interfaces
+04/240/244. São 123 vínculos dos arquivos novos e três em arquivos existentes.
+O vínculo explícito do IEEE 4013 já era atendido pelo nome; a cobertura global
+cresce em 125 entradas, para **533 modelos e 767 entradas associadas**.
+
+As pinagens, polaridades de enable e funções específicas foram conferidas nos
+documentos oficiais e na biblioteca local. AUC1G18 e desenhos com terminais
+incompatíveis ficaram fora dos vínculos. Os modelos são aproximações funcionais
+com parâmetros nominais; os limiares LVC usam razões configuráveis, sem prometer
+as curvas DC segmentadas de compatibilidade TTL. Consulte
+[Portas pequenas e interfaces](SMALL_LOGIC_MODELS.md) para o catálogo, fontes,
+limites e bancadas.
 
 ## Uso e atualização
 

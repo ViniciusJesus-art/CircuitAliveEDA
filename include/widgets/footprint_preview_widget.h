@@ -150,11 +150,16 @@ public:
 
     virtual BOARD* GetBoard() = 0;
 
+
     /**
      * Get the colors to use in a preview widget to match the preview panel.
      */
     virtual const KIGFX::COLOR4D& GetBackgroundColor() const = 0;
     virtual const KIGFX::COLOR4D& GetForegroundColor() const = 0;
+
+    virtual wxWindow* Create3DPreview( wxWindow* aParent ) { return nullptr; }
+    virtual void Update3DPreview( bool aHasFootprint ) {}
+    virtual void Shutdown3DPreview() {}
 
     /**
      * Return a footprint preview panel instance via Kiface. May return null if Kiway is not

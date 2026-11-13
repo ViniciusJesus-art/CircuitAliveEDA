@@ -61,6 +61,10 @@ DIALOG_SYMBOL_CHOOSER::DIALOG_SYMBOL_CHOOSER( SCH_BASE_FRAME* aParent, const LIB
                                                    EndModal( wxID_CANCEL );
                                                } );
 
+    // The chooser restores symbol defaults itself. Generic dialog state would
+    // replay the last local footprint/filter and override those saved defaults.
+    OptOut( m_chooserPanel );
+
     sizer->Add( m_chooserPanel, 1, wxEXPAND, 5 );
 
     if( aPreselect && aPreselect->IsValid() )
@@ -114,6 +118,12 @@ DIALOG_SYMBOL_CHOOSER::DIALOG_SYMBOL_CHOOSER( SCH_BASE_FRAME* aParent, const LIB
 DIALOG_SYMBOL_CHOOSER::~DIALOG_SYMBOL_CHOOSER()
 {
     Unbind( wxEVT_CHAR_HOOK, &PANEL_SYMBOL_CHOOSER::OnChar, m_chooserPanel );
+}
+
+void DIALOG_SYMBOL_CHOOSER::EndModal( int aCode )
+{
+    m_chooserPanel->ShutdownCanvases();
+    DIALOG_SHIM::EndModal( aCode );
 }
 
 
