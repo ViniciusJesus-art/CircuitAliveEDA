@@ -6,5 +6,6 @@ class wxWindow;
 namespace CIRCUITALIVE
 {
 std::optional<std::size_t> ChooseSimulationModel( wxWindow* aParent,
-        const std::vector<SIMULATION_MODEL>& aModels, int aSelected = -1 );
+        const std::vector<SIMULATION_MODEL>& aModels, int aSelected = -1,
+        std::optional<std::size_t> aSymbolPinCount = {} );
 }

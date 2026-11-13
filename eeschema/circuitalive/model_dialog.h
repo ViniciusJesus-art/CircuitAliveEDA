@@ -3,8 +3,10 @@
 #include "circuit_snapshot.h"
 
 class wxWindow;
+class SCH_SYMBOL;
 namespace CIRCUITALIVE
 {
 /// Edits a copy; the caller owns the schematic commit/undo boundary.
-bool EditSimulationModel( wxWindow* aParent, CIRCUIT_COMPONENT& aComponent, bool& aExcluded );
+bool EditSimulationModel( wxWindow* aParent, CIRCUIT_COMPONENT& aComponent, bool& aExcluded,
+                          const SCH_SYMBOL& aSymbol );
 }

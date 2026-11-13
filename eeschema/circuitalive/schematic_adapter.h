@@ -24,7 +24,14 @@ struct SCHEMATIC_SNAPSHOT
     CIRCUIT_SNAPSHOT circuit;
     std::vector<SYMBOL_LOCATION> locations;
     std::vector<SYMBOL_LOCATION> probes;
-    struct PIN_LOCATION { std::size_t component; std::string pin; wxString sheet; VECTOR2I position; };
+    struct PIN_LOCATION
+    {
+        std::size_t component;
+        std::string pin;
+        wxString sheet;
+        VECTOR2I position;
+        std::size_t logicIndex = NO_SIGNAL;
+    };
     std::vector<PIN_LOCATION> pins;
     struct WIRE_LOCATION { std::string node; wxString sheet; VECTOR2I start, end; };
     std::vector<WIRE_LOCATION> wires;

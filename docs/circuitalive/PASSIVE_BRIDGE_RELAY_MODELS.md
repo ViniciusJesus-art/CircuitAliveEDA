@@ -104,6 +104,12 @@ são editáveis. Bobina e cada polo têm grupos galvânicos independentes, para
 preservar referências e circuitos flutuantes. A implementação usa L e SW
 nativos e atrasos XSPICE descritos no
 [manual do ngspice](https://ngspice.sourceforge.io/docs/ngspice-manual.pdf).
+Os contatos leem diretamente a posição contínua da armadura, com uma pequena
+histerese de 0,001 na escala normalizada de 0 a 1. Isso substitui as fontes
+comparadoras booleanas, que podiam produzir `Timestep too small` durante a
+comutação em sessões com pausas frequentes. NC e NO conservam os limiares próximos
+de 25% e 75%, o intervalo com ambos abertos e as resistências configuradas.
+O controle usa a [histerese nativa do modelo SW](https://nmg.gitlab.io/ngspice-manual/circuitelementsandmodels/elementarydevices/switchmodel_sw_csw.html).
 
 Não existe diodo de supressão interno. O circuito externo define o caminho
 da corrente indutiva ao desligar a bobina. Os atrasos são funcionais; não

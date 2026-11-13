@@ -52,6 +52,40 @@ Sim.Name `1N4148` usa `diode_1n4148.casim` e confere A/K. Uma peça desconhecida
 continua precisando de modelo; não se escolhe um transistor qualquer apenas
 pelo número de pinos.
 
+## Escolha de modelo e vínculo visual dos pinos
+
+Na janela **Simulation model…**, **Choose model…** mostra apenas modelos com
+a mesma quantidade de pinos físicos do símbolo. A busca e as categorias mantêm
+esse filtro; a coluna **Pins** informa a quantidade. **Load file…**, **Reload
+file** e **Automatic** também conferem a quantidade antes de aceitar um modelo.
+Pinos com o mesmo número físico são tratados como um único terminal, inclusive
+em símbolos com várias unidades.
+
+A aba **Pin mapping** apresenta as portas do modelo à esquerda e o desenho
+real do símbolo à direita. Selecione uma porta e clique no ponto do pino do
+símbolo para vinculá-los, mesmo que seus nomes ou números sejam diferentes.
+A lista informa o número e o nome do pino vinculado; as cores identificam os
+pares. Clicar em um pino já ocupado troca os dois vínculos, mantendo um único
+destino para cada porta. Para pinos ocultos, sobrepostos ou de outra unidade,
+use a lista de pinos físicos e **Connect**. O seletor de unidade muda a parte
+exibida; **Fit symbol** enquadra novamente o desenho. Segure e arraste a rodinha
+do mouse sobre a prévia para movimentar o desenho. O anel laranja identifica o
+pino selecionado, preservando a cor da bolinha que representa seu vínculo.
+
+**Disconnect selected** remove um vínculo, **Clear connections** limpa todos e
+**Use model defaults** restaura os números declarados pelo modelo. Todos os
+pinos precisam estar vinculados antes de confirmar. Quando faltam vínculos,
+a janela abre essa aba automaticamente. Os parâmetros ficam em **Parameters**.
+
+Ao confirmar, o mapeamento continua salvo em `CA.Pins` no símbolo e participa
+do desfazer/refazer do editor. Salve o projeto para manter os vínculos ao
+reabrir. A opção **Use these settings for new … symbols** também grava o
+modelo e seus vínculos como padrão pessoal para novas instâncias desse símbolo.
+Cancelar a janela descarta as alterações.
+
+O destaque de componentes e folhas excluídos da simulação aparece somente na
+edição. A impressão e sua prévia desenham o símbolo sem essa borda ou marcador.
+
 ## Parâmetros de exemplos antigos
 
 VDC/VSIN/VPULSE copiadas para bibliotecas locais são reconhecidas pelo nome do

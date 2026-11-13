@@ -2697,8 +2697,8 @@ void SCH_PAINTER::draw( const SCH_SYMBOL* aSymbol, int aLayer )
 
     SCH_SHEET_PATH* sheetPath = optSheetPath ? &optSheetPath.value() : nullptr;
     bool DNP = aSymbol->GetDNP( sheetPath, variantName );
-    bool markExclusion = eeconfig()->m_Appearance.mark_sim_exclusions && aSymbol->GetExcludedFromSim( sheetPath,
-                                                                                                      variantName );
+    bool markExclusion = !m_schSettings.IsPrinting() && eeconfig()->m_Appearance.mark_sim_exclusions
+                         && aSymbol->GetExcludedFromSim( sheetPath, variantName );
 
     if( m_schSettings.IsPrinting() && drawingShadows )
         return;
@@ -3351,7 +3351,7 @@ void SCH_PAINTER::draw( const SCH_SHEET* aSheet, int aLayer )
     }
 
     bool drawingShadows = aLayer == LAYER_SELECTION_SHADOWS;
-    bool markExclusion = eeconfig()->m_Appearance.mark_sim_exclusions
+    bool markExclusion = !m_schSettings.IsPrinting() && eeconfig()->m_Appearance.mark_sim_exclusions
                             && aSheet->GetExcludedFromSim( sheetPath, variant );
 
     if( m_schSettings.IsPrinting() && drawingShadows )

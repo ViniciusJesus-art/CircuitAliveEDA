@@ -1189,6 +1189,63 @@ BOOST_AUTO_TEST_CASE( ProgrammableStopConditionsKeepPrecisionAcrossLongTimeRange
     }
 }
 
+BOOST_FIXTURE_TEST_CASE( ProgrammableRelayDriverSurvivesRepeatedEditorFrames, PROGRAM_FILES )
+{
+    auto mcu = AvrSymbol( Firmware( "relay-output", DigitalOutput( true ) ) );
+    mcu.pins["1"] = "";
+    mcu.pins["21"] = "";
+    CIRCUIT_COMPONENT relay{ "K1", "Relay:Relay_DPDT", "12V", {} };
+    for( const auto& pin : MODEL_REPOSITORY().SelectModel( relay ).pins ) relay.pins[pin.defaultPin] = "";
+    relay.pins["A1"] = "coil_supply"; relay.pins["A2"] = "collector";
+    relay.pins["21"] = "vcc"; relay.pins["24"] = "led_feed";
+    auto circuit = BuildCircuitSnapshot( { mcu, relay,
+        { "R3", "Device:R", "1k", {{"1","out"},{"2","base"}} },
+        { "Q1", "Transistor_BJT:BC337", "BC337", {{"1","collector"},{"2","base"},{"3","0"}} },
+        { "D4", "Diode:1N4007", "1N4007", {{"1","coil_supply"},{"2","collector"}} },
+        { "D5", "Device:LED", "LED", {{"1","led_return"},{"2","led_feed"}} },
+        { "R2", "Device:R", "330", {{"1","led_return"},{"2","0"}} } }, {}, true,
+        { { "#PWR1", "+12V", "coil_supply" }, { "#PWR2", "+5V", "vcc" } } );
+    // Isolate the electrical scheduling from firmware execution cost while
+    // retaining the actual ATmega GPIO, transistor, flyback diode and relay.
+    circuit.config.programmableDevices[0].source = R"JS(
+        globalThis.createDevice = function() {
+            let next = 0;
+            function prepare(time) {
+                const events = [];
+                while(next <= time) {
+                    events.push({pin:'PB5',drive:(Math.round(next*2)%2)?1:2,time:next});
+                    next += .5;
+                }
+                return {time,events,needsInputs:false};
+            }
+            return {nextEventTime:()=>Infinity,advanceTo:t=>prepare(t).events,prepareWindow:prepare};
+        };
+    )JS";
+    circuit.config.historyCapacity = 1;
+    circuit.config.step = circuit.config.maxStep = 100e-6;
+    circuit.config.horizon = 4;
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    const auto output = std::find_if( circuit.logicPins.begin(), circuit.logicPins.end(),
+        []( const auto& pin ) { return pin.reference == "U1" && pin.pin == "19"; } );
+    BOOST_REQUIRE( output != circuit.logicPins.end() );
+    for( double target = circuit.config.step; target < 3.6; )
+    {
+        session.AdvanceTo( target );
+        const auto sample = session.Snapshot( true );
+        BOOST_REQUIRE( sample.state == SIM_SESSION_STATE::PAUSED );
+        BOOST_REQUIRE_SMALL( sample.latest.time - target, 1e-10 );
+        for( const auto value : sample.latest.values ) BOOST_REQUIRE( std::isfinite( value ) );
+        if( std::fmod( sample.latest.time, .5 ) > .0001 )
+            BOOST_CHECK( PinLogicLevel( *output, sample.latest ) ==
+                ( int( sample.latest.time * 2 ) % 2 ? LOGIC_LEVEL::LOW : LOGIC_LEVEL::HIGH ) );
+        // Vary display batch boundaries across contact transitions, as happens
+        // when the editor adapts to solver load. Firmware time stays unchanged.
+        const double batches[] = { .008, .0013, .0041, .0067 };
+        target = sample.latest.time + batches[int( sample.latest.time * 1000 ) % 4];
+    }
+}
+
 BOOST_FIXTURE_TEST_CASE( ProgrammableRepeatedEditorBatchesKeepAnalogSourcesConvergent, PROGRAM_FILES )
 {
     // A sine source AC-coupled into an amplifier exposed a tiny saved timestep

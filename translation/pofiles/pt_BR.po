@@ -84544,3 +84544,86 @@ msgstr "Recapturar"
 
 msgid "Yellow = changed since the previous pause (first pause: initial contents). ? = unknown bits (X). Read-only; capture does not advance time."
 msgstr "Amarelo = alterado desde a pausa anterior (na primeira pausa: conteúdo inicial). ? = bits indefinidos (X). Somente leitura; capturar não avança o tempo."
+
+#. CircuitAliveEDA visual model pin mapping.
+#, c-format
+msgid "Symbol: %zu pins — showing only models with the same number of pins"
+msgstr "Símbolo: %zu pinos — mostrando apenas modelos com a mesma quantidade de pinos"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "No matching models. Try another search or load a model file with the same pin count."
+msgstr "Nenhum modelo encontrado. Tente outra busca ou carregue um modelo com a mesma quantidade de pinos."
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Pin mapping"
+msgstr "Vínculo dos pinos"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Symbol pin"
+msgstr "Pino do símbolo"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Symbol preview unavailable. Use the symbol pin list below."
+msgstr "Prévia do símbolo indisponível. Use a lista de pinos abaixo."
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Overlapping pins: choose the physical pin in the list below, then click Connect."
+msgstr "Pinos sobrepostos: escolha o pino físico na lista abaixo e clique em Vincular."
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Overlapping pins: use the list below"
+msgstr "Pinos sobrepostos: use a lista abaixo"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "1. Select a model port on the left.  2. Click the symbol pin to connect it.\nColors identify connected pairs. Connecting an occupied pin swaps the connections."
+msgstr "1. Selecione uma porta do modelo à esquerda.  2. Clique no pino do símbolo para vinculá-lo.\nAs cores identificam os pares. Vincular um pino ocupado troca os vínculos."
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Fit symbol"
+msgstr "Enquadrar símbolo"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "All physical pins, including hidden pins and pins in other units"
+msgstr "Todos os pinos físicos, incluindo pinos ocultos e de outras unidades"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Connect"
+msgstr "Vincular"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Disconnect selected"
+msgstr "Desvincular selecionado"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Clear connections"
+msgstr "Limpar vínculos"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Use model defaults"
+msgstr "Usar padrão do modelo"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Not connected"
+msgstr "Não vinculado"
+
+#. CircuitAliveEDA visual model pin mapping.
+#, c-format
+msgid "%zu / %zu connections"
+msgstr "%zu / %zu vínculos"
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Choose a model with the same pin count as the symbol."
+msgstr "Escolha um modelo com a mesma quantidade de pinos do símbolo."
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "The model and symbol must have the same number of pins."
+msgstr "O modelo e o símbolo devem ter a mesma quantidade de pinos."
+
+#. CircuitAliveEDA visual model pin mapping.
+#, c-format
+msgid "The model has %zu pins, but the symbol has %zu. Choose a model with the same number of pins."
+msgstr "O modelo tem %zu pinos, mas o símbolo tem %zu. Escolha um modelo com a mesma quantidade de pinos."
+
+#. CircuitAliveEDA visual model pin mapping.
+msgid "Connect every model port to a distinct symbol pin in the Pin mapping tab."
+msgstr "Vincule cada porta do modelo a um pino diferente do símbolo na aba Vínculo dos pinos."

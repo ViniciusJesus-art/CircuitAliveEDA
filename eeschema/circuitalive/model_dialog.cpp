@@ -6,6 +6,8 @@
 #include "model_profiles.h"
 #include <sim/platform_runtime.h>
 #include "panel_led_appearance.h"
+#include "panel_model_pin_mapping.h"
+#include <sch_symbol.h>
 #include <dialog_shim.h>
 #include <wx/button.h>
 #include "choice_controls.h"
@@ -25,7 +27,7 @@ namespace CIRCUITALIVE
 class MODEL_DIALOG : public DIALOG_SHIM
 {
 public:
-    MODEL_DIALOG( wxWindow* parent, const CIRCUIT_COMPONENT& component, bool excluded ) :
+    MODEL_DIALOG( wxWindow* parent, const CIRCUIT_COMPONENT& component, bool excluded, const SCH_SYMBOL& symbol ) :
         DIALOG_SHIM( parent, wxID_ANY, _( "Simulation model" ), wxDefaultPosition,
                      wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER ), m_component( component ),
         m_repository( MODEL_REPOSITORY::DefaultDirectories( component.projectDirectory ) )
@@ -67,18 +69,13 @@ public:
         } );
         m_details = new wxStaticText( this, wxID_ANY, "" );
         layout->Add( m_details, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
-        layout->Add( new wxStaticText( this, wxID_ANY, _( "Model ports → physical symbol pins" ) ),
-                     0, wxLEFT | wxRIGHT | wxTOP, 10 );
-        m_pins = new wxGrid( this, wxID_ANY );
-        m_pins->SetMinSize( wxSize( 200, 150 ) );
-        m_pins->CreateGrid( 0, 3 );
-        m_pins->SetColLabelValue( 0, _( "Model port" ) );
-        m_pins->SetColLabelValue( 1, _( "Role" ) );
-        m_pins->SetColLabelValue( 2, _( "Physical pin" ) );
-        layout->Add( m_pins, 1, wxEXPAND | wxALL, 10 );
-        layout->Add( new wxStaticText( this, wxID_ANY, _( "Parameters — blank uses the model default; $value follows the symbol Value" ) ),
-                     0, wxLEFT | wxRIGHT, 10 );
-        m_parameterPages=new wxNotebook(this,wxID_ANY);
+        m_pages = new wxNotebook( this, wxID_ANY );
+        auto* parametersPage = new wxPanel( m_pages );
+        auto* parametersLayout = new wxBoxSizer( wxVERTICAL );
+        parametersLayout->Add( new wxStaticText( parametersPage, wxID_ANY,
+            _( "Parameters — blank uses the model default; $value follows the symbol Value" ) ),
+            0, wxEXPAND | wxALL, 10 );
+        m_parameterPages=new wxNotebook(parametersPage,wxID_ANY);
         auto* electrical=new wxPanel(m_parameterPages);auto* parameterLayout=new wxBoxSizer(wxVERTICAL);
         m_parameters = new wxGrid( electrical, wxID_ANY );
         m_parameters->SetMinSize( wxSize( 200, 180 ) );
@@ -90,7 +87,13 @@ public:
         parameterLayout->Add(m_parameters,1,wxEXPAND);electrical->SetSizer(parameterLayout);
         m_parameterPages->AddPage(electrical,_("Electrical parameters"));
         m_appearance=new PANEL_LED_APPEARANCE(m_parameterPages);m_appearance->Hide();
-        layout->Add( m_parameterPages, 2, wxEXPAND | wxALL, 10 );
+        parametersLayout->Add( m_parameterPages, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
+        parametersPage->SetSizer( parametersLayout );
+        m_pages->AddPage( parametersPage, _( "Parameters" ) );
+        m_pins = new PANEL_MODEL_PIN_MAPPING( m_pages, symbol.GetLibSymbolRef().get(),
+                                             symbol.GetUnit(), symbol.GetBodyStyle() );
+        m_pages->AddPage( m_pins, _( "Pin mapping" ) );
+        layout->Add( m_pages, 1, wxEXPAND | wxALL, 10 );
         auto* measurements = new wxBoxSizer( wxVERTICAL );
         auto* checks = new wxBoxSizer( wxHORIZONTAL );
         m_voltage = new wxCheckBox( this, wxID_ANY, _( "Measure V" ) );
@@ -133,7 +136,7 @@ public:
         m_selected = selected;
         if( !excluded ) { selectExternalFile(); load( true ); }
         else m_details->SetLabel( _( "Excluded — no simulation model is required." ) );
-        m_editingControls = { m_choice, chooseModel, automatic, browse, reload, m_files, m_filePath, m_pins, m_parameterPages,
+        m_editingControls = { m_choice, chooseModel, automatic, browse, reload, m_files, m_filePath, m_pages,
             m_voltage, m_current, m_power, m_positive, m_negative, m_remember, forget };
         enableModelControls();
         m_exclude->Bind( wxEVT_CHECKBOX, [this]( wxCommandEvent& )
@@ -147,10 +150,19 @@ public:
             if( current < 0 && m_model )
                 for( std::size_t i = 0; i < m_models.size(); ++i )
                     if( m_models[i].id == m_model->id ) current = i;
-            if( const auto picked = ChooseSimulationModel( this, m_models, current ) )
-            { m_selected = *picked + 1; load( false ); }
+            if( const auto picked = ChooseSimulationModel( this, m_models, current, m_component.pins.size() ) )
+            {
+                const auto previous = m_selected;
+                m_selected = *picked + 1;
+                if( !load( false ) ) m_selected = previous;
+            }
         } );
-        automatic->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& ) { m_selected = 0; load( false ); } );
+        automatic->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& )
+        {
+            const auto previous = m_selected;
+            m_selected = 0;
+            if( !load( false ) ) m_selected = previous;
+        } );
         browse->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& )
         {
             wxFileDialog picker( this, _( "Load simulation model" ),
@@ -172,6 +184,7 @@ public:
                 {
                     collect();
                     auto refreshed = MODEL_REPOSITORY::Load( m_model->file );
+                    requireMatchingPins( refreshed );
                     if( m_selected > 0 ) m_models.at( m_selected - 1 ) = refreshed;
                     m_repository = MODEL_REPOSITORY( MODEL_REPOSITORY::DefaultDirectories( m_component.projectDirectory ) );
                     load( true );
@@ -248,6 +261,7 @@ private:
     }
     int addModel( SIMULATION_MODEL model )
     {
+        requireMatchingPins( model );
         for( std::size_t i = 0; i < m_models.size(); ++i )
         {
             std::error_code error;
@@ -261,46 +275,62 @@ private:
         return static_cast<int>( m_models.size() );
     }
     void showError( const std::string& text ) { wxMessageBox( DiagnosticText( text ), _( "Simulation model" ), wxOK | wxICON_INFORMATION, this ); }
-    void load( bool preserve )
+    void requireMatchingPins( const SIMULATION_MODEL& model ) const
     {
-        if( !preserve ) { m_component.modelPins.clear(); m_component.modelParameters.clear(); m_component.resources.clear(); }
-        m_model.reset();
+        if( model.pins.size() != m_component.pins.size() )
+            throw std::runtime_error( wxString::Format(
+                _( "The model has %zu pins, but the symbol has %zu. Choose a model with the same number of pins." ),
+                model.pins.size(), m_component.pins.size() ).ToStdString( wxConvUTF8 ) );
+    }
+    bool load( bool preserve )
+    {
         try
         {
+            auto component = m_component;
+            SIMULATION_MODEL model;
             const auto selected = m_selected;
             if( selected == 0 )
             {
-                m_component.modelFile.clear();
-                m_model = m_repository.SelectModel( m_component );
+                component.modelFile.clear();
+                model = m_repository.SelectModel( component );
             }
             else
             {
-                m_model = m_models.at( selected - 1 );
+                model = m_models.at( selected - 1 );
                 // Bundled choices retain an ID; user files retain a path, relative inside the project.
-                const auto bundled = m_model->file.parent_path();
+                const auto bundled = model.file.parent_path();
                 bool builtin = false;
                 for( const auto& directory : MODEL_REPOSITORY::DefaultDirectories() )
                 {
                     std::error_code error;
                     if( std::filesystem::equivalent( bundled, directory, error ) ) builtin = true;
                 }
-                m_component.modelFile = "builtin:" + m_model->id;
+                component.modelFile = "builtin:" + model.id;
                 if( !builtin )
                 {
                     std::error_code error;
-                    auto relative = std::filesystem::relative( m_model->file, std::filesystem::u8path( m_component.projectDirectory ), error );
-                    m_component.modelFile = !error && !relative.empty() && *relative.begin() != ".."
-                            ? PathUtf8( relative ) : PathUtf8( m_model->file );
+                    auto relative = std::filesystem::relative( model.file, std::filesystem::u8path( component.projectDirectory ), error );
+                    component.modelFile = !error && !relative.empty() && *relative.begin() != ".."
+                            ? PathUtf8( relative ) : PathUtf8( model.file );
                 }
             }
+            requireMatchingPins( model );
+            if( !preserve ) { component.modelPins.clear(); component.modelParameters.clear(); component.resources.clear(); }
+            m_component = std::move( component );
+            m_model = std::move( model );
             m_choice->ChangeValue( ( m_selected == 0 ? _( "Automatic: " ) : wxString() ) + ModelText( m_model->name ) );
             m_details->SetLabel( wxString::FromUTF8( PathUtf8( m_model->file ) ) + "\n" + ModelText( m_model->description ) );
             if( m_model->runtime )
                 m_details->SetLabel( m_details->GetLabel() + "\n"
                     + _( "Set CPU clock to the frequency used when compiling the firmware. Changing it changes firmware timing, including delays and timers." ) );
         }
-        catch( const std::exception& e ) { m_choice->ChangeValue( _( "No model selected" ) ); m_details->SetLabel( DiagnosticText( e.what() ) ); }
-        if( m_pins->GetNumberRows() ) m_pins->DeleteRows( 0, m_pins->GetNumberRows() );
+        catch( const std::exception& e )
+        {
+            if( m_model ) { showError( e.what() ); return false; }
+            m_choice->ChangeValue( _( "No model selected" ) ); m_details->SetLabel( DiagnosticText( e.what() ) );
+        }
+        m_pins->Configure( m_model ? &*m_model : nullptr, m_component );
+        if( m_model && !m_pins->Complete() ) m_pages->SetSelection( 1 );
         if( m_parameters->GetNumberRows() ) m_parameters->DeleteRows( 0, m_parameters->GetNumberRows() );
         m_positive->Clear(); m_negative->Clear();
         if( m_model )
@@ -313,17 +343,8 @@ private:
                 try { inherited = m_repository.Resolve( m_component ).parameterText; }
                 catch( const std::exception& ) {}
             }
-            wxArrayString physical;
-            for( const auto& [pin, net] : m_component.pins ) physical.Add( wxString::FromUTF8( pin ) );
             for( const auto& pin : m_model->pins )
             {
-                const int row = m_pins->GetNumberRows(); m_pins->AppendRows();
-                m_pins->SetCellValue( row, 0, ModelText( pin.label ) + " [" + wxString::FromUTF8(pin.id) + "]" );
-                m_pins->SetCellValue( row, 1, ModelText( pin.role ) );
-                auto it = m_component.modelPins.find( pin.id );
-                m_pins->SetCellValue( row, 2, wxString::FromUTF8( it == m_component.modelPins.end() ? pin.defaultPin : it->second ) );
-                m_pins->SetReadOnly( row, 0 ); m_pins->SetReadOnly( row, 1 );
-                m_pins->SetCellEditor( row, 2, new CLICK_CHOICE_EDITOR( physical, false ) );
                 m_positive->Append( ModelText( pin.label ) + " [" + wxString::FromUTF8(pin.id) + "]" );
                 m_negative->Append( ModelText( pin.label ) + " [" + wxString::FromUTF8(pin.id) + "]" );
             }
@@ -352,10 +373,7 @@ private:
                 for( const int col : { 0, 2, 3 } ) m_parameters->SetReadOnly( row, col );
             }
         }
-        for( auto* grid : { m_pins, m_parameters } )
-        {
-            grid->SetRowLabelSize( 30 ); grid->AutoSizeColumns(); grid->SetColSize( 0, 310 );
-        }
+        m_parameters->SetRowLabelSize( 30 ); m_parameters->AutoSizeColumns();
         m_parameters->SetColSize( 0, 350 );
         m_parameters->SetColSize( 1, 130 );
         m_parameters->SetColSize( 3, 130 );
@@ -381,15 +399,19 @@ private:
         m_filePath->Show( m_model && !m_model->resources.empty() );
         updateResourcePaths();
         m_details->Wrap( 830 ); Layout();
+        return m_model.has_value();
     }
     void collect()
     {
         if( !m_model ) throw std::runtime_error( "Choose a simulation model file first" );
-        for( auto* grid : { m_pins, m_parameters } )
+        requireMatchingPins( *m_model );
+        if( !m_pins->Complete() )
         {
-            grid->SaveEditControlValue(); grid->HideCellEditControl();
+            m_pages->SetSelection( 1 );
+            throw std::runtime_error( _( "Connect every model port to a distinct symbol pin in the Pin mapping tab." ).ToStdString( wxConvUTF8 ) );
         }
-        m_component.modelPins.clear(); m_component.modelParameters.clear();
+        m_parameters->SaveEditControlValue(); m_parameters->HideCellEditControl();
+        m_component.modelPins = m_pins->Mapping(); m_component.modelParameters.clear();
         auto& selected = m_component.measurements;
         selected.voltage = m_voltage->GetValue(); selected.current = m_current->GetValue(); selected.power = m_power->GetValue();
         if( selected.Any() )
@@ -400,8 +422,6 @@ private:
             selected.positive = m_model->pins.at( m_positive->GetSelection() ).id;
             selected.negative = m_model->pins.at( m_negative->GetSelection() ).id;
         }
-        for( std::size_t i = 0; i < m_model->pins.size(); ++i )
-            m_component.modelPins[m_model->pins[i].id] = m_pins->GetCellValue( i, 2 ).ToStdString(wxConvUTF8);
         for( std::size_t i = 0; i < m_model->parameters.size(); ++i )
             if( auto value = m_parameters->GetCellValue( i, 1 ).ToStdString(wxConvUTF8); !value.empty() )
                 m_component.modelParameters[m_model->parameters[i].id] = value;
@@ -415,7 +435,8 @@ private:
     wxTextCtrl* m_choice;
     int m_selected = 0;
     wxStaticText* m_details;
-    wxGrid* m_pins;
+    PANEL_MODEL_PIN_MAPPING* m_pins;
+    wxNotebook* m_pages;
     wxGrid* m_parameters;
     wxNotebook* m_parameterPages;
     PANEL_LED_APPEARANCE* m_appearance;
@@ -427,9 +448,9 @@ private:
     bool m_forget = false;
 };
 
-bool EditSimulationModel( wxWindow* parent, CIRCUIT_COMPONENT& component, bool& excluded )
+bool EditSimulationModel( wxWindow* parent, CIRCUIT_COMPONENT& component, bool& excluded, const SCH_SYMBOL& symbol )
 {
-    MODEL_DIALOG dialog( parent, component, excluded );
+    MODEL_DIALOG dialog( parent, component, excluded, symbol );
     if( dialog.ShowQuasiModal() != wxID_OK ) return false;
     component = dialog.Result();
     excluded = dialog.Excluded();

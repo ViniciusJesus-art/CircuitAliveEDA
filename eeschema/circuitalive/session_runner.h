@@ -19,6 +19,10 @@ std::chrono::steady_clock::time_point NextPlaybackDeadline(
         std::chrono::steady_clock::time_point aNow,
         std::chrono::steady_clock::duration aInterval );
 
+/// Keep solver requests within the display budget without changing electrical timesteps.
+double NextPlaybackAdvance( double aMaximum, double aPreviousAdvance,
+                            double aPreviousWorkSeconds, double aBudgetSeconds );
+
 enum class EDITOR_SESSION_STATE { STOPPED, PREPARING, RUNNING, PAUSED, COMPLETED, FAILED };
 
 struct SESSION_MEMORY_REGION

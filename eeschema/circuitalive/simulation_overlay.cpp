@@ -33,10 +33,10 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
         for( const auto& location : aCircuit.pins )
         {
             if( location.sheet != aCurrentSheet ) continue;
-            for( std::size_t i = 0; i < aCircuit.circuit.logicPins.size() && i < aSession.logicLevels.size(); ++i )
+            const auto i = location.logicIndex;
+            if( i < aCircuit.circuit.logicPins.size() && i < aSession.logicLevels.size() )
             {
                 const auto& pin = aCircuit.circuit.logicPins[i];
-                if( pin.component != location.component || pin.pin != location.pin ) continue;
                 const auto level = aSession.logicLevels[i];
                 const bool conflict = pin.component < aCircuit.circuit.pinNodes.size()
                     && conflictingNodes.contains( aCircuit.circuit.pinNodes[pin.component].at( pin.pin ) );
@@ -52,7 +52,6 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
                 const char* text = conflict ? "!" : rapid ? "~" : level == LOGIC_LEVEL::HIGH ? "1" : level == LOGIC_LEVEL::LOW ? "0"
                     : level == LOGIC_LEVEL::HIGH_Z ? "Z" : "X";
                 BitmapText( text, location.position + VECTOR2I( schIUScale.mmToIU( .7 ), schIUScale.mmToIU( -.7 ) ), ANGLE_0 );
-                break;
             }
         }
     for( const auto& channel : aCircuit.circuit.measurements )

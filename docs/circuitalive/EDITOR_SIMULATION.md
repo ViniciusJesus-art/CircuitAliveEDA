@@ -168,9 +168,22 @@ as APIs do KiCad mudarem.
 
 Somente a thread gráfica lê o esquema e desenha os resultados. A thread de
 controle recebe cópias e executa as chamadas bloqueantes do worker isolado.
-Um timer de 33 ms apresenta snapshots; o controle avança em trechos de 20 ms
-simulados, com pausas entre trechos, sem acumular trabalho para recuperar atraso
-de parede. Circuitos lentos podem avançar abaixo do tempo real.
+O timer apresenta snapshots na frequência configurada nas preferências. O controle
+inclui o trabalho do solver no orçamento de cada quadro: um lote atrasado publica
+seus resultados e prossegue sem acrescentar outra espera completa nem acumular
+quadros para recuperar atraso. Lotes analógicos se adaptam ao custo medido; lotes
+de MCU conservam a janela cooperativa para evitar repetir o custo de pausa/retomada
+em pedidos muito pequenos. O passo elétrico máximo e a velocidade solicitada
+continuam respeitados. Circuitos lentos podem avançar abaixo do tempo real; a
+barra inferior mostra a velocidade efetivamente alcançada.
+
+Cada pino gráfico é associado ao seu canal elétrico durante a captura. A atualização
+do desenho consulta esse índice diretamente e compara apenas os pinos e LEDs da
+folha visível. A animação independe de movimentos do mouse. Somente canais usados
+pelo osciloscópio e pelos avisos são copiados para o histórico a cada ponto do
+solver; valores instantâneos e detecção de sinais rápidos continuam completos.
+A captura ordena os componentes por referência para que a ordem do índice gráfico
+não altere a ordenação elétrica após navegar ou editar o esquema.
 
 Os parâmetros internos desta etapa são passo máximo de **100 µs**, horizonte
 finito de **1 hora simulada**, histórico circular de 256 amostras e até 64 LEDs.

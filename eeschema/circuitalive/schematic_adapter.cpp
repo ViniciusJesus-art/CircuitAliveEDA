@@ -13,6 +13,8 @@
 #include <sch_symbol.h>
 #include <schematic.h>
 #include <algorithm>
+#include <numeric>
+#include <tuple>
 #include <stdexcept>
 
 namespace CIRCUITALIVE
@@ -266,6 +268,24 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
                 result.pins.push_back( { index, pin->GetShownNumber().ToStdString(), sheet.Path().AsString(), pin->GetPosition() } );
         }
     }
+    // Spatial-index iteration changes after editing or switching pages. Keep
+    // the solver's device/node ordering independent of that graphical order.
+    std::vector<std::size_t> order( components.size() ), indices( components.size() );
+    std::iota( order.begin(), order.end(), 0 );
+    std::stable_sort( order.begin(), order.end(), [&]( auto a, auto b )
+                     { return components[a].reference < components[b].reference; } );
+    auto unsortedComponents = std::move( components );
+    auto unsortedLocations = std::move( result.locations );
+    components.clear(); result.locations.clear();
+    for( const auto old : order )
+    {
+        indices[old] = components.size();
+        components.push_back( std::move( unsortedComponents[old] ) );
+        result.locations.push_back( std::move( unsortedLocations[old] ) );
+    }
+    for( auto& location : result.pins ) location.component = indices[location.component];
+    std::stable_sort( powerSymbols.begin(), powerSymbols.end(), []( const auto& a, const auto& b )
+                     { return std::tie( a.net, a.reference ) < std::tie( b.net, b.reference ); } );
     result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators, powerSymbols,
                                           aPreferences, pinObservers );
     const std::size_t observerStart = result.circuit.pinNodes.size() - pinObservers.size();
@@ -274,6 +294,17 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
         location.component += observerStart;
         result.pins.push_back( std::move( location ) );
     }
+    // Bind each graphical pin once, rather than searching all electrical pins
+    // again on every display frame. Multi-unit/stacked pins can share one index.
+    std::map<std::pair<std::size_t, std::string>, std::size_t> logicIndices;
+    for( std::size_t i = 0; i < result.circuit.logicPins.size(); ++i )
+    {
+        const auto& pin = result.circuit.logicPins[i];
+        logicIndices.emplace( std::make_pair( pin.component, pin.pin ), i );
+    }
+    for( auto& location : result.pins )
+        if( const auto it = logicIndices.find( { location.component, location.pin } ); it != logicIndices.end() )
+            location.logicIndex = it->second;
     std::map<std::string, std::string> netNodes;
     for( std::size_t i = 0; i < components.size(); ++i )
         for( const auto& [pin, net] : components[i].pins )

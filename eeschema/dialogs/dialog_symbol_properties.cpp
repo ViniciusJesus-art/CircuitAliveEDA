@@ -648,7 +648,7 @@ void DIALOG_SYMBOL_PROPERTIES::OnEditSpiceModel( wxCommandEvent& event )
         auto component = CIRCUITALIVE::ReadSymbolModelSettings( pending, sheet, wxEmptyString,
                 GetParent()->Prj().GetProjectPath().ToStdString( wxConvUTF8 ), true );
         bool excluded = m_cbExcludeFromSim->IsChecked();
-        if( !CIRCUITALIVE::EditSimulationModel( this, component, excluded ) ) return;
+        if( !CIRCUITALIVE::EditSimulationModel( this, component, excluded, pending ) ) return;
         if( !excluded ) CIRCUITALIVE::WriteSymbolModelSettings( pending, component );
         m_cbExcludeFromSim->SetValue( excluded );
         fields.clear();

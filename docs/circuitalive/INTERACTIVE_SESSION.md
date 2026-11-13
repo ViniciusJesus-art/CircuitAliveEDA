@@ -22,6 +22,12 @@ Estados: `STOPPED`, `RUNNING`, `PAUSED`, `COMPLETED`, `ERROR`.
 As chamadas do controlador são síncronas e serializadas. A interface da etapa 2
 as executa em sua thread de controle e publica os snapshots para a thread wx.
 Callbacks do ngspice não acessam objetos do editor nem objetos gráficos.
+`AdvanceTo` usa `run`/`resume` síncronos na thread do worker, pois o pedido já
+aguarda uma fronteira elétrica confirmada. Isso evita criar uma thread do ngspice
+por quadro. `Play` analógico mantém `bg_run`/`bg_resume` para execução contínua.
+Quando há seleção de canais históricos, o buffer circular copia somente esses
+canais durante a captura; o snapshot instantâneo e os monitores de atividade
+mantêm todos os sinais solicitados.
 
 ## Por que usar um processo auxiliar
 

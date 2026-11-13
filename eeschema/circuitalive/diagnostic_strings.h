@@ -4,12 +4,14 @@
 namespace CIRCUITALIVE
 {
 inline const char* const DIAGNOSTIC_STRINGS[] = {
+    wxTRANSLATE( "The model has %zu pins, but the symbol has %zu. Choose a model with the same number of pins." ),
     wxTRANSLATE( "BIN cannot represent unknown bits (X). Export a .camem snapshot to preserve them." ),
     wxTRANSLATE( "Interactive button needs an independent V/I source in the component instance" ),
     wxTRANSLATE( "Click on an electrical wire or a component pin endpoint to place the probe" ),
     wxTRANSLATE( "Intel HEX cannot represent partially unknown bytes. Export .camem instead." ),
     wxTRANSLATE( "Live references in subcircuits or global solver settings are not supported" ),
     wxTRANSLATE( ": programmable runtime models cannot be composed as electrical blocks yet" ),
+    wxTRANSLATE( "Connect every model port to a distinct symbol pin in the Pin mapping tab." ),
     wxTRANSLATE( "External terminals are distinct. Add a resistor/link block between them." ),
     wxTRANSLATE( "This component has no memory in the active simulation. Stop and restart " ),
     wxTRANSLATE( "Programmable runtime models cannot be composed as electrical blocks yet" ),

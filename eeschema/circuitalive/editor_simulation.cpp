@@ -536,7 +536,7 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
             m_frame->Schematic().GetCurrentVariant(), m_frame->Prj().GetProjectPath().ToStdString(wxConvUTF8), true );
         bool excluded = symbol->GetExcludedFromSim( &m_frame->GetCurrentSheet(),
                                                    m_frame->Schematic().GetCurrentVariant() );
-        if( EditSimulationModel( m_frame, component, excluded ) )
+        if( EditSimulationModel( m_frame, component, excluded, *symbol ) )
         {
             SCH_COMMIT commit( m_frame );
             for( auto& sheet : m_frame->Schematic().Hierarchy() )
@@ -777,21 +777,30 @@ void EDITOR_SIMULATION_TOOL::redraw( bool force )
     const auto sheet = m_frame->GetCurrentSheet().Path().AsString();
     std::vector<int> brightness;
     for( std::size_t i = 0; visible && i < m_circuit.circuit.leds.size(); ++i )
-        brightness.push_back( int( 255 * LedBrightness( i < m_session.ledCurrents.size() ? m_session.ledCurrents[i] : 0,
-                                                      m_circuit.circuit.leds[i].brightnessCurrent ) ) );
+        if( m_circuit.locations[m_circuit.circuit.leds[i].component].sheet == sheet )
+            brightness.push_back( int( 255 * LedBrightness( i < m_session.ledCurrents.size() ? m_session.ledCurrents[i] : 0,
+                                                          m_circuit.circuit.leds[i].brightnessCurrent ) ) );
+    std::vector<LOGIC_LEVEL> levels;
+    std::vector<bool> rapid;
+    if( visible && m_logicLevels )
+        for( const auto& pin : m_circuit.pins )
+            if( pin.sheet == sheet && pin.logicIndex < m_session.logicLevels.size() )
+            {
+                levels.push_back( m_session.logicLevels[pin.logicIndex] );
+                rapid.push_back( pin.logicIndex < m_session.logicRapid.size() && m_session.logicRapid[pin.logicIndex] );
+            }
     if( !force && m_overlayCached && visible == m_overlayVisible && sheet == m_overlaySheet
         && m_logicLevels == m_overlayLogic && brightness == m_overlayBrightness
         && m_session.switches == m_overlaySwitches
         && m_session.adjustments == m_overlayAdjustments
         && m_session.netContentions == m_overlayContentions
-        && ( !m_logicLevels || ( m_session.logicLevels == m_overlayLevels
-                                 && m_session.logicRapid == m_overlayRapid ) ) ) return;
+        && levels == m_overlayLevels && rapid == m_overlayRapid ) return;
     m_overlayCached = true; m_overlayVisible = visible; m_overlaySheet = sheet; m_overlayLogic = m_logicLevels;
     m_overlayBrightness = std::move( brightness ); m_overlaySwitches = m_session.switches;
     m_overlayAdjustments = m_session.adjustments;
     m_overlayContentions = m_session.netContentions;
-    m_overlayLevels = m_logicLevels ? m_session.logicLevels : std::vector<LOGIC_LEVEL>{};
-    m_overlayRapid = m_logicLevels ? m_session.logicRapid : std::vector<bool>{};
+    m_overlayLevels = std::move( levels );
+    m_overlayRapid = std::move( rapid );
     auto* view = m_frame->GetCanvas()->GetView();
     m_overlay->Render( m_circuit, m_session, m_frame->GetCurrentSheet().Path().AsString(), m_logicLevels );
     if( !view->HasItem( m_overlay.get() ) )

@@ -34,8 +34,98 @@
 #include <sch_line.h>
 #include <sch_connection.h>
 #include <base_units.h>
+#include <sch_painter.h>
+#include <gal/graphics_abstraction_layer.h>
+#include <kiface_base.h>
+#include <array>
+#include <thread>
 
 using namespace CIRCUITALIVE;
+
+BOOST_FIXTURE_TEST_CASE( NativePinIndicatorsBindDirectlyToElectricalChannels, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file( CIRCUITALIVE_TEST_SCHEMATIC ); file.SetFullName( "digital_74hc00.kicad_sch" );
+    LoadSchematic( file );
+    const auto snapshot = CaptureSchematic( *m_schematic, true );
+    BOOST_REQUIRE( !snapshot.pins.empty() );
+    for( const auto& location : snapshot.pins )
+    {
+        BOOST_REQUIRE_LT( location.logicIndex, snapshot.circuit.logicPins.size() );
+        const auto& pin = snapshot.circuit.logicPins[location.logicIndex];
+        BOOST_CHECK_EQUAL( pin.component, location.component );
+        BOOST_CHECK_EQUAL( pin.pin, location.pin );
+    }
+    std::vector<SCH_SYMBOL*> symbols;
+    for( auto* item : m_schematic->RootScreen()->Items().OfType( SCH_SYMBOL_T ) )
+        symbols.push_back( static_cast<SCH_SYMBOL*>( item ) );
+    std::reverse( symbols.begin(), symbols.end() );
+    for( auto* symbol : symbols )
+    {
+        m_schematic->RootScreen()->Remove( symbol );
+        m_schematic->RootScreen()->Append( symbol );
+    }
+    const auto reordered = CaptureSchematic( *m_schematic, true );
+    BOOST_CHECK_EQUAL( reordered.circuit.netlist, snapshot.circuit.netlist );
+    BOOST_CHECK( reordered.circuit.config.signals == snapshot.circuit.config.signals );
+}
+
+BOOST_FIXTURE_TEST_CASE( SimulationExclusionMarkersAreScreenOnlyForSymbolsAndSheets, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    struct PAINTER_SETTINGS
+    {
+        EESCHEMA_SETTINGS settings;
+        APP_SETTINGS_BASE* previous = Kiface().KifaceSettings();
+        PAINTER_SETTINGS()
+        {
+            settings.m_Appearance.mark_sim_exclusions = true;
+            Kiface().InitSettings( &settings );
+        }
+        ~PAINTER_SETTINGS() { Kiface().InitSettings( previous ); }
+    } settings;
+    struct RECORDING_GAL : KIGFX::GAL
+    {
+        using KIGFX::GAL::GAL;
+        std::array<unsigned, 3> counts{};
+        void DrawSegment( const VECTOR2D&, const VECTOR2D&, double ) override { ++counts[0]; }
+        void DrawCircle( const VECTOR2D&, double ) override { ++counts[1]; }
+        void DrawCurve( const VECTOR2D&, const VECTOR2D&, const VECTOR2D&, const VECTOR2D&, double ) override
+        { ++counts[2]; }
+    };
+    LoadSchematic( wxFileName( CIRCUITALIVE_TEST_SCHEMATIC ) );
+    SCH_SYMBOL* symbol = nullptr;
+    for( auto* item : m_schematic->RootScreen()->Items().OfType( SCH_SYMBOL_T ) )
+        if( ( symbol = static_cast<SCH_SYMBOL*>( item ) ) ) break;
+    BOOST_REQUIRE( symbol );
+    symbol->SetDNP( false );
+    KIGFX::GAL_DISPLAY_OPTIONS options;
+    RECORDING_GAL gal( options );
+    KIGFX::SCH_PAINTER painter( &gal );
+    painter.SetSchematic( m_schematic.get() );
+    auto draw = [&]( SCH_ITEM* item, int layer, bool printing )
+    {
+        gal.counts = {};
+        painter.GetSettings()->SetIsPrinting( printing );
+        painter.Draw( item, layer );
+        return gal.counts;
+    };
+    symbol->SetExcludedFromSim( false );
+    const auto symbolOnScreen = draw( symbol, LAYER_DEVICE, false );
+    const auto symbolPrinted = draw( symbol, LAYER_DEVICE, true );
+    symbol->SetExcludedFromSim( true );
+    const auto excludedOnScreen = draw( symbol, LAYER_DEVICE, false );
+    BOOST_CHECK_GT( excludedOnScreen[0], symbolOnScreen[0] );
+    BOOST_CHECK_GT( excludedOnScreen[1], symbolOnScreen[1] );
+    BOOST_CHECK( draw( symbol, LAYER_DEVICE, true ) == symbolPrinted );
+
+    SCH_SHEET sheet;
+    sheet.SetSize( VECTOR2I( schIUScale.mmToIU( 20 ), schIUScale.mmToIU( 15 ) ) );
+    const auto sheetOnScreen = draw( &sheet, LAYER_SHEET, false );
+    const auto sheetPrinted = draw( &sheet, LAYER_SHEET, true );
+    sheet.SetExcludedFromSim( true );
+    const auto excludedSheetOnScreen = draw( &sheet, LAYER_SHEET, false );
+    BOOST_CHECK_GT( excludedSheetOnScreen[0], sheetOnScreen[0] );
+    BOOST_CHECK( draw( &sheet, LAYER_SHEET, true ) == sheetPrinted );
+}
 
 // Opt-in diagnostic: capture the same connected circuit as the editor without changing its files.
 BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_FIXTURE,
@@ -75,6 +165,50 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
     auto save = [&] { std::ofstream output( std::filesystem::path( reinterpret_cast<const char8_t*>( destination ) ) );
                      BOOST_REQUIRE( output ); output << report.dump( 2 ) << '\n'; };
     save();
+    if( const auto* live = std::getenv( "CIRCUITALIVE_AUDIT_LIVE_UNTIL" ) )
+    {
+        const double until = std::stod( live );
+        SESSION_RUNNER runner( CIRCUITALIVE_TEST_WORKER );
+        runner.Start( circuit );
+        const auto started = std::chrono::steady_clock::now();
+        auto lastUpdate = started;
+        double lastTime = -1, maxGap = 0;
+        std::size_t updates = 0;
+        JSON changes = JSON::array();
+        std::vector<LOGIC_LEVEL> previous;
+        for( ;; )
+        {
+            const auto view = runner.View();
+            const auto now = std::chrono::steady_clock::now();
+            if( view.state == EDITOR_SESSION_STATE::FAILED )
+            {
+                report["error"] = view.error; save(); BOOST_FAIL( view.error );
+            }
+            if( view.sample.latest.time > lastTime && !view.logicLevels.empty() )
+            {
+                if( updates > 1 ) maxGap = std::max( maxGap,
+                    std::chrono::duration<double>( now - lastUpdate ).count() );
+                ++updates; lastTime = view.sample.latest.time; lastUpdate = now;
+                for( std::size_t i = 0; i < circuit.logicPins.size(); ++i )
+                {
+                    const auto& pin = circuit.logicPins[i];
+                    BOOST_REQUIRE( view.logicLevels.at( i ) == PinLogicLevel( pin, view.sample.latest ) );
+                    if( pin.reference == "U3" && pin.pin == "19"
+                        && ( previous.empty() || previous[i] != view.logicLevels[i] ) )
+                        changes.push_back( { { "time", lastTime }, { "level", int( view.logicLevels[i] ) } } );
+                }
+                previous = view.logicLevels;
+            }
+            if( lastTime >= until ) break;
+            BOOST_REQUIRE( now - started < std::chrono::seconds( 60 ) );
+            std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
+        }
+        report["live"] = { { "time", lastTime }, { "wall_seconds",
+            std::chrono::duration<double>( std::chrono::steady_clock::now() - started ).count() },
+            { "updates", updates }, { "max_update_gap_ms", maxGap * 1000 }, { "pb5_changes", changes } };
+        save();
+        return;
+    }
     INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
     try
     {

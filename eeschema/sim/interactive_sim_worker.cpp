@@ -321,7 +321,7 @@ private:
         std::lock_guard lock( m_mutex );
         m_ring.assign( m_config.historyCapacity, SIM_SAMPLE{} );
         for( auto& sample : m_ring )
-            sample.values.resize( m_names.size() );
+            sample.values.resize( m_config.historySignals ? m_config.historySignals->size() : m_names.size() );
         Clear();
     }
 
@@ -455,7 +455,7 @@ private:
         Command( "esave none" ); // Event history is outside the analog stage-1 contract.
     }
 
-    void Run( bool aFresh )
+    void Run( bool aFresh, bool aBackground = true )
     {
         {
             std::lock_guard lock( m_mutex );
@@ -464,7 +464,17 @@ private:
         m_state = SIM_SESSION_STATE::RUNNING;
         try
         {
-            Command( aFresh ? "bg_run" : "bg_resume" );
+            if( aBackground )
+                Command( aFresh ? "bg_run" : "bg_resume" );
+            else
+            {
+                // Advance already waits for this boundary. Running on the
+                // worker's control thread avoids creating a new ngspice thread
+                // for every display frame; Play still uses background execution.
+                Command( aFresh ? "run" : "resume" );
+                std::lock_guard lock( m_mutex );
+                m_finished = true;
+            }
         }
         catch( ... )
         {
@@ -600,7 +610,7 @@ private:
         const double bias = exact ? ProgrammableStopMargin( aTime ) : 0;
         const double threshold = StopThreshold( aTime, bias );
         Command( "stop when time >= " + Number( threshold ) );
-        Run( fresh );
+        Run( fresh, false );
         Wait();
         Refresh();
         CheckError();
@@ -941,16 +951,7 @@ private:
         for( std::size_t i = 0; i < m_size; ++i )
         {
             const auto& sample = m_ring[( m_head + i ) % m_ring.size()];
-            if( m_config.historySignals )
-            {
-                std::vector<double> values;
-                values.reserve( m_config.historySignals->size() );
-                for( const auto index : *m_config.historySignals )
-                    values.push_back( sample.values[index] );
-                history.push_back( { { "time", sample.time }, { "values", std::move( values ) } } );
-            }
-            else
-                history.push_back( { { "time", sample.time }, { "values", sample.values } } );
+            history.push_back( { { "time", sample.time }, { "values", sample.values } } );
         }
         JSON result = { { "state", StateName( m_state ) }, { "generation", m_generation },
                         { "time", m_latest.time }, { "values", m_latest.values },
@@ -1059,7 +1060,16 @@ private:
             self.m_activity[i].Observe( self.m_config.activityMonitors[i], self.m_latest.time,
                                        self.m_latest.values );
         const auto position = ( self.m_head + self.m_size ) % self.m_ring.size();
-        self.m_ring[position] = self.m_latest;
+        auto& stored = self.m_ring[position];
+        stored.time = self.m_latest.time;
+        if( self.m_config.historySignals )
+        {
+            // Only scope/warning channels need a historical copy at every
+            // solver step. Latest pin values and activity remain complete.
+            for( std::size_t i = 0; i < self.m_config.historySignals->size(); ++i )
+                stored.values[i] = self.m_latest.values[( *self.m_config.historySignals )[i]];
+        }
+        else stored.values = self.m_latest.values;
         if( self.m_size == self.m_ring.size() )
         {
             self.m_head = ( self.m_head + 1 ) % self.m_ring.size();

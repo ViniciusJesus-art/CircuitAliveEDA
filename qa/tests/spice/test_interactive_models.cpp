@@ -3,6 +3,8 @@
 #include <circuitalive/circuit_snapshot.h>
 #include <circuitalive/simulation_model.h>
 #include <circuitalive/model_profiles.h>
+#include <circuitalive/model_pin_mapping.h>
+#include <circuitalive/model_catalog_index.h>
 #include <filesystem>
 #include <fstream>
 #include <sim/platform_runtime.h>
@@ -109,6 +111,80 @@ BOOST_FIXTURE_TEST_CASE( ModelFilesValidateSchemaParametersAndPinMapping, MODEL_
     BOOST_CHECK_THROW( BuildCircuitSnapshot( Divider( directory ) ), std::runtime_error );
     Write( "divider.casim", "invalid json" );
     BOOST_CHECK_THROW( MODEL_REPOSITORY::Load( directory / "divider.casim" ), std::runtime_error );
+}
+
+BOOST_FIXTURE_TEST_CASE( PinCountFilterCombinesSearchAndCategoryWithoutChangingModelIndices, MODEL_FILES )
+{
+    auto divider = MODEL_REPOSITORY::LoadText( dividerModel );
+    divider.category = "Analog/Dividers";
+    auto resistor = MODEL_REPOSITORY().SelectModel( { "R1", "Device:R", "1k", {} } );
+    resistor.category = "Analog/Passive";
+    auto other = divider; other.id = "other"; other.name = "Other divider"; other.category = "Custom";
+    MODEL_CATALOG_INDEX index( { divider, resistor, other } );
+    BOOST_CHECK_EQUAL( index.Find( "" ).size(), 3u );
+    const auto twoPins = index.Find( "", "", 2 );
+    BOOST_REQUIRE_EQUAL( twoPins.size(), 1u );
+    BOOST_CHECK_EQUAL( index.Records().at( twoPins[0] ).model, 1u );
+    BOOST_CHECK_EQUAL( index.Find( "", "", 3 ).size(), 2u );
+    const auto threePins = index.Find( "divider", "Analog", 3 );
+    BOOST_REQUIRE_EQUAL( threePins.size(), 1u );
+    BOOST_CHECK_EQUAL( index.Records().at( threePins[0] ).model, 0u );
+    BOOST_CHECK( index.Find( "divider", "Analog", 2 ).empty() );
+    BOOST_CHECK( index.Find( "", "", 0 ).empty() );
+    BOOST_CHECK( index.Find( "", "", 8 ).empty() );
+}
+
+BOOST_FIXTURE_TEST_CASE( PinConnectionsPreserveSavedChoicesAndSwapOccupiedPins, MODEL_FILES )
+{
+    const auto model = MODEL_REPOSITORY::LoadText( dividerModel );
+    auto component = Divider( directory )[1];
+    auto mapping = ModelPinMapping( model, component );
+    BOOST_CHECK_EQUAL( mapping.at( "in" ), "10" );
+    AssignModelPin( mapping, "in", "20" );
+    BOOST_CHECK_EQUAL( mapping.at( "in" ), "20" );
+    BOOST_CHECK_EQUAL( mapping.at( "out" ), "10" );
+    component.modelPins = mapping;
+    BOOST_CHECK( ModelPinMapping( model, component ) == mapping );
+    AssignModelPin( mapping, "in", "" );
+    AssignModelPin( mapping, "in", "10" );
+    BOOST_CHECK_EQUAL( mapping.at( "in" ), "10" );
+    BOOST_CHECK( mapping.at( "out" ).empty() );
+    BOOST_CHECK_EQUAL( mapping.at( "gnd" ), "30" );
+
+    // A saved connection takes priority over another port's default number.
+    component.modelPins = { { "out", "10" } };
+    mapping = ModelPinMapping( model, component );
+    BOOST_CHECK( mapping.at( "in" ).empty() );
+    BOOST_CHECK_EQUAL( mapping.at( "out" ), "10" );
+    component.modelPins = { { "in", "missing" }, { "out", "30" }, { "gnd", "30" } };
+    mapping = ModelPinMapping( model, component );
+    BOOST_CHECK( mapping.at( "in" ).empty() );
+    BOOST_CHECK_EQUAL( mapping.at( "out" ), "30" );
+    BOOST_CHECK( mapping.at( "gnd" ).empty() );
+}
+
+BOOST_FIXTURE_TEST_CASE( ClickMappedPinsWithDifferentNamesSurviveProfileReloadAndSimulate, MODEL_FILES )
+{
+    Write( "divider.casim", dividerModel );
+    auto components = Divider( directory );
+    auto& component = components[1];
+    component.pins = { { "A", "supply" }, { "20", "output" }, { "G", "return" } };
+    component.pinNames = { { "A", "VCC" }, { "20", "SENSE" }, { "G", "VSS" } };
+    const auto model = MODEL_REPOSITORY::LoadText( dividerModel );
+    auto mapping = ModelPinMapping( model, component );
+    AssignModelPin( mapping, "in", "G" );
+    AssignModelPin( mapping, "gnd", "A" );
+    AssignModelPin( mapping, "in", "A" ); // Swap the occupied return pin.
+    component.modelPins = mapping;
+    component.modelParameters["ratio"] = "3";
+    const auto profile = directory / "click-mapping.json";
+    MODEL_PROFILES( profile ).Save( component );
+    component.modelFile.clear(); component.modelPins.clear(); component.modelParameters.clear();
+    BOOST_REQUIRE( MODEL_PROFILES( profile ).Apply( component ) );
+    BOOST_CHECK_EQUAL( component.modelPins.at( "in" ), "A" );
+    BOOST_CHECK_EQUAL( component.modelPins.at( "gnd" ), "G" );
+    BOOST_CHECK( ModelPinMapping( model, component ) == mapping );
+    BOOST_CHECK_CLOSE( Output( components ), 1.25, 1e-5 );
 }
 
 BOOST_FIXTURE_TEST_CASE( AutomaticAssociationsComeFromModelFilesAndAmbiguityIsExplicit, MODEL_FILES )

@@ -142,15 +142,14 @@
       "Aadc_${id} [state_${id}] [raw_${id}] adc_${id}",
       "Adelay_${id} raw_${id} delayed_${id} delay_${id}",
       "Adac_${id} [delayed_${id}] [position_${id}] dac_${id}",
-      "Bno0_${id} control_no0_${id} 0 V={v(position_${id}) > .75}",
-      "Sno0_${id} ${pin:common0} ${pin:no0} control_no0_${id} 0 contact_${id}"
+      "Sno0_${id} ${pin:common0} ${pin:no0} position_${id} 0 contact_no_${id}"
     ],
     "definitions": [
       ".model state_${id} SW(Ron=1 Roff=1e12 Vt={(${param:pickup_ratio}+${param:dropout_ratio})/2} Vh={(${param:pickup_ratio}-${param:dropout_ratio})/2})",
       ".model adc_${id} adc_bridge(in_low=.3 in_high=.7)",
       ".model delay_${id} d_buffer(rise_delay=${param:operate_delay} fall_delay=${param:release_delay})",
       ".model dac_${id} dac_bridge(out_low=0 out_high=1 out_undef=.5 t_rise=${param:transition} t_fall=${param:transition})",
-      ".model contact_${id} SW(Ron=${param:contact_resistance} Roff=${param:off_resistance} Vt=.5 Vh=0)",
+      ".model contact_no_${id} SW(Ron=${param:contact_resistance} Roff=${param:off_resistance} Vt=.75 Vh=.001)",
       ".options method=gear maxord=2"
     ]
   },
@@ -184,6 +183,7 @@
     "NC opens at 25% and NO closes at 75% of travel, giving break-before-make; this functional travel interval is not a mechanical bounce model.",
     "Coil and each contact pole have independent galvanic groups. Contact paths are bilateral and have finite on/off resistance; no internal coil suppression diode.",
     "No AC-coil mechanics, remanence, latching, bounce, arcing, welding, contact-life or thermal failure model. Coil-current warning does not assess contact ratings.",
-    "Displayed current and power refer only to the coil, not contact dissipation. Requests circuit-wide Gear order 2 for contact transitions."
+    "Displayed current and power refer only to the coil, not contact dissipation. Requests circuit-wide Gear order 2 for contact transitions.",
+    "Contacts read the continuous armature position directly with 0.001 normalized hysteresis, avoiding discontinuous behavioral comparator voltages during repeated transient pause/resume."
   ]
 }

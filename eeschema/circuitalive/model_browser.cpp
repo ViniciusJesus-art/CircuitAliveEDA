@@ -27,6 +27,7 @@ public:
         InsertColumn( 0, _( "Model" ), wxLIST_FORMAT_LEFT, 300 );
         InsertColumn( 1, _( "Family" ), wxLIST_FORMAT_LEFT, 160 );
         InsertColumn( 2, _( "Library symbols" ), wxLIST_FORMAT_LEFT, 330 );
+        InsertColumn( 3, _( "Pins" ), wxLIST_FORMAT_LEFT, 65 );
     }
     std::vector<std::size_t> rows;
 private:
@@ -34,6 +35,7 @@ private:
     {
         if( item < 0 || static_cast<std::size_t>( item ) >= rows.size() ) return {};
         const auto& r = m_index.Records().at( rows[item] );
+        if( column == 3 ) return wxString::Format( "%zu", r.pinCount );
         return W( column == 0 ? r.name : column == 1 ? r.family : r.libraries );
     }
     const MODEL_CATALOG_INDEX& m_index;
@@ -41,13 +43,18 @@ private:
 class BROWSER : public DIALOG_SHIM
 {
 public:
-    BROWSER( wxWindow* parent, const std::vector<SIMULATION_MODEL>& models, int selected ) :
+    BROWSER( wxWindow* parent, const std::vector<SIMULATION_MODEL>& models, int selected,
+             std::optional<std::size_t> pinCount ) :
         DIALOG_SHIM( parent, wxID_ANY, _( "Choose simulation model" ), wxDefaultPosition,
             wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER ),
-        m_models( models ), m_index( ModelsForDisplay( models ) ), m_timer( this )
+        m_models( models ), m_index( ModelsForDisplay( models ) ), m_pinCount( pinCount ), m_timer( this )
     {
         OptOut( this ); SetInitialFocus( nullptr );
         auto* box = new wxBoxSizer( wxVERTICAL );
+        if( pinCount )
+            box->Add( new wxStaticText( this, wxID_ANY, wxString::Format(
+                _( "Symbol: %zu pins — showing only models with the same number of pins" ), *pinCount ) ),
+                0, wxLEFT | wxRIGHT | wxTOP, 10 );
         m_search = new wxSearchCtrl( this, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER );
         m_search->SetDescriptiveText( _( "Search name, ID, family or library symbol…" ) );
         m_search->ShowCancelButton( true ); box->Add( m_search, 0, wxEXPAND | wxALL, 10 );
@@ -58,6 +65,7 @@ public:
         std::map<std::string, wxTreeItemId> groups; groups[""] = root;
         for( const auto& r : m_index.Records() )
         {
+            if( m_pinCount && r.pinCount != *m_pinCount ) continue;
             std::string path; auto parentItem = root;
             std::size_t start = 0;
             while( start < r.group.size() )
@@ -84,6 +92,7 @@ public:
         m_tree->Expand( root );
         // Open near the current model, but a typed search starts globally.
         const auto initial = selected >= 0 && static_cast<std::size_t>( selected ) < models.size()
+                && groups.contains( m_index.Records()[selected].group )
             ? groups.at( m_index.Records()[selected].group ) : root;
         m_tree->SelectItem( initial ); m_tree->EnsureVisible( initial );
         refresh( selected );
@@ -111,7 +120,8 @@ private:
         if( prefer < 0 ) if( const auto current = selection() ) prefer = *current;
         m_list->Freeze(); m_list->SetItemCount( 0 );
         const auto item = m_tree->GetSelection();
-        m_list->rows = m_index.Find( m_search->GetValue().ToStdString(wxConvUTF8), item.IsOk() ? m_paths.at( item ) : "" );
+        m_list->rows = m_index.Find( m_search->GetValue().ToStdString(wxConvUTF8),
+                                    item.IsOk() ? m_paths.at( item ) : "", m_pinCount );
         m_list->SetItemCount( m_list->rows.size() );
         if( !m_list->rows.empty() )
         {
@@ -127,6 +137,8 @@ private:
     {
         FindWindow( wxID_OK )->Enable( selection().has_value() );
         wxString text = wxString::Format( _( "%zu models found" ), m_list->rows.size() );
+        if( m_list->rows.empty() && m_pinCount )
+            text += "\n" + _( "No matching models. Try another search or load a model file with the same pin count." );
         if( const auto index = selection() )
         {
             const auto& model = m_models.at( *index );
@@ -137,6 +149,7 @@ private:
     void accept() { if( auto picked = selection() ) { result = picked; EndQuasiModal( wxID_OK ); } }
     const std::vector<SIMULATION_MODEL>& m_models;
     MODEL_CATALOG_INDEX m_index;
+    std::optional<std::size_t> m_pinCount;
     wxTimer m_timer;
     wxSearchCtrl* m_search;
     wxTreeCtrl* m_tree;
@@ -146,9 +159,9 @@ private:
 };
 }
 std::optional<std::size_t> ChooseSimulationModel( wxWindow* parent,
-        const std::vector<SIMULATION_MODEL>& models, int selected )
+        const std::vector<SIMULATION_MODEL>& models, int selected, std::optional<std::size_t> pinCount )
 {
-    BROWSER browser( parent, models, selected );
+    BROWSER browser( parent, models, selected, pinCount );
     if( browser.ShowQuasiModal() != wxID_OK ) return {};
     return browser.result;
 }

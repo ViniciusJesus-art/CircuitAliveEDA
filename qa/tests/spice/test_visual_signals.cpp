@@ -348,13 +348,27 @@ BOOST_AUTO_TEST_CASE( PlaybackPacingDiscardsStartupLagWithoutBurstingThroughCloc
     // A slow initial batch must not leave a queue of already-overdue deadlines.
     const auto delayed = start + seconds( 2 );
     next = NextPlaybackDeadline( next, delayed, interval );
-    BOOST_CHECK( next == delayed + interval );
+    BOOST_CHECK( next == delayed );
     for( int frame = 0; frame < 10; ++frame )
     {
         const auto finished = next + milliseconds( 1 );
         next = NextPlaybackDeadline( next, finished, interval );
         BOOST_CHECK( next > finished );
     }
+    // Sustained work above the frame budget must not add another idle interval.
+    const auto slowFinished = next + milliseconds( 12 );
+    BOOST_CHECK( NextPlaybackDeadline( next, slowFinished, interval ) == slowFinished );
+}
+
+BOOST_AUTO_TEST_CASE( PlaybackBatchSizeAdaptsToSlowSolverWithoutChangingPlaybackRate )
+{
+    BOOST_CHECK_CLOSE( NextPlaybackAdvance( .008, 0, 0, .0064 ), .008, 1e-8 );
+    BOOST_CHECK_CLOSE( NextPlaybackAdvance( .008, .008, .016, .0064 ), .004, 1e-8 );
+    BOOST_CHECK_CLOSE( NextPlaybackAdvance( .008, .004, .008, .0064 ), .0032, 1e-8 );
+    BOOST_CHECK_CLOSE( NextPlaybackAdvance( .008, .0032, .001, .0064 ), .0064, 1e-8 );
+    BOOST_CHECK_CLOSE( NextPlaybackAdvance( .008, .0064, .001, .0064 ), .008, 1e-8 );
+    // Slow motion and the configured maximum always take precedence.
+    BOOST_CHECK_CLOSE( NextPlaybackAdvance( .000008, .004, .008, .0064 ), .000008, 1e-8 );
 }
 
 BOOST_AUTO_TEST_CASE( VisualPreferencesNormalizeInvalidValuesBeforeUse )

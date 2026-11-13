@@ -17,10 +17,17 @@ std::chrono::steady_clock::time_point NextPlaybackDeadline(
         std::chrono::steady_clock::duration interval )
 {
     const auto deadline = previous + interval;
-    // Keep the normal cadence, but discard accumulated wall-clock lag after a
-    // slow startup/batch. Replaying overdue frames at full CPU speed makes a
-    // low-frequency clock visibly accelerate until an interaction resets it.
-    return deadline > now ? deadline : now + interval;
+    // Discard accumulated lag; an overdue batch has already spent its time
+    // budget. Adding another full wait here halves playback under sustained load.
+    return std::max( deadline, now );
+}
+
+double NextPlaybackAdvance( double maximum, double previousAdvance, double previousWorkSeconds,
+                            double budgetSeconds )
+{
+    if( previousAdvance <= 0 || previousWorkSeconds <= 0 ) return maximum;
+    const double estimate = previousAdvance * budgetSeconds / previousWorkSeconds;
+    return std::min( maximum, std::clamp( estimate, previousAdvance * .5, previousAdvance * 2 ) );
 }
 
 std::string FindSessionWorker( const std::string& aApplicationExecutable )
@@ -168,6 +175,7 @@ void SESSION_RUNNER::run()
     bool running = false;
     double speed = 1;
     SIMULATION_PREFERENCES preferences;
+    double previousAdvance = 0, previousWorkSeconds = 0;
     std::map<std::string, std::string> latchedWarnings;
     auto next = std::chrono::steady_clock::now();
 
@@ -186,12 +194,15 @@ void SESSION_RUNNER::run()
         }
         try
         {
+            std::optional<std::chrono::steady_clock::time_point> batchStarted;
+            double batchAdvance = 0;
             for( auto& command : commands )
             {
                 revision = command.revision;
                 switch( command.type )
                 {
                 case COMMAND_TYPE::START:
+                    previousAdvance = previousWorkSeconds = 0;
                     speed = command.value;
                     preferences = command.preferences;
                     session.reset();
@@ -253,6 +264,7 @@ void SESSION_RUNNER::run()
                     next = std::chrono::steady_clock::now() + preferences.FrameInterval();
                     break;
                 case COMMAND_TYPE::RESUME:
+                    previousAdvance = previousWorkSeconds = 0;
                     if( session && view.sample.state != SIM_SESSION_STATE::COMPLETED )
                         running = true;
                     next = std::chrono::steady_clock::now();
@@ -301,10 +313,12 @@ void SESSION_RUNNER::run()
                     }
                     break;
                 case COMMAND_TYPE::SPEED:
+                    previousAdvance = previousWorkSeconds = 0;
                     speed = command.value;
                     next = std::chrono::steady_clock::now();
                     break;
                 case COMMAND_TYPE::PREFERENCES:
+                    previousAdvance = previousWorkSeconds = 0;
                     if( preferences.playbackSpeed != command.preferences.playbackSpeed )
                         speed = command.preferences.playbackSpeed;
                     preferences = command.preferences;
@@ -365,7 +379,10 @@ void SESSION_RUNNER::run()
             }
             if( session && running && std::chrono::steady_clock::now() >= next )
             {
-                double advance = std::chrono::duration<double>( preferences.FrameInterval() ).count() * speed;
+                batchStarted = std::chrono::steady_clock::now();
+                const double frameSeconds = std::chrono::duration<double>( preferences.FrameInterval() ).count();
+                double advance = frameSeconds * speed;
+                double minimumBatch = circuit.config.step;
                 if( !circuit.config.programmableDevices.empty() )
                 {
                     double quantum = 1e-3;
@@ -375,9 +392,23 @@ void SESSION_RUNNER::run()
                     // are processed between batches even on a slow computer.
                     double batch = quantum * 512 / circuit.config.programmableDevices.size();
                     if( circuit.config.programmableDevices.size() == 1 )
+                    {
                         batch = std::max( batch, circuit.config.programmableDevices.front().autonomousWindowSeconds * 8 );
+                        // Splitting a cooperative CPU window into many tiny
+                        // pause/resume requests repeats its fixed runtime/solver
+                        // overhead and can make the estimator shrink forever.
+                        minimumBatch = std::max( minimumBatch, batch );
+                    }
                     advance = std::min( advance, batch );
                 }
+                const double maximum = advance;
+                // Leave some of the frame for snapshot/visual processing. Slow
+                // circuits publish smaller batches instead of freezing indicators
+                // until a large request finishes. Preserve cooperative MCU
+                // batches: pause/resume overhead dominates shorter requests.
+                advance = std::max( std::min( maximum, minimumBatch ),
+                    NextPlaybackAdvance( maximum, previousAdvance, previousWorkSeconds, frameSeconds * .8 ) );
+                const double before = view.sample.latest.time;
                 session->AdvanceTo( std::min( view.sample.latest.time
                                              + advance,
                                              circuit.config.horizon ) );
@@ -385,11 +416,7 @@ void SESSION_RUNNER::run()
                 if( view.sample.state == SIM_SESSION_STATE::FAILED )
                     throw std::runtime_error( view.sample.error );
                 running = view.sample.state != SIM_SESSION_STATE::COMPLETED;
-                // Solver work belongs inside the frame budget. If a whole frame
-                // is missed, resume at the requested speed without a catch-up burst.
-                next = NextPlaybackDeadline( next, std::chrono::steady_clock::now(),
-                        std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                                std::chrono::duration<double>( advance / speed ) ) );
+                batchAdvance = view.sample.latest.time - before;
             }
             if( session )
             {
@@ -441,6 +468,15 @@ void SESSION_RUNNER::run()
                     view.scopeHistory = std::make_shared<const SCOPE_HISTORY>( scopeHistory );
                 }
                 view.sample.history.clear();
+            }
+            if( batchStarted )
+            {
+                const auto finished = std::chrono::steady_clock::now();
+                previousAdvance = batchAdvance;
+                previousWorkSeconds = std::chrono::duration<double>( finished - *batchStarted ).count();
+                next = NextPlaybackDeadline( next, finished,
+                    std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                        std::chrono::duration<double>( batchAdvance / speed ) ) );
             }
         }
         catch( const std::exception& e )

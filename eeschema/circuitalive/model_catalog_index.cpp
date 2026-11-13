@@ -38,10 +38,11 @@ MODEL_CATALOG_INDEX::MODEL_CATALOG_INDEX( const std::vector<SIMULATION_MODEL>& m
         std::string terms = m.name + " " + m.id + " " + group + " " + libraries + " " + m.description;
         for( const auto& name : m.symbolNames ) terms += " " + name;
         for( const auto& name : m.partNames ) terms += " " + name;
-        m_records.push_back( { i, m.name, category, m.family, group, libraries, fold( terms ) } );
+        m_records.push_back( { i, m.name, category, m.family, group, libraries, fold( terms ), m.pins.size() } );
     }
 }
-std::vector<std::size_t> MODEL_CATALOG_INDEX::Find( const std::string& query, const std::string& group ) const
+std::vector<std::size_t> MODEL_CATALOG_INDEX::Find( const std::string& query, const std::string& group,
+                                                 std::optional<std::size_t> pinCount ) const
 {
     std::istringstream words( fold( query ) );
     std::vector<std::string> terms;
@@ -50,6 +51,7 @@ std::vector<std::size_t> MODEL_CATALOG_INDEX::Find( const std::string& query, co
     for( std::size_t i = 0; i < m_records.size(); ++i )
     {
         const auto& r = m_records[i];
+        if( pinCount && r.pinCount != *pinCount ) continue;
         if( !group.empty() && r.group != group && !r.group.starts_with( group + "/" ) ) continue;
         if( std::all_of( terms.begin(), terms.end(), [&]( const auto& term ) { return r.search.find( term ) != std::string::npos; } ) )
             found.push_back( i );
