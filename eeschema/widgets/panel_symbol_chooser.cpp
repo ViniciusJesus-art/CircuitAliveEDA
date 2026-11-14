@@ -817,8 +817,8 @@ void PANEL_SYMBOL_CHOOSER::populateFootprintSelector( LIB_ID const& aLibId )
             const int requested = m_pinFilter->GetValue() ? m_pinFilter->GetValue() : m_query.pins;
             if( requested ) m_fp_sel_ctrl->FilterByPinCount( requested );
             const auto physical = CIRCUITALIVE::ParseComponentQuery( m_package->GetValue().ToStdString( wxConvUTF8 ) );
-            const wxString mounting = m_mounting->GetSelection() == 1 ? "pth"
-                                      : m_mounting->GetSelection() == 2 ? "smd"
+            const wxString mounting = m_mounting->GetSelection() == 1 ? wxString( wxS( "pth" ) )
+                                      : m_mounting->GetSelection() == 2 ? wxString( wxS( "smd" ) )
                                       : wxString::FromUTF8( m_query.mounting );
             wxString extra = wxString::FromUTF8( m_query.footprint );
             extra += " " + wxString::FromUTF8( physical.symbols + " " + physical.footprint );

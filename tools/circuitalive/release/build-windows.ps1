@@ -74,9 +74,10 @@ function Validate-Project {
     # Compile the affected controller, worker, tests and GUI consumers before the full build.
     $targets = @('qa_interactive_sim', 'qa_circuitalive_json_link',
         'common/CMakeFiles/pcbcommon.dir/__/pcbnew/pcb_painter.cpp.obj',
+        'eeschema/CMakeFiles/eeschema_kiface_objects.dir/widgets/panel_symbol_chooser.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/instrument_panel.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/simulation_overlay.cpp.obj')
-    Invoke-Checked -Program cmake -Arguments (@('--build', $build, '--parallel', "$Jobs", '--target') + $targets)
+    Invoke-Checked -Program cmake -Arguments (@('--build', $build, '--parallel', "$Jobs", '--target') + $targets + @('--', '-k', '0'))
     Invoke-Checked -Program $python -Arguments @("$PSScriptRoot/prepare-runtime.py", "$build/eeschema/sim", "$prefix/lib/ngspice")
     $env:SPICE_SCRIPTS = "$build/eeschema/sim/ngspice/scripts"
     $env:PATH = "$prefix/bin;$prefix/tools/python3;$build/common;$build/api;$build/common/gal;$env:PATH"
@@ -103,7 +104,8 @@ if ($Phase -in @('all', 'dependencies')) { Prepare-Dependencies }
 if ($Phase -in @('all', 'configure')) { Configure-Project }
 if ($Phase -in @('all', 'validate', 'build')) { Validate-Project }
 if ($Phase -in @('all', 'build')) {
-    Invoke-Checked -Program cmake -Arguments @('--build', '--preset', 'circuitalive-windows-msvc', '--parallel', "$Jobs")
+    # Collect independent compilation failures in one run; Ninja still exits nonzero.
+    Invoke-Checked -Program cmake -Arguments @('--build', '--preset', 'circuitalive-windows-msvc', '--parallel', "$Jobs", '--', '-k', '0')
 }
 if ($Phase -in @('all', 'stage', 'package')) {
     Invoke-Checked -Program cmake -Arguments @('--install', $build)
