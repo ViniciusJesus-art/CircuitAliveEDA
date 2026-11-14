@@ -73,6 +73,7 @@ function Configure-Project {
 function Validate-Project {
     # Compile the affected controller, worker, tests and GUI consumers before the full build.
     $targets = @('qa_interactive_sim', 'qa_circuitalive_json_link',
+        'common/CMakeFiles/pcbcommon.dir/__/pcbnew/pcb_painter.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/instrument_panel.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/simulation_overlay.cpp.obj')
     Invoke-Checked -Program cmake -Arguments (@('--build', $build, '--parallel', "$Jobs", '--target') + $targets)

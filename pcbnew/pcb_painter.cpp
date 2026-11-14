@@ -1007,7 +1007,7 @@ void PCB_PAINTER::draw( const PCB_ARC* aArc, int aLayer )
             color = COLOR4D( 1.0, 0.65, 0.15, 1.0 );
         }
 
-        wxString netname = missingLabel ? wxS( "MISS" ) : aArc->GetDisplayNetname();
+        wxString netname = missingLabel ? wxString( wxS( "MISS" ) ) : aArc->GetDisplayNetname();
 
         if( netname.IsEmpty() )
             return;

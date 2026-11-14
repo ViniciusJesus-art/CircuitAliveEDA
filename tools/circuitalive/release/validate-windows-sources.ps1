@@ -23,6 +23,7 @@ foreach ($entry in $commands) {
         $seen[$source] = $source.StartsWith('eeschema/circuitalive/') -or
             $source.StartsWith('common/circuitalive/') -or
             $source -eq 'eeschema/sim/platform_runtime.cpp' -or
+            $source -eq 'pcbnew/pcb_painter.cpp' -or
             $source -eq 'kicad/pcm/dialogs/dialog_manage_repositories.cpp'
         if (!$seen[$source] -and (Test-Path -LiteralPath $entry.file)) {
             $seen[$source] = [bool](Select-String -LiteralPath $entry.file -SimpleMatch -Quiet -Pattern 'circuitalive/branding.h')
