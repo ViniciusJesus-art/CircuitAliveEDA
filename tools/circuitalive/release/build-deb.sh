@@ -54,7 +54,9 @@ cmake --install .circuitalive/nng-build
 (
     cd .circuitalive/ngspice-ngspice-47
     ./autogen.sh
-    ./configure --prefix="$ngroot" --with-ngshared --enable-xspice --enable-cider \
+    # Match Fedora's predictor solver. Without it, ngspice 47 produces an
+    # invalid avalanche voltage after a live DC source change (1N4148/generic D).
+    ./configure --prefix="$ngroot" --with-ngshared --enable-xspice --enable-cider --enable-predictor \
         --without-x --with-readline=no CFLAGS='-O2'
     make -j "$jobs"
     make install

@@ -167,8 +167,9 @@ if( TARGET circuitalive_sim_session )
     kicad_add_boost_test( qa_memory_viewer qa_memory_viewer )
     setup_qa_env( qa_memory_viewer )
     add_test( NAME qa_interactive_sim COMMAND qa_interactive_sim --log_level=test_suite )
-    # Full catalog truth-table sweeps need several minutes on slower runners.
-    set_tests_properties( qa_interactive_sim PROPERTIES TIMEOUT 600 )
+    # Full catalog sweeps launch thousands of isolated workers. Windows runners
+    # exceed ten minutes even while every case continues to make progress.
+    set_tests_properties( qa_interactive_sim PROPERTIES TIMEOUT 1800 )
     # Exercise the desktop JSON imports as well as the standalone worker build.
     # A static-only test cannot expose collisions with kicommon's import library.
     add_executable( qa_circuitalive_json_link test_circuitalive_json_link.cpp )
