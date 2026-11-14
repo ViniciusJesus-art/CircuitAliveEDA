@@ -37,6 +37,10 @@ jobs:
     env:
       CA_WINDOWS_TOOLS: D:/ca-tools
       RELEASE_VERSION: ${{ inputs.version || '10.0.7-alpha.1' }}
+      CA_USE_SCCACHE: '1'
+      SCCACHE_GHA_ENABLED: 'true'
+      SCCACHE_GHA_VERSION: circuitalive-msvc-v1
+      SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
     defaults:
       run:
         shell: pwsh
@@ -78,8 +82,22 @@ jobs:
         with:
           name: installer
           cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-installer
+      - name: Prepare persistent application compiler cache
+        id: compiler-cache
+        continue-on-error: true
+        # v0.0.11; writes each completed object to the Actions cache immediately.
+        uses: Mozilla-Actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+        with:
+          version: v0.16.0
       - name: Configure applications with dependency installation disabled
+        env:
+          CA_USE_SCCACHE: ${{ steps.compiler-cache.outcome == 'success' && '1' || '0' }}
         run: ./tools/circuitalive/release/build-windows.ps1 -Phase configure -Version $env:RELEASE_VERSION
+      - name: Check compiler cache and header invalidation with native MSVC
+        if: steps.compiler-cache.outcome == 'success'
+        run: |
+          ./tools/circuitalive/release/build-windows.ps1 -Phase environment
+          ./qa/tests/cli/test_windows_compiler_cache.ps1
       - name: Validate affected sources and simulator, then build all applications
         run: ./tools/circuitalive/release/build-windows.ps1 -Phase build
       - name: Stage application and dependencies without building an installer

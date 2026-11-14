@@ -178,16 +178,54 @@ Os logs, o script `.iss` e o inventário de tamanhos ficam no artefato
 Inno Setup; pacotes que ultrapassem isso exigirão outra forma de distribuição,
 como partes externas. As bibliotecas 3D continuam incluídas.
 
+### Cache entre execuções
+
+- **Windows:** o vcpkg continua validando o ABI das dependências. A aplicação usa
+  sccache 0.16.0, instalado por uma revisão fixa da action da Mozilla. Cada objeto
+  concluído é gravado no cache do Actions durante a compilação, inclusive antes
+  de uma falha posterior. O cache considera compilador, argumentos e conteúdo
+  dos fontes/cabeçalhos. Só no CI, `CA_USE_SCCACHE=1` configura os launchers C/C++,
+  desativa PCH e usa informações de debug embutidas (`/Z7`), necessárias para
+  armazenar objetos MSVC. As funcionalidades e os testes permanecem habilitados.
+  Um teste nativo compila C e C++ repetidamente e verifica uma mudança de cabeçalho
+  antes do build completo. Estatísticas aparecem no post-step da action.
+  Se o setup do cache estiver indisponível, o job compila pelo caminho normal;
+  falha de comunicação com o servidor também pode recorrer ao compilador local.
+- **Fedora e Ubuntu:** restauram o ccache e tentam salvar os objetos concluídos
+  mesmo após uma falha ou cancelamento normal. Encerramento forçado do runner
+  pode impedir esse salvamento. Os logs mostram estatísticas zeradas por execução;
+  o conteúdo do compilador participa da identificação dos objetos.
+- **Ubuntu:** ngspice e NNG instalados têm cache separado, salvo antes da aplicação.
+  A chave considera arquitetura, compiladores, versões dos pacotes instalados,
+  versões fixadas e receita de compilação. Um manifesto confere hashes de todos
+  os arquivos e destinos dos links; cache incompleto, alterado ou incompatível é
+  descartado e reconstruído. Só instalações concluídas são salvas.
+  Falhas de transferência dos caches não bloqueiam a compilação normal.
+
+A primeira execução com os novos perfis aquece os caches; mudanças no ambiente
+ou nas opções podem exigir nova compilação. Não se restaura uma árvore CMake
+antiga nem se omitem testes/linkedição/validação dos pacotes. Os caches são uma
+otimização: objetos compatíveis são reaproveitados e os demais são recompilados.
+
+O script Ubuntu também pode executar as fases `tools`, `dependencies` e `build`
+separadamente; sem argumento continua executando todas. `build` exige uma
+instalação nativa validada para o perfil atual.
+
+Referências: [sccache com CMake/MSVC](https://github.com/mozilla/sccache/blob/v0.16.0/README.md#usage)
+e [backend de cache do Actions](https://github.com/mozilla/sccache/blob/v0.16.0/docs/GHA.md).
+
 ## Verificação local da configuração
 
-Todos os workflows e a action composta de checkpoint usam actions com runtime
-Node.js 24: checkout v7, github-script v8, cache v5, upload-artifact v7 e
-download-artifact v8. O runner hospedado fornece esse runtime; não é necessário
+As actions principais usam runtime Node.js 24: checkout v7, github-script v8,
+cache v5, upload-artifact v7 e download-artifact v8. A action de setup do sccache
+está fixada por commit e instala a versão indicada acima. O runner hospedado
+fornece os runtimes necessários; não é necessário
 instalar Node.js nos pacotes do CircuitAliveEDA.
 
 ```bash
 actionlint
 python3 qa/tests/cli/test_release_artifacts.py
+python3 qa/tests/cli/test_deb_dependency_cache.py
 python3 qa/tests/cli/test_windows_installer.py
 bash -n tools/circuitalive/release/build-linux.sh tools/circuitalive/release/build-deb.sh tools/circuitalive/dependencies-fedora.sh
 ```

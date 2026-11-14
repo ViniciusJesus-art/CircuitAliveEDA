@@ -13,23 +13,43 @@ if [[ ! $RELEASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ || $(git rev-
     printf 'Invalid release version or source checkout.\n' >&2
     exit 1
 fi
+phase=${1:-all}
+case "$phase" in
+    all|tools|dependencies|build) ;;
+    *) printf 'Unknown build phase: %s\n' "$phase" >&2; exit 1 ;;
+esac
 mkdir -p .circuitalive/logs
-exec > >(tee .circuitalive/logs/deb-release.log) 2>&1
-sudo apt-get update
-sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    build-essential cmake ninja-build git ccache pkg-config gettext \
-    libwxgtk3.2-dev libwxgtk-webview3.2-dev libboost-all-dev libcairo2-dev libpixman-1-dev \
-    libglew-dev libglm-dev freeglut3-dev libglu1-mesa-dev libgtk-3-dev \
-    libcurl4-openssl-dev libgit2-dev libsecret-1-dev libspnav-dev \
-    libfreetype-dev libharfbuzz-dev libfontconfig1-dev libocct-data-exchange-dev \
-    libocct-ocaf-dev libocct-visualization-dev libprotobuf-dev protobuf-compiler \
-    unixodbc-dev python3-dev python3-wxgtk4.0 swig zlib1g-dev libzstd-dev \
-    libpoppler-dev libpoppler-glib-dev libwayland-dev dpkg-dev \
-    autoconf automake libtool bison flex libfftw3-dev libsuitesparse-dev
+exec > >(tee -a .circuitalive/logs/deb-release.log) 2>&1
+if [[ $phase == all || $phase == tools ]]; then
+    sudo apt-get update
+    sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+        build-essential cmake ninja-build git ccache pkg-config gettext \
+        libwxgtk3.2-dev libwxgtk-webview3.2-dev libboost-all-dev libcairo2-dev libpixman-1-dev \
+        libglew-dev libglm-dev freeglut3-dev libglu1-mesa-dev libgtk-3-dev \
+        libcurl4-openssl-dev libgit2-dev libsecret-1-dev libspnav-dev \
+        libfreetype-dev libharfbuzz-dev libfontconfig1-dev libocct-data-exchange-dev \
+        libocct-ocaf-dev libocct-visualization-dev libprotobuf-dev protobuf-compiler \
+        unixodbc-dev python3-dev python3-wxgtk4.0 swig zlib1g-dev libzstd-dev \
+        libpoppler-dev libpoppler-glib-dev libwayland-dev dpkg-dev \
+        autoconf automake libtool bison flex libfftw3-dev libsuitesparse-dev
+fi
+if [[ $phase == tools ]]; then exit 0; fi
 
-# Pin both dependencies whose Ubuntu versions are older than the APIs/ABI used here.
 ngroot="$PWD/.circuitalive/deb-deps"
-python3 - <<'PY'
+jobs=${CIRCUITALIVE_JOBS:-2}
+cache_helper=tools/circuitalive/release/deb-dependency-cache.py
+dependency_profile=$(python3 "$cache_helper" profile)
+prepare_native_dependencies() {
+    if python3 "$cache_helper" verify "$ngroot" "$dependency_profile"; then
+        printf 'Reusing verified Ubuntu native dependencies: %s\n' "$dependency_profile"
+        if [[ -n ${GITHUB_OUTPUT:-} ]]; then printf 'cache-reused=true\n' >> "$GITHUB_OUTPUT"; fi
+        return
+    fi
+    if [[ -n ${GITHUB_OUTPUT:-} ]]; then printf 'cache-reused=false\n' >> "$GITHUB_OUTPUT"; fi
+    # Discard incomplete/ABI-incompatible prefixes and old intermediate objects.
+    rm -rf -- "$ngroot" .circuitalive/nng-build .circuitalive/nng-1.9.0 .circuitalive/ngspice-ngspice-47
+    # Pin both dependencies whose Ubuntu versions are older than the APIs/ABI used here.
+    python3 - <<'PY'
 import hashlib, json, tarfile, urllib.request
 from pathlib import Path
 import shutil
@@ -45,26 +65,36 @@ for name in ('ubuntu_ngspice', 'ubuntu_nng'):
     with tarfile.open(archive) as source:
         source.extractall('.circuitalive', filter='data')
 PY
-jobs=${CIRCUITALIVE_JOBS:-2}
-cmake -S .circuitalive/nng-1.9.0 -B .circuitalive/nng-build -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release "-DCMAKE_INSTALL_PREFIX=$ngroot" -DCMAKE_INSTALL_LIBDIR=lib \
-    -DBUILD_SHARED_LIBS=ON -DNNG_TESTS=OFF -DNNG_TOOLS=OFF -DNNG_ENABLE_TLS=OFF
-cmake --build .circuitalive/nng-build --parallel "$jobs"
-cmake --install .circuitalive/nng-build
-(
-    cd .circuitalive/ngspice-ngspice-47
-    ./autogen.sh
-    # Match Fedora's predictor solver. Without it, ngspice 47 produces an
-    # invalid avalanche voltage after a live DC source change (1N4148/generic D).
-    ./configure --prefix="$ngroot" --with-ngshared --enable-xspice --enable-cider --enable-predictor \
-        --without-x --with-readline=no CFLAGS='-O2'
-    make -j "$jobs"
-    make install
-)
+    cmake -S .circuitalive/nng-1.9.0 -B .circuitalive/nng-build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release "-DCMAKE_INSTALL_PREFIX=$ngroot" -DCMAKE_INSTALL_LIBDIR=lib \
+        -DBUILD_SHARED_LIBS=ON -DNNG_TESTS=OFF -DNNG_TOOLS=OFF -DNNG_ENABLE_TLS=OFF
+    cmake --build .circuitalive/nng-build --parallel "$jobs"
+    cmake --install .circuitalive/nng-build
+    (
+        cd .circuitalive/ngspice-ngspice-47
+        ./autogen.sh
+        # Match Fedora's predictor solver. Without it, ngspice 47 produces an
+        # invalid avalanche voltage after a live DC source change (1N4148/generic D).
+        ./configure --prefix="$ngroot" --with-ngshared --enable-xspice --enable-cider --enable-predictor \
+            --without-x --with-readline=no CFLAGS='-O2'
+        make -j "$jobs"
+        make install
+    )
+    python3 "$cache_helper" record "$ngroot" "$dependency_profile"
+}
+if [[ $phase == all || $phase == dependencies ]]; then prepare_native_dependencies; fi
+if [[ $phase == dependencies ]]; then exit 0; fi
+if ! python3 "$cache_helper" verify "$ngroot" "$dependency_profile"; then
+    printf 'Prepare the matching Ubuntu native dependencies before building.\n' >&2
+    exit 1
+fi
 export PATH="$ngroot/bin:$PATH"
 export LD_LIBRARY_PATH="$ngroot/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export PKG_CONFIG_PATH="$ngroot/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 export CCACHE_DIR="$PWD/.circuitalive/ccache-deb" CCACHE_BASEDIR="$PWD" CCACHE_MAXSIZE=2G DPKG_DEB_THREADS_MAX=2
+export CCACHE_COMPILERCHECK=content
+ccache --zero-stats
+trap 'ccache --show-stats || true' EXIT
 cmake -S . -B build/deb -G Ninja \
     -DCMAKE_BUILD_TYPE=Release '-DCMAKE_CXX_FLAGS_RELEASE=-O2 -DNDEBUG' \
     '-DCMAKE_C_FLAGS_RELEASE=-O2 -DNDEBUG' -DCMAKE_INSTALL_PREFIX=/opt/circuitaliveeda \
@@ -89,4 +119,3 @@ python3 tools/circuitalive/release/prepare-source-libraries.py --directory .circ
 python3 tools/circuitalive/release/package-deb.py --stage stage/deb \
     --libraries .circuitalive/deb-libraries --ngspice "$ngroot" \
     --version "$RELEASE_VERSION" --commit "$RELEASE_COMMIT" --output dist
-ccache --show-stats

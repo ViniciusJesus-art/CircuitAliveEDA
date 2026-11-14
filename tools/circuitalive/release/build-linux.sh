@@ -41,6 +41,9 @@ if [[ $(pkg-config --modversion ngspice) != 47 ]]; then
     exit 1
 fi
 export CCACHE_BASEDIR="$PWD" CCACHE_MAXSIZE=2G
+export CCACHE_COMPILERCHECK=content
+ccache --zero-stats
+trap 'ccache --show-stats || true' EXIT
 jobs=${CIRCUITALIVE_JOBS:-2}
 prefix="$PWD/stage/linux"
 cmake --preset circuitalive-fedora \
@@ -66,4 +69,3 @@ if [[ $formats == *appimage* ]]; then
                    --appimage-runtime .circuitalive/appimage-tools/runtime-x86_64)
 fi
 python3 tools/circuitalive/release/package-linux.py "${package_args[@]}"
-ccache --show-stats

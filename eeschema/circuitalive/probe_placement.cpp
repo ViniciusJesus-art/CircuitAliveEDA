@@ -306,7 +306,7 @@ void NormalizeSourceProbeSymbols( SCHEMATIC& schematic )
             try { settings = ReadSourceProbeSettings( *symbol ); }
             catch( const std::exception& ) { continue; } // Keep malformed settings editable.
             auto prototype = MakeProbeSymbol( kind, sheet, symbol->GetPosition(),
-                    wxString( symbol->GetLibId().GetLibItemName() ).EndsWith( "_vertical" ), 1, "", settings );
+                    symbol->GetLibId().GetLibItemName().wx_str().EndsWith( "_vertical" ), 1, "", settings );
             auto lib = std::make_unique<LIB_SYMBOL>( *prototype->GetLibSymbolRef() );
             screen->Remove( symbol );
             symbol->SetLibSymbol( lib.release() );

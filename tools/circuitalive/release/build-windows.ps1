@@ -63,7 +63,15 @@ function Configure-Project {
     if (!(Test-Path $env:SWIG_EXECUTABLE)) { throw 'Run -Phase setup first.' }
     . "$PSScriptRoot/windows-dependencies-data.ps1"
     Assert-WindowsDependenciesComplete -Root $root
-    Invoke-Checked -Program cmake -Arguments @('--preset', 'circuitalive-windows-msvc', "-DCIRCUITALIVE_RELEASE_VERSION=$Version")
+    $arguments = @('--preset', 'circuitalive-windows-msvc', "-DCIRCUITALIVE_RELEASE_VERSION=$Version")
+    if ($env:CA_USE_SCCACHE -eq '1') {
+        $cache = (Get-Command sccache -CommandType Application -ErrorAction Stop).Source.Replace('\', '/')
+        # MSVC PCH and a shared compiler PDB cannot be cached by sccache.
+        # These affect build performance/debug storage, not application features.
+        $arguments += @("-DCMAKE_C_COMPILER_LAUNCHER=$cache", "-DCMAKE_CXX_COMPILER_LAUNCHER=$cache",
+            '-DKICAD_USE_PCH=OFF', '-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded')
+    }
+    Invoke-Checked -Program cmake -Arguments $arguments
     $compilerFile = Get-ChildItem "$build/CMakeFiles/*/CMakeCXXCompiler.cmake" | Select-Object -First 1
     if (!(Select-String -Path $compilerFile.FullName -Pattern 'CMAKE_CXX_COMPILER_ID "MSVC"' -Quiet)) {
         throw 'The selected compiler is not MSVC. Use a fresh build/windows-msvc directory.'
@@ -75,6 +83,7 @@ function Validate-Project {
     $targets = @('qa_interactive_sim', 'qa_circuitalive_json_link',
         'common/CMakeFiles/pcbcommon.dir/__/pcbnew/pcb_painter.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/widgets/panel_symbol_chooser.cpp.obj',
+        'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/probe_placement.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/instrument_panel.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/simulation_overlay.cpp.obj')
     Invoke-Checked -Program cmake -Arguments (@('--build', $build, '--parallel', "$Jobs", '--target') + $targets + @('--', '-k', '0'))

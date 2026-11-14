@@ -130,7 +130,9 @@ jobs:
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
           df -h .
       - name: Restore Linux compiler cache
-        uses: actions/cache@v5
+        id: compiler-cache
+        continue-on-error: true
+        uses: actions/cache/restore@v5
         with:
           path: .circuitalive/ccache
           key: linux-fedora44-release-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -141,6 +143,13 @@ jobs:
             -e RELEASE_VERSION -e RELEASE_COMMIT -e RELEASE_FORMATS -e CIRCUITALIVE_JOBS=2 \
             -v "$GITHUB_WORKSPACE:/work" -w /work \
             fedora:44 bash tools/circuitalive/release/build-linux.sh
+      - name: Preserve Linux compiler cache after success or failure
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v5
+        with:
+          path: .circuitalive/ccache
+          key: linux-fedora44-release-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Downloadable Fedora RPM
         if: contains(needs.prepare.outputs.formats, 'rpm')
         uses: actions/upload-artifact@v7
@@ -194,13 +203,46 @@ jobs:
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
           df -h .
       - name: Restore Ubuntu compiler cache
-        uses: actions/cache@v5
+        id: compiler-cache
+        continue-on-error: true
+        uses: actions/cache/restore@v5
         with:
           path: .circuitalive/ccache-deb
           key: linux-ubuntu2404-deb-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: linux-ubuntu2404-deb-v1-
+      - name: Install Ubuntu build tools and development headers
+        run: bash tools/circuitalive/release/build-deb.sh tools
+      - name: Identify Ubuntu native dependency ABI
+        id: native-profile
+        run: |
+          python3 qa/tests/cli/test_deb_dependency_cache.py
+          echo "value=$(python3 tools/circuitalive/release/deb-dependency-cache.py profile)" >> "$GITHUB_OUTPUT"
+      - name: Restore matching Ubuntu native dependencies
+        continue-on-error: true
+        uses: actions/cache/restore@v5
+        with:
+          path: .circuitalive/deb-deps
+          key: ubuntu2404-native-v1-${{ steps.native-profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ubuntu2404-native-v1-${{ steps.native-profile.outputs.value }}-
+      - name: Verify or compile Ubuntu native dependencies
+        id: native-deps
+        run: bash tools/circuitalive/release/build-deb.sh dependencies
+      - name: Preserve verified native dependencies before the application build
+        if: always() && steps.native-deps.outcome == 'success' && steps.native-deps.outputs.cache-reused != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v5
+        with:
+          path: .circuitalive/deb-deps
+          key: ubuntu2404-native-v1-${{ steps.native-profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Compile and test natively on Ubuntu 24.04, then package and verify DEB
-        run: bash tools/circuitalive/release/build-deb.sh
+        run: bash tools/circuitalive/release/build-deb.sh build
+      - name: Preserve Ubuntu compiler cache after success or failure
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v5
+        with:
+          path: .circuitalive/ccache-deb
+          key: linux-ubuntu2404-deb-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Downloadable Ubuntu DEB
         uses: actions/upload-artifact@v7
         with:

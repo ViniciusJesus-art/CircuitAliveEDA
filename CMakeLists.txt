@@ -572,7 +572,7 @@ if( MSVC )
         # ccache may encounter external PDB file write errors due to paralleism
         # Using the embedded PDB mode is ok for development use of ccache
         set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "Embedded")
-    else()
+    elseif( NOT DEFINED CMAKE_MSVC_DEBUG_INFORMATION_FORMAT )
         # Equivalent to /Zi, ensures cmake doesn't fight over the default
         set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "ProgramDatabase")
     endif()
