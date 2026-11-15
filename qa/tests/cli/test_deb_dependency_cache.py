@@ -1,6 +1,9 @@
 """A native dependency cache must not bypass ABI or file-integrity checks."""
 import importlib.util
 from pathlib import Path
+import json
+import shutil
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -10,6 +13,11 @@ SPEC = importlib.util.spec_from_file_location(
     'deb_dependency_cache', ROOT / 'tools/circuitalive/release/deb-dependency-cache.py')
 cache = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(cache)
+sys.path.insert(0, str(ROOT / 'tools/circuitalive/release'))
+PACKAGE_SPEC = importlib.util.spec_from_file_location(
+    'package_deb', ROOT / 'tools/circuitalive/release/package-deb.py')
+package = importlib.util.module_from_spec(PACKAGE_SPEC)
+PACKAGE_SPEC.loader.exec_module(package)
 
 
 class NativeDependencyCacheTests(unittest.TestCase):
@@ -46,6 +54,37 @@ class NativeDependencyCacheTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             cache.record(self.directory, 'profile')
         self.assertFalse((self.directory / cache.MANIFEST).exists())
+
+    def test_restored_prefix_supplies_packaging_licenses_without_source_trees(self):
+        cache.record(self.directory, 'profile')
+        with tempfile.TemporaryDirectory() as temporary:
+            restored = Path(temporary) / 'restored-prefix'
+            shutil.copytree(self.directory, restored)
+            shutil.rmtree(self.directory)
+            self.assertTrue(cache.verify(restored, 'profile'))
+            app = Path(temporary) / 'stage/opt/circuitaliveeda'
+            package.copy_native_dependency_licenses(restored, app)
+            for name in cache.LICENSES:
+                self.assertEqual((app / name).read_bytes(), (restored / name).read_bytes())
+
+    def test_old_cache_without_each_license_is_rejected_before_application_build(self):
+        for name in cache.LICENSES:
+            with self.subTest(license=name):
+                path = self.directory / name
+                original = path.read_bytes()
+                path.unlink()
+                # Reproduce the old cache: its manifest tracks all installed
+                # binaries/headers correctly, but contains no source licenses.
+                (self.directory / cache.MANIFEST).write_text(json.dumps(
+                    {'profile': 'profile', 'files': cache.inventory(self.directory)}))
+                self.assertFalse(cache.verify(self.directory, 'profile'))
+                with self.assertRaises(ValueError):
+                    cache.record(self.directory, 'profile')
+                app = self.directory / 'not-created'
+                with self.assertRaisesRegex(FileNotFoundError, 'Missing cached native dependency license'):
+                    package.copy_native_dependency_licenses(self.directory, app)
+                self.assertFalse(app.exists())
+                path.write_bytes(original)
 
     def test_malformed_completion_manifests_are_cache_misses(self):
         for contents in ('{broken', 'null', '[]', '{}'):

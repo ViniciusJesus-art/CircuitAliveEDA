@@ -200,6 +200,11 @@ como partes externas. As bibliotecas 3D continuam incluídas.
   pode impedir esse salvamento. Os logs mostram estatísticas zeradas por execução;
   o conteúdo do compilador participa da identificação dos objetos.
 - **Ubuntu:** ngspice e NNG instalados têm cache separado, salvo antes da aplicação.
+  Esse prefixo inclui as licenças e a lista de autores usadas pelo DEB. O
+  empacotamento não depende das pastas de fontes, ausentes após uma restauração.
+  Caches antigos sem esses arquivos são rejeitados antes de compilar a aplicação;
+  o novo perfil recompila essas duas dependências uma vez, preservando o ccache
+  dos objetos da aplicação.
   A chave considera arquitetura, compiladores, versões dos pacotes instalados,
   versões fixadas e receita de compilação. Um manifesto confere hashes de todos
   os arquivos e destinos dos links; cache incompleto, alterado ou incompatível é

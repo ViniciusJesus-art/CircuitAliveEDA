@@ -20,6 +20,21 @@ def debian_version(version):
     return version.replace('-alpha.', '~alpha.') + '-1'
 
 
+def copy_native_dependency_licenses(prefix, app):
+    # A restored installation must be sufficient: the source trees may not exist.
+    files = [Path('share/licenses') / folder / name
+             for folder, names in (('ngspice47', ('COPYING', 'AUTHORS')),
+                                   ('nng190', ('LICENSE.txt',)))
+             for name in names]
+    for name in files:
+        if not (prefix / name).is_file():
+            raise FileNotFoundError(f'Missing cached native dependency license: {prefix / name}')
+    for name in files:
+        destination = app / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(prefix / name, destination)
+
+
 def prepare_launcher(app):
     launcher = app / 'CircuitAliveEDA'
     launcher.write_text('''#!/usr/bin/env bash
@@ -85,6 +100,7 @@ def package(stage, libraries, ngspice, version, commit, output):
     for name in ('kicad', 'kicad-cli', 'eeschema', 'pcbnew', 'circuitalive-sim-worker'):
         if not (app / 'bin' / name).is_file():
             raise FileNotFoundError(app / 'bin' / name)
+    copy_native_dependency_licenses(ngspice, app)
     ignore = shutil.ignore_patterns('.git', '__pycache__', '*.pyc', '.history')
     validate_component_libraries(libraries)
     for folder in LIBRARIES:
@@ -118,14 +134,6 @@ def package(stage, libraries, ngspice, version, commit, output):
     prepare_launcher(app)
     for license in ('LICENSE', 'LICENSE.README', 'LICENSE.GPLv3', 'AUTHORS.txt'):
         shutil.copy2(root / license, app / license)
-    ng_license = app / 'share/licenses/ngspice47'
-    ng_license.mkdir(parents=True, exist_ok=True)
-    ng_source = root / '.circuitalive/ngspice-ngspice-47'
-    for name in ('COPYING', 'AUTHORS'):
-        shutil.copy2(ng_source / name, ng_license / name)
-    nng_license = app / 'share/licenses/nng190'
-    nng_license.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(root / '.circuitalive/nng-1.9.0/LICENSE.txt', nng_license / 'LICENSE.txt')
     shutil.copy2(libraries / 'component-commits.json', app / 'component-commits.json')
     (app / 'PACKAGE-INFO.json').write_text(json.dumps(
         {'product': 'CircuitAliveEDA', 'version': version, 'commit': commit,

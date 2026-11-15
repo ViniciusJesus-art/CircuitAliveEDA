@@ -10,9 +10,11 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
 MANIFEST = '.circuitalive-dependency-cache.json'
+LICENSES = ('share/licenses/ngspice47/COPYING', 'share/licenses/ngspice47/AUTHORS',
+            'share/licenses/nng190/LICENSE.txt')
 REQUIRED = ('lib/libnng.so', 'lib/libngspice.so',
             'include/nng/nng.h', 'include/ngspice/sharedspice.h',
-            'lib/ngspice/analog.cm', 'share/ngspice/scripts/spinit')
+            'lib/ngspice/analog.cm', 'share/ngspice/scripts/spinit') + LICENSES
 
 
 def profile(root=ROOT, run=subprocess.check_output):

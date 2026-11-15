@@ -80,6 +80,11 @@ PY
         make -j "$jobs"
         make install
     )
+    # Keep everything needed for redistribution in the cached installation.
+    # Source/build directories are intentionally not restored on a cache hit.
+    install -Dm644 .circuitalive/ngspice-ngspice-47/COPYING "$ngroot/share/licenses/ngspice47/COPYING"
+    install -Dm644 .circuitalive/ngspice-ngspice-47/AUTHORS "$ngroot/share/licenses/ngspice47/AUTHORS"
+    install -Dm644 .circuitalive/nng-1.9.0/LICENSE.txt "$ngroot/share/licenses/nng190/LICENSE.txt"
     python3 "$cache_helper" record "$ngroot" "$dependency_profile"
 }
 if [[ $phase == all || $phase == dependencies ]]; then prepare_native_dependencies; fi
