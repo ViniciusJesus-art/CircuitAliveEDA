@@ -240,3 +240,17 @@ endif()
 kicad_add_boost_test( qa_common qa_common )
 
 setup_qa_env( qa_common )
+
+# A fresh process owns the graphics session state. Exercise real canvases and the
+# one-time modal warning without affecting the other common tests' rendering mode.
+add_executable( qa_gal_session_fallback test_gal_session_fallback.cpp
+    ${CMAKE_SOURCE_DIR}/qa/mocks/kicad/common_mocks.cpp )
+target_link_libraries( qa_gal_session_fallback PRIVATE common gal qa_utils
+    Boost::unit_test_framework ${wxWidgets_LIBRARIES} )
+add_test( NAME qa_gal_session_fallback COMMAND qa_gal_session_fallback )
+set_tests_properties( qa_gal_session_fallback PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 30 )
+add_dependencies( qa_all_tests qa_gal_session_fallback )
+if( NOT KICAD_BUILD_QA_TESTS )
+    set_target_properties( qa_gal_session_fallback PROPERTIES EXCLUDE_FROM_ALL TRUE )
+endif()
+setup_qa_env( qa_gal_session_fallback )

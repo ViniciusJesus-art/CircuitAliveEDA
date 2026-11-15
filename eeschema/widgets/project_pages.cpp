@@ -64,52 +64,6 @@ wxFileName absolutePage( PROJECT& project, const wxString& name )
     return file;
 }
 
-std::vector<wxString> excludedPages( PROJECT& project )
-{
-    std::vector<wxString> result;
-    const auto json = project.GetProjectFile().Get<nlohmann::json>( "schematic.excluded_pages" );
-    if( json && json->is_array() )
-    {
-        for( const auto& name : *json )
-            if( name.is_string() )
-                result.push_back( wxString::FromUTF8( name.get<std::string>() ) );
-    }
-    return result;
-}
-
-void storeExclusions( PROJECT& project, const std::vector<wxString>& names )
-{
-    auto json = nlohmann::json::array();
-    for( const auto& name : names )
-    {
-        auto file = absolutePage( project, name );
-        file.MakeRelativeTo( project.GetProjectPath() );
-        json.push_back( file.GetFullPath( wxPATH_UNIX ).ToStdString( wxConvUTF8 ) );
-    }
-    project.GetProjectFile().Set<nlohmann::json>( "schematic.excluded_pages", json );
-}
-}
-
-bool IsExcludedProjectPage( PROJECT& project, const wxString& name )
-{
-    const auto selected = absolutePage( project, name );
-    for( const auto& excluded : excludedPages( project ) )
-        if( absolutePage( project, excluded ).SameAs( selected ) )
-            return true;
-    return false;
-}
-
-void IncludeProjectPage( PROJECT& project, const wxString& name )
-{
-    auto excluded = excludedPages( project );
-    const auto selected = absolutePage( project, name );
-    const auto count = excluded.size();
-    std::erase_if( excluded, [&]( const wxString& file )
-    {
-        return absolutePage( project, file ).SameAs( selected );
-    } );
-    if( count != excluded.size() )
-        storeExclusions( project, excluded );
 }
 
 bool CanDeleteProjectPage( const SCHEMATIC& schematic, const SCH_SHEET_PATH& page )
@@ -118,18 +72,13 @@ bool CanDeleteProjectPage( const SCHEMATIC& schematic, const SCH_SHEET_PATH& pag
             && ( page.size() > 1 || schematic.GetTopLevelSheets().size() > 1 );
 }
 
-bool RemoveProjectPage( SCHEMATIC& schematic, const SCH_SHEET_PATH& page, bool deleteFiles )
+bool RemoveProjectPage( SCHEMATIC& schematic, const SCH_SHEET_PATH& page )
 {
     if( !CanDeleteProjectPage( schematic, page ) )
         return false;
     const SCH_SHEET_PATH removedPath = page;
     SCH_SHEET* removed = removedPath.Last();
-    std::vector<wxString> before;
-    for( const auto& path : schematic.Hierarchy() )
-        before.push_back( path.LastScreen()->GetFileName() );
-
     PAGE_FILE_DELETION files;
-    if( deleteFiles )
     {
         std::vector<wxFileName> removedFiles, retainedFiles;
         for( const auto& path : schematic.Hierarchy() )
@@ -181,20 +130,6 @@ bool RemoveProjectPage( SCHEMATIC& schematic, const SCH_SHEET_PATH& page, bool d
     schematic.GetCurrentScreen()->SetContentModified();
 
     auto& project = schematic.Project();
-    auto excluded = excludedPages( project );
-    for( const auto& file : before )
-    {
-        bool inUse = false;
-        for( const auto& path : schematic.Hierarchy() )
-            if( absolutePage( project, file ).SameAs( wxFileName( path.LastScreen()->GetFileName() ) ) )
-                inUse = true;
-        const bool alreadyExcluded = std::any_of( excluded.begin(), excluded.end(),
-                [&]( const wxString& entry )
-                { return absolutePage( project, entry ).SameAs( absolutePage( project, file ) ); } );
-        if( !inUse && !file.IsEmpty() && !alreadyExcluded )
-            excluded.push_back( file );
-    }
-    storeExclusions( project, excluded );
     auto& manifest = project.GetProjectFile().GetTopLevelSheets();
     manifest.clear();
     for( const auto* sheet : schematic.GetTopLevelSheets() )
@@ -234,7 +169,7 @@ void DeleteCurrentPage( SCH_EDIT_FRAME& frame )
     frame.ClearUndoRedoList();
     frame.ClearRepeatItemsList();
     bool removed = false;
-    try { removed = RemoveProjectPage( frame.Schematic(), page, true ); }
+    try { removed = RemoveProjectPage( frame.Schematic(), page ); }
     catch( const IO_ERROR& error )
     { wxMessageBox( error.What(), _( "Delete Page" ), wxOK | wxICON_ERROR, &frame ); }
     if( removed )

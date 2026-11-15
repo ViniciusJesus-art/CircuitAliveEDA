@@ -95,6 +95,7 @@ PANEL_SYMBOL_CHOOSER::PANEL_SYMBOL_CHOOSER( SCH_BASE_FRAME* aFrame, wxWindow* aP
         m_show_footprints( aShowFootprints )
 {
     m_frame = aFrame;
+    m_filterTimer = new wxTimer( this );
 
     SYMBOL_LIBRARY_ADAPTER*   libmgr = PROJECT_SCH::SymbolLibAdapter( &m_frame->Prj() );
     COMMON_SETTINGS::SESSION& session = Pgm().GetCommonSettings()->m_Session;
@@ -303,21 +304,12 @@ PANEL_SYMBOL_CHOOSER::PANEL_SYMBOL_CHOOSER( SCH_BASE_FRAME* aFrame, wxWindow* aP
             const int pins = m_pinFilter && m_pinFilter->GetValue() ? m_pinFilter->GetValue() : m_query.pins;
             auto& item = node.m_Type == LIB_TREE_NODE::TYPE::UNIT && node.m_Parent
                          ? *node.m_Parent : node;
-            if( pins > 0 && item.m_PinCount == 0 && item.m_LibId.IsValid() )
-            {
-                // Derived symbols can have an empty cached count even though
-                // their parent supplies all physical pins. Resolve it once.
-                if( const auto* symbol = m_frame->GetLibSymbol( item.m_LibId, false, false ) )
-                    for( const auto* pin : symbol->GetGraphicalPins( 0, 1 ) )
-                        item.m_PinCount += pin->GetStackedPinCount();
-            }
             if( pins > 0 && item.m_PinCount != pins ) return false;
             if( !m_query.package.empty() && node.m_LibId.IsValid() )
             {
                 // A package-only search should omit symbols whose library explicitly
                 // restricts them to another package (for example, SOIC-only parts).
-                const auto* symbol = m_frame->GetLibSymbol( node.m_LibId, false, false );
-                const auto patterns = symbol ? symbol->GetFPFilters() : wxArrayString{};
+                const auto& patterns = item.m_FootprintFilters;
                 if( !patterns.empty()
                     && std::none_of( patterns.begin(), patterns.end(),
                             [&]( const wxString& pattern )
@@ -336,6 +328,14 @@ PANEL_SYMBOL_CHOOSER::PANEL_SYMBOL_CHOOSER( SCH_BASE_FRAME* aFrame, wxWindow* aP
 
     m_dbl_click_timer = new wxTimer( this );
     m_open_libs_timer = new wxTimer( this );
+    Bind( wxEVT_TIMER, [this]( wxTimerEvent& )
+    {
+        if( !m_shuttingDown )
+        {
+            m_tree->Regenerate( true );
+            refreshPhysicalFilters();
+        }
+    }, m_filterTimer->GetId() );
 
     SetSizer( sizer );
 
@@ -377,8 +377,10 @@ PANEL_SYMBOL_CHOOSER::~PANEL_SYMBOL_CHOOSER()
     // Stop the timer during destruction early to avoid potential race conditions (that do happen)
     m_dbl_click_timer->Stop();
     m_open_libs_timer->Stop();
+    m_filterTimer->Stop();
     delete m_dbl_click_timer;
     delete m_open_libs_timer;
+    delete m_filterTimer;
 
     if( m_showPower )
         g_powerSearchString = m_tree->GetSearchString();
@@ -427,6 +429,8 @@ void PANEL_SYMBOL_CHOOSER::onMenuClose( wxMenuEvent& aEvent )
 
 void PANEL_SYMBOL_CHOOSER::OnChar( wxKeyEvent& aEvent )
 {
+    if( aEvent.GetKeyCode() == WXK_RETURN || aEvent.GetKeyCode() == WXK_NUMPAD_ENTER )
+        FlushPendingFilters();
     if( aEvent.GetKeyCode() == WXK_ESCAPE )
     {
         wxObject* eventSource = aEvent.GetEventObject();
@@ -514,7 +518,7 @@ wxPanel* PANEL_SYMBOL_CHOOSER::constructRightPanel( wxWindow* aParent )
 
         auto filterChanged = [this]( wxCommandEvent& )
         {
-            if( !m_shuttingDown ) { m_tree->Regenerate( true ); refreshPhysicalFilters(); }
+            if( !m_shuttingDown ) m_filterTimer->StartOnce( 150 );
         };
         m_mounting->Bind( wxEVT_CHOICE, filterChanged );
         m_pinFilter->Bind( wxEVT_TEXT, filterChanged );
@@ -670,6 +674,7 @@ void PANEL_SYMBOL_CHOOSER::ShutdownCanvases()
     m_shuttingDown = true;
     m_dbl_click_timer->Stop();
     m_open_libs_timer->Stop();
+    m_filterTimer->Stop();
     wxLogTrace( traceGalContext, wxS( "Symbol chooser shutting down preview canvas %p" ),
                 m_symbol_preview->GetCanvas() );
 
@@ -749,6 +754,10 @@ void PANEL_SYMBOL_CHOOSER::showFootprintFor( LIB_ID const& aLibId )
 
 void PANEL_SYMBOL_CHOOSER::showFootprint( wxString const& aFootprint )
 {
+    // Regenerating the symbol tree can select the same footprint repeatedly.
+    // Keep its 3D scene/camera instead of reloading models for each filter event.
+    if( !aFootprint.IsEmpty() && m_displayedFootprint == aFootprint )
+        return;
     m_displayedFootprint = aFootprint;
     if( !m_fp_preview || !m_fp_preview->IsInitialized() )
         return;
@@ -803,7 +812,7 @@ void PANEL_SYMBOL_CHOOSER::populateFootprintSelector( LIB_ID const& aLibId )
 
     if( symbol != nullptr )
     {
-        int        pinCount = symbol->GetGraphicalPins( 0 /* all units */, 1 /* single bodyStyle */ ).size();
+        int        pinCount = symbol->GetPinCount();
         SCH_FIELD* fp_field = symbol->GetField( FIELD_T::FOOTPRINT );
         wxString   fp_name = preferredFootprint( aLibId, fp_field ? fp_field->GetFullText() : wxString( "" ) );
 
@@ -1002,8 +1011,15 @@ wxString PANEL_SYMBOL_CHOOSER::prepareSearch( const wxString& aSearch )
             || query.mounting != m_query.mounting || query.pins != m_query.pins
             || query.width != m_query.width || query.height != m_query.height;
     m_query = std::move( query );
-    if( physicalChanged && m_fp_sel_ctrl )
-        CallAfter( [this]() { if( !m_shuttingDown ) refreshPhysicalFilters(); } );
+    if( physicalChanged && m_fp_sel_ctrl && !m_physicalRefreshPending )
+    {
+        m_physicalRefreshPending = true;
+        CallAfter( [this]()
+        {
+            m_physicalRefreshPending = false;
+            if( !m_shuttingDown ) refreshPhysicalFilters();
+        } );
+    }
     if( m_advanced && m_advanced->GetValue() ) return aSearch;
     if( m_query.symbols.empty() && ( m_query.pins > 0 || !m_query.footprint.empty()
         || !m_query.mounting.empty() || !m_query.package.empty() || m_query.width > 0 || m_query.height > 0
@@ -1015,6 +1031,14 @@ wxString PANEL_SYMBOL_CHOOSER::prepareSearch( const wxString& aSearch )
 void PANEL_SYMBOL_CHOOSER::refreshPhysicalFilters()
 {
     if( m_fp_sel_ctrl ) populateFootprintSelector( GetSelectedLibId() );
+}
+
+void PANEL_SYMBOL_CHOOSER::FlushPendingFilters()
+{
+    if( m_shuttingDown || !m_filterTimer->IsRunning() ) return;
+    m_filterTimer->Stop();
+    m_tree->Regenerate( true );
+    refreshPhysicalFilters();
 }
 
 wxString PANEL_SYMBOL_CHOOSER::preferredFootprint( const LIB_ID& aSymbol,

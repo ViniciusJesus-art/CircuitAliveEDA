@@ -300,6 +300,10 @@ void EDITOR_SIMULATION_TOOL::Invalidate()
 
 int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
 {
+    // Finish the placement coroutine before clearing its state or hiding its
+    // controls. Otherwise its preview/cursor capture survives Play on MSW.
+    m_toolMgr->RunAction( ACTIONS::cancelInteractive );
+    dismissControl();
     m_placing.reset();
     if( m_instruments ) m_instruments->SetPlacement( {} );
     if( !m_runner )
@@ -308,8 +312,6 @@ int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
     if( m_active && state == EDITOR_SESSION_STATE::PAUSED )
     {
         m_runner->Resume();
-        if( m_circuit.circuit.measurements.empty() )
-            showInstruments( false );
     }
     else if( state != EDITOR_SESSION_STATE::RUNNING && state != EDITOR_SESSION_STATE::PREPARING )
     {
@@ -326,8 +328,9 @@ int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
             m_resultOpened = false;
             m_active = true;
             m_errorShown = false;
-            if( m_circuit.circuit.measurements.empty() )
-                showInstruments( false );
+            // Preserve an explicitly opened probe panel across Play/Resume,
+            // including circuits without measurements. Hiding its focused
+            // native controls here can interrupt the MSW toolbar action.
         }
         catch( const std::exception& e )
         {
@@ -349,10 +352,13 @@ void EDITOR_SIMULATION_TOOL::showInstruments( bool visible )
         if( visible && m_instrumentLayout )
             pane.SafeSet( *m_instrumentLayout );
         pane.Show( visible );
+        // Native focus/size notifications can re-enter the editor during
+        // Update(). Publish visibility first and move focus out of hidden panes.
+        m_instrumentsVisible = visible;
+        if( !visible ) m_frame->GetCanvas()->SetFocus();
         manager->Update();
         if( visible && m_instrumentLayout && pane.IsDocked() && pane.best_size.x > 0 )
             SetAuiPaneSize( *manager, pane, pane.best_size.x, -1 );
-        m_instrumentsVisible = visible;
         if( !visible )
             saveInstrumentLayout();
     }

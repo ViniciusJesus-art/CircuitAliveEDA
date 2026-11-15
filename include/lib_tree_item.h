@@ -29,6 +29,7 @@
 #include <lib_id.h>
 #include <import_export.h>
 #include <eda_pattern_match.h>
+#include <wx/arrstr.h>
 
 /**
  * A mix-in to provide polymorphism between items stored in libraries (symbols, aliases
@@ -70,6 +71,9 @@ public:
      * For items with footprint fields.
      */
     virtual wxString GetFootprint() { return wxEmptyString; }
+
+    /// Cached by the chooser so package filtering never reloads library files.
+    virtual wxArrayString GetFootprintFilters() const { return {}; }
 
     /**
      * The pin count for symbols or the unique pad count for footprints.

@@ -166,7 +166,7 @@ Name: "{{userdesktop}}\\CircuitAliveEDA"; Filename: "{{app}}\\bin\\CircuitAliveE
 '''
 
 
-def verify_installer(installer, root=ROOT):
+def verify_installer(installer, root=ROOT, version=None):
     smoke = root / 'installer smoke'
     with tempfile.TemporaryDirectory(prefix='ca-installed-profile-') as temporary:
         profile = Path(temporary)
@@ -187,8 +187,13 @@ def verify_installer(installer, root=ROOT):
                        check=True, timeout=1800)
         validate_installed_assets(smoke)
         validate_programmable_assets(smoke)
-        subprocess.run([str(smoke / 'bin/kicad-cli.exe'), 'version'], check=True, timeout=60,
-                       env=env, cwd=profile)
+        reported = subprocess.run([str(smoke / 'bin/kicad-cli.exe'), 'version', '--format', 'about'],
+                                  check=True, timeout=60, env=env, cwd=profile,
+                                  capture_output=True, text=True, encoding='utf-8')
+        if version is not None and not re.search(
+                rf'^Version: {re.escape(version)}(?:-[^,\s]+)?(?:,|\s|$)', reported.stdout, re.MULTILINE):
+            raise ValueError(f'Installed application version differs from requested package {version}: '
+                             f'{reported.stdout.strip()}')
         verify_first_start(profile / 'config')
         subprocess.run([str(smoke / 'bin/kicad-cli.exe'), 'sym', 'export', 'svg', '--symbol', 'R',
                         '--output', str(profile / 'symbols'), str(smoke / 'share/kicad/symbols/Device.kicad_sym')],
@@ -221,7 +226,7 @@ def package_runtime(stage, version, compiler, root=ROOT):
     installer = dist / f'CircuitAliveEDA-{version}-windows-x86_64-setup.exe'
     installer.with_suffix('.exe.sha256').unlink(missing_ok=True)
     subprocess.run([compiler, '-Qp', str(script)], check=True)
-    verify_installer(installer, root)
+    verify_installer(installer, root, version)
     # A checksum denotes a verified installer; failed smoke tests cannot be published.
     installer.with_suffix('.exe.sha256').write_text(f'{digest(installer)}  {installer.name}\n', encoding='utf-8')
 

@@ -1098,6 +1098,52 @@ BOOST_FIXTURE_TEST_CASE( ProgrammableCoordinatedUartAndInterruptsUseElectricalPe
     }
 }
 
+BOOST_FIXTURE_TEST_CASE( ProgrammableAvrResetPullupKeepsBlinkingAndRespondsToGround, PROGRAM_FILES )
+{
+    auto avr = AvrSymbol( Firmware( "reset-pullup-blink", BlinkOutput() ) );
+    auto circuit = BuildCircuitSnapshot( { Supply( "VCC", "vcc", "5" ),
+        Supply( "VRESET", "reset_source", "5" ), avr,
+        { "RRESET", "Device:R", "1k", { { "1", "reset_source" }, { "2", "reset" } } },
+        { "RLOAD", "Device:R", "300", { { "1", "out" }, { "2", "0" } } } } );
+    SelectSignals( circuit, { "v(" + circuit.pinNodes[2].at( "19" ) + ")",
+                             "v(" + circuit.pinNodes[2].at( "1" ) + ")" } );
+    BOOST_REQUIRE_EQUAL( circuit.config.programmableDevices.size(), 1 );
+    BOOST_CHECK_GT( circuit.config.programmableDevices[0].autonomousWindowSeconds, 0 );
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config );
+    for( double time : { .0001, .0003, .0005, .0007 } )
+    {
+        session.AdvanceTo( time );
+        const auto sample = session.Snapshot();
+        BOOST_CHECK_GT( sample.latest.values[1], 4.9 );
+        if( time == .0001 || time == .0005 ) BOOST_CHECK_GT( sample.latest.values[0], 4.5 );
+        else BOOST_CHECK_LT( sample.latest.values[0], .1 );
+    }
+    session.SetSourceValue( "Vca2", 0 );
+    session.AdvanceTo( .0008 );
+    BOOST_CHECK_LT( session.Snapshot().latest.values[1], .3 );
+    BOOST_CHECK_LT( session.Snapshot().latest.values[0], .1 );
+    session.SetSourceValue( "Vca2", 5 );
+    session.AdvanceTo( .0009 );
+    BOOST_CHECK_GT( session.Snapshot().latest.values[0], 4.5 );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableResetLookaheadRejectsCapacitorsAndGpioDrivers, PROGRAM_FILES )
+{
+    const auto avr = AvrSymbol( Firmware( "reset-network", BlinkOutput() ) );
+    std::vector<CIRCUIT_COMPONENT> components{ Supply( "VCC", "vcc", "5" ), avr,
+        { "RRESET", "Device:R", "1k", { { "1", "vcc" }, { "2", "reset" } } } };
+    const auto fixed = BuildCircuitSnapshot( components );
+    BOOST_CHECK_GT( fixed.config.programmableDevices[0].autonomousWindowSeconds, 0 );
+    components.push_back( { "CRESET", "Device:C", "100n", { { "1", "reset" }, { "2", "0" } } } );
+    const auto rc = BuildCircuitSnapshot( components );
+    BOOST_CHECK_EQUAL( rc.config.programmableDevices[0].autonomousWindowSeconds, 0 );
+    components.pop_back();
+    components[1].pins["19"] = "reset"; // A firmware output can pull RESET low.
+    const auto driven = BuildCircuitSnapshot( components );
+    BOOST_CHECK_EQUAL( driven.config.programmableDevices[0].autonomousWindowSeconds, 0 );
+}
+
 BOOST_FIXTURE_TEST_CASE( ProgrammableCoordinatorKeepsVariablePowerSamplingIndependent, PROGRAM_FILES )
 {
     auto first = AvrSymbol( Firmware( "fixed-power", DigitalOutput( true ) ) );

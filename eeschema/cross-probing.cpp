@@ -50,6 +50,8 @@
 #include <wx/filefn.h>
 #include <wx/log.h>
 #include <trace_helpers.h>
+#include <wildcards_and_files_ext.h>
+#include <wx/filename.h>
 
 SCH_ITEM* SCH_EDITOR_CONTROL::FindSymbolAndItem( const wxString* aPath, const wxString* aReference,
                                                  bool aSearchHierarchy, SCH_SEARCH_T aSearchType,
@@ -1181,18 +1183,34 @@ void SCH_EDIT_FRAME::KiwayMailIn( KIWAY_MAIL_EVENT& mail )
     case MAIL_SCH_NAVIGATE_TO_SHEET:
     {
         wxString targetFile( payload );
+        const wxFileName target( targetFile );
 
         for( SCH_SHEET_PATH& sheetPath : m_schematic->Hierarchy() )
         {
             SCH_SCREEN* screen = sheetPath.LastScreen();
 
-            if( screen && screen->GetFileName() == targetFile )
+            if( screen && wxFileName( screen->GetFileName() ).SameAs( target ) )
             {
                 m_toolManager->RunAction<SCH_SHEET_PATH*>( SCH_ACTIONS::changeSheet, &sheetPath );
                 payload = "success";
                 Raise();
                 return;
             }
+        }
+
+        // The manager can list a page created after this editor was opened. An explicit
+        // click must load that file, not just search the old hierarchy. Use the normal
+        // open path so pending edits can be saved/cancelled before reloading.
+        if( target.FileExists()
+            && ( target.GetExt().CmpNoCase( FILEEXT::KiCadSchematicFileExtension ) == 0
+                 || target.GetExt().CmpNoCase( FILEEXT::LegacySchematicFileExtension ) == 0 )
+            && wxFileName::DirName( target.GetPath() ).SameAs(
+                    wxFileName::DirName( Prj().GetProjectPath() ) )
+            && OpenProjectFiles( { target.GetFullPath() } ) )
+        {
+            payload = "success";
+            Raise();
+            return;
         }
 
         payload.clear();

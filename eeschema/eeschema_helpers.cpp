@@ -41,7 +41,6 @@
 
 #include <wx/app.h>
 #include <wx/dir.h>
-#include <widgets/project_pages.h>
 #include <wx/ffile.h>
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -102,8 +101,6 @@ bool EESCHEMA_HELPERS::LoadProjectSheets( SCH_IO& aPlugin, SCHEMATIC& aSchematic
                                           const wxString& aFileName )
 {
     const wxFileName selected( aFileName );
-    // Explicitly opening an excluded file restores it; discovering its siblings does not.
-    CIRCUITALIVE::IncludeProjectPage( aSchematic.Project(), aFileName );
     const wxString projectDirectory = aSchematic.Project().GetProjectPath();
     std::vector<TOP_LEVEL_SHEET_INFO> candidates =
             aSchematic.Project().GetProjectFile().GetTopLevelSheets();
@@ -172,8 +169,6 @@ bool EESCHEMA_HELPERS::LoadProjectSheets( SCH_IO& aPlugin, SCHEMATIC& aSchematic
         wxFileName file( info.filename );
         file.MakeAbsolute( projectDirectory );
         if( file.GetExt().CmpNoCase( selected.GetExt() ) != 0 )
-            continue;
-        if( CIRCUITALIVE::IsExcludedProjectPage( aSchematic.Project(), file.GetFullPath() ) )
             continue;
         if( !file.FileExists() || loadedFiles.contains( file.GetFullPath() ) )
             continue;

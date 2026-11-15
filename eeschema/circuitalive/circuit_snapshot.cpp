@@ -600,6 +600,46 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             warnings.push_back( { "i(" + source + ")", { rail.name, NO_SIGNAL, 10 } } );
         }
     }
+    // A RESET pull-up is a DC resistive network even though its voltage is not
+    // constrained by an ideal source. Keep cooperative CPU execution for this
+    // common wiring, while sampling RC resets, buttons and driven nets normally.
+    std::map<std::string, std::vector<std::pair<std::size_t, std::string>>> terminals;
+    for( std::size_t i = 0; i < topology.nodes.size(); ++i )
+        for( const auto& [pin, node] : topology.nodes[i] ) terminals[node].emplace_back( i, pin );
+    auto fixedResetNetwork = [&]( const std::string& start, const std::string& ground )
+    {
+        std::set<std::string> visited;
+        std::vector<std::string> pending{ start };
+        while( !pending.empty() )
+        {
+            auto node = std::move( pending.back() ); pending.pop_back();
+            if( !visited.insert( node ).second || supplies.Difference( node, ground ) ) continue;
+            for( const auto& [i, physical] : terminals[node] )
+            {
+                const auto& model = models[i];
+                if( model.model.id == "resistor" )
+                {
+                    for( const auto& [pin, next] : topology.nodes[i] ) pending.push_back( next );
+                }
+                else if( model.model.runtime )
+                {
+                    const auto& descriptor = *model.model.runtime;
+                    const bool reset = std::any_of( descriptor.pins.begin(), descriptor.pins.end(),
+                        [&]( const auto& pin ) { return pin.id == "RESET" && model.pins.at( pin.port ) == physical; } );
+                    if( !reset || !supplies.Difference( topology.nodes[i].at( model.pins.at( descriptor.vcc ) ), ground )
+                        || !supplies.Difference( topology.nodes[i].at( model.pins.at( descriptor.ground ) ), ground ) )
+                        return false;
+                }
+                else if( i >= aComponents.size() && i < powerStart )
+                {
+                    // Probes only observe voltage or insert an ideal series sensor.
+                    for( const auto& [pin, next] : topology.nodes[i] ) pending.push_back( next );
+                }
+                else return false;
+            }
+        }
+        return true;
+    };
     for( auto& runtime : result.config.programmableDevices )
     {
         const auto component = std::find_if( aComponents.begin(), aComponents.end(),
@@ -618,7 +658,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             const auto& physical = model.pins.at( reset->port );
             const auto connection = component->pins.find( physical );
             fixed = fixed && ( connection == component->pins.end() || connection->second.empty()
-                || supplies.Difference( nodes.at( physical ), ground ).has_value() );
+                || fixedResetNetwork( nodes.at( physical ), ground ) );
         }
         if( fixed ) runtime.autonomousWindowSeconds = .001;
         const auto window = std::max( runtime.quantumSeconds, runtime.autonomousWindowSeconds );

@@ -55,6 +55,7 @@
 #include <core/profile.h>
 
 #include <functional>
+#include <atomic>
 #include <limits>
 #include <memory>
 #include <list>
@@ -75,6 +76,9 @@ static void InitTesselatorCallbacks( GLUtesselator* aTesselator );
 
 // Trace mask for XOR/difference mode debugging
 static const wxChar* const traceGalXorMode = wxT( "KICAD_GAL_XOR_MODE" );
+
+// Keep this in the shared GAL library, rather than in each editor's static common library.
+static std::atomic_bool s_openGlDisabledForSession{ false };
 
 static wxGLAttributes getGLAttribs()
 {
@@ -563,6 +567,18 @@ OPENGL_GAL::~OPENGL_GAL()
             m_glMainContext = nullptr;
         }
     }
+}
+
+
+bool OPENGL_GAL::IsDisabledForSession()
+{
+    return s_openGlDisabledForSession.load();
+}
+
+
+bool OPENGL_GAL::DisableForSession()
+{
+    return !s_openGlDisabledForSession.exchange( true );
 }
 
 

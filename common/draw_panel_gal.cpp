@@ -273,6 +273,26 @@ void EDA_DRAW_PANEL_GAL::onPaint( wxPaintEvent& WXUNUSED( aEvent ) )
 }
 
 
+bool EDA_DRAW_PANEL_GAL::switchToFallback( const wxString& aError )
+{
+    if( !GAL_FALLBACK_AVAILABLE || m_backend == GAL_FALLBACK )
+        return false;
+
+    // Claim the warning before switching or opening a modal dialog: both may process events
+    // that create another preview. All editors must already know to use software at that point.
+    const bool notify = KIGFX::OPENGL_GAL::DisableForSession();
+
+    if( !SwitchBackend( GAL_FALLBACK ) )
+        return false;
+
+    if( notify )
+        DisplayInfoMessage( m_parent, _( "Could not use OpenGL, falling back to software rendering" ),
+                            aError );
+
+    return true;
+}
+
+
 bool EDA_DRAW_PANEL_GAL::recoverFromGalError( const std::exception& aError )
 {
     // A predicted GPU out-of-memory cannot be cured by reinitializing OpenGL; it would just
@@ -283,7 +303,8 @@ bool EDA_DRAW_PANEL_GAL::recoverFromGalError( const std::exception& aError )
     {
         // Sleep/wake and GPU resets can invalidate the entire GL context.
         // Try a full reinit of the current backend before falling back.
-        if( !gpuOutOfMemory && !m_glRecoveryAttempted )
+        if( !gpuOutOfMemory && !m_glRecoveryAttempted
+            && ( m_backend != GAL_TYPE_OPENGL || !KIGFX::OPENGL_GAL::IsDisabledForSession() ) )
         {
             m_glRecoveryAttempted = true;
             GAL_TYPE prevBackend = m_backend;
@@ -296,13 +317,9 @@ bool EDA_DRAW_PANEL_GAL::recoverFromGalError( const std::exception& aError )
             }
         }
 
-        if( GAL_FALLBACK_AVAILABLE && GAL_FALLBACK != m_backend )
+        if( switchToFallback( wxString( aError.what() ) ) )
         {
             m_glRecoveryAttempted = false;
-            SwitchBackend( GAL_FALLBACK );
-
-            DisplayInfoMessage( m_parent, _( "Could not use OpenGL, falling back to software rendering" ),
-                                wxString( aError.what() ) );
 
             StartDrawing();
             return true;
@@ -757,6 +774,12 @@ void EDA_DRAW_PANEL_GAL::SetTopLayer( int aLayer )
 
 bool EDA_DRAW_PANEL_GAL::SwitchBackend( GAL_TYPE aGalType )
 {
+    if( aGalType == GAL_TYPE_OPENGL && GAL_FALLBACK_AVAILABLE
+        && KIGFX::OPENGL_GAL::IsDisabledForSession() )
+    {
+        aGalType = GAL_FALLBACK;
+    }
+
     // Do not do anything if the currently used GAL is correct
     if( aGalType == m_backend && m_gal != nullptr )
         return true;
@@ -772,6 +795,8 @@ bool EDA_DRAW_PANEL_GAL::SwitchBackend( GAL_TYPE aGalType )
     m_pendingResize = false;
 
     KIGFX::GAL* new_gal = nullptr;
+    bool notifyFallback = false;
+    wxString fallbackError;
 
     try
     {
@@ -783,17 +808,23 @@ bool EDA_DRAW_PANEL_GAL::SwitchBackend( GAL_TYPE aGalType )
 
             if( errormsg.empty() )
             {
-                new_gal = new KIGFX::OPENGL_GAL( GetVcSettings(), m_options, this, this, this );
+                try
+                {
+                    new_gal = new KIGFX::OPENGL_GAL( GetVcSettings(), m_options, this, this, this );
+                }
+                catch( const std::runtime_error& error )
+                {
+                    errormsg = wxString( error.what() );
+                }
             }
-            else
+
+            if( !errormsg.empty() )
             {
                 if( GAL_FALLBACK != aGalType )
                 {
                     aGalType = GAL_FALLBACK;
-                    DisplayInfoMessage(
-                            m_parent,
-                            _( "Could not use OpenGL, falling back to software rendering" ),
-                            errormsg );
+                    notifyFallback = KIGFX::OPENGL_GAL::DisableForSession();
+                    fallbackError = errormsg;
                     new_gal = new KIGFX::CAIRO_GAL( m_options, this, this, this );
                 }
                 else
@@ -861,6 +892,11 @@ bool EDA_DRAW_PANEL_GAL::SwitchBackend( GAL_TYPE aGalType )
     }
 
     m_backend = aGalType;
+
+    // The canvas must be fully initialized before the dialog runs a nested event loop.
+    if( notifyFallback && result )
+        DisplayInfoMessage( m_parent, _( "Could not use OpenGL, falling back to software rendering" ),
+                            fallbackError );
 
     wxLogTrace( traceGalContext, wxS( "Canvas %s switched to backend %d, result %d" ), traceName(),
                 (int) aGalType, result );

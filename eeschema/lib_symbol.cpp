@@ -1297,6 +1297,13 @@ std::vector<LIB_SYMBOL::LOGICAL_PIN> LIB_SYMBOL::GetLogicalPins( int aUnit, int 
 
 int LIB_SYMBOL::GetPinCount()
 {
+    // Derived symbols inherit graphical pins. Their local cache can be empty
+    // until flattening; resolve from the in-memory parent, without library I/O.
+    if( IsDerived() )
+    {
+        if( auto parent = m_parent.lock() )
+            return parent->GetPinCount();
+    }
     return m_pinCountCache;
 }
 

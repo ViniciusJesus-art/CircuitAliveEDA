@@ -199,6 +199,7 @@ LIB_TREE_NODE_ITEM::LIB_TREE_NODE_ITEM( LIB_TREE_NODE* aParent, LIB_TREE_ITEM* a
     m_Name = aItem->GetName();
     m_Desc = aItem->GetDesc();
     m_Footprint = aItem->GetFootprint();
+    m_FootprintFilters = aItem->GetFootprintFilters();
     m_PinCount = aItem->GetPinCount();
 
     aItem->GetChooserFields( m_Fields );
@@ -231,6 +232,9 @@ void LIB_TREE_NODE_ITEM::Update( LIB_TREE_ITEM* aItem )
 
     m_Name = aItem->GetName();
     m_Desc = aItem->GetDesc();
+    m_Footprint = aItem->GetFootprint();
+    m_FootprintFilters = aItem->GetFootprintFilters();
+    m_PinCount = aItem->GetPinCount();
 
     aItem->GetChooserFields( m_Fields );
 

@@ -707,6 +707,25 @@ BOOST_AUTO_TEST_CASE( GetUnitDrawItems )
 /**
  * Check inheritance support.
  */
+BOOST_AUTO_TEST_CASE( DerivedChooserMetadataUsesInheritedPinsAndPackageFilters )
+{
+    LIB_SYMBOL parent( "parent" );
+    auto* pin = new SCH_PIN( &parent );
+    pin->SetNumber( "[1-4]" );
+    parent.AddDrawItem( pin );
+    parent.SetFPFilters( wxArrayString{ "DIP*4*" } );
+    LIB_SYMBOL child( "child", &parent );
+    LIB_SYMBOL grandchild( "grandchild", &child );
+    BOOST_CHECK_EQUAL( child.GetPinCount(), 4 );
+    BOOST_CHECK_EQUAL( grandchild.GetPinCount(), 4 );
+    BOOST_REQUIRE_EQUAL( grandchild.GetFootprintFilters().size(), 1 );
+    BOOST_CHECK_EQUAL( grandchild.GetFootprintFilters()[0], "DIP*4*" );
+    auto* extra = new SCH_PIN( &parent );
+    extra->SetNumber( "5" );
+    parent.AddDrawItem( extra );
+    BOOST_CHECK_EQUAL( grandchild.GetPinCount(), 5 );
+}
+
 BOOST_AUTO_TEST_CASE( Inheritance )
 {
     std::unique_ptr<LIB_SYMBOL> parent = std::make_unique<LIB_SYMBOL>( "parent" );

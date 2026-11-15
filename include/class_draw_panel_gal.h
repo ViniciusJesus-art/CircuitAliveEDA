@@ -296,6 +296,9 @@ protected:
 
     bool recoverFromGalError( const std::exception& aErr );
 
+    /// Switch to software for the rest of the session and report only its first OpenGL failure.
+    bool switchToFallback( const wxString& aError );
+
     /// Trace why DoRePaint drew or skipped, only when the reason changes so a stuck canvas stands out
     void tracePaintState( int aState );
 

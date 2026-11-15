@@ -21,7 +21,9 @@ usa o editor e a PCB do próprio projeto.
 projeto. Não é permitido remover a última folha principal. Após a confirmação,
 os arquivos correspondentes são excluídos, exceto os ainda usados por outras
 páginas. Essa operação não tem desfazer. Salve o projeto para manter a lista
-atualizada e excluir as folhas removidas da descoberta automática.
+atualizada. A descoberta usa os arquivos existentes: uma página apagada deixa de
+aparecer e um arquivo restaurado ou recriado volta a ser reconhecido. Listas de
+exclusão gravadas por versões anteriores não ocultam páginas.
 
 Ao abrir um `.kicad_sch`, o editor identifica seu `.kicad_pro` e carrega as folhas
 declaradas no projeto, além dos outros `.kicad_sch` da mesma pasta. A folha

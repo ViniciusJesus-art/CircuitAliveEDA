@@ -268,6 +268,14 @@ void PROJECT_TREE_ITEM::Activate( PROJECT_TREE_PANE* aTreePrjFrame )
         if( fullFileName == rootSchematic )
         {
             toolMgr->RunAction( KICAD_MANAGER_ACTIONS::editSchematic );
+
+            // The project-named page may also be excluded or a different page may be active.
+            // Always honor the clicked file, even when the project editor is already open.
+            if( kiway.Player( FRAME_SCH, false ) )
+            {
+                packet = fullFileName.ToStdString();
+                kiway.ExpressMail( FRAME_SCH, MAIL_SCH_NAVIGATE_TO_SHEET, packet );
+            }
         }
         else
         {

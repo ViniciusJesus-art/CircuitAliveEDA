@@ -122,6 +122,7 @@ DIALOG_SYMBOL_CHOOSER::~DIALOG_SYMBOL_CHOOSER()
 
 void DIALOG_SYMBOL_CHOOSER::EndModal( int aCode )
 {
+    if( aCode == wxID_OK ) m_chooserPanel->FlushPendingFilters();
     m_chooserPanel->ShutdownCanvases();
     DIALOG_SHIM::EndModal( aCode );
 }

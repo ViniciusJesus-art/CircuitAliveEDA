@@ -242,6 +242,8 @@ public:
 
     void SetFPFilters( const wxArrayString& aFilters ) { m_fpFilters = aFilters; }
 
+    wxArrayString GetFootprintFilters() const override { return GetFPFilters(); }
+
     wxArrayString GetFPFilters() const
     {
         if( m_fpFilters.IsEmpty() && IsDerived() )

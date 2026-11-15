@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import shutil
@@ -78,6 +79,20 @@ class WindowsInstallerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'version differs'):
             package.validate_runtime(self.stage, '10.0.7-alpha.2')
 
+    def test_windows_file_version_uses_release_alpha_instead_of_git_commit_count(self):
+        header = self.root / 'version.h'
+        subprocess.run(['cmake', f'-DKICAD_CMAKE_MODULE_PATH={ROOT / "cmake"}',
+                        f'-DSRC_PATH={ROOT}', f'-DCIRCUITALIVE_RELEASE_VERSION={self.version}',
+                        '-DKICAD_VERSION_EXTRA=CircuitAliveEDA', f'-DOUTPUT_FILE={header}',
+                        f'-DTEXT_OUTPUT_FILE={self.root / "version.txt"}',
+                        '-P', str(ROOT / 'cmake/BuildSteps/WriteVersionHeader.cmake')],
+                       check=True, capture_output=True, text=True)
+        definitions = dict(re.findall(r'^#define\s+(\w+)\s+(.+)$', header.read_text(), re.MULTILINE))
+        self.assertEqual(definitions['KICAD_WIN32_RC_FILEVER'], '10, 0, 7, 1')
+        self.assertEqual(definitions['KICAD_WIN32_RC_PRODVER'], '10, 0, 7, 1')
+        self.assertIn(self.version, definitions['KICAD_WIN32_RC_FILEVER_STR'])
+        self.assertIn(self.version, definitions['KICAD_WIN32_RC_PRODVER_STR'])
+
     def test_installer_requires_bundled_firmware_engines(self):
         for name in ('avr8js.js', 'pic16.js'):
             with self.subTest(module=name):
@@ -127,7 +142,7 @@ class WindowsInstallerTests(unittest.TestCase):
         installer.write_bytes(b'MZ verified installer')
         with patch.object(package.subprocess, 'run'), patch.object(package, 'verify_installer') as verify:
             package.package_runtime(self.stage, self.version, 'ISCC.exe', self.root)
-        verify.assert_called_once_with(installer, self.root)
+        verify.assert_called_once_with(installer, self.root, self.version)
         self.assertEqual(installer.with_suffix('.exe.sha256').read_text().split()[0], package.digest(installer))
 
     def test_runtime_checks_use_installed_python_and_no_build_path(self):
@@ -145,6 +160,22 @@ class WindowsInstallerTests(unittest.TestCase):
             self.assertNotIn('vcpkg', call.kwargs['env']['PATH'])
             self.assertEqual(call.kwargs['env']['PYTHONHOME'], str(self.root / 'installer smoke/bin'))
         self.assertEqual(run.call_args_list[3].args[0][0], str(self.root / 'installer smoke/bin/python.exe'))
+
+    def test_installer_rejects_an_application_built_with_another_alpha_version(self):
+        for reported, matches in ((self.version, True), ('10.0.7-alpha.24', False),
+                                  ('10.0.7-alpha.10', False)):
+            with self.subTest(reported=reported), \
+                    patch.dict(os.environ, {'SystemRoot': 'C:/Windows'}), \
+                    patch.object(package.subprocess, 'run', return_value=subprocess.CompletedProcess(
+                        [], 0, f'Application: kicad-cli\nVersion: {reported}-CircuitAliveEDA, release build\n')), \
+                    patch.object(package, 'validate_installed_assets'), \
+                    patch.object(package, 'validate_programmable_assets'), \
+                    patch.object(package, 'verify_first_start'):
+                if matches:
+                    package.verify_installer(self.dist / 'setup.exe', self.root, self.version)
+                else:
+                    with self.assertRaisesRegex(ValueError, 'application version differs'):
+                        package.verify_installer(self.dist / 'setup.exe', self.root, self.version)
 
     @unittest.skipUnless(os.name == 'nt' and os.environ.get('INNO_ISCC'), 'Native Inno Setup integration')
     def test_real_installer_extracts_libraries_and_excludes_git_metadata(self):

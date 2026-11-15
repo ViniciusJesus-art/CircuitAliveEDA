@@ -14,6 +14,8 @@ class wxListCtrl;
 class wxToggleButton;
 class wxButton;
 class wxBookCtrlEvent;
+class wxScrolledWindow;
+class wxGridSizer;
 namespace CIRCUITALIVE
 {
 
@@ -33,6 +35,13 @@ public:
 
 private:
     void tabChanged( wxBookCtrlEvent& );
+    void layoutProbes();
+    void scheduleProbeLayout();
+    wxScrolledWindow* m_probePage = nullptr;
+    wxGridSizer *m_measurementGrid = nullptr, *m_sourceGrid = nullptr;
+    std::vector<std::pair<wxStaticText*, wxString>> m_wrappedLabels;
+    int m_probeWidth = -1;
+    bool m_probeLayoutPending = false;
     wxNotebook* m_tabs;
     wxTextCtrl* m_name;
     wxStaticText* m_help;

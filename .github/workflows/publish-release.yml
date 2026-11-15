@@ -10,6 +10,11 @@ on:
         required: true
         default: 10.0.7-alpha.3
         type: string
+      package_version:
+        description: Application/package version when the public name is not a numeric alpha version
+        required: true
+        default: 10.0.7-alpha.3
+        type: string
       target:
         description: Packages to build (all = RPM + AppImage + DEB + EXE)
         type: choice
@@ -56,6 +61,7 @@ jobs:
         id: release
         env:
           RELEASE_LABEL: ${{ inputs.version }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
           RELEASE_TARGET: ${{ inputs.target }}
           PUBLISH_RELEASE: ${{ inputs.publish_release }}
         with:
@@ -72,10 +78,14 @@ jobs:
               .replace(/\.{2,}/g, '.').slice(0, 80).replace(/[._-]+$/g, '');
             if (!slug) throw new Error('Release name needs a letter or number for its filename.');
             const tag = /^v[0-9]/.test(slug) ? slug : `v${slug}`;
-            // RPM and Debian metadata require a numeric version. Keep that separate
-            // from the unrestricted public release name, and auto-derive one when needed.
-            const version = /^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$/.test(label)
-              ? label : `10.0.7-alpha.${process.env.GITHUB_RUN_NUMBER}`;
+            // Use one explicit application version for all platforms. The CI run
+            // number is build provenance, never the alpha release number.
+            const numericLabel = label.replace(/^v(?=[0-9]+\.)/, '');
+            const version = /^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$/.test(numericLabel)
+              ? numericLabel : process.env.PACKAGE_VERSION.trim();
+            if (!/^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$/.test(version)) {
+              throw new Error('Enter an application/package version such as 10.0.7-alpha.1.');
+            }
             const targets = {all: ['rpm', 'appimage', 'deb', 'exe'],
               linux: ['rpm', 'appimage', 'deb'], exe: ['exe'],
               rpm: ['rpm'], appimage: ['appimage'], deb: ['deb']};

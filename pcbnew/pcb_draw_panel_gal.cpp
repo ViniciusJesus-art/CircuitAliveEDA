@@ -759,15 +759,14 @@ void PCB_DRAW_PANEL_GAL::OnShow()
     }
     catch( const std::runtime_error& e )
     {
-        DisplayError( GetParent(), e.what() );
-
-        // Use the fallback if we have one
-        if( GAL_FALLBACK != m_backend )
+        if( switchToFallback( wxString( e.what() ) ) )
         {
-            SwitchBackend( GAL_FALLBACK );
-
             if( frame )
                 frame->ActivateGalCanvas();
+        }
+        else
+        {
+            DisplayError( GetParent(), e.what() );
         }
     }
 

@@ -138,6 +138,7 @@ public:
     wxString    m_Name;        // Actual name of the part
     wxString    m_Desc;        // Description to be displayed
     wxString    m_Footprint;   // Footprint ID as a string (ie: the footprint field text)
+    wxArrayString m_FootprintFilters; // Package constraints, captured with the library item
     int         m_PinCount;    // Pin count from symbol, or unique pad count from footprint
 
     std::vector<SEARCH_TERM>     m_SearchTerms;    /// List of weighted search terms

@@ -101,6 +101,12 @@ public:
      */
     static wxString CheckFeatures( GAL_DISPLAY_OPTIONS& aOptions );
 
+    /// Shared by all editors/previews through the GAL library; never saved to preferences.
+    static bool IsDisabledForSession();
+
+    /// Disable OpenGL until exit. Returns true only for the first failure (claiming its warning).
+    static bool DisableForSession();
+
     bool IsOpenGlEngine() override { return true; }
 
     /// @copydoc GAL::IsInitialized()

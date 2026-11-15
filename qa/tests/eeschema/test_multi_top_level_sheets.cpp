@@ -186,13 +186,17 @@ BOOST_FIXTURE_TEST_CASE( IgnoreNonSchematicProjectEntries, PROJECT_PAGES_FIXTURE
 BOOST_FIXTURE_TEST_CASE( DeletedPageStaysRemovedAfterDiscovery, PROJECT_PAGES_FIXTURE )
 {
     Save();
+    wxString savedPage;
+    {
+        wxFFile file( Path( "second.kicad_sch" ), "r" );
+        BOOST_REQUIRE( file.ReadAll( &savedPage ) );
+    }
     SCH_SHEET_PATH deleted;
     deleted.push_back( second );
     schematic->SetCurrentSheet( deleted );
     BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, deleted ) );
     BOOST_CHECK( schematic->CurrentSheet().Last() == first );
-    BOOST_CHECK( wxFileExists( Path( "second.kicad_sch" ) ) );
-    BOOST_CHECK( CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "second.kicad_sch" ) ) );
+    BOOST_CHECK( !wxFileExists( Path( "second.kicad_sch" ) ) );
     manager.SaveProject();
     schematic.reset();
     manager.UnloadProject( &manager.Prj(), false );
@@ -201,13 +205,50 @@ BOOST_FIXTURE_TEST_CASE( DeletedPageStaysRemovedAfterDiscovery, PROJECT_PAGES_FI
     BOOST_REQUIRE_EQUAL( schematic->GetTopLevelSheets().size(), 1u );
     BOOST_CHECK( !CIRCUITALIVE::CanDeleteProjectPage( *schematic, schematic->CurrentSheet() ) );
     BOOST_CHECK( !CIRCUITALIVE::RemoveProjectPage( *schematic, schematic->CurrentSheet() ) );
-    // Opening a removed file explicitly restores it instead of showing an unrelated page.
-    Open( "second.kicad_sch" );
+    // Restoring a file makes it discoverable again, without explicitly opening that file.
+    {
+        wxFFile file( Path( "second.kicad_sch" ), "w" );
+        BOOST_REQUIRE( file.Write( savedPage ) );
+    }
+    Open( "first.kicad_sch" );
     BOOST_CHECK_EQUAL( schematic->GetTopLevelSheets().size(), 2u );
-    BOOST_CHECK( !CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "second.kicad_sch" ) ) );
+
+    manager.SaveProject();
+    schematic.reset();
+    manager.UnloadProject( &manager.Prj(), false );
+    manager.LoadProject( project );
+    Open( "first.kicad_sch" );
+    BOOST_CHECK_EQUAL( schematic->GetTopLevelSheets().size(), 2u );
 }
 
-BOOST_FIXTURE_TEST_CASE( DeleteHierarchicalPageRetargetsParentAndExcludesFile, PROJECT_PAGES_FIXTURE )
+BOOST_FIXTURE_TEST_CASE( OldExclusionsDoNotHideExistingFiles, PROJECT_PAGES_FIXTURE )
+{
+    Save();
+    // Match an existing project: one page is declared, another is only on disk, and
+    // both are in an obsolete exclusion list. Neither should disappear on startup.
+    manager.Prj().GetProjectFile().GetTopLevelSheets() = {
+        { first->m_Uuid, "First", "first.kicad_sch" }
+    };
+    manager.Prj().GetProjectFile().Set<nlohmann::json>( "schematic.excluded_pages",
+            nlohmann::json::array( { "first.kicad_sch", "second.kicad_sch", "missing.kicad_sch" } ) );
+    manager.SaveProject();
+    schematic.reset();
+    manager.UnloadProject( &manager.Prj(), false );
+    manager.LoadProject( project );
+    Open( "first.kicad_sch" );
+    BOOST_REQUIRE_EQUAL( schematic->GetTopLevelSheets().size(), 2u );
+    BOOST_CHECK_EQUAL( schematic->CurrentSheet().LastScreen()->GetFileName(), Path( "first.kicad_sch" ) );
+    Save();
+    manager.SaveProject();
+    schematic.reset();
+    manager.UnloadProject( &manager.Prj(), false );
+    manager.LoadProject( project );
+    Open( "second.kicad_sch" );
+    BOOST_REQUIRE_EQUAL( schematic->GetTopLevelSheets().size(), 2u );
+    BOOST_CHECK_EQUAL( schematic->CurrentSheet().LastScreen()->GetFileName(), Path( "second.kicad_sch" ) );
+}
+
+BOOST_FIXTURE_TEST_CASE( DeleteHierarchicalPageRetargetsParentAndDeletesFile, PROJECT_PAGES_FIXTURE )
 {
     auto* child = createTopLevelSheet( *schematic, "Child", "child.kicad_sch" );
     child->GetScreen()->SetFileName( Path( "child.kicad_sch" ) );
@@ -220,10 +261,9 @@ BOOST_FIXTURE_TEST_CASE( DeleteHierarchicalPageRetargetsParentAndExcludesFile, P
     schematic->RefreshHierarchy();
     Save();
     schematic->SetCurrentSheet( childPath );
-    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, childPath, true ) );
+    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, childPath ) );
     BOOST_CHECK( schematic->CurrentSheet().Last() == first );
     BOOST_CHECK_EQUAL( schematic->Hierarchy().size(), 2u );
-    BOOST_CHECK( CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "child.kicad_sch" ) ) );
     BOOST_CHECK( !wxFileExists( Path( "child.kicad_sch" ) ) );
     Save();
     Open( "second.kicad_sch" );
@@ -235,7 +275,7 @@ BOOST_FIXTURE_TEST_CASE( ConfirmedPageDeletionRemovesItsSchematicFile, PROJECT_P
     Save();
     SCH_SHEET_PATH removed;
     removed.push_back( second );
-    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, removed, true ) );
+    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, removed ) );
     BOOST_CHECK( !wxFileExists( Path( "second.kicad_sch" ) ) );
     BOOST_CHECK( wxFileExists( Path( "first.kicad_sch" ) ) );
     Save();
@@ -259,11 +299,9 @@ BOOST_FIXTURE_TEST_CASE( DeleteFirstPageKeepsSharedChildInSurvivingHierarchy, PR
     SCH_SHEET_PATH removed;
     removed.push_back( first );
     schematic->SetCurrentSheet( removed );
-    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, removed, true ) );
+    BOOST_REQUIRE( CIRCUITALIVE::RemoveProjectPage( *schematic, removed ) );
     BOOST_CHECK( schematic->CurrentSheet().Last() == second );
     BOOST_CHECK_EQUAL( schematic->Hierarchy().size(), 2u );
-    BOOST_CHECK( CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "first.kicad_sch" ) ) );
-    BOOST_CHECK( !CIRCUITALIVE::IsExcludedProjectPage( manager.Prj(), Path( "child.kicad_sch" ) ) );
     BOOST_CHECK( !wxFileExists( Path( "first.kicad_sch" ) ) );
     BOOST_CHECK( wxFileExists( Path( "child.kicad_sch" ) ) );
     BOOST_CHECK( wxFileExists( Path( "second.kicad_sch" ) ) );

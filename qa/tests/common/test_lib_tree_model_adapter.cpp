@@ -102,6 +102,30 @@ private:
 
 BOOST_AUTO_TEST_SUITE( LibTreeModelAdapter )
 
+BOOST_AUTO_TEST_CASE( PackageAndPinMetadataFollowLibraryUpdatesWithoutReloadingSymbols )
+{
+    class PACKAGE_ITEM : public TEST_LIB_TREE_ITEM
+    {
+    public:
+        PACKAGE_ITEM() : TEST_LIB_TREE_ITEM( "Test", "QuadGate", "", "" ) {}
+        wxArrayString GetFootprintFilters() const override { return filters; }
+        int GetPinCount() override { return pins; }
+        wxArrayString filters{ "DIP*14*" };
+        int pins = 14;
+    } item;
+    LIB_TREE_NODE_ROOT root;
+    auto& library = root.AddLib( "Test", "" );
+    auto& node = library.AddItem( &item );
+    BOOST_CHECK_EQUAL( node.m_PinCount, 14 );
+    BOOST_REQUIRE_EQUAL( node.m_FootprintFilters.size(), 1 );
+    BOOST_CHECK_EQUAL( node.m_FootprintFilters[0], "DIP*14*" );
+    item.filters[0] = "SOIC*16*";
+    item.pins = 16;
+    node.Update( &item );
+    BOOST_CHECK_EQUAL( node.m_PinCount, 16 );
+    BOOST_CHECK_EQUAL( node.m_FootprintFilters[0], "SOIC*16*" );
+}
+
 /**
  * A persisted column width can become corrupt after a mixed-DPI monitor change (issue 24702
  * reported width 427218649), which pushes the tree content off-screen and leaves the

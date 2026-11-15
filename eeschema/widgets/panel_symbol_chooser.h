@@ -80,6 +80,7 @@ public:
     void OnChar( wxKeyEvent& aEvent );
 
     void FinishSetup();
+    void FlushPendingFilters();
 
     void SetPreselect( const LIB_ID& aPreselect );
 
@@ -174,6 +175,7 @@ protected:
     static wxString           g_powerSearchString;
 
     wxTimer*                  m_dbl_click_timer;
+    wxTimer*                  m_filterTimer;
     wxTimer*                  m_open_libs_timer;
     SYMBOL_PREVIEW_WIDGET*    m_symbol_preview;
     wxSplitterWindow*         m_hsplitter;
@@ -210,6 +212,7 @@ protected:
     std::function<bool( LIB_TREE_NODE& )> m_choiceFilter;
     std::function<bool( LIB_TREE_NODE& )>* m_originalFilter = nullptr;
     bool                      m_shuttingDown = false;
+    bool                      m_physicalRefreshPending = false;
 
     std::vector<std::pair<FIELD_T, wxString>>  m_field_edits;
 };

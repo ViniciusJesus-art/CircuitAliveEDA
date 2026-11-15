@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -105,6 +106,32 @@ class ReleaseArtifactsTests(unittest.TestCase):
         for label in ('', '  ', '!!!', '../', 'broken\nname', 'x' * 101):
             with self.subTest(label=label), self.assertRaises(ValueError):
                 release.release_slug(label)
+
+    @unittest.skipUnless(shutil.which('node'), 'Node is required to exercise the GitHub workflow script')
+    def test_workflow_never_uses_ci_run_number_as_the_alpha_version(self):
+        workflow = (ROOT / '.github/workflows/publish-release.yml').read_text()
+        source = workflow.split('          script: |\n', 1)[1].split('\n  windows:', 1)[0]
+        source = '\n'.join(line[12:] if line.startswith(' ' * 12) else line for line in source.splitlines())
+        harness = '''
+const outputs = {};
+const context = {ref: 'refs/heads/main', sha: 'abc123', repo: {}};
+const core = {setOutput: (key, value) => outputs[key] = value,
+    summary: {addHeading() {return this;}, addRaw() {return this;}, async write() {}}};
+const github = {};
+(async () => {
+''' + source + '''
+})().then(() => process.stdout.write(JSON.stringify(outputs)))
+    .catch(error => {process.stderr.write(error.message); process.exitCode = 1;});
+'''
+        for label, package_version, expected in (('Windows Preview', '10.0.7-alpha.1', '10.0.7-alpha.1'),
+                                                  ('10.0.7-alpha.3', '10.0.7-alpha.1', '10.0.7-alpha.3'),
+                                                  ('v10.0.7-alpha.3', '10.0.7-alpha.1', '10.0.7-alpha.3')):
+            with self.subTest(label=label):
+                env = dict(os.environ, RELEASE_LABEL=label, PACKAGE_VERSION=package_version,
+                           RELEASE_TARGET='all', PUBLISH_RELEASE='false', GITHUB_RUN_NUMBER='24')
+                result = subprocess.run(['node', '-e', harness], env=env,
+                                        check=True, capture_output=True, text=True)
+                self.assertEqual(json.loads(result.stdout)['version'], expected)
 
     def test_all_selection_requires_deb_before_any_publication(self):
         self.packages[2].unlink()

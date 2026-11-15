@@ -199,15 +199,14 @@ void SCH_DRAW_PANEL::OnShow()
     }
     catch( const std::runtime_error& e )
     {
-        DisplayInfoMessage( frame, e.what() );
-
-        // Use fallback if one is available
-        if( GAL_FALLBACK != m_backend )
+        if( switchToFallback( wxString( e.what() ) ) )
         {
-            SwitchBackend( GAL_FALLBACK );
-
             if( frame )
                 frame->ActivateGalCanvas();
+        }
+        else
+        {
+            DisplayInfoMessage( frame, e.what() );
         }
     }
 }
