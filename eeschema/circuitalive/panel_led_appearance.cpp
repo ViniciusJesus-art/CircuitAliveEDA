@@ -5,6 +5,7 @@
 #include <wx/spinctrl.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
+#include <wx/textctrl.h>
 #include <algorithm>
 #include <charconv>
 #include <cmath>

@@ -187,8 +187,12 @@ como partes externas. As bibliotecas 3D continuam incluídas.
   dos fontes/cabeçalhos. Só no CI, `CA_USE_SCCACHE=1` configura os launchers C/C++,
   desativa PCH e usa informações de debug embutidas (`/Z7`), necessárias para
   armazenar objetos MSVC. As funcionalidades e os testes permanecem habilitados.
-  Um teste nativo compila C e C++ repetidamente e verifica uma mudança de cabeçalho
-  antes do build completo. Estatísticas aparecem no post-step da action.
+  A opção de avisos `-external:env:INCLUDE` usa o prefixo `-`, também aceito pelo
+  MSVC: com `/`, o parser do sccache 0.16 interpreta essa opção como outro fonte
+  e deixa de armazenar os objetos C++. Um teste nativo usa essa opção ao compilar
+  C e C++ repetidamente, verifica uma mudança de cabeçalho e confere se o cache
+  recusou a chamada antes do build completo. Estatísticas aparecem no post-step
+  da action.
   Se o setup do cache estiver indisponível, o job compila pelo caminho normal;
   falha de comunicação com o servidor também pode recorrer ao compilador local.
 - **Fedora e Ubuntu:** restauram o ccache e tentam salvar os objetos concluídos

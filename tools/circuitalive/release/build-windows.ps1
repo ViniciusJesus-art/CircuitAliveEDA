@@ -84,6 +84,8 @@ function Validate-Project {
         'common/CMakeFiles/pcbcommon.dir/__/pcbnew/pcb_painter.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/widgets/panel_symbol_chooser.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/probe_placement.cpp.obj',
+        'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/live_control_popup.cpp.obj',
+        'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/panel_led_appearance.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/instrument_panel.cpp.obj',
         'eeschema/CMakeFiles/eeschema_kiface_objects.dir/circuitalive/simulation_overlay.cpp.obj')
     Invoke-Checked -Program cmake -Arguments (@('--build', $build, '--parallel', "$Jobs", '--target') + $targets + @('--', '-k', '0'))

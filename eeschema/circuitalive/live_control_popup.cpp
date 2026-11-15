@@ -6,6 +6,7 @@
 #include <wx/slider.h>
 #include <wx/spinctrl.h>
 #include <wx/stattext.h>
+#include <wx/textctrl.h>
 #include <algorithm>
 #include <cmath>
 

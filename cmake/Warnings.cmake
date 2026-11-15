@@ -238,7 +238,9 @@ if( MSVC )
 
     # Warnings for C are not enabled since C files are mostly generated
     # set( WARN_FLAGS_C   "/external:W0 /external:env:INCLUDE /external:I${CMAKE_SOURCE_DIR}/thirdparty /Wall" )
-    set( WARN_FLAGS_CXX "/external:W0 /external:env:INCLUDE /external:I${CMAKE_SOURCE_DIR}/thirdparty /Wall" )
+    # MSVC accepts '-' too. sccache 0.16 treats the unrecognized slash form of
+    # external:env:INCLUDE as another input file, bypassing the C++ object cache.
+    set( WARN_FLAGS_CXX "/external:W0 -external:env:INCLUDE /external:I${CMAKE_SOURCE_DIR}/thirdparty /Wall" )
 
     # disable 'type' : class 'type1' needs to have dll-interface to be used by clients of class 'type2'
     string( APPEND WARN_FLAGS_CXX " /wd4251" )
