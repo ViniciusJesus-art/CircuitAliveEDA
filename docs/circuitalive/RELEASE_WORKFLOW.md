@@ -195,6 +195,12 @@ como partes externas. As bibliotecas 3D continuam incluídas.
   da action.
   Se o setup do cache estiver indisponível, o job compila pelo caminho normal;
   falha de comunicação com o servidor também pode recorrer ao compilador local.
+  As bibliotecas da interface também propagam `/FIjson_common.h` aos seus
+  consumidores MSVC. Isso faz os painéis importarem o JSON de `kicommon` antes
+  de usar os helpers inline, evitando definições duplicadas na ligação da DLL.
+  O teste inicial `qa_circuitalive_json_link` inclui esses helpers antes dos
+  outros cabeçalhos e verifica a serialização dos controles. O worker isolado
+  continua usando suas próprias instâncias de JSON.
 - **Fedora e Ubuntu:** restauram o ccache e tentam salvar os objetos concluídos
   mesmo após uma falha ou cancelamento normal. Encerramento forçado do runner
   pode impedir esse salvamento. Os logs mostram estatísticas zeradas por execução;

@@ -1,4 +1,7 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
+// Match the GUI panel: inline JSON helpers precede headers that import kicommon.
+// On MSVC the GUI library must propagate /FIjson_common.h to its consumers.
+#include <circuitalive/control_visual_json.h>
 #include <json_common.h>
 #include <circuitalive/model_design.h>
 #include <circuitalive/model_profiles.h>
@@ -80,6 +83,15 @@ int main()
         // Force imported basic_json methods into the same link as all CA JSON users.
         const nlohmann::json document = { { "model", model.id }, { "voltage", snapshot.latest.values[0] } };
         Require( nlohmann::json::parse( document.dump() ).at( "model" ) == model.id, "Imported JSON failed" );
+        CONTROL_VISUAL visual;
+        visual.custom = true;
+        visual.visible = false;
+        visual.x = .1; visual.y = .2; visual.width = .5; visual.height = .6;
+        const auto restoredVisual = ReadControlVisual( WriteControlVisual( visual ) );
+        Require( restoredVisual.custom && !restoredVisual.visible
+                 && restoredVisual.x == visual.x && restoredVisual.y == visual.y
+                 && restoredVisual.width == visual.width && restoredVisual.height == visual.height,
+                 "Inline control JSON round trip failed" );
         std::cout << "Desktop JSON imports, models, profiles, memory and worker protocol passed.\n";
         return 0;
     }

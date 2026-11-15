@@ -16,8 +16,10 @@ if( TARGET circuitalive_sim_session )
     set( CIRCUITALIVE_DESKTOP_LIBRARY circuitalive_interactive )
     if( MSVC )
         circuitalive_add_interactive_library( circuitalive_interactive_gui circuitalive_sim_session_gui )
-        target_include_directories( circuitalive_interactive_gui PRIVATE ${PROJECT_SOURCE_DIR}/include )
-        target_compile_options( circuitalive_interactive_gui PRIVATE /FIjson_common.h )
+        # Consumers also instantiate JSON in inline control headers. They must
+        # see kicommon's dllimport before those headers, including without PCH.
+        target_include_directories( circuitalive_interactive_gui PUBLIC ${PROJECT_SOURCE_DIR}/include )
+        target_compile_options( circuitalive_interactive_gui PUBLIC /FIjson_common.h )
         target_link_libraries( circuitalive_interactive_gui PRIVATE kicommon )
         set( CIRCUITALIVE_DESKTOP_LIBRARY circuitalive_interactive_gui )
     endif()

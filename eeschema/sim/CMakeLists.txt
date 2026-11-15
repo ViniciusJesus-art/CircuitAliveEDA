@@ -27,8 +27,8 @@ if( CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32 )
         # Desktop objects must see its dllimport before instantiating JSON.
         # Keep the original library independent for the isolated worker/tests.
         circuitalive_add_session_library( circuitalive_sim_session_gui )
-        target_include_directories( circuitalive_sim_session_gui PRIVATE ${PROJECT_SOURCE_DIR}/include )
-        target_compile_options( circuitalive_sim_session_gui PRIVATE /FIjson_common.h )
+        target_include_directories( circuitalive_sim_session_gui PUBLIC ${PROJECT_SOURCE_DIR}/include )
+        target_compile_options( circuitalive_sim_session_gui PUBLIC /FIjson_common.h )
         target_link_libraries( circuitalive_sim_session_gui PRIVATE kicommon )
     endif()
 
