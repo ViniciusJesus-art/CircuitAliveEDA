@@ -6,14 +6,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Public release name (e.g. 10.0.7-alpha.3 or October Preview)
+        description: Public GitHub release name (independent of the application version)
         required: true
-        default: 10.0.7-alpha.3
+        default: 10.0.7-alpha.4.1
         type: string
       package_version:
-        description: Application/package version when the public name is not a numeric alpha version
+        description: Application/installer/About version — KiCad-CircuitAlive (e.g. 10.0.7-alpha.4.1 or 10.0.7-1.2.3)
         required: true
-        default: 10.0.7-alpha.3
+        default: 10.0.7-alpha.4.1
         type: string
       target:
         description: Packages to build (all = RPM + AppImage + DEB + EXE)
@@ -56,6 +56,7 @@ jobs:
       - name: Check release publication guard
         run: |
           python3 qa/tests/cli/test_release_artifacts.py
+          python3 qa/tests/cli/test_release_versions.py
           python3 qa/tests/cli/test_component_libraries.py
       - uses: actions/github-script@v8
         id: release
@@ -78,13 +79,12 @@ jobs:
               .replace(/\.{2,}/g, '.').slice(0, 80).replace(/[._-]+$/g, '');
             if (!slug) throw new Error('Release name needs a letter or number for its filename.');
             const tag = /^v[0-9]/.test(slug) ? slug : `v${slug}`;
-            // Use one explicit application version for all platforms. The CI run
-            // number is build provenance, never the alpha release number.
-            const numericLabel = label.replace(/^v(?=[0-9]+\.)/, '');
-            const version = /^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$/.test(numericLabel)
-              ? numericLabel : process.env.PACKAGE_VERSION.trim();
-            if (!/^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$/.test(version)) {
-              throw new Error('Enter an application/package version such as 10.0.7-alpha.1.');
+            // Public label and technical version are independent. Never infer an
+            // application version from the label or the CI run number.
+            const version = process.env.PACKAGE_VERSION.trim();
+            const parsed = /^([0-9]+\.[0-9]+\.[0-9]+)-(alpha\.)?([0-9]+(?:\.[0-9]+){0,3})$/.exec(version);
+            if (!parsed || parsed[3].split('.').some(part => Number(part) > 65535)) {
+              throw new Error('Enter KiCad-CircuitAlive version, e.g. 10.0.7-alpha.4.1 or 10.0.7-1.2.3 (1–4 CircuitAlive numbers, each 0–65535).');
             }
             const targets = {all: ['rpm', 'appimage', 'deb', 'exe'],
               linux: ['rpm', 'appimage', 'deb'], exe: ['exe'],

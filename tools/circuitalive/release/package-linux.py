@@ -2,6 +2,7 @@
 """Bundle the Fedora 44 x86_64 build, component libraries, Python and runtime dependencies."""
 import argparse,hashlib,importlib.util,json,os,re,shutil,subprocess,sys
 from pathlib import Path
+from release_version import parse_version
 from programmable_assets import validate_programmable_assets
 from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start
 p=argparse.ArgumentParser(description=__doc__)
@@ -14,7 +15,7 @@ p.add_argument('--appimagetool',type=Path,help='Also generate and smoke-test an 
 p.add_argument('--appimage-runtime',type=Path,help='Pinned x86_64 type-2 AppImage runtime')
 args=p.parse_args()
 if bool(args.appimagetool) != bool(args.appimage_runtime):p.error('AppImage creation requires both tool and runtime')
-if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+',args.version):raise SystemExit('Invalid alpha version')
+release_version=parse_version(args.version)
 root=Path(__file__).resolve().parents[3];out=args.output.resolve();out.mkdir(parents=True,exist_ok=True)
 work=out/'work';app=work/'CircuitAliveEDA';app.mkdir(parents=True,exist_ok=True)
 ignore=shutil.ignore_patterns('.git','.history','*-backups','*.kicad_prl','~*.lck','__pycache__','*.pyc','*.pyo')
@@ -163,13 +164,13 @@ if not args.skip_rpm:
  if rpm_alias.resolve()!=work.resolve():raise SystemExit('RPM build alias is occupied')
  rpmdir=rpm_alias/'rpmbuild'
  for directory in ('BUILD','BUILDROOT','RPMS','SOURCES','SPECS','SRPMS'):(rpmdir/directory).mkdir(parents=True,exist_ok=True)
- spec=rpmdir/'SPECS/circuitaliveeda.spec';numeric=args.version.split('-')[0];alpha=args.version.split('-alpha.')[1]
+ spec=rpmdir/'SPECS/circuitaliveeda.spec'
  spec.write_text(f'''%global debug_package %{{nil}}
 %global __os_install_post %{{nil}}
 %global _binary_payload w9T2.zstdio
 Name: circuitaliveeda
-Version: {numeric}
-Release: 0.alpha.{alpha}.fc44
+Version: {release_version.base}
+Release: {release_version.rpm_release}
 Summary: CircuitAliveEDA with interactive circuit simulation
 License: GPL-3.0-or-later AND BSD-3-Clause AND LGPL-2.1-or-later
 URL: https://github.com/ViniciusJesus-art/CircuitAliveEDA
@@ -177,8 +178,8 @@ BuildArch: x86_64
 AutoReqProv: no
 Requires: glibc >= 2.43, gtk3, fontconfig, libglvnd-glx, libglvnd-egl, libglvnd-opengl, shared-mime-info
 %description
-CircuitAliveEDA {args.version}, based on version 10.0.7, with bundled models,
-component libraries, translations and simulation runtime. Alpha release.
+CircuitAliveEDA {args.version}, based on KiCad {release_version.base}, with bundled models,
+component libraries, translations and simulation runtime.
 %prep
 %build
 %install

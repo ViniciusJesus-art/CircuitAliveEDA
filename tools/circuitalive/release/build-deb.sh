@@ -9,7 +9,7 @@ if [[ $ID != ubuntu || $VERSION_ID != 24.04 || $(uname -m) != x86_64 || ${GITHUB
 fi
 : "${RELEASE_VERSION:?Missing release version}"
 : "${RELEASE_COMMIT:?Missing source commit}"
-if [[ ! $RELEASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ || $(git rev-parse HEAD) != "$RELEASE_COMMIT" ]]; then
+if [[ ! $RELEASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+-(alpha\.)?[0-9]+(\.[0-9]+){0,3}$ || $(git rev-parse HEAD) != "$RELEASE_COMMIT" ]]; then
     printf 'Invalid release version or source checkout.\n' >&2
     exit 1
 fi

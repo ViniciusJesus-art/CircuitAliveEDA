@@ -10,7 +10,13 @@ $ErrorActionPreference = 'Stop'
 $ErrorView = 'NormalView'
 Set-StrictMode -Version Latest
 if ($env:OS -ne 'Windows_NT') { throw 'This build requires native Windows and Visual Studio 2022.' }
-if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.]+)?$') { throw 'Invalid release version.' }
+if ($Version -cnotmatch '^[0-9]+\.[0-9]+\.[0-9]+-(alpha\.)?[0-9]+(\.[0-9]+){0,3}\z') {
+    throw 'Use KiCad-CircuitAlive version, e.g. 10.0.7-alpha.4.1 or 10.0.7-1.2.3.'
+}
+$circuitaliveNumbers = ($Version -split '-', 2)[1] -creplace '^alpha\.', ''
+foreach ($part in ($circuitaliveNumbers -split '\.')) {
+    if ([decimal]$part -gt 65535) { throw 'CircuitAlive version components must be between 0 and 65535.' }
+}
 if ($env:MINGW_PREFIX) { throw 'Run in native PowerShell, outside the MSYS2 environment.' }
 $root = (Resolve-Path "$PSScriptRoot/../../..").Path
 Set-Location $root

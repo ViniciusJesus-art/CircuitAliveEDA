@@ -12,10 +12,12 @@ ainda não mudam os Actions do repositório.
 1. Abra **GitHub → Actions → Release packages (all or individual)**.
 2. Clique em **Run workflow** e selecione a branch **main**.
 3. No campo **version**, informe o nome público desejado, por exemplo
-   `10.0.7-alpha.3` ou `October Preview 2026`. Não precisa seguir o padrão alpha.
-4. Escolha **target** conforme a tabela abaixo.
-5. Marque **publish_release** para publicar, ou desmarque para gerar apenas artefatos de teste.
-6. Clique no botão verde **Run workflow**.
+   `10.0.7-alpha.4.1` ou `Preview de novembro`. Ele determina o título e a tag no GitHub.
+4. Em **package_version**, informe a versão completa do aplicativo, por exemplo
+   `10.0.7-alpha.4.1` ou `10.0.7-4.1`. Esse campo é independente do nome público.
+5. Escolha **target** conforme a tabela abaixo.
+6. Marque **publish_release** para publicar, ou desmarque para gerar apenas artefatos de teste.
+7. Clique no botão verde **Run workflow**.
 
 | target | Pacotes gerados | Compilações executadas |
 | --- | --- | --- |
@@ -42,15 +44,27 @@ pontuação viram hífens, acentos latinos são removidos e apenas letras ASCII,
 números, pontos, sublinhados e hífens são mantidos. O nome precisa conter pelo
 menos uma letra ou número. Por exemplo, `October Preview 2026!` produz a tag
 `vOctober-Preview-2026`, o título `CircuitAliveEDA October Preview 2026!` e
-arquivos como `CircuitAliveEDA-October-Preview-2026.exe`.
+arquivos com nomes fixos, como `CircuitAliveEDA-windows-x86_64-setup.exe`.
 
 Não pode haver uma tag/release anterior com a mesma tag normalizada; confira
-possíveis colisões como `Test 1` e `Test-1`. Os empacotadores RPM/DEB e o CMake
-continuam usando uma versão técnica `X.Y.Z-alpha.N`: quando o nome público já
-segue esse formato, ela é reutilizada; caso contrário, o workflow gera
-`10.0.7-alpha.<número da execução>`. Essa diferença é registrada nas notas da
-release e nos metadados dos pacotes. As releases ficam marcadas como
-**Pre-release**. Não é preciso criar a tag ou cadastrar um token pessoal: o job de
+possíveis colisões como `Test 1` e `Test-1`. A versão técnica vem sempre de
+**package_version**: o nome público e o número da execução não a substituem.
+A identificação completa segue `KiCad-CircuitAlive`: em `10.0.7-alpha.4.1`,
+`10.0.7` identifica a base KiCad e `alpha.4.1` identifica o CircuitAlive.
+Uma versão final pode usar `10.0.7-4.1`, mantendo as duas partes.
+O aplicativo, o instalador e o **Sobre** preservam a identificação completa.
+O CircuitAlive aceita de um a quatro componentes numéricos, cada um entre 0 e
+65535, para permitir recursos de versão válidos no Windows. Os campos binários
+numéricos do Windows usam somente a parte CircuitAlive preenchida com zeros
+(`4.1.0.0`); os campos textuais mantêm `10.0.7-alpha.4.1`.
+RPM usa `Version: 10.0.7` e `Release: 0.alpha.4.1.fc44` para alpha, ou
+`Release: 1.4.1.fc44` para a versão final. DEB usa `10.0.7~alpha.4.1-1` e
+`10.0.7+4.1-1`, respectivamente. As versões finais são ordenadas após as alpha.
+Veja as regras de [versão do instalador Windows](https://jrsoftware.org/ishelp/topic_setup_versioninfoversion.htm),
+[RPM](https://rpm.org/docs/latest/manual/spec.html) e
+[Debian](https://www.debian.org/doc/debian-policy/ch-controlfields.html#version).
+As releases são publicadas como **estáveis**, inclusive quando o nome contém
+`alpha`. Não é preciso criar a tag ou cadastrar um token pessoal: o job de
 publicação usa o `GITHUB_TOKEN` do próprio Actions com `contents: write`.
 
 ## Etapas da execução
@@ -77,10 +91,10 @@ Uma compilação Windows em andamento pode fazer a nova aguardar sua vez.
 
 Para a versão de exemplo, com `target=all`, a release `v10.0.7-alpha.3` terá:
 
-- `CircuitAliveEDA-10.0.7-alpha.3.rpm`
-- `CircuitAliveEDA-10.0.7-alpha.3.AppImage`
-- `CircuitAliveEDA-10.0.7-alpha.3.deb`
-- `CircuitAliveEDA-10.0.7-alpha.3.exe`
+- `CircuitAliveEDA-fedora44-x86_64.rpm`
+- `CircuitAliveEDA-linux-x86_64.AppImage`
+- `CircuitAliveEDA-ubuntu24.04-amd64.deb`
+- `CircuitAliveEDA-windows-x86_64-setup.exe`
 - `SHA256SUMS.txt` com os hashes de todos os instaladores publicados.
 
 Os `.sha256` individuais continuam sendo gerados e conferidos durante o build,
@@ -111,25 +125,25 @@ Uma execução já iniciada mantém os nomes e as actions do commit original.
 O pacote para DNF é o **`.rpm`**; `.dnf` não é uma extensão de pacote.
 
 ```bash
-sudo dnf install ./CircuitAliveEDA-10.0.7-alpha.3.rpm
+sudo dnf install ./CircuitAliveEDA-fedora44-x86_64.rpm
 ```
 
 No Ubuntu 24.04, instale o DEB com APT para resolver suas dependências:
 
 ```bash
-sudo apt install ./CircuitAliveEDA-10.0.7-alpha.3.deb
+sudo apt install ./CircuitAliveEDA-ubuntu24.04-amd64.deb
 ```
 
 O `.deb` usa bibliotecas e Python nativos do Ubuntu 24.04. Não é uma conversão do
 RPM do Fedora e não promete instalação em todas as versões de Debian/Ubuntu.
-Internamente a versão Debian usa `10.0.7~alpha.2-1`, para que uma versão estável
+Internamente a versão Debian usa, por exemplo, `10.0.7~alpha.4.1-1`, para que uma versão estável
 posterior seja considerada mais nova pelo gerenciador de pacotes.
 
 Para executar a AppImage:
 
 ```bash
-chmod +x CircuitAliveEDA-10.0.7-alpha.3.AppImage
-./CircuitAliveEDA-10.0.7-alpha.3.AppImage
+chmod +x CircuitAliveEDA-linux-x86_64.AppImage
+./CircuitAliveEDA-linux-x86_64.AppImage
 ```
 
 Os pacotes são x86_64. A AppImage preserva a base Linux atual: **Fedora 44 / glibc

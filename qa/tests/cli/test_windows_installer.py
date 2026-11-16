@@ -88,8 +88,8 @@ class WindowsInstallerTests(unittest.TestCase):
                         '-P', str(ROOT / 'cmake/BuildSteps/WriteVersionHeader.cmake')],
                        check=True, capture_output=True, text=True)
         definitions = dict(re.findall(r'^#define\s+(\w+)\s+(.+)$', header.read_text(), re.MULTILINE))
-        self.assertEqual(definitions['KICAD_WIN32_RC_FILEVER'], '10, 0, 7, 1')
-        self.assertEqual(definitions['KICAD_WIN32_RC_PRODVER'], '10, 0, 7, 1')
+        self.assertEqual(definitions['KICAD_WIN32_RC_FILEVER'], '1, 0, 0, 0')
+        self.assertEqual(definitions['KICAD_WIN32_RC_PRODVER'], '1, 0, 0, 0')
         self.assertIn(self.version, definitions['KICAD_WIN32_RC_FILEVER_STR'])
         self.assertIn(self.version, definitions['KICAD_WIN32_RC_PRODVER_STR'])
 
@@ -114,6 +114,16 @@ class WindowsInstallerTests(unittest.TestCase):
         script = package.installer_script(self.stage, self.libraries, self.version, self.dist, self.root)
         icon = package.inno_quote(self.root / 'resources/bitmaps_png/icons/icon_kicad.ico')
         self.assertIn(f'SetupIconFile="{icon}"', script)
+
+    def test_installer_keeps_base_and_dotted_circuitalive_version(self):
+        for version in ('10.0.7-alpha.4.1', '10.0.7-4.1'):
+            with self.subTest(version=version):
+                script = package.installer_script(self.stage, self.libraries, version, self.dist, self.root)
+                self.assertIn(f'AppVersion={version}\n', script)
+                self.assertIn('VersionInfoVersion=4.1.0.0\n', script)
+                self.assertIn(f'VersionInfoTextVersion={version}\n', script)
+                self.assertIn(f'VersionInfoProductTextVersion={version}\n', script)
+                self.assertIn(f'OutputBaseFilename=CircuitAliveEDA-{version}-windows-x86_64-setup', script)
 
     def test_inno_setup_paths_are_quoted_when_root_or_output_have_spaces(self):
         root = self.root / 'ci runner path with spaces'

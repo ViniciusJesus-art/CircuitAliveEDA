@@ -9,15 +9,13 @@ import re
 import shutil
 import subprocess
 import tempfile
+from release_version import parse_version
 from programmable_assets import validate_programmable_assets
 from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start
 
 
 def debian_version(version):
-    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+', version):
-        raise ValueError('Expected an alpha version without v')
-    # Debian sorts ~alpha before the corresponding final version.
-    return version.replace('-alpha.', '~alpha.') + '-1'
+    return parse_version(version).debian
 
 
 def copy_native_dependency_licenses(prefix, app):

@@ -58,10 +58,10 @@ else()
     message( FATAL_ERROR "Unable to extract major, minor and patch version string" )
 endif()
 
-if( CIRCUITALIVE_RELEASE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)-alpha\\.([0-9]+)$" )
-    # Explorer's Details tab must describe the selected release, not the Git
-    # commit count used for development builds (e.g. an unrelated trailing 24).
-    set( KICAD_WIN32_RC_FILEVER "${CMAKE_MATCH_1}, ${CMAKE_MATCH_2}, ${CMAKE_MATCH_3}, ${CMAKE_MATCH_4}" )
+if( CIRCUITALIVE_RELEASE_VERSION )
+    # Numeric resources identify CircuitAlive; the strings retain both the KiCad
+    # base and the complete CircuitAlive version, without losing dotted revisions.
+    set( KICAD_WIN32_RC_FILEVER "${CIRCUITALIVE_WINDOWS_VERSION}" )
     set( KICAD_WIN32_RC_PRODVER "${KICAD_WIN32_RC_FILEVER}" )
     set( KICAD_WIN32_RC_FILEVER_STR "${KICAD_VERSION_FULL}\\0" )
     set( KICAD_WIN32_RC_PRODVER_STR "${CIRCUITALIVE_RELEASE_VERSION}\\0" )

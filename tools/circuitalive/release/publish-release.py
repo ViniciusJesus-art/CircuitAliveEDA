@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import unicodedata
+from release_version import parse_version
 
 
 PACKAGE_SUFFIXES = {
@@ -48,8 +49,7 @@ def selected_formats(formats):
 
 
 def verify_packages(directory, version, commit, formats='all', release_label=None):
-    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+', version):
-        raise ValueError('Expected an internal alpha package version without the v prefix')
+    parse_version(version)
     if not re.fullmatch(r'[0-9a-f]{40}', commit):
         raise ValueError('Expected the full source commit SHA')
     label = version if release_label is None else release_label

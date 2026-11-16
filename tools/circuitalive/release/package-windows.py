@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from release_version import parse_version
 from programmable_assets import validate_programmable_assets
 from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start
 
@@ -109,6 +110,7 @@ def inno_quote(value):
 
 
 def installer_script(stage, libraries, version, dist, root=ROOT):
+    windows_version = parse_version(version).windows
     data = libraries / 'share/kicad'
     validate_component_libraries(data)
     extra = []
@@ -131,7 +133,9 @@ def installer_script(stage, libraries, version, dist, root=ROOT):
 AppId=CircuitAliveEDA
 AppName=CircuitAliveEDA
 AppVersion={version}
-VersionInfoVersion={version.split('-')[0]}
+VersionInfoVersion={windows_version}
+VersionInfoTextVersion={version}
+VersionInfoProductTextVersion={version}
 SetupArchitecture=x64
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -240,8 +244,10 @@ def main():
     parser.add_argument('--verify-only', action='store_true')
     parser.add_argument('--compiler', default=os.environ.get('INNO_ISCC'))
     args = parser.parse_args()
-    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.]+)?', args.version):
-        parser.error('Invalid release version')
+    try:
+        parse_version(args.version)
+    except ValueError as error:
+        parser.error(str(error))
     stage = args.stage.resolve()
     if args.verify_only:
         validate_runtime(stage, args.version)

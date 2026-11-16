@@ -100,6 +100,20 @@ class ReleaseArtifactsTests(unittest.TestCase):
         self.assertEqual(command[command.index('--title') + 1], 'CircuitAliveEDA ' + label)
         self.assertFalse(any(item.endswith('.sha256') for item in command))
 
+    def test_two_part_versions_reach_publication_without_relabeling_packages(self):
+        for version in ('10.0.7-alpha.4.1', '10.0.7-4.1'):
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as temporary:
+                directory = Path(temporary)
+                for source in self.packages:
+                    package = directory / source.name.replace(self.version, version)
+                    package.write_bytes(source.read_bytes())
+                    self.write_checksum(package)
+                assets, _ = release.verify_packages(directory, version, self.commit)
+                self.assertEqual(len(assets), 5)
+                manifest = json.loads((directory / 'release-manifest.json').read_text())
+                self.assertEqual(manifest['version'], version)
+                self.assertEqual(manifest['tag'], 'v' + version)
+
     def test_label_slug_normalization_and_invalid_names(self):
         self.assertEqual(release.release_slug('Prévia do CircuitAlive!'), 'Previa-do-CircuitAlive')
         self.assertEqual(release.release_tag('v10.0.7-alpha.2'), 'v10.0.7-alpha.2')
@@ -108,7 +122,7 @@ class ReleaseArtifactsTests(unittest.TestCase):
                 release.release_slug(label)
 
     @unittest.skipUnless(shutil.which('node'), 'Node is required to exercise the GitHub workflow script')
-    def test_workflow_never_uses_ci_run_number_as_the_alpha_version(self):
+    def test_workflow_uses_package_version_independently_of_public_name(self):
         workflow = (ROOT / '.github/workflows/publish-release.yml').read_text()
         source = workflow.split('          script: |\n', 1)[1].split('\n  windows:', 1)[0]
         source = '\n'.join(line[12:] if line.startswith(' ' * 12) else line for line in source.splitlines())
@@ -124,14 +138,25 @@ const github = {};
     .catch(error => {process.stderr.write(error.message); process.exitCode = 1;});
 '''
         for label, package_version, expected in (('Windows Preview', '10.0.7-alpha.1', '10.0.7-alpha.1'),
-                                                  ('10.0.7-alpha.3', '10.0.7-alpha.1', '10.0.7-alpha.3'),
-                                                  ('v10.0.7-alpha.3', '10.0.7-alpha.1', '10.0.7-alpha.3')):
+                                                  ('10.0.7-alpha.3', '10.0.7-alpha.1', '10.0.7-alpha.1'),
+                                                  ('v10.0.7-alpha.3', '10.0.7-alpha.1', '10.0.7-alpha.1'),
+                                                  ('10.0.7-alpha.4.1', '10.0.7-alpha.4.1', '10.0.7-alpha.4.1'),
+                                                  ('Stable Preview', '10.0.7-1.2.3', '10.0.7-1.2.3')):
             with self.subTest(label=label):
                 env = dict(os.environ, RELEASE_LABEL=label, PACKAGE_VERSION=package_version,
                            RELEASE_TARGET='all', PUBLISH_RELEASE='false', GITHUB_RUN_NUMBER='24')
                 result = subprocess.run(['node', '-e', harness], env=env,
                                         check=True, capture_output=True, text=True)
                 self.assertEqual(json.loads(result.stdout)['version'], expected)
+        for version in ('10.0.7', '10.0.7-alpha.', '10.0.7-alpha.1.2.3.4.5',
+                        '10.0.7-alpha.65536', '10.0.7-1..2', '10.0.7-beta.1'):
+            with self.subTest(invalid_version=version):
+                env = dict(os.environ, RELEASE_LABEL='Preview', PACKAGE_VERSION=version,
+                           RELEASE_TARGET='all', PUBLISH_RELEASE='false')
+                result = subprocess.run(['node', '-e', harness], env=env,
+                                        capture_output=True, text=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('KiCad-CircuitAlive version', result.stderr)
 
     def test_all_selection_requires_deb_before_any_publication(self):
         self.packages[2].unlink()
@@ -206,6 +231,10 @@ const github = {};
 
 
 class DebianLauncherTests(unittest.TestCase):
+    def test_debian_metadata_keeps_base_and_circuitalive_versions(self):
+        self.assertEqual(deb.debian_version('10.0.7-alpha.4.1'), '10.0.7~alpha.4.1-1')
+        self.assertEqual(deb.debian_version('10.0.7-4.1'), '10.0.7+4.1-1')
+
     def test_relocated_launcher_routes_cli_and_configures_private_runtime(self):
         with tempfile.TemporaryDirectory(prefix='ca deb path with spaces ') as temporary:
             app = Path(temporary) / 'installation'

@@ -18,8 +18,8 @@ case "$formats" in
     rpm|appimage|rpm,appimage) ;;
     *) printf 'Select rpm, appimage or rpm,appimage for the Fedora build.\n' >&2; exit 1 ;;
 esac
-if [[ ! $RELEASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then
-    printf 'Invalid alpha release version.\n' >&2
+if [[ ! $RELEASE_VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+-(alpha\.)?[0-9]+(\.[0-9]+){0,3}$ ]]; then
+    printf 'Use KiCad-CircuitAlive version, e.g. 10.0.7-alpha.4.1 or 10.0.7-1.2.3.\n' >&2
     exit 1
 fi
 mkdir -p .circuitalive/logs

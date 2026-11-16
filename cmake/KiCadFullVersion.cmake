@@ -32,9 +32,8 @@ include( ${KICAD_CMAKE_MODULE_PATH}/CreateGitVersionHeader.cmake )
 create_git_version_header( ${SRC_PATH} )
 
 if(CIRCUITALIVE_RELEASE_VERSION)
-    if(NOT CIRCUITALIVE_RELEASE_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+-alpha\\.[0-9]+$")
-        message(FATAL_ERROR "Invalid CircuitAliveEDA alpha release version")
-    endif()
+    include(${KICAD_CMAKE_MODULE_PATH}/CircuitAliveVersion.cmake)
+    circuitalive_parse_release_version("${CIRCUITALIVE_RELEASE_VERSION}")
     set(KICAD_VERSION "${CIRCUITALIVE_RELEASE_VERSION}")
 endif()
 
