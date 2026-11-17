@@ -1,5 +1,10 @@
 # Preparação das dependências Windows MSVC
 
+> Registro do fluxo anterior no GitHub Actions. Os workflows Windows foram
+> removidos; o preparo atual roda localmente com
+> `tools/circuitalive/dev-windows.ps1 -Phase prepare`. Os perfis e scripts
+> descritos abaixo continuam disponíveis. Veja [DEVELOPMENT_PLATFORMS.md](DEVELOPMENT_PLATFORMS.md).
+
 O workflow manual `windows-dependencies.yml` prepara somente as bibliotecas e ferramentas do manifesto. Não configura nem compila os aplicativos e não cria instaladores ou releases. Usa o runner público `windows-2022` e o mesmo grupo de concorrência dos workflows Windows existentes.
 
 ## Perfil de distribuição

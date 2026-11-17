@@ -295,13 +295,16 @@ PANEL_SYMBOL_CHOOSER::PANEL_SYMBOL_CHOOSER( SCH_BASE_FRAME* aFrame, wxWindow* aP
         m_choiceFilter = [this]( LIB_TREE_NODE& node )
         {
             if( m_originalFilter && !( *m_originalFilter )( node ) ) return false;
-            const auto& settings = ChooserPreferences();
-            const wxString id = node.m_LibId.Format();
-            if( m_quickList->GetSelection() == 1
-                && !alg::contains( settings.favorites, id ) ) return false;
-            if( m_quickList->GetSelection() == 2
-                && !alg::contains( settings.recent_symbols, id ) ) return false;
-            const int pins = m_pinFilter && m_pinFilter->GetValue() ? m_pinFilter->GetValue() : m_query.pins;
+            if( m_filterQuickList != 0 )
+            {
+                const auto& settings = ChooserPreferences();
+                const wxString id = node.m_LibId.Format();
+                if( m_filterQuickList == 1
+                    && !alg::contains( settings.favorites, id ) ) return false;
+                if( m_filterQuickList == 2
+                    && !alg::contains( settings.recent_symbols, id ) ) return false;
+            }
+            const int pins = m_filterPinCount ? m_filterPinCount : m_query.pins;
             auto& item = node.m_Type == LIB_TREE_NODE::TYPE::UNIT && node.m_Parent
                          ? *node.m_Parent : node;
             if( pins > 0 && item.m_PinCount != pins ) return false;
@@ -1005,6 +1008,11 @@ void PANEL_SYMBOL_CHOOSER::buildChoiceTools( wxWindow* aParent, wxBoxSizer* aSiz
 
 wxString PANEL_SYMBOL_CHOOSER::prepareSearch( const wxString& aSearch )
 {
+    // Scoring visits every symbol and unit. Read native controls once per pass:
+    // wxMSW implements these getters with synchronous window messages.
+    m_filterQuickList = m_quickList ? m_quickList->GetSelection() : 0;
+    m_filterPinCount = m_pinFilter ? m_pinFilter->GetValue() : 0;
+
     auto query = m_advanced && m_advanced->GetValue() ? CIRCUITALIVE::COMPONENT_QUERY{}
                                                      : CIRCUITALIVE::ParseComponentQuery( aSearch.ToStdString( wxConvUTF8 ) );
     const bool physicalChanged = query.footprint != m_query.footprint || query.package != m_query.package
@@ -1023,7 +1031,7 @@ wxString PANEL_SYMBOL_CHOOSER::prepareSearch( const wxString& aSearch )
     if( m_advanced && m_advanced->GetValue() ) return aSearch;
     if( m_query.symbols.empty() && ( m_query.pins > 0 || !m_query.footprint.empty()
         || !m_query.mounting.empty() || !m_query.package.empty() || m_query.width > 0 || m_query.height > 0
-        || m_quickList->GetSelection() != 0 || ( m_pinFilter && m_pinFilter->GetValue() > 0 ) ) )
+        || m_filterQuickList != 0 || m_filterPinCount > 0 ) )
         return "*";
     return wxString::FromUTF8( m_query.symbols );
 }

@@ -20,11 +20,12 @@ if (!(Test-Path $compiler)) {
     if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Pyrsys B\.V\.') {
         throw 'Inno Setup publisher signature is invalid.'
     }
-    $process = Start-Process $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
+    $process = Start-Process $installer -WindowStyle Hidden -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART',
         '/CURRENTUSER', "/DIR=`"$destination`"") -PassThru -Wait
     if ($process.ExitCode -ne 0) { throw "Inno Setup installation failed: $($process.ExitCode)" }
 }
 if (!(Test-Path $compiler)) { throw 'Missing native x64 Inno Setup compiler.' }
 & $compiler --version
 if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compiler did not start.' }
-"INNO_ISCC=$compiler" | Add-Content $env:GITHUB_ENV
+$env:INNO_ISCC = $compiler
+if ($env:GITHUB_ENV) { "INNO_ISCC=$compiler" | Add-Content $env:GITHUB_ENV }

@@ -350,8 +350,9 @@ O objetivo de longo prazo é que novos modelos possam ser adicionados sem exigir
 Para quem quiser entender melhor o funcionamento ou estudar a implementação, mantenho documentos mais técnicos em [`docs/circuitalive/`](docs/circuitalive/).
 
 - [Compilação no Fedora](docs/circuitalive/BUILD_FEDORA.md)
-- [Release manual: RPM, AppImage, DEB e EXE — juntos ou individualmente](docs/circuitalive/RELEASE_WORKFLOW.md)
+- [Releases: builds locais Fedora/Windows e Ubuntu nos Actions](docs/circuitalive/RELEASE_WORKFLOW.md)
 - [Compilação no Windows / MSVC](docs/circuitalive/BUILD_WINDOWS.md)
+- [Desenvolvimento compartilhado Fedora/Windows e testes locais](docs/circuitalive/DEVELOPMENT_PLATFORMS.md)
 - [Arquitetura da simulação interativa](docs/circuitalive/INTERACTIVE_SESSION.md)
 - [Integração com o editor](docs/circuitalive/EDITOR_SIMULATION.md)
 - [Medições e osciloscópio](docs/circuitalive/MEASUREMENTS.md)

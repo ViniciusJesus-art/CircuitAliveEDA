@@ -17,6 +17,12 @@ O triplet próprio mantém a verificação do compilador no hash de ABI do vcpkg
 
 Instale o Visual Studio 2022 com **Desktop development with C++**, Windows SDK e ferramentas CMake/Ninja. Instale Git, Python e PowerShell 7. O script `prepare-inno.ps1` prepara o Inno Setup x64 fixado. Use caminhos curtos e habilite caminhos longos no Windows se necessário.
 
+Inclua o pacote de idioma **English** do Visual Studio Installer. O builder e o
+preset Windows usam `VSLANG=1033` para manter o prefixo de `/showIncludes` em
+inglês, permitindo ao Ninja rastrear as dependências de cabeçalhos também em
+Windows configurado em português. Depois de adicionar o idioma a um build já
+configurado, use um diretório de build novo ou refaça a detecção do compilador.
+
 Em PowerShell nativo, na raiz do checkout:
 
 ```powershell
@@ -34,13 +40,16 @@ A compilação preserva API IPC, wxPython/SWIG, OpenCascade, editor esquemático
 
 O instalador Inno Setup x64 inclui Python/wxPython, DLLs MSVC redistribuíveis, code models correspondentes e bibliotecas de componentes. O empacotamento verifica a instalação silenciosa em caminho com espaços, CLI, registro automático das bibliotecas em perfil limpo, importação de `wx`/`pcbnew` e simulação analógica, digital e memória. O executável final fica em `dist/`, acompanhado de SHA-256. Veja [bibliotecas prontas na primeira execução](BUNDLED_LIBRARIES.md) para o comportamento comum a EXE, RPM, DEB e AppImage.
 
-## Compilação remota sem publicação
+## Desenvolvimento e publicação
 
-O workflow `release.yml` aceita apenas disparo manual em `main`, tem permissão `contents: read` e guarda o instalador como artefato temporário `windows-x86_64`. Não cria release, tag, commit de binários ou upload de assets para GitHub Releases. Após concluir, baixe o artefato para `dist/`:
+Os Actions agora compilam somente o Ubuntu. O EXE é compilado e testado no
+Windows local; RPM e AppImage são compilados no Fedora local. Os scripts MSVC
+e as validações nativas permanecem disponíveis neste repositório.
 
-```bash
-gh run download ID_DA_EXECUCAO --name windows-x86_64 --dir dist
-(cd dist && sha256sum --check CircuitAliveEDA-10.0.7-alpha.1-windows-x86_64-setup.exe.sha256)
-```
+O comando `tools/circuitalive/dev-windows.ps1` reúne o preparo, build e execução
+do runtime local para testar janelas e carregamento sem gerar um instalador a
+cada edição. Veja [desenvolvimento nas duas plataformas](DEVELOPMENT_PLATFORMS.md)
+e [reunião dos pacotes em uma release](RELEASE_WORKFLOW.md).
 
-A validação local Linux não comprova um build MSVC. Consulte as etapas da execução Windows antes de considerar o instalador validado.
+A validação local Linux não comprova um build MSVC. Execute os testes nativos e
+teste o aplicativo no Windows antes de considerar o instalador validado.

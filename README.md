@@ -337,8 +337,9 @@ In the long term, I want new models to be added without requiring extensive chan
 For anyone interested in understanding the software in greater detail or studying its implementation, I keep more technical documentation in [`docs/circuitalive/`](docs/circuitalive/).
 
 - [Building on Fedora](docs/circuitalive/BUILD_FEDORA.md)
-- [Manual releases: RPM, AppImage, DEB, and EXE — together or individually](docs/circuitalive/RELEASE_WORKFLOW.md)
+- [Releases: local Fedora/Windows builds and Ubuntu Actions](docs/circuitalive/RELEASE_WORKFLOW.md)
 - [Building on Windows / MSVC](docs/circuitalive/BUILD_WINDOWS.md)
+- [Shared Fedora/Windows development and local Windows testing](docs/circuitalive/DEVELOPMENT_PLATFORMS.md)
 - [Interactive simulation architecture](docs/circuitalive/INTERACTIVE_SESSION.md)
 - [Editor integration](docs/circuitalive/EDITOR_SIMULATION.md)
 - [Measurements and oscilloscope](docs/circuitalive/MEASUREMENTS.md)

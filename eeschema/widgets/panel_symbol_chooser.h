@@ -208,6 +208,8 @@ protected:
     wxSpinCtrlDouble*         m_width = nullptr;
     wxSpinCtrlDouble*         m_height = nullptr;
     wxTextCtrl*               m_package = nullptr;
+    int                       m_filterQuickList = 0;
+    int                       m_filterPinCount = 0;
     CIRCUITALIVE::COMPONENT_QUERY m_query;
     std::function<bool( LIB_TREE_NODE& )> m_choiceFilter;
     std::function<bool( LIB_TREE_NODE& )>* m_originalFilter = nullptr;

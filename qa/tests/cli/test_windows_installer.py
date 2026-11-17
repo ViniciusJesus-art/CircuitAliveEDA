@@ -79,6 +79,26 @@ class WindowsInstallerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'version differs'):
             package.validate_runtime(self.stage, '10.0.7-alpha.2')
 
+    @unittest.skipUnless(os.name == 'nt' and os.environ.get('INNO_ISCC') and shutil.which('pwsh'),
+                         'Native Inno Setup preparation')
+    def test_inno_preparation_exports_compiler_without_github_environment_file(self):
+        compiler = Path(os.environ['INNO_ISCC'])
+        lock = json.loads((ROOT / 'tools/circuitalive/release/windows-toolchain.json').read_text())
+        if compiler.parent.name != f'innosetup-{lock["innoVersion"]}-x64':
+            self.skipTest('Requires the pinned Inno Setup prepared by this project')
+        script = self.root / 'prepare-local-inno.ps1'
+        script.write_text(
+            "$ErrorActionPreference = 'Stop'\n"
+            '& $env:CA_TEST_PREPARE_INNO -ToolsRoot $env:CA_TEST_INNO_TOOLS\n'
+            "if ($env:INNO_ISCC -ne $env:CA_TEST_EXPECTED_INNO) { throw 'Compiler was not exported locally' }\n",
+            encoding='utf-8')
+        env = dict(os.environ, CA_TEST_PREPARE_INNO=str(ROOT / 'tools/circuitalive/release/prepare-inno.ps1'),
+                   CA_TEST_INNO_TOOLS=str(compiler.parent.parent), CA_TEST_EXPECTED_INNO=str(compiler))
+        env.pop('GITHUB_ENV', None)
+        env.pop('INNO_ISCC', None)
+        subprocess.run(['pwsh', '-NoLogo', '-NoProfile', '-File', str(script)],
+                       env=env, check=True, timeout=60)
+
     def test_windows_file_version_uses_release_alpha_instead_of_git_commit_count(self):
         header = self.root / 'version.h'
         subprocess.run(['cmake', f'-DKICAD_CMAKE_MODULE_PATH={ROOT / "cmake"}',

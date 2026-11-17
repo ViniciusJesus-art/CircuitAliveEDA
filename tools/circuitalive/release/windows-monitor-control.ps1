@@ -3,7 +3,7 @@
 function Start-ResourceMonitor {
     Remove-Item "$output/monitor.stop" -ErrorAction SilentlyContinue
     $script = Join-Path $PSScriptRoot 'monitor-windows-runner.ps1'
-    $monitor = Start-Process -FilePath (Get-Process -Id $PID).Path -PassThru -NoNewWindow `
+    $monitor = Start-Process -FilePath (Get-Process -Id $PID).Path -PassThru -WindowStyle Hidden `
         -ArgumentList @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', "`"$script`"", '-OutputDirectory', "`"$output`"") `
         -RedirectStandardError "$output/monitor-stderr.log"
     $monitor.Id | Set-Content "$output/monitor.pid"

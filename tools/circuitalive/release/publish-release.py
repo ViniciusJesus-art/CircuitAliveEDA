@@ -109,7 +109,7 @@ def verify_packages(directory, version, commit, formats='all', release_label=Non
         f'Internal package version: `{version}`.\n\n'
         + ''.join(descriptions[f] for f in formats) + '\n'
         'Only the selected formats are included in this release. All packages use the same source commit. '
-        'All selected build jobs and package smoke tests passed before publication. '
+        'Package formats and SHA-256 checksums were verified before publication. '
         'SHA-256 checksums are included in `SHA256SUMS.txt`.\n')
     return [*assets, sums], notes
 

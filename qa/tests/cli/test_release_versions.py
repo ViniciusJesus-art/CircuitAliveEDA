@@ -1,5 +1,6 @@
 """Verify the independent KiCad/CircuitAlive versions across package formats."""
 from pathlib import Path
+import os
 import re
 import shutil
 import subprocess
@@ -72,7 +73,11 @@ class ReleaseVersionTests(unittest.TestCase):
                 if '65536' in version:
                     continue  # The build's CMake validation checks numeric resource bounds.
                 with self.subTest(script=script, version=version):
-                    result = subprocess.run(['bash', '-c', '[[ $1 =~ $2 ]]', '--', version, pattern])
+                    # Git Bash's Windows launcher can reinterpret regex arguments.
+                    # Pass the exact pattern and version through the environment.
+                    result = subprocess.run(
+                        ['bash', '-s'], input='[[ $CA_TEST_VERSION =~ $CA_TEST_PATTERN ]]\n',
+                        text=True, env=dict(os.environ, CA_TEST_VERSION=version, CA_TEST_PATTERN=pattern))
                     self.assertEqual(result.returncode == 0, version in VALID)
 
     @unittest.skipUnless(shutil.which('rpm'), 'RPM is required')

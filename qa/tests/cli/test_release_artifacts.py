@@ -124,7 +124,7 @@ class ReleaseArtifactsTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which('node'), 'Node is required to exercise the GitHub workflow script')
     def test_workflow_uses_package_version_independently_of_public_name(self):
         workflow = (ROOT / '.github/workflows/publish-release.yml').read_text()
-        source = workflow.split('          script: |\n', 1)[1].split('\n  windows:', 1)[0]
+        source = workflow.split('          script: |\n', 1)[1].split('\n  deb:', 1)[0]
         source = '\n'.join(line[12:] if line.startswith(' ' * 12) else line for line in source.splitlines())
         harness = '''
 const outputs = {};
@@ -148,6 +148,7 @@ const github = {};
                 result = subprocess.run(['node', '-e', harness], env=env,
                                         check=True, capture_output=True, text=True)
                 self.assertEqual(json.loads(result.stdout)['version'], expected)
+                self.assertEqual(json.loads(result.stdout)['formats'], 'deb')
         for version in ('10.0.7', '10.0.7-alpha.', '10.0.7-alpha.1.2.3.4.5',
                         '10.0.7-alpha.65536', '10.0.7-1..2', '10.0.7-beta.1'):
             with self.subTest(invalid_version=version):
@@ -235,6 +236,7 @@ class DebianLauncherTests(unittest.TestCase):
         self.assertEqual(deb.debian_version('10.0.7-alpha.4.1'), '10.0.7~alpha.4.1-1')
         self.assertEqual(deb.debian_version('10.0.7-4.1'), '10.0.7+4.1-1')
 
+    @unittest.skipIf(os.name == 'nt', 'Exercises the Linux executable launcher')
     def test_relocated_launcher_routes_cli_and_configures_private_runtime(self):
         with tempfile.TemporaryDirectory(prefix='ca deb path with spaces ') as temporary:
             app = Path(temporary) / 'installation'
@@ -252,6 +254,7 @@ class DebianLauncherTests(unittest.TestCase):
             init = Path(result[2]) / 'spinit'
             self.assertIn(f"codemodel '{app}/bin/ngspice/digital.cm'", init.read_text())
 
+    @unittest.skipIf(os.name == 'nt', 'Exercises Linux executable symlinks')
     def test_system_entry_symlink_finds_its_actual_installation(self):
         with tempfile.TemporaryDirectory(prefix='ca deb relocation ') as temporary:
             app = Path(temporary) / 'opt/circuitaliveeda'

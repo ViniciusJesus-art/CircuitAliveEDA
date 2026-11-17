@@ -103,6 +103,9 @@ function Validate-Project {
 }
 
 Import-Msvc
+# Ninja parses /showIncludes diagnostics to track header dependencies. Use an
+# ASCII prefix consistently on localized Windows installations.
+$env:VSLANG = '1033'
 # Developer PowerShell replaces VCPKG_ROOT with Visual Studio's bundled copy.
 # Apply our pinned toolchain paths after importing it, for every build phase.
 $env:VCPKG_ROOT = Join-Path $ToolsRoot 'vcpkg'
