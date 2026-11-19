@@ -5,6 +5,10 @@ footprints, modelos 3D, templates de projetos, modelos e blocos de simulação e
 seus runtimes. A instalação não depende de um KiCad instalado no computador nem
 de downloads de bibliotecas na primeira abertura.
 
+Componentes próprios ficam em `resources/component-libraries/` e são adicionados
+às bibliotecas padrão durante o empacotamento. Para incorporar uma biblioteca ou
+acompanhar as adições de um projeto, veja [componentes adicionais](CUSTOM_COMPONENTS.md).
+
 O preparo por código-fonte usa as regras de instalação dos repositórios KiCad
 10.0.7. Copiar apenas o checkout não produz o mesmo resultado: os símbolos
 `.kicad_symdir` precisam ser empacotados, e `sym-lib-table` e `fp-lib-table`

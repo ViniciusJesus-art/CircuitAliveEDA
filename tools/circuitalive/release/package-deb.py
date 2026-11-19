@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 from release_version import parse_version
 from programmable_assets import validate_programmable_assets
-from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start
+from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start, install_custom_component_libraries
 
 
 def debian_version(version):
@@ -107,6 +107,7 @@ def package(stage, libraries, ngspice, version, commit, output):
         shutil.copytree(libraries / folder, app / 'share/kicad' / folder, dirs_exist_ok=True, ignore=ignore)
     if (libraries / 'licenses').is_dir():
         shutil.copytree(libraries / 'licenses', app / 'share/licenses/component-libraries', dirs_exist_ok=True)
+    install_custom_component_libraries(app / 'share/kicad')
     validate_installed_assets(app)
     for pattern in ('libngspice.so*', 'libnng.so*'):
         sources = list((ngspice / 'lib').glob(pattern))

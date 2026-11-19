@@ -4,7 +4,7 @@ import argparse,hashlib,importlib.util,json,os,re,shutil,subprocess,sys
 from pathlib import Path
 from release_version import parse_version
 from programmable_assets import validate_programmable_assets
-from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start
+from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start, install_custom_component_libraries
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--prefix',type=Path,required=True);p.add_argument('--libraries',type=Path,required=True)
 p.add_argument('--version',default='10.0.7-alpha.1');p.add_argument('--commit',required=True)
@@ -77,6 +77,7 @@ else:
       if directory.exists():shutil.copytree(directory,app/'share'/base/package,dirs_exist_ok=True,ignore=ignore)
     (app/'DEPENDENCIES.txt').write_text(subprocess.check_output(['rpm','-q','--qf','%{NAME} %{VERSION}-%{RELEASE} source=%{SOURCERPM}\n',*sorted(packages)],text=True))
 validate_programmable_assets(app)
+install_custom_component_libraries(app/'share/kicad')
 validate_installed_assets(app)
 # The upstream APPDIR integration expects usr/bin and the Debian plugin layout.
 for alias,target in ((app/'usr/bin',app/'bin'),(app/'usr/share',app/'share'),

@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 from release_version import parse_version
 from programmable_assets import validate_programmable_assets
-from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start
+from component_libraries import LIBRARIES, validate_component_libraries, validate_installed_assets, verify_first_start, install_custom_component_libraries
 
 ROOT = Path(__file__).resolve().parents[3]
 CHECKPOINT = 'RUNTIME-CHECKPOINT.json'
@@ -112,6 +112,7 @@ def inno_quote(value):
 def installer_script(stage, libraries, version, dist, root=ROOT):
     windows_version = parse_version(version).windows
     data = libraries / 'share/kicad'
+    install_custom_component_libraries(data, root)
     validate_component_libraries(data)
     extra = []
     for folder in LIBRARIES:

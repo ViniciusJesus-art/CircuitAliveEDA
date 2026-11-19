@@ -1,8 +1,21 @@
 """Check installed component data and first-start registration on every platform."""
 from pathlib import Path
 import re
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from component_library import install_collection, refresh_sources
 
 LIBRARIES = ('symbols', 'footprints', '3dmodels', 'template')
+
+
+def install_custom_component_libraries(data, root=None):
+    """Apply the versioned collection after copying the standard component data."""
+    root = Path(root) if root else Path(__file__).resolve().parents[3]
+    collection = root / 'resources/component-libraries'
+    if collection.is_dir():
+        refresh_sources(root)
+        install_collection(data, collection)
 
 
 def validate_component_libraries(data):

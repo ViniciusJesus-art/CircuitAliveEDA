@@ -9,7 +9,8 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools/circuitalive/release'))
-from component_libraries import validate_component_libraries, validate_installed_assets, verify_first_start
+from component_libraries import (validate_component_libraries, validate_installed_assets,
+                                 verify_first_start, install_custom_component_libraries)
 
 
 def create_library_fixture(data):
@@ -37,6 +38,23 @@ class ComponentLibrariesTests(unittest.TestCase):
         create_library_fixture(self.data)
 
     def test_installed_layout_is_complete(self):
+        validate_component_libraries(self.data)
+
+    def test_release_overlay_contains_custom_components_without_original_project(self):
+        checkout = self.root / 'isolated checkout'
+        shutil.copytree(ROOT / 'resources/component-libraries',
+                        checkout / 'resources/component-libraries')
+        install_custom_component_libraries(self.data, checkout)
+        validate_component_libraries(self.data)
+        table = (self.data / 'template/sym-lib-table').read_text()
+        self.assertIn('${KICAD10_SYMBOL_DIR}/EDAC.kicad_sym', table)
+        self.assertIn('(name "395-040-520-201")', table)
+        self.assertTrue((self.data / 'symbols/27c801.kicad_sym').is_file())
+        footprint = (self.data / 'footprints/Wall8.pretty/395040520201.kicad_mod').read_text()
+        self.assertIn('${KICAD10_3DMODEL_DIR}/Wall8.3dshapes/', footprint)
+        self.assertTrue((self.data / '3dmodels/Wall8.3dshapes/M27C801-100F6.stp').is_file())
+        # Applying the same overlay again must preserve a complete installed table.
+        install_custom_component_libraries(self.data, checkout)
         validate_component_libraries(self.data)
 
     def test_raw_checkout_tables_cannot_replace_installed_tables(self):

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import urllib.request
+from component_library import install_collection, refresh_sources
 
 ROOT = Path(__file__).resolve().parents[2]
 PREFIX = ROOT / '.circuitalive/libraries'
@@ -51,6 +52,8 @@ def prepare(download=False):
             digest = hashlib.file_digest(stream, 'sha256').hexdigest()
         manifest['packages'].append({'file': filename, 'url': url, 'sha256': digest})
     libraries = PREFIX / 'usr/share/kicad'
+    refresh_sources()
+    install_collection(libraries)
     for directory, required in (('symbols', 'Device.kicad_sym'),
                                 ('footprints', 'Resistor_SMD.pretty'),
                                 ('3dmodels', 'Resistor_SMD.3dshapes'),

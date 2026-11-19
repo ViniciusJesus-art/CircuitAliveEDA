@@ -865,7 +865,9 @@ void PANEL_SYM_LIB_TABLE::onConvertLegacyLibraries( wxCommandEvent& event )
 
         if( SCH_IO_MGR::ConvertLibrary( &props, legacyLib.GetFullPath(), newLib.GetFullPath() ) )
         {
-            relPath = NormalizePath( newLib.GetFullPath(), &Pgm().GetLocalEnvVariables(), m_project );
+            relPath = NormalizePath( newLib.GetFullPath(), &Pgm().GetLocalEnvVariables(),
+                                     m_notebook->GetSelection() == 0 ? wxString()
+                                                                    : m_project->GetProjectPath() );
 
             cur_grid()->SetCellValue( row, COL_URI, relPath );
             cur_grid()->SetCellValue( row, COL_TYPE, kicadType );

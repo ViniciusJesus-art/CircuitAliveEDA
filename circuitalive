@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/tools/circuitalive/env.sh"
+# Library authoring must also work before a local runtime has been built.
+if [[ "${1:-}" == library ]]; then
+    shift
+    python3 "$CIRCUITALIVE_ROOT/tools/circuitalive/component_library.py" "$@"
+    source "$CIRCUITALIVE_ROOT/tools/circuitalive/runtime-env.sh"
+    exit 0
+fi
 source "$CIRCUITALIVE_ROOT/tools/circuitalive/runtime-env.sh"
 from_build=false
 if [[ "${1:-}" == --build ]]; then
@@ -22,6 +29,8 @@ case "${1:-}" in
             'Uso: ./circuitalive [--build] [aplicativo] [arquivo/opções]' \
             'Aplicativos: kicad (padrão), eeschema, pcbnew, gerbview, cli,' \
             '             bitmap2component, pcb_calculator, pl_editor, cvpcb' \
+            'Bibliotecas: ./circuitalive library add PASTA_DO_PROJETO --watch' \
+            '             ./circuitalive library sync' \
             'Exemplos:' \
             '  ./circuitalive' \
             '  ./circuitalive eeschema circuito.kicad_sch' \

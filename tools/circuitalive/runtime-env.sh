@@ -19,6 +19,13 @@ for table in sym-lib-table fp-lib-table; do
     fi
 done
 
+# Custom assets live in the repository so new releases include them. Refresh
+# explicitly watched sources and register the collection in existing dev profiles.
+if ! python3 "$CIRCUITALIVE_ROOT/tools/circuitalive/component_library.py" sync \
+    --data "$CIRCUITALIVE_LIBRARY_DIR" --profile "$KICAD_CONFIG_HOME/10.0"; then
+    printf 'Não foi possível sincronizar os componentes; mantendo a última cópia instalada.\n' >&2
+fi
+
 # Both the editor and the isolated worker need the matching XSPICE code models.
 # Prefer the local dependency set, and repair obsolete system-directory links.
 CIRCUITALIVE_CODEMODELS=

@@ -599,7 +599,9 @@ void PANEL_FP_LIB_TABLE::onMigrateLibraries( wxCommandEvent& event )
         if( PCB_IO_MGR::ConvertLibrary( props, legacyLib.GetFullPath(), newLib.GetFullPath(),
                                         errorReporter.m_Reporter ) )
         {
-            relPath = NormalizePath( newLib.GetFullPath(), &Pgm().GetLocalEnvVariables(), m_project );
+            relPath = NormalizePath( newLib.GetFullPath(), &Pgm().GetLocalEnvVariables(),
+                                     m_notebook->GetSelection() == 0 ? wxString()
+                                                                    : m_project->GetProjectPath() );
 
             cur_grid()->SetCellValue( row, COL_URI, relPath );
             cur_grid()->SetCellValue( row, COL_TYPE, kicadType );

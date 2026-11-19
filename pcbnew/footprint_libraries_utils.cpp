@@ -531,7 +531,8 @@ bool PCB_BASE_EDIT_FRAME::AddLibrary( const wxString& aDialogTitle, const wxStri
         libName = fn.GetFullName();
 
     // try to use path normalized to an environmental variable or project path
-    wxString normalizedPath = NormalizePath( libPath, &Pgm().GetLocalEnvVariables(), &Prj() );
+    wxString normalizedPath = NormalizePath( libPath, &Pgm().GetLocalEnvVariables(),
+                                             isGlobal ? wxString() : Prj().GetProjectPath() );
     bool     success = true;
 
     try
