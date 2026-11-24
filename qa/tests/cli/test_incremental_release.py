@@ -35,6 +35,17 @@ class IncrementalReleaseTests(unittest.TestCase):
     def upload(self):
         release.upload(self.directory, self.version, self.commit, 'owner/repo', 'exe')
 
+    def test_missing_github_cli_explains_installation_and_login(self):
+        for system, install in [('Linux', 'sudo dnf install gh'),
+                                ('Windows', 'winget install --id GitHub.cli --exact')]:
+            with self.subTest(system=system), \
+                 patch.object(release.platform, 'system', return_value=system), \
+                 patch.object(release.subprocess, 'run', side_effect=FileNotFoundError('gh')):
+                with self.assertRaises(ValueError) as error:
+                    release.run('gh', 'auth', 'status')
+                self.assertIn(install, str(error.exception))
+                self.assertIn('gh auth login', str(error.exception))
+
     def test_first_machine_creates_draft_uploads_and_publishes(self):
         with patch.object(release, 'remote_release', return_value=None), \
              patch.object(release, 'api', return_value={'default_branch': 'main'}), patch.object(release, 'run') as run:
@@ -144,15 +155,26 @@ class IncrementalReleaseTests(unittest.TestCase):
         self.assertEqual(create[create.index('--target') + 1], 'main')
         api.assert_called_once_with('owner/repo', '')
 
-    def test_cli_dirty_checkout_stops_before_remote_or_build(self):
+    def test_cli_accepts_uncommitted_files_and_does_not_require_a_clean_checkout(self):
+        def git_output(*args):
+            if args == ('git', 'status', '--porcelain', '--untracked-files=normal'):
+                return ' M source.cpp\n?? new-model.casim'
+            self.assertEqual(args, ('git', 'rev-parse', 'HEAD'))
+            return self.commit
         with patch.object(sys, 'argv', ['release.py', self.version]), \
+             patch.object(release, 'ROOT', self.directory), \
              patch.object(release.platform, 'system', return_value='Linux'), \
              patch.object(release.platform, 'machine', return_value='x86_64'), \
-             patch.object(release, 'output', return_value=' M source.cpp'), \
-             patch.object(release, 'run') as run:
-            with self.assertRaises(SystemExit):
-                release.main()
-            run.assert_not_called()
+             patch.object(release, 'output', side_effect=git_output), \
+             patch.object(release, 'run'), \
+             patch.object(release, 'remote_release', return_value=None), \
+             patch.object(release, 'build') as build, \
+             patch.object(release, 'receipt', return_value=self.commit), \
+             patch.object(release, 'upload') as upload:
+            release.main()
+        build.assert_called_once_with(self.version, self.commit, 2, None)
+        upload.assert_called_once_with(self.directory / 'dist', self.version, self.commit,
+                                       'ViniciusJesus-art/CircuitAliveEDA', 'rpm,appimage')
 
     def test_cli_build_upload_and_retry_use_current_platform_and_revision(self):
         for system, formats in [('Linux', 'rpm,appimage'), ('Windows', 'exe')]:
@@ -162,7 +184,7 @@ class IncrementalReleaseTests(unittest.TestCase):
                      patch.object(release, 'ROOT', self.directory), \
                      patch.object(release.platform, 'system', return_value=system), \
                      patch.object(release.platform, 'machine', return_value='AMD64'), \
-                     patch.object(release, 'output', side_effect=['', self.commit, self.commit, '']), \
+                     patch.object(release, 'output', side_effect=[self.commit, self.commit]), \
                      patch.object(release, 'run'), patch.object(release, 'api'), \
                      patch.object(release, 'remote_release', return_value=None), \
                      patch.object(release, 'build') as build, \
@@ -180,7 +202,7 @@ class IncrementalReleaseTests(unittest.TestCase):
              patch.object(release, 'ROOT', self.directory), \
              patch.object(release.platform, 'system', return_value='Linux'), \
              patch.object(release.platform, 'machine', return_value='x86_64'), \
-             patch.object(release, 'output', side_effect=['', self.commit, 'b' * 40]), \
+             patch.object(release, 'output', side_effect=[self.commit, 'b' * 40]), \
              patch.object(release, 'run'), patch.object(release, 'api'), \
              patch.object(release, 'remote_release', return_value=None), \
              patch.object(release, 'build'), patch.object(release, 'upload') as upload:

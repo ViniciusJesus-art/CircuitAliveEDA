@@ -8,8 +8,9 @@ cria e publica a release; os seguintes acrescentam os pacotes daquela plataforma
 A ordem é livre: Windows ou Fedora pode enviar primeiro.
 
 Nas duas máquinas, informe o mesmo nome/versão da release. Os commits podem
-ser diferentes, inclusive por mudanças no README. Faça commit das alterações
-locais antes de compilar. Instale Python **3.11+** e GitHub CLI e autentique uma vez com
+ser diferentes, inclusive por mudanças no README. Alterações locais ainda sem
+commit também entram no build; não é necessário fazer commit ou push para enviar
+os instaladores. Instale Python **3.11+** e GitHub CLI e autentique uma vez com
 `gh auth login`. As ferramentas de compilação continuam sendo as descritas nos
 guias Windows/Fedora; no Linux é necessário Docker ou Podman funcional, e no
 Windows, PowerShell 7 e MSVC 2022.
@@ -35,8 +36,8 @@ não fazem commit nem push automaticamente.
 Se o build terminou, mas a rede ou o upload falhou, repita o comando adicionando
 `--upload-only`: ele usa os pacotes já gerados. Um registro local confere a versão
 e os hashes antes de permitir esse reenvio, mesmo se o checkout já estiver em
-outro commit. O commit original fica registrado localmente como informação do
-build. Execute o comando normal para recompilar: ele substitui somente os pacotes
+outro commit. O commit base fica registrado localmente como informação do
+build, que pode incluir alterações locais ainda sem commit. Execute o comando normal para recompilar: ele substitui somente os pacotes
 dessa plataforma na release informada.
 
 O envio identifica a release pelo nome/versão informado, sem comparar commits

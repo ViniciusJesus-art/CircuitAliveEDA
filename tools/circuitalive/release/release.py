@@ -20,7 +20,19 @@ MARKER = '<!-- circuitalive-release '
 
 
 def run(*args, **kwargs):
-    return subprocess.run(list(args), cwd=ROOT, check=True, **kwargs)
+    try:
+        return subprocess.run(list(args), cwd=ROOT, check=True, **kwargs)
+    except FileNotFoundError:
+        if args[0] != 'gh':
+            raise
+        install = ('winget install --id GitHub.cli --exact'
+                   if platform.system() == 'Windows' else 'sudo dnf install gh')
+        raise ValueError(
+            'GitHub CLI (gh) não encontrado no PATH. Instale uma vez com:\n'
+            f'  {install}\n'
+            'Depois execute:\n  gh auth login\n'
+            'E repita o comando de release. No Windows, reabra o terminal após instalar.'
+        ) from None
 
 
 def output(*args):
@@ -139,8 +151,6 @@ def main():
         parser.error('Run on Windows x64 or Linux x86_64.')
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repository):
         parser.error('Repository must be owner/name.')
-    if output('git', 'status', '--porcelain', '--untracked-files=normal'):
-        parser.error('Commit your changes before building/publishing a release.')
     commit = output('git', 'rev-parse', 'HEAD')
     run('gh', 'auth', 'status')
     tag = packages.release_tag(packages.release_slug(args.version))
@@ -152,8 +162,8 @@ def main():
     formats = 'exe' if platform.system() == 'Windows' else 'rpm,appimage'
     if not args.upload_only:
         build(args.version, commit, args.jobs, args.engine)
-    # Do not label binaries with a revision that changed during a long build.
-    if output('git', 'rev-parse', 'HEAD') != commit or output('git', 'status', '--porcelain', '--untracked-files=normal'):
+    # Local edits are supported; only switching revisions mid-build is rejected.
+    if not args.upload_only and output('git', 'rev-parse', 'HEAD') != commit:
         parser.error('Checkout changed during the build; nothing was uploaded.')
     build_commit = receipt(directory, args.version, commit, formats, save=not args.upload_only)
     upload(directory, args.version, build_commit, args.repository, formats)
