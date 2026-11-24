@@ -71,7 +71,7 @@ std::vector<ANALOG_PARTITION> BuildAnalogPartitions( const std::string& netlist,
         for( const auto& memory : config.memories ) part.memories.insert( memory.id );
         return std::vector<ANALOG_PARTITION>{ std::move( part ) };
     };
-    if( !config.partitionable || !config.mutableElements.empty() ) return original();
+    if( !config.partitionable || !config.mutableElements.empty() || !config.audioChannels.empty() ) return original();
     const bool automatic = !maximum;
     if( !maximum ) maximum = std::min( 4u, std::max( 1u, std::thread::hardware_concurrency() > 2
             ? std::thread::hardware_concurrency() - 2 : 1 ) );
@@ -260,10 +260,15 @@ std::vector<ANALOG_PARTITION> BuildAnalogPartitions( const std::string& netlist,
         std::vector<std::vector<std::size_t>> ordered;
         for( auto& [root, members] : islands ) ordered.push_back( std::move( members ) );
         std::stable_sort( ordered.begin(), ordered.end(), []( const auto& a, const auto& b ) { return a.size() > b.size(); } );
+        // Native peripherals can have a tiny netlist but frequent optical/bus
+        // edges. Keep their islands eligible for a worker, so their analog
+        // sample grid does not repeatedly solve unrelated static displays.
+        std::set<std::size_t> runtimeRoots;
+        for(const auto& related:runtimeOwners)runtimeRoots.insert(groups.Root(related.front()));
         // A process for an isolated bypass capacitor costs more IPC than its
-        // solver work. Pack small islands into the existing substantial jobs.
+        // solver work. Pack other small islands into the substantial jobs.
         const auto substantial = std::count_if( ordered.begin(), ordered.end(),
-                []( const auto& island ) { return island.size() >= 16; } );
+                [&]( const auto& island ) { return island.size() >= 16||runtimeRoots.contains(groups.Root(island.front())); } );
         const auto count = std::min<std::size_t>( maximum, automatic
                 ? std::max<std::size_t>( 1, substantial ) : ordered.size() );
         if( count < 2 ) return original();
@@ -342,11 +347,12 @@ struct ANALOG_SIM_SESSION::IMPL
         SIM_SESSION_SNAPSHOT snapshot;
         SIM_SAMPLE anchor;
         std::vector<std::size_t> historyColumns;
-        std::thread thread;
         std::mutex mutex;
         std::condition_variable wake;
         std::function<void()> task;
         bool quit = false;
+        // Launch only after every object used by the thread has been initialized.
+        std::thread thread;
         WORKER( ANALOG_PARTITION p, const std::string& path, std::chrono::milliseconds timeout ) :
                 part( std::move( p ) ), session( path, timeout ), thread( [this]
                 {
@@ -440,13 +446,71 @@ MEMORY_SNAPSHOT ANALOG_SIM_SESSION::ReadMemory( const std::string& id, std::size
     for( const auto& w : m_impl->workers ) if( w->part.memories.contains( id ) ) return w->session.ReadMemory( id, offset, length );
     throw std::runtime_error( "Unknown simulation memory: " + id );
 }
-SIM_SESSION_SNAPSHOT ANALOG_SIM_SESSION::Snapshot( bool drain )
+SIM_SESSION_SNAPSHOT ANALOG_SIM_SESSION::Snapshot( bool drain,
+        const std::optional<SIM_SNAPSHOT_OBSERVATIONS>& observations )
 {
     auto& self = *m_impl;
-    self.Each( [drain]( auto& w ) { w.snapshot = w.session.Snapshot( drain ); } );
-    if( self.workers.size() == 1 ) return self.workers[0]->snapshot;
+    const bool summary=observations&&self.config.historySignals;
+    if(summary)
+    {
+        auto retained=[&](std::size_t index){return std::find(self.config.historySignals->begin(),self.config.historySignals->end(),index)!=self.config.historySignals->end();};
+        for(auto index:observations->history)if(!retained(index))throw std::runtime_error("Scope signal is not retained");
+        for(const auto& [index,limit]:observations->warningLimits)
+            if(!retained(index)||!std::isfinite(limit)||limit<0)throw std::runtime_error("Invalid warning observation");
+    }
+    self.Each( [&]( auto& w )
+    {
+        std::optional<std::vector<std::size_t>> selected;
+        if(summary)
+        {
+            selected.emplace();
+            for(std::size_t n=0;n<w.part.signals.size();++n)
+                if(observations->history.contains(w.part.signals[n]))selected->push_back(n);
+        }
+        w.snapshot=w.session.Snapshot(drain,selected);
+    } );
+    bool fetch=false;
+    std::vector<double> warningMaxima;
+    if(summary)
+    {
+        const bool extrema=std::all_of(self.workers.begin(),self.workers.end(),[](const auto& w)
+        {return !w->snapshot.latest.values.empty()&&w->snapshot.historyMinimum.size()==w->snapshot.latest.values.size()
+            &&w->snapshot.historyMaximum.size()==w->snapshot.latest.values.size();});
+        if(extrema)
+        {
+            std::vector<double> minimum(self.config.signals.size()),maximum(minimum);
+            std::vector<unsigned> contributors(minimum.size());
+            warningMaxima.resize(minimum.size());
+            for(const auto& w:self.workers)for(std::size_t n=0;n<w->part.signals.size();++n)
+            {
+                const auto index=w->part.signals[n];if(!observations->warningLimits.contains(index))continue;
+                ++contributors[index];
+                const auto low=w->snapshot.historyMinimum[n],high=w->snapshot.historyMaximum[n];
+                if(self.workers.size()>1&&self.additive[index]){minimum[index]+=low;maximum[index]+=high;}
+                else {minimum[index]=low;maximum[index]=high;}
+            }
+            for(const auto& [index,limit]:observations->warningLimits)
+            {
+                const double bound=std::max(std::abs(minimum[index]),std::abs(maximum[index]));
+                if(contributors[index]>1&&self.additive[index]&&bound>limit)
+                {
+                    // Peaks of independent loads need not coincide. Fetch the
+                    // original traces before reporting an ambiguous total.
+                    fetch=true;
+                }
+                else warningMaxima[index]=bound;
+            }
+        }
+        else fetch=true; // Older workers already returned their full history.
+    }
+    if(fetch)self.Each([](auto& w)
+    {if(w.snapshot.historyToken)w.snapshot.history=w.session.FetchHistory(w.snapshot.historyToken);});
+    if( self.workers.size() == 1 )
+    {self.workers[0]->snapshot.warningMaxima=std::move(warningMaxima);return self.workers[0]->snapshot;}
     SIM_SESSION_SNAPSHOT result = self.workers[0]->snapshot; result.history.clear();
+    result.warningMaxima=std::move(warningMaxima);result.historyMinimum.clear();result.historyMaximum.clear();result.historyToken=0;
     if( result.latest.values.empty() ) return result;
+    result.presentation.clear();
     result.latest.values.assign( self.config.signals.size(), 0 ); result.activity.assign( self.config.activityMonitors.size(), {} );
     result.samplesReceived = result.samplesOverwritten = result.eventsApplied = result.residentBytes = result.engineRetainedPoints = 0;
     const auto& additive = self.additive;
@@ -454,6 +518,7 @@ SIM_SESSION_SNAPSHOT ANALOG_SIM_SESSION::Snapshot( bool drain )
     for( const auto& w : self.workers )
     {
         const auto& s = w->snapshot;
+        result.presentation.insert(s.presentation.begin(),s.presentation.end());
         if( s.state == SIM_SESSION_STATE::FAILED ) { self.failed = true; throw std::runtime_error( s.error ); }
         const double tolerance = std::max( 2e-11, std::abs( s.latest.time ) * 32 * std::numeric_limits<double>::epsilon() );
         if( std::abs( result.latest.time - s.latest.time ) > tolerance )
@@ -491,6 +556,7 @@ SIM_SESSION_SNAPSHOT ANALOG_SIM_SESSION::Snapshot( bool drain )
             for( auto n : w->historyColumns )
             {
                 const auto index = w->part.signals[n];
+                if(summary&&!fetch&&!observations->history.contains(index))continue;
                 double value = b->values.at( n );
                 if( a && b->time > a->time ) value = std::lerp( a->values.at( n ), value,
                         std::clamp( ( time - a->time ) / ( b->time - a->time ), 0., 1. ) );

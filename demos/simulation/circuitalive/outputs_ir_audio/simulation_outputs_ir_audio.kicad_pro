@@ -1,0 +1,16 @@
+{
+  "meta": {
+    "filename": "simulation_outputs_ir_audio.kicad_pro",
+    "version": 3
+  },
+  "text_variables": {},
+  "schematic": {
+    "top_level_sheets": [
+      {
+        "filename": "simulation_outputs_ir_audio.kicad_sch",
+        "name": "simulation_outputs_ir_audio",
+        "uuid": "e136597d-d6ed-4172-b87c-d0420d0018be"
+      }
+    ]
+  }
+}

@@ -1,0 +1,183 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "ir_led",
+  "name": "IR LED \u2014 linked optical transmitter",
+  "description": "Infrared emitter. Link to a compatible receiver; transmitted strength follows actual forward current.",
+  "license": "GPL-3.0-or-later",
+  "pins": [
+    {
+      "id": "k",
+      "label": "Cathode (K)",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "a",
+      "label": "Anode (A)",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "forward_voltage",
+      "label": "Forward voltage at reference current",
+      "default": "1.35",
+      "unit": "V",
+      "min": 0.8,
+      "max": 6
+    },
+    {
+      "id": "reference_current",
+      "label": "Reference current",
+      "default": "10m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 0.1
+    },
+    {
+      "id": "emission",
+      "label": "Emission coefficient",
+      "default": "2",
+      "unit": "",
+      "min": 1,
+      "max": 4
+    },
+    {
+      "id": "series_resistance",
+      "label": "Series resistance",
+      "default": "5",
+      "unit": "Ohm",
+      "min": 0,
+      "max": 10
+    },
+    {
+      "id": "brightness_current",
+      "label": "Current for full displayed brightness",
+      "default": "10m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 1
+    },
+    {
+      "id": "rated_current",
+      "label": "Current warning threshold",
+      "default": "20m",
+      "unit": "A",
+      "min": 1e-06,
+      "max": 1
+    },
+    {
+      "id": "color_red",
+      "label": "Display color \u2014 red",
+      "default": "255",
+      "unit": "",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "color_green",
+      "label": "Display color \u2014 green",
+      "default": "40",
+      "unit": "",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "color_blue",
+      "label": "Display color \u2014 blue",
+      "default": "255",
+      "unit": "",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "display_intensity",
+      "label": "Display intensity",
+      "default": "100",
+      "unit": "%",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "circle_diameter",
+      "label": "Overlay circle diameter",
+      "default": "3.4",
+      "unit": "mm",
+      "min": 0,
+      "max": 50
+    },
+    {
+      "id": "halo_diameter",
+      "label": "Overlay halo diameter",
+      "default": "4.6",
+      "unit": "mm",
+      "min": 0,
+      "max": 100
+    },
+    {
+      "id": "display_opacity",
+      "label": "Overlay opacity",
+      "default": "80",
+      "unit": "%",
+      "min": 0,
+      "max": 100
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Vsoptical_${id} ${pin:a} optical_a_${id} 0",
+      "D${id} optical_a_${id} ${pin:k} m${id} area={area${id}}"
+    ],
+    "definitions": [
+      ".param area${id}={${param:reference_current}/(exp((${param:forward_voltage}-${param:reference_current}*${param:series_resistance})/(${param:emission}*0.0258649258))-1)/1e-12}",
+      ".model m${id} D(Is=1e-12 N=${param:emission} Rs={${param:series_resistance}*area${id}} Tnom=27)"
+    ]
+  },
+  "matches": {
+    "library_ids": [
+      "LED:CQY99",
+      "Device:LED_IR"
+    ],
+    "symbol_names": [
+      "CQY99",
+      "LED_IR"
+    ]
+  },
+  "legacy_spice_fields": {
+    "Sim.Pins": "1=K 2=A"
+  },
+  "indicator": {
+    "type": "led",
+    "signal": "@d${id}[id]",
+    "brightness_parameter": "brightness_current",
+    "rating_parameter": "rated_current",
+    "appearance": {
+      "red_parameter": "color_red",
+      "green_parameter": "color_green",
+      "blue_parameter": "color_blue",
+      "intensity_parameter": "display_intensity",
+      "diameter_parameter": "circle_diameter",
+      "halo_diameter_parameter": "halo_diameter",
+      "opacity_parameter": "display_opacity"
+    }
+  },
+  "measurement_ports": {
+    "positive": "a",
+    "negative": "k"
+  },
+  "category": "Sensors/Infrared",
+  "family": "Infrared links",
+  "equations": [
+    "Forward PN junction with series resistance; current is set by the connected circuit.",
+    "Forward voltage is calibrated at reference_current. Reverse current does not light the LED.",
+    "Brightness and warning currents control visualization and warnings; they do not limit current.",
+    "Display color, intensity, opacity and circle/halo diameters affect only the overlay; electrical current is unchanged. Diameters are in schematic millimeters. Zero diameter hides that circle."
+  ],
+  "link": {
+    "medium": "ir",
+    "role": "transmit",
+    "signal": "i(Vsoptical_${id})"
+  }
+}

@@ -15,6 +15,9 @@ struct SIMULATION_ACTIONS
     static TOOL_ACTION memory;
     static TOOL_ACTION probes;
     static TOOL_ACTION logicLevels;
+    static TOOL_ACTION linkComponents;
+    static TOOL_ACTION unlinkComponents;
+    static TOOL_ACTION audio;
 };
 
 /// Append native-sized actions to the existing main toolbar, including after customization/recreation.

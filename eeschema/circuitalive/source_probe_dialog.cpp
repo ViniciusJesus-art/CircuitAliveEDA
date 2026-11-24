@@ -1,5 +1,6 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include "source_probe_dialog.h"
+#include "numeric_value.h"
 #include <wx/checkbox.h>
 #include <wx/dialog.h>
 #include <wx/msgdlg.h>
@@ -17,19 +18,20 @@ bool EditSourceProbe( wxWindow* parent, PROBE_KIND kind, SOURCE_PROBE_SETTINGS& 
     auto* layout = new wxBoxSizer( wxVERTICAL );
     auto* info = new wxStaticText( &dialog, wxID_ANY,
         _( "Place on a connection, or in empty space and connect a wire later. Voltage is referenced to GND.\n"
-           "During simulation: click 0/1 to toggle, or PWM/square to adjust duty cycle.\n"
+           "During simulation: click 0/1 to toggle, or PWM to adjust duty cycle. CLK always uses 50%.\n"
            "Double-click a placed probe, or press E, to edit these settings." ) );
     layout->Add( info, 0, wxALL, 12 );
     auto* grid = new wxFlexGridSizer( 2, 8, 12 ); grid->AddGrowableCol( 1 );
     grid->Add( new wxStaticText( &dialog, wxID_ANY, _( "Probe name (optional)" ) ), 0, wxALIGN_CENTER_VERTICAL );
     auto* nameText = new wxTextCtrl( &dialog, wxID_ANY, wxString::FromUTF8( name ) ); grid->Add( nameText, 1, wxEXPAND );
     SOURCE_PROBE_SETTINGS candidate = settings;
+    if( kind == PROBE_KIND::SQUARE ) candidate.duty = .5;
     struct INPUT { wxTextCtrl* text; double* value; double scale; };
     std::vector<INPUT> inputs;
     auto add = [&]( const wxString& label, double& value, double scale = 1 )
     {
         grid->Add( new wxStaticText( &dialog, wxID_ANY, label ), 0, wxALIGN_CENTER_VERTICAL );
-        auto* text = new wxTextCtrl( &dialog, wxID_ANY, wxString::Format( "%.12g", value * scale ) );
+        auto* text = new wxTextCtrl( &dialog, wxID_ANY, wxString::FromUTF8( FormatSimulationNumber( value * scale ) ) );
         text->SetMinSize( dialog.FromDIP( wxSize( 170, -1 ) ) );
         grid->Add( text, 1, wxEXPAND ); inputs.push_back( { text, &value, scale } );
     };
@@ -54,7 +56,7 @@ bool EditSourceProbe( wxWindow* parent, PROBE_KIND kind, SOURCE_PROBE_SETTINGS& 
         add( _( "Frequency (Hz)" ), candidate.frequency ); add( _( "Start delay (s)" ), candidate.delay );
         if( kind != PROBE_KIND::SINE )
         {
-            add( _( "Duty cycle (%)" ), candidate.duty, 100 );
+            if( kind == PROBE_KIND::PWM ) add( _( "Duty cycle (%)" ), candidate.duty, 100 );
             add( _( "Rise time (s)" ), candidate.rise ); add( _( "Fall time (s)" ), candidate.fall );
         }
     }

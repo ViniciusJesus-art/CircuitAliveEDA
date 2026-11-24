@@ -4,6 +4,7 @@
 #include "circuit_snapshot.h"
 #include "control_visual_json.h"
 #include "control_references.h"
+#include "symbol_variant.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
@@ -65,11 +66,12 @@ std::string ModelBehaviorSummary( const std::string& text )
 MODEL_DESIGN MODEL_DESIGN::Open( const std::string& text )
 {
     auto model = MODEL_REPOSITORY::LoadText( text );
-    if( model.runtime )
-        throw std::runtime_error( "Programmable models use external runtime modules. Edit their .casim/module files; block composition cannot preserve runtime behavior yet." );
     const auto json = JSON::parse( text ); MODEL_DESIGN d;
     d.id = model.id; d.name = model.name; d.description = model.description;
     d.pins = model.pins; d.parameters = model.parameters;
+    d.automaticAssociation=model.automaticAssociation;
+    d.linkedSymbols = model.libraryIds; d.excludedSymbols = model.excludedLibraryIds;
+    d.symbolVariants = model.symbolVariants;
     if( !model.libraryIds.empty() ) d.libraryId = model.libraryIds[0];
     d.baseJson = text;
     if( json.contains( "authoring" ) )
@@ -102,11 +104,159 @@ MODEL_DESIGN MODEL_DESIGN::Open( const std::string& text )
             if( d.wireRoutes.size() > 4096 ) throw std::runtime_error( "Too many wire routes" );
         }
     }
+    if( !d.libraryId.empty() && std::find(d.linkedSymbols.begin(),d.linkedSymbols.end(),d.libraryId)==d.linkedSymbols.end() )
+        d.linkedSymbols.push_back(d.libraryId);
     return d;
+}
+namespace
+{
+std::string InteractionKey(const DESIGN_INTERACTION& interaction)
+{
+    const auto prefix="b_"+interaction.block+"_";
+    if(interaction.control=="switch")return "control:"+prefix+"switch";
+    if(interaction.control.starts_with("toggle:"))return "control:"+prefix+interaction.control.substr(7);
+    if(interaction.control.starts_with("adjust:"))return "adjust:"+prefix+interaction.control.substr(7);
+    return {};
+}
+}
+std::map<std::string,std::string> MODEL_DESIGN::SymbolPinMap() const
+{
+    std::map<std::string,std::string> result;
+    for(const auto& pin:pins)result[pin.id]=pin.defaultPin;
+    if(auto it=symbolVariants.find(libraryId);it!=symbolVariants.end())
+        for(const auto& [port,number]:JSON::parse(it->second).value("pin_map",std::map<std::string,std::string>{}))result[port]=number;
+    return result;
+}
+std::vector<MODEL_PARAMETER> MODEL_DESIGN::SymbolParameters() const
+{
+    auto result=parameters;
+    if(const auto it=symbolVariants.find(libraryId);it!=symbolVariants.end())
+        ApplySymbolParameterDefaults(result,JSON::parse(it->second));
+    return result;
+}
+void MODEL_DESIGN::SetSymbolParameters(const std::vector<MODEL_PARAMETER>& edited)
+{
+    const auto previous=SymbolParameters();
+    auto definitions=edited;
+    auto variant=libraryId.empty()||!symbolVariants.contains(libraryId)?JSON::object():JSON::parse(symbolVariants.at(libraryId));
+    for(auto& parameter:definitions)
+    {
+        const auto original=std::find_if(parameters.begin(),parameters.end(),[&](const auto& p){return p.id==parameter.id;});
+        if(libraryId.empty()||original==parameters.end())continue;
+        const auto effective=std::find_if(previous.begin(),previous.end(),[&](const auto& p){return p.id==parameter.id;});
+        if(parameter.defaultValue!=effective->defaultValue)variant["parameter_defaults"][parameter.id]=parameter.defaultValue;
+        parameter.defaultValue=original->defaultValue;
+    }
+    if(!libraryId.empty())symbolVariants[libraryId]=variant.dump();
+    // Removing a public parameter also removes its per-symbol defaults.
+    for(auto& [symbol,text]:symbolVariants)
+    {
+        auto stored=JSON::parse(text);
+        if(stored.contains("parameter_defaults"))
+        {
+            for(auto it=stored["parameter_defaults"].begin();it!=stored["parameter_defaults"].end();)
+                if(std::none_of(definitions.begin(),definitions.end(),[&](const auto& p){return p.id==it.key();}))it=stored["parameter_defaults"].erase(it);
+                else ++it;
+        }
+        text=stored.dump();
+    }
+    parameters=std::move(definitions);
+}
+void MODEL_DESIGN::SetSymbolPinMap(const std::map<std::string,std::string>& mapping)
+{
+    if(libraryId.empty())return;
+    auto& text=symbolVariants[libraryId];auto variant=text.empty()?JSON::object():JSON::parse(text);
+    variant["pin_map"]=mapping;text=variant.dump();
+}
+void MODEL_DESIGN::StoreSymbolVariant()
+{
+    if(libraryId.empty())return;
+    auto mapping=SymbolPinMap();auto& text=symbolVariants[libraryId];
+    auto variant=text.empty()?JSON::object():JSON::parse(text);
+    variant["pin_map"]=mapping;variant["segments"]=JSON::object();variant["controls"]=JSON::object();
+    const auto base=baseJson.empty()?JSON::object():JSON::parse(baseJson);
+    for(const auto& segment:base.value("segments",JSON::array()))
+        variant["segments"][segment.at("id").get<std::string>()]=SegmentPresentation(segment);
+    if(base.contains("display")&&base.at("display").contains("visual"))variant["display_visual"]=base.at("display").at("visual");
+    if(!interactionsConfigured)
+    {
+        if(base.contains("control"))variant["controls"]["switch"]=base.at("control").value("visual",JSON::object());
+        for(const auto& control:base.value("controls",JSON::array()))variant["controls"]["control:"+control.at("id").get<std::string>()]=control.value("visual",JSON::object());
+        for(const auto& control:base.value("adjustments",JSON::array()))variant["controls"]["adjust:"+control.at("id").get<std::string>()]=control.value("visual",JSON::object());
+    }
+    for(const auto& interaction:interactions)variant["controls"][InteractionKey(interaction)]=WriteControlVisual(interaction.visual);
+    text=variant.dump();
+}
+void MODEL_DESIGN::SelectSymbol(const std::string& symbol)
+{
+    if(std::find(linkedSymbols.begin(),linkedSymbols.end(),symbol)==linkedSymbols.end()&&!symbol.empty())
+        throw std::runtime_error("Symbol is not linked to this model: "+symbol);
+    StoreSymbolVariant();
+    // Freeze defaults for every existing symbol before editing one presentation.
+    for(const auto& linked:linkedSymbols)
+        if(!symbolVariants.contains(linked)&&symbolVariants.contains(libraryId))
+        {
+            auto variant=JSON::parse(symbolVariants.at(libraryId));
+            variant.erase("parameter_defaults");variant.erase("settings");
+            symbolVariants[linked]=variant.dump();
+        }
+    libraryId=symbol;
+    if(!symbolVariants.contains(symbol))return;
+    const auto variant=JSON::parse(symbolVariants.at(symbol));
+    auto base=baseJson.empty()?JSON::object():JSON::parse(baseJson);
+    const auto segments=variant.value("segments",JSON::object());
+    if(base.contains("segments"))for(auto& item:base["segments"])
+    {
+        const auto key=item.at("id").get<std::string>();
+        if(segments.contains(key)){auto segment=ReadLuminousSegment(item);ApplySegmentPresentation(segment,segments.at(key));item=WriteLuminousSegment(segment);}
+    }
+    const auto controls=variant.value("controls",JSON::object());
+    for(auto& interaction:interactions)
+        if(controls.contains(InteractionKey(interaction)))interaction.visual=ReadControlVisual(controls.at(InteractionKey(interaction)));
+    if(!interactionsConfigured)
+    {
+        if(base.contains("control")&&controls.contains("switch"))base["control"]["visual"]=controls.at("switch");
+        for(const char* kind:{"controls","adjustments"})if(base.contains(kind))for(auto& control:base[kind])
+        {
+            const auto key=std::string(kind==std::string("controls")?"control:":"adjust:")+control.at("id").get<std::string>();
+            if(controls.contains(key))control["visual"]=controls.at(key);
+        }
+    }
+    if(variant.contains("display_visual"))base["display"]["visual"]=variant.at("display_visual");
+    if(!baseJson.empty()||!base.empty())baseJson=base.dump();
+}
+void MODEL_DESIGN::AddSymbol(const std::string& symbol,const std::vector<MODEL_PIN>& physicalPins)
+{
+    if(symbol.empty()||physicalPins.empty())throw std::runtime_error("Choose a symbol with physical pins");
+    if(std::find(linkedSymbols.begin(),linkedSymbols.end(),symbol)!=linkedSymbols.end()){SelectSymbol(symbol);return;}
+    if(!pins.empty()&&physicalPins.size()!=pins.size())
+        throw std::runtime_error("This symbol has "+std::to_string(physicalPins.size())+" pins; the shared model has "+std::to_string(pins.size())+" ports. Choose a symbol with the same pin count.");
+    if(!libraryId.empty()&&std::find(linkedSymbols.begin(),linkedSymbols.end(),libraryId)==linkedSymbols.end())linkedSymbols.push_back(libraryId);
+    StoreSymbolVariant();
+    if(pins.empty())pins=physicalPins;
+    auto variant=libraryId.empty()||!symbolVariants.contains(libraryId)?JSON::object():JSON::parse(symbolVariants.at(libraryId));
+    variant.erase("parameter_defaults");variant.erase("settings");
+    std::map<std::string,std::string> mapping;std::set<std::string> used;
+    auto match=[&](auto predicate){for(const auto& pin:pins)if(!mapping.contains(pin.id))for(const auto& physical:physicalPins)
+        if(!used.contains(physical.defaultPin)&&predicate(pin,physical)){mapping[pin.id]=physical.defaultPin;used.insert(physical.defaultPin);break;}};
+    match([](const auto& a,const auto& b){return a.label==b.label&&!a.label.empty()&&a.label!="~";});
+    match([](const auto& a,const auto& b){return a.defaultPin==b.defaultPin;});
+    match([](const auto&,const auto&){return true;});
+    variant["pin_map"]=mapping;variant["physical_pins"]=JSON::array();
+    for(const auto& pin:physicalPins)variant["physical_pins"].push_back({{"number",pin.defaultPin},{"name",pin.label},{"role",pin.role}});
+    symbolVariants[symbol]=variant.dump();linkedSymbols.push_back(symbol);std::erase(excludedSymbols,symbol);SelectSymbol(symbol);
+}
+void MODEL_DESIGN::RemoveSymbol(const std::string& symbol)
+{
+    if(libraryId==symbol)SelectSymbol("");
+    std::erase(linkedSymbols,symbol);symbolVariants.erase(symbol);
+    if(std::find(excludedSymbols.begin(),excludedSymbols.end(),symbol)==excludedSymbols.end())excludedSymbols.push_back(symbol);
+    if(libraryId.empty()&&!linkedSymbols.empty())SelectSymbol(linkedSymbols.front());
 }
 void MODEL_DESIGN::MakeCoreVisible()
 {
-    if( baseJson.empty() || !blocks.empty() ) return;
+    if( baseJson.empty() || !blocks.empty() ) { ConfigureInteractions(); SelectSymbol(libraryId); return; }
+    if(JSON::parse(baseJson).contains("runtime")){SelectSymbol(libraryId);return;}
     auto core = JSON::parse( baseJson );
     const auto model = MODEL_REPOSITORY::LoadText( core.dump() );
     core.erase( "authoring" );
@@ -145,7 +295,7 @@ void MODEL_DESIGN::MakeCoreVisible()
         }
         else if( item.is_structured() ) for( auto& child : item ) rename( child );
     };
-    for( const auto* key : { "logic", "indicator", "control", "controls", "adjustments", "current_warning", "current_warnings" } )
+    for( const auto* key : { "segments", "display", "audio", "link", "logic", "indicator", "control", "controls", "adjustments", "current_warning", "current_warnings" } )
         if( core.contains( key ) ) rename( core[key] );
     baseJson = core.dump(); coreBlock = block.id;
     // A native PN diode has a real series path followed by the nonlinear
@@ -187,6 +337,20 @@ void MODEL_DESIGN::MakeCoreVisible()
             {{"resistance","@series_resistance"}}, 400, 100 } );
     }
     blocks.push_back( std::move( block ) );
+    for(auto& [symbol,text]:symbolVariants)
+    {
+        auto variant=JSON::parse(text);auto controls=JSON::object();
+        for(auto it=variant["controls"].begin();it!=variant["controls"].end();++it)
+        {
+            auto key=it.key();
+            if(key=="switch")key="control:b_Core_switch";
+            else if(key.starts_with("control:"))key="control:b_Core_"+key.substr(8);
+            else if(key.starts_with("adjust:"))key="adjust:b_Core_"+key.substr(7);
+            controls[key]=it.value();
+        }
+        variant["controls"]=controls;text=variant.dump();
+    }
+    ConfigureInteractions();SelectSymbol(libraryId);
 }
 std::vector<DESIGN_INTERACTION> MODEL_DESIGN::AvailableInteractions() const
 {
@@ -202,7 +366,7 @@ std::vector<DESIGN_INTERACTION> MODEL_DESIGN::AvailableInteractions() const
 }
 void MODEL_DESIGN::ConfigureInteractions()
 {
-    if( interactionsConfigured ) return;
+    if( interactionsConfigured || ( !baseJson.empty() && JSON::parse(baseJson).contains("runtime") ) ) return;
     // Existing imported components already expose their core's controls on the parent.
     for( const auto& i : AvailableInteractions() )
         if( i.block == coreBlock ) interactions.push_back( i );
@@ -217,7 +381,7 @@ void MODEL_DESIGN::RemoveBlock( const std::string& blockId )
     if( coreBlock == blockId )
     {
         auto base = JSON::parse( baseJson );
-        for( const auto* key : { "logic", "indicator", "control", "controls", "adjustments", "current_warning", "current_warnings", "memories", "resources" } ) base.erase(key);
+        for( const auto* key : { "segments", "display", "audio", "link", "logic", "indicator", "control", "controls", "adjustments", "current_warning", "current_warnings", "memories", "resources" } ) base.erase(key);
         baseJson = base.dump(); coreBlock.clear();
     }
 }
@@ -275,13 +439,13 @@ std::string MODEL_DESIGN::Export() const
     if( !Identifier( id ) || name.empty() || pins.empty() ) throw std::runtime_error( "Set a model ID, name and component pins" );
     if( blocks.size() > 128 ) throw std::runtime_error( "Model design supports up to 128 blocks" );
     JSON j = baseJson.empty() ? JSON::object() : JSON::parse( baseJson );
-    if( j.contains( "runtime" ) )
+    if( j.contains( "runtime" ) && !blocks.empty() )
         throw std::runtime_error( "Programmable runtime models cannot be composed as electrical blocks yet" );
     j.erase( "authoring" );
     if( !blocks.empty() ) { j.erase( "live_updates" ); j.erase( "live_texts" ); }
     if( interactionsConfigured )
         for( const auto* key : { "control", "controls", "adjustments" } ) j.erase( key );
-    j["schema_version"] = 1; j["backend"] = "ngspice"; j["id"] = id; j["name"] = name;
+    j["schema_version"] = j.contains("runtime") ? 2 : 1; j["backend"] = j.contains("runtime") ? "ngspice+runtime" : "ngspice"; j["id"] = id; j["name"] = name;
     j["description"] = description; j["license"] = j.value( "license", "GPL-3.0-or-later" );
     j["pins"] = JSON::array(); j["parameters"] = JSON::array();
     std::set<std::string> ports, physical, parameterIds;
@@ -306,9 +470,14 @@ std::string MODEL_DESIGN::Export() const
     };
     for( const auto& p : parameters ) addParameter( p );
     if( parameterIds.contains( "max_step" ) ) j["max_step_parameter"] = "max_step";
-    // Author alternatives bind through the saved symbol profile. They must not make
-    // existing automatic associations ambiguous with bundled models for that symbol.
-    j.erase( "matches" );
+    auto snapshot=*this;snapshot.StoreSymbolVariant();
+    auto links=linkedSymbols;
+    if(!libraryId.empty()&&std::find(links.begin(),links.end(),libraryId)==links.end())links.push_back(libraryId);
+    j["matches"]["automatic"]=automaticAssociation;
+    j["matches"]["library_ids"]=links;
+    j["matches"]["excluded_library_ids"]=excludedSymbols;
+    j["symbol_variants"]=JSON::object();
+    for(const auto& [symbol,text]:snapshot.symbolVariants)j["symbol_variants"][symbol]=JSON::parse(text);
     if( baseJson.empty() ) j["ignore_legacy_spice_fields"] = true;
     if( !j.contains( "spice" ) ) j["spice"] = { { "instance", JSON::array() }, { "definitions", JSON::array() } };
     if( !j["spice"].contains( "definitions" ) ) j["spice"]["definitions"] = JSON::array();
@@ -444,12 +613,31 @@ std::string MODEL_DESIGN::Export() const
                 c = *found;
             }
             else throw std::runtime_error( "Unknown interaction control" );
+            if(interaction.control=="switch")c.initiallyOpenSymbols=model.controlInitiallyOpenSymbols;
             j["controls"].push_back( { { "id", prefix + c.id }, { "label", interaction.label },
                 { "source", Expand( c.source, tokens[n] ) }, { "on", c.on }, { "off", c.off },
-                { "initially_closed", c.initiallyClosed }, { "visual", visual } } );
+                { "initially_closed", c.initiallyClosed }, { "initially_open_symbols",c.initiallyOpenSymbols }, { "visual", visual } } );
         }
     }
     references.Resolve( tokens, j );
+    // Output metadata observes the same parameter bindings as its visible core.
+    for(std::size_t i=0;i<blocks.size();++i)if(blocks[i].id==coreBlock)
+    {
+        auto bindOutput=[&](JSON& output,const char* parameterKey,const char* valueKey)
+        {
+            if(!output.contains(parameterKey))return;
+            const auto parameter=output.at(parameterKey).get<std::string>();
+            const auto token=tokens[i].at("param:"+parameter);
+            if(token.starts_with("${param:"))output[parameterKey]=token.substr(8,token.size()-9);
+            else {output[valueKey]=ParseComponentValue(token);output.erase(parameterKey);}
+        };
+        if(j.contains("segments"))for(auto& segment:j["segments"])bindOutput(segment,"full_scale_parameter","full_scale");
+        if(j.contains("audio"))
+        {
+            bindOutput(j["audio"],"full_scale_parameter","full_scale");
+            bindOutput(j["audio"],"volume_parameter","volume");
+        }
+    }
     // A visible LED core may override or rebind display values in its properties.
     // Its component-level indicator must observe those exact block bindings.
     if(j.contains("indicator")&&!coreBlock.empty())for(std::size_t i=0;i<blocks.size();++i)if(blocks[i].id==coreBlock)
@@ -605,7 +793,7 @@ std::string MODEL_DESIGN::Export() const
     }
     const auto compiled = MODEL_REPOSITORY::LoadText( j.dump() );
     bool anchor = false;
-    for( const auto& p : pins )
+    if(!compiled.runtime)for( const auto& p : pins )
     {
         const auto token = "${pin:" + p.id + "}";
         const bool used = std::any_of( compiled.instance.begin(), compiled.instance.end(), [&]( const auto& s ) { return s.find( token ) != std::string::npos; } )

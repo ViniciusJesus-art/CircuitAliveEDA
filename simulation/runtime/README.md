@@ -74,8 +74,10 @@ are never silently ignored. Reset restores the original frozen images.
 ## Included AVR backend
 
 `avr8js.js` bundles upstream AVR8js 0.21.1 and the editable
-`avr8js-adapter.js`. Run `python3 simulation/runtime/build-avr8js.py` after editing
-the adapter or updating the vendored dependency. Python is needed for development
+`avr8js-adapter.js`, `avr8js-devices.js`, `avr8js-serial.js`, `avr8js-usart.js`,
+`avr8js-nvm.js`, `avr8js-system.js`, `avr8js-analog.js`, `avr8js-timers.js` and
+CPU-independent `mcu-serial.js`. Run `python3 simulation/runtime/build-avr8js.py` after editing
+these modules or updating the vendored dependency. Python is needed for development
 only; the installed application uses the resulting JavaScript directly.
 The generator resolves opcode masks into a lookup table, retaining upstream
 instruction bodies and their priority. `node qa/tests/cli/test_avr_decoder.cjs`
@@ -98,18 +100,82 @@ Supported exact targets are `atmega48p`, `atmega88p`, `atmega168p`, `atmega328p`
 The adapter selects each device's Flash, SRAM, EEPROM and interrupt-vector
 spacing. Package/board pin mappings live in `.casim` descriptors. CPU instructions,
 GPIO direction, pull-ups, pin interrupts, timers 0/1/2, timer PWM, ADC conversions,
-EEPROM and asynchronous UART TX/RX are emulated through registers and firmware.
-UART electrical framing supports 5–8 data bits and parity/stop configuration;
+EEPROM, asynchronous UART TX/RX, SPI and TWI/I2C are emulated through registers and firmware.
+UART electrical framing supports 5–9 data bits and parity/stop configuration;
 RX is sampled through the electrical window, so choose a quantum comfortably
-shorter than the bit period. SPI, TWI/I2C, watchdog, sleep modes, self-programming
-and 9-bit UART are explicitly rejected when requested. ADC auto-triggering and
-analog comparator are not currently part of the validated capabilities.
+shorter than the bit period. USART includes RXB8/TXB8, parity/framing/overrun
+flags, a two-entry receive FIFO, transmit buffering, MPCM, synchronous controller/
+target operation through PD4/XCK and master SPI mode (MSPIM).
+
+The ADC implements single conversions, free-running and all eight ADTS selections
+(comparator, INT0, Timer0 compare/overflow, Timer1 compare/overflow/capture),
+ADCL/ADCH locking, references and left adjustment. Analog comparator inputs are
+PD6/AIN0, PD7/AIN1, bandgap or the ADC mux with ACME and ADEN cleared. Comparator
+interrupt modes and ACIC route to Timer1 capture. ICP1/PB0 supports edge selection,
+the four-clock noise filter, ICF1/ICIE1 and the shared 16-bit TEMP read latch.
+Timer2 supports an ideal 32768 Hz asynchronous oscillator (`timer2Hz`), external
+TOSC1/PB6 edges with EXCLK, ASSR update-busy flags and operation during applicable
+sleep modes. GTCCR synchronizes/holds prescalers; PRR gates peripheral clocks.
+
+The watchdog uses independent simulated time for 16 ms–8 s periods, WDR, timed
+configuration, interrupt/reset/combined modes and WDTON. All six defined sleep
+modes stop the CPU and gate the appropriate clocks; enabled wake sources resume
+execution even with global interrupts disabled. Reset rebuilds peripheral state,
+retains SRAM for electrical/watchdog resets and sets sticky MCUSR cause flags.
+IVCE/IVSEL relocate interrupt vectors; fuses configure CKDIV8, CKOUT, RSTDISBL,
+WDTON, BOD, BOOTSZ/BOOTRST. BOD has a functional threshold/hysteresis and the timed
+sleep disable sequence. OSCCAL adjusts nominal frequency using an approximate
+linear calibration law; oscillator startup and analog calibration are idealized.
+
+SPM implements page buffering, erase/write, busy timing, lock bits, fuse reads and
+RWW/NRWW execution rules. ATmega48P has no boot section; SELFPRGEN controls SPM.
+The other devices restrict SPM to their fuse-selected boot section. Flash page
+size, boot geometry, signature and vector spacing are device profiles. ATmega328P
+also supports SIGRD signature/calibration reads. EEPROM implements protected
+erase/write modes, ready interrupt and independent write timing. Flash/EEPROM
+survive electrical reset; session reset restores the original firmware/images.
+SPM never writes the user's HEX/BIN file. Flash uses 4.5 ms operations and EEPROM
+3.4 ms erase+write / 1.8 ms single operations, as functional timing constants.
+
+SPI uses PB2/SS, PB3/MOSI, PB4/MISO and PB5/SCK. Controller and target roles,
+all four CPOL/CPHA modes, both bit orders, SPIF/SPIE and write collision are
+implemented. DDR still controls controller MOSI/SCK and target MISO outputs.
+Target deselection releases MISO. A controller's input SS going LOW switches
+it to target mode and raises SPIF. Flags clear on ISR entry or the documented
+SPSR-then-SPDR access sequence, not by writing a 1 to SPSR.
+
+TWI uses PC4/SDA and PC5/SCL, always open-drain; external pull-ups or enabled
+PORT pull-ups must bring the bus HIGH. Both controller and target support 7-bit
+addressing, ACK/NACK, repeated START/STOP, TWINT/TWIE and clock stretching.
+Targets support TWAR/TWAMR address matching and general call. Controller reads
+and acknowledgements observe the actual SDA voltage. A controller that releases
+SDA but observes LOW during a transmitted 1 reports arbitration lost (38h).
+Controllers synchronize SCL LOW/HIGH phases and arbitrate on the resolved SDA
+line. Address recognition can continue after arbitration loss. Hardware target
+matching is 7-bit, as on these AVRs; 10-bit protocol sequences require firmware.
+A target holds SCL LOW while TWINT awaits firmware.
+No peer/pull-up is invented: unmatched addresses NACK, and a bus held LOW waits.
+Choose an input quantum much shorter than a half-bit period, including for SPI
+targets; clock stretching and electrical rise times can extend an I2C transfer.
+SPI, USART and I2C rates use the current CPU prescaler; CLKPR/OSCCAL changes
+rescale the remaining phase of an in-flight bit.
+
+Device capacities/vector spacing are registered in `avr8js-devices.js`.
+`CircuitAliveAVR.registerDevice(id, profile)` accepts the implemented `atmega-x8`
+layout only. A later descriptor module may register a verified compatible device
+without editing the adapter. Other register layouts need an adapter, not a renamed
+profile. `CircuitAliveAVR.capabilities` records functional blocks and physical scope.
 
 Pin IDs are `PB0`–`PB7`, `PC0`–`PC6`, `PD0`–`PD7`, `ADC6`, `ADC7`, `VCC`,
-`AVCC`, `GND`, `AREF`, `RESET`. PC6 remains reserved for reset (no fuse override).
-The configured clock is an ideal oscillator; crystal startup, fuses, bootloader
-selection, oscillator-pin multiplexing, brown-out hysteresis, supply current,
-protection diodes and thermal/electrical damage are outside this initial backend.
+`AVCC`, `GND`, `AREF`, `RESET`. Programming RSTDISBL enables PC6 through the RESET
+binding. Bundled descriptors conditionally create that driver from `fuse_high`,
+so ordinary shared reset nets remain passive and do not couple analog partitions.
+The configured clock is an ideal nominal oscillator. External ISP/high-voltage
+programmers and debugWIRE are separate programming/debug interfaces and are not
+included. Protection diodes, startup jitter and thermal/electrical damage are
+outside the functional circuit model.
+Bundled descriptors now include a configurable approximate supply-current load;
+it is not a prediction of consumption versus firmware, temperature or clock.
 EEPROM survives electrical reset but returns to the initial image on session reset.
 
 The ADC uses `AVCC` (falling back to `VCC`), external `AREF` and the upstream
@@ -117,6 +183,9 @@ internal references; channel inputs are voltages relative to `GND`. GPIO inputs
 use 0.3/0.6 of VCC with hysteresis. `options.supplyMin` and `supplyMax` set the
 allowed supply window (defaults 1.8–5.5 V). Invalid power or active-low reset
 releases all GPIOs and stops CPU execution. Restoring power/reset restarts the CPU.
+The optional `option_parameters` descriptor map feeds resolved numeric symbol
+parameters into runtime options. AVR models expose decimal `fuse_low`,
+`fuse_high`, `fuse_extended`, `lock_bits` and `timer2_hz` this way.
 
 The host holds inputs throughout each configured electrical window (default
 1 µs), and outputs preserve firmware instruction/timer timestamps. AVR instructions
@@ -149,7 +218,7 @@ EEPROM at 2100h–213Fh, using twice those addresses as Intel HEX byte addresses
 Other non-erased regions are rejected. WDT must be disabled if a configuration
 word is supplied; absent configuration defaults to disabled. SLEEP and EEPROM
 write/unlock timing are explicitly unsupported. Supply defaults to 4–5.5 V.
-Oscillator modes, power-up timing, protection fuses, supply consumption and pin
+Oscillator modes, power-up timing, protection fuses, precise supply consumption and pin
 protection are outside this backend. This does not implement other PIC families.
 
 PIC PORT read-modify-write instructions sample the physical pin, including

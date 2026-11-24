@@ -48,9 +48,11 @@ public:
         m_choice = new wxTextCtrl( this, wxID_ANY, {}, wxDefaultPosition, wxDefaultSize, wxTE_READONLY );
         auto* chooseModel = new wxButton( this, wxID_ANY, _( "Choose model…" ) );
         auto* automatic = new wxButton( this, wxID_ANY, _( "Automatic" ) );
+        m_makeDefault=new wxButton(this,wxID_ANY,_("Make default"));
+        m_makeDefault->SetToolTip(_("Save the selected model, parameter defaults, pin mapping and options in the model file for this library symbol."));
         m_models = m_repository.List();
         row->Add( m_choice, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8 );
-        row->Add( chooseModel, 0, wxRIGHT, 8 ); row->Add( automatic, 0, wxRIGHT, 8 );
+        row->Add( chooseModel, 0, wxRIGHT, 8 ); row->Add(m_makeDefault,0,wxRIGHT,8); row->Add( automatic, 0, wxRIGHT, 8 );
         auto* browse = new wxButton( this, wxID_ANY, _( "Load file..." ) );
         auto* reload = new wxButton( this, wxID_ANY, _( "Reload file" ) );
         row->Add( browse, 0, wxRIGHT, 8 ); row->Add( reload );
@@ -113,20 +115,19 @@ public:
         measurements->Add( new wxStaticText( this, wxID_ANY,
             _( "I enters the (+) terminal. P is signed power for this port pair." ) ), 0, wxTOP, 4 );
         layout->Add( measurements, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
-        auto* defaults = new wxBoxSizer( wxHORIZONTAL );
-        m_remember = new wxCheckBox( this, wxID_ANY,
-            wxString::Format( _( "Use these settings for new %s symbols" ), wxString::FromUTF8( component.libraryId ) ) );
-        m_remember->SetValue( !excluded );
-        m_remember->SetToolTip( _( "Copies the model, pin mapping, parameters and measurement choices into new symbols. Existing symbols keep their settings. $value follows each symbol's Value." ) );
-        defaults->Add( m_remember, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8 );
-        auto* forget = new wxButton( this, wxID_ANY, _( "Forget saved default" ) );
-        defaults->Add( forget );
-        layout->Add( defaults, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
-        forget->Bind( wxEVT_BUTTON, [this, forget]( wxCommandEvent& )
+        m_makeDefault->Bind(wxEVT_BUTTON,[this](wxCommandEvent&)
         {
-            m_forget = true; m_remember->SetValue( false );
-            forget->SetLabel( _( "Removed on OK" ) );
-        } );
+            try
+            {
+                collect();const auto file=m_model->file;
+                MODEL_PROFILES().MakeDefault(m_component,*m_model,m_exclude->GetValue());
+                m_repository=MODEL_REPOSITORY(MODEL_REPOSITORY::DefaultDirectories(m_component.projectDirectory));
+                m_selected=addModel(MODEL_REPOSITORY::Load(file));
+                load(true);
+                m_details->SetLabel(m_details->GetLabel()+"\n"+_("Defaults saved in the model file."));Layout();
+            }
+            catch(const std::exception& error){showError(error.what());}
+        });
         layout->Add( CreateSeparatedButtonSizer( wxOK | wxCANCEL ), 0, wxEXPAND | wxALL, 10 );
         SetSizer( layout );
         SetMinSize( wxSize( 760, 720 ) ); SetSize( 900, 880 ); Centre();
@@ -137,7 +138,7 @@ public:
         if( !excluded ) { selectExternalFile(); load( true ); }
         else m_details->SetLabel( _( "Excluded — no simulation model is required." ) );
         m_editingControls = { m_choice, chooseModel, automatic, browse, reload, m_files, m_filePath, m_pages,
-            m_voltage, m_current, m_power, m_positive, m_negative, m_remember, forget };
+            m_voltage, m_current, m_power, m_positive, m_negative };
         enableModelControls();
         m_exclude->Bind( wxEVT_CHECKBOX, [this]( wxCommandEvent& )
         {
@@ -205,13 +206,6 @@ public:
                 for( const auto& [pin, net] : m_component.pins ) nodes[pin] = "n" + std::to_string( nodes.size() + 1 );
                 for( const auto& line : resolved.model.instance ) ExpandModelTemplate( line, resolved, nodes, 0 );
                 for( const auto& line : resolved.model.definitions ) ExpandModelTemplate( line, resolved, nodes, 0 );
-                if( m_remember->GetValue() )
-                {
-                    auto profile = m_component;
-                    if( profile.modelFile.empty() ) profile.modelFile = "builtin:" + resolved.model.id;
-                    MODEL_PROFILES().Save( profile );
-                }
-                else if( m_forget ) MODEL_PROFILES().Remove( m_component.libraryId );
                 EndQuasiModal( wxID_OK );
             }
             catch( const std::exception& e ) { showError( e.what() ); }
@@ -247,6 +241,7 @@ private:
     void enableModelControls()
     {
         for( auto* control : m_editingControls ) control->Enable( !m_exclude->GetValue() );
+        m_makeDefault->Enable(m_model.has_value());
     }
     void selectExternalFile()
     {
@@ -314,6 +309,7 @@ private:
                             ? PathUtf8( relative ) : PathUtf8( model.file );
                 }
             }
+            model=model.ForSymbol(component.libraryId);
             requireMatchingPins( model );
             if( !preserve ) { component.modelPins.clear(); component.modelParameters.clear(); component.resources.clear(); }
             m_component = std::move( component );
@@ -398,6 +394,7 @@ private:
         m_files->Show(m_model && !m_model->resources.empty());
         m_filePath->Show( m_model && !m_model->resources.empty() );
         updateResourcePaths();
+        m_makeDefault->Enable(m_model.has_value());
         m_details->Wrap( 830 ); Layout();
         return m_model.has_value();
     }
@@ -419,9 +416,9 @@ private:
             if( m_positive->GetSelection() < 0 || m_negative->GetSelection() < 0
                 || m_positive->GetSelection() == m_negative->GetSelection() )
                 throw std::runtime_error( "Select two distinct measurement ports" );
-            selected.positive = m_model->pins.at( m_positive->GetSelection() ).id;
-            selected.negative = m_model->pins.at( m_negative->GetSelection() ).id;
         }
+        if(m_positive->GetSelection()>=0)selected.positive=m_model->pins.at(m_positive->GetSelection()).id;
+        if(m_negative->GetSelection()>=0)selected.negative=m_model->pins.at(m_negative->GetSelection()).id;
         for( std::size_t i = 0; i < m_model->parameters.size(); ++i )
             if( auto value = m_parameters->GetCellValue( i, 1 ).ToStdString(wxConvUTF8); !value.empty() )
                 m_component.modelParameters[m_model->parameters[i].id] = value;
@@ -442,10 +439,9 @@ private:
     PANEL_LED_APPEARANCE* m_appearance;
     wxCheckBox *m_voltage, *m_current, *m_power;
     CLICK_CHOICE *m_positive, *m_negative;
-    wxCheckBox* m_remember;
+    wxButton* m_makeDefault;
     wxCheckBox* m_exclude;
     std::vector<wxWindow*> m_editingControls;
-    bool m_forget = false;
 };
 
 bool EditSimulationModel( wxWindow* parent, CIRCUIT_COMPONENT& component, bool& excluded, const SCH_SYMBOL& symbol )

@@ -7,7 +7,7 @@
 
 namespace CIRCUITALIVE
 {
-inline CONTROL_VISUAL ReadControlVisual( const nlohmann::json& json )
+inline CONTROL_VISUAL ReadControlVisual( const nlohmann::json& json, double minimum = .05 )
 {
     CONTROL_VISUAL v;
     v.visible = json.value( "visible", true );
@@ -19,7 +19,7 @@ inline CONTROL_VISUAL ReadControlVisual( const nlohmann::json& json )
     v.width = json.at( "width" ); v.height = json.at( "height" );
     if( !std::isfinite( v.x ) || !std::isfinite( v.y ) || !std::isfinite( v.width )
         || !std::isfinite( v.height ) || std::abs( v.x ) > 10 || std::abs( v.y ) > 10
-        || v.width < .05 || v.height < .05 || v.width > 10 || v.height > 10 )
+        || v.width < minimum || v.height < minimum || v.width > 10 || v.height > 10 )
         throw std::runtime_error( "Invalid interaction rectangle" );
     return v;
 }

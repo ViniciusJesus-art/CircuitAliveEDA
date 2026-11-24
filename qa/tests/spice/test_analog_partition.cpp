@@ -19,6 +19,49 @@ SIM_SESSION_CONFIG configuration()
 }
 }
 BOOST_AUTO_TEST_SUITE( AnalogPartitions )
+BOOST_AUTO_TEST_CASE(SelectedSnapshotsKeepFrameExtremaAndRejectExpiredHistory)
+{
+    auto cfg=configuration();cfg.historySignals=std::vector<std::size_t>{0};cfg.historyCapacity=16;
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(deck,cfg);session.AdvanceTo(.001);
+    const auto first=session.Snapshot(true,std::vector<std::size_t>{});
+    BOOST_CHECK(first.history.empty());BOOST_REQUIRE(first.historyToken>0);
+    BOOST_CHECK_GT(first.samplesOverwritten,0u);
+    BOOST_CHECK_LT(first.historyMinimum[0],first.latest.values[0]*.2);
+    BOOST_CHECK_SMALL(first.historyMaximum[0]-first.latest.values[0],1e-12);
+    const auto raw=session.FetchHistory(first.historyToken);BOOST_REQUIRE_GT(raw.size(),2u);
+    for(const auto& point:raw)
+    {BOOST_CHECK_GE(point.values[0],first.historyMinimum[0]);BOOST_CHECK_LE(point.values[0],first.historyMaximum[0]);}
+    session.AdvanceTo(.002);const auto second=session.Snapshot(true,std::vector<std::size_t>{0});
+    BOOST_CHECK(!second.history.empty());BOOST_CHECK_SMALL(second.historyMinimum[0]-first.latest.values[0],1e-12);
+    BOOST_CHECK_THROW(session.FetchHistory(first.historyToken),std::runtime_error);
+}
+BOOST_AUTO_TEST_CASE(WarningPeaksAvoidHistoryAndResolveAmbiguousSummedCurrentsExactly)
+{
+    const std::string circuit="Independent complementary loads\nVrail rail 0 DC 5\n"
+        "Vclock1 c1 0 PULSE(0 1 0 1n 1n .5m 1m)\nR1 rail a 100\nB1 a 0 I={v(c1)*.005}\n"
+        "Vclock2 c2 0 PULSE(1 0 0 1n 1n .5m 1m)\nR2 rail b 100\nB2 b 0 I={v(c2)*.005}\n.end\n";
+    auto cfg=configuration();cfg.signals={"i(Vrail)","v(a)","v(b)"};cfg.historySignals=std::vector<std::size_t>{0,1,2};
+    cfg.synchronizeAdvances=true;cfg.historyCapacity=4096;
+    ANALOG_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(circuit,cfg,true,2);
+    BOOST_REQUIRE_EQUAL(session.PartitionCount(),2u);
+    SIM_SNAPSHOT_OBSERVATIONS observations;observations.warningLimits={{0,.02}};
+    session.AdvanceTo(.00075);const auto safe=session.Snapshot(true,observations);
+    BOOST_CHECK(safe.history.empty());BOOST_CHECK_LT(safe.warningMaxima[0],.02);
+    BOOST_CHECK_SMALL(std::abs(safe.latest.values[0])-.005,1e-6);
+    observations.history={1};session.AdvanceTo(.0015);const auto scope=session.Snapshot(true,observations);
+    BOOST_REQUIRE_GT(scope.history.size(),2u);
+    for(const auto& point:scope.history)
+    {BOOST_CHECK(std::isnan(point.values[0]));BOOST_CHECK(std::isfinite(point.values[1]));}
+    // The separate 5 mA peaks sum to 10 mA, but the actual total is always 5 mA.
+    observations.warningLimits[0]=.0075;session.AdvanceTo(.00225);
+    const auto ambiguous=session.Snapshot(true,observations);BOOST_REQUIRE_GT(ambiguous.history.size(),2u);
+    BOOST_CHECK_EQUAL(ambiguous.warningMaxima[0],0);
+    for(const auto& point:ambiguous.history)BOOST_CHECK_LE(std::abs(point.values[0]),.00501);
+    ANALOG_SIM_SESSION single(CIRCUITALIVE_TEST_WORKER);single.Configure(circuit,cfg,false);
+    observations.history.clear();observations.warningLimits[0]=.004;
+    single.AdvanceTo(.00075);const auto overload=single.Snapshot(true,observations);
+    BOOST_CHECK(overload.history.empty());BOOST_CHECK_GT(overload.warningMaxima[0],.004);
+}
 BOOST_AUTO_TEST_CASE( SharedGroundAndIdealSupplyCanBeSeparated )
 {
     auto cfg = configuration(); auto plan = BuildAnalogPartitions( deck, cfg, 2 );

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "buzzer_passive",
+  "name": "Passive piezo buzzer",
+  "description": "Passive piezo buzzer",
+  "license": "GPL-3.0-or-later",
+  "category": "Simulation outputs",
+  "family": "Functional peripherals",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Positive",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Negative",
+      "role": "passive",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "amplitude",
+      "label": "Voltage for full audio scale",
+      "default": "5",
+      "min": 0.001,
+      "max": 1000,
+      "unit": "V"
+    },
+    {
+      "id": "volume",
+      "label": "Playback volume",
+      "default": "0.2",
+      "min": 0,
+      "max": 1,
+      "unit": ""
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Cpiezo_${id} ${pin:p} ${pin:n} 20n",
+      "Rleak_${id} ${pin:p} ${pin:n} 10Meg",
+      "Baudio_${id} audio_${id} 0 V={v(${pin:p},${pin:n})}"
+    ],
+    "definitions": []
+  },
+  "audio": {
+    "signal": "v(audio_${id})",
+    "full_scale": 5,
+    "volume": 0.2,
+    "full_scale_parameter": "amplitude",
+    "volume_parameter": "volume"
+  },
+  "matches": {
+    "library_ids": [
+      "Device:Buzzer",
+      "Device:Speaker_Crystal"
+    ]
+  }
+}

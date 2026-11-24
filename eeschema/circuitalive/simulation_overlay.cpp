@@ -3,6 +3,8 @@
 #include "probe_geometry.h"
 #include "control_geometry.h"
 #include "control_references.h"
+#include "output_geometry.h"
+#include <nlohmann/json.hpp>
 #include <base_units.h>
 #include <algorithm>
 #include <set>
@@ -75,11 +77,69 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
         SetIsStroke( true );
         SetStrokeColor( KIGFX::COLOR4D( appearance.red,appearance.green,appearance.blue,display.strokeOpacity ) );
         SetFillColor( KIGFX::COLOR4D( display.red,display.green,display.blue,display.fillOpacity ) );
-        if(appearance.diameterMm>0)Circle( VECTOR2D( location.position ), schIUScale.mmToIU(appearance.diameterMm/2) );
+        if(appearance.diameterMm>0)Circle( VECTOR2D( location.lightPosition ), schIUScale.mmToIU(appearance.diameterMm/2) );
         SetIsFill( false );
         SetStrokeColor( KIGFX::COLOR4D( appearance.red,appearance.green,appearance.blue,display.haloOpacity ) );
         if(appearance.haloDiameterMm>0&&display.haloOpacity>0)
-            Circle( VECTOR2D( location.position ), schIUScale.mmToIU(appearance.haloDiameterMm/2) );
+            Circle( VECTOR2D( location.lightPosition ), schIUScale.mmToIU(appearance.haloDiameterMm/2) );
+    }
+    for(std::size_t i=0;i<aCircuit.circuit.segments.size();++i)
+    {
+        const auto& segment=aCircuit.circuit.segments[i];const auto& location=aCircuit.locations.at(segment.component);
+        if(location.sheet==aCurrentSheet)DrawLuminousSegment(*this,location.body,segment.appearance,
+            i<aSession.segmentLevels.size()?aSession.segmentLevels[i]:0,location.axisX,location.axisY);
+    }
+    for(const auto& display:aCircuit.circuit.displays)
+    {
+        const auto& location=aCircuit.locations.at(display.component);
+        if(location.sheet!=aCurrentSheet||!display.appearance.visual.visible)continue;
+        const auto box=ControlBounds(location.body,display.appearance.visual);
+        auto found=aSession.sample.presentation.find(display.reference);if(found==aSession.sample.presentation.end())continue;
+        try
+        {
+            const auto state=nlohmann::json::parse(found->second);
+            const bool powered=state.value("powered",false),on=powered&&state.value("display",false);
+            const bool backlight=powered&&state.value("backlight",false);
+            SetIsFill(true);SetIsStroke(true);SetLineWidth(schIUScale.mmToIU(.12));
+            SetStrokeColor(KIGFX::COLOR4D(.08,.2,.10,1));SetFillColor(backlight?KIGFX::COLOR4D(.58,.84,.2,1):KIGFX::COLOR4D(.31,.42,.25,1));
+            SetDepthOffset(1);
+            Rectangle(VECTOR2D(box.GetOrigin()),VECTOR2D(box.GetEnd()));
+            SetDepthOffset(0);
+            SetIsFill(false);
+            if(!on)continue;
+            const auto cells=state.at("cells").get<std::vector<int>>();const auto cg=state.at("cgram").get<std::vector<int>>();
+            if(cells.size()!=32||cg.size()!=64)continue;
+            const double cw=box.GetWidth()/17.0,ch=box.GetHeight()/2.5;
+            const VECTOR2D origin=VECTOR2D(box.GetOrigin())+VECTOR2D(cw*.5,ch*.25);
+            SetStrokeColor(KIGFX::COLOR4D(.03,.1,.03,1));SetFillColor(KIGFX::COLOR4D(.03,.1,.03,1));
+            SetGlyphSize(VECTOR2I(cw*.65,ch*.65));SetLineWidth(schIUScale.mmToIU(.08));
+            for(int i=0;i<32;++i)
+            {
+                const VECTOR2D at=origin+VECTOR2D((i%16)*cw,(i/16)*ch);
+                const int code=cells[i];
+                if(code<16)
+                {
+                    SetIsFill(true);
+                    for(int row=0;row<8;++row)for(int col=0;col<5;++col)if(cg[(code&7)*8+row]&(16>>col))
+                        Rectangle(at+VECTOR2D(col*cw/6.0,row*ch/9.0),at+VECTOR2D((col+.75)*cw/6.0,(row+.75)*ch/9.0));
+                    SetIsFill(false);
+                }
+                else if(code!=32)
+                {
+                    wxString text;
+                    if(code>=32&&code<=126)text=wxString(static_cast<wxChar>(code));
+                    else if(code==0xdf)text=wxString::FromUTF8("°");else if(code==0xff)text=wxString::FromUTF8("█");else text="?";
+                    BitmapText(text,VECTOR2I(at+VECTOR2D(cw*.4,ch*.45)),ANGLE_0);
+                }
+                const int address=(i/16?64:0)+(i%16+state.value("shift",0))%40;
+                if(address==state.value("address",-1))
+                {
+                    if(state.value("cursor",false))Line(at+VECTOR2D(0,ch*.9),at+VECTOR2D(cw*.8,ch*.9));
+                    if(state.value("blink",false)){SetIsFill(true);Rectangle(at,at+VECTOR2D(cw*.8,ch*.9));SetIsFill(false);}
+                }
+            }
+        }
+        catch(const std::exception&){} // Invalid optional presentation cannot disrupt editor rendering.
     }
     std::set<std::size_t> adjusted;
     for( std::size_t i = 0; i < aCircuit.circuit.adjustments.size(); ++i )
@@ -144,6 +204,22 @@ void SIMULATION_OVERLAY::Render( const SCHEMATIC_SNAPSHOT& aCircuit,
         BitmapText( text, box.GetOrigin() - VECTOR2I( 0, schIUScale.mmToIU( 1.5 ) ),
                     ANGLE_0 );
     }
+}
+
+int SIMULATION_OVERLAY::DisplayAt( const SCHEMATIC_SNAPSHOT& circuit, const EDITOR_SESSION_VIEW& session,
+                                 const wxString& sheet, const VECTOR2I& position ) const
+{
+    // Displays drawn last are in front when their rectangles overlap.
+    for( std::size_t n = circuit.circuit.displays.size(); n > 0; --n )
+    {
+        const auto& display = circuit.circuit.displays[n - 1];
+        const auto& location = circuit.locations.at( display.component );
+        if( location.sheet == sheet && display.appearance.visual.visible
+            && session.sample.presentation.contains( display.reference )
+            && ControlBounds( location.body, display.appearance.visual ).Contains( position ) )
+            return static_cast<int>( n - 1 );
+    }
+    return -1;
 }
 
 int SIMULATION_OVERLAY::SwitchAt( const SCHEMATIC_SNAPSHOT& aCircuit,

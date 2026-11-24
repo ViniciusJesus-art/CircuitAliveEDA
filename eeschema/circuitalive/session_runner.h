@@ -2,6 +2,7 @@
 #pragma once
 
 #include "circuit_snapshot.h"
+#include "analog_partition.h"
 #include "scope_history.h"
 #include <chrono>
 #include <condition_variable>
@@ -13,6 +14,8 @@ namespace CIRCUITALIVE
 {
 /// Installed bin/, standalone source build, and source-build KiCad project manager layouts.
 std::string FindSessionWorker( const std::string& aApplicationExecutable );
+/// Transfer scope/current-warning history; all indicators retain their latest values and activity.
+SIM_SNAPSHOT_OBSERVATIONS ConfigureSessionHistory( CIRCUIT_SNAPSHOT& aCircuit );
 
 std::chrono::steady_clock::time_point NextPlaybackDeadline(
         std::chrono::steady_clock::time_point aPrevious,
@@ -45,6 +48,7 @@ struct EDITOR_SESSION_VIEW
     std::vector<bool> switches;
     std::vector<double> adjustments;
     std::vector<double> ledCurrents;
+    std::vector<double> segmentLevels;
     std::vector<double> measurements;
     // Scope history contains only these measured values, independently of the
     // worker's complete electrical vectors used for circuit/logic state.
@@ -84,6 +88,7 @@ public:
     /// Read only when paused/completed; never changes the playback state. Zero means queue full.
     std::uint64_t CaptureMemory( std::size_t aRegion );
     EDITOR_SESSION_VIEW View() const;
+    std::vector<std::int16_t> TakeAudio();
 
 private:
     enum class COMMAND_TYPE { START, RESUME, PAUSE, STOP, TOGGLE, ADJUST, SPEED, STEP, MEMORY, PREFERENCES };
@@ -104,6 +109,7 @@ private:
     std::condition_variable m_wake;
     std::deque<COMMAND> m_commands;
     EDITOR_SESSION_VIEW m_view;
+    std::deque<std::int16_t> m_audioQueue;
     std::uint64_t m_revision = 0;
     std::uint64_t m_memoryRequest = 0;
     bool m_quit = false;

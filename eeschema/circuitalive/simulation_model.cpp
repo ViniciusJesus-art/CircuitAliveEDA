@@ -3,6 +3,9 @@
 #include "circuit_snapshot.h"
 #include "behavioral_model.h"
 #include "control_visual_json.h"
+#include "segment_json.h"
+#include "symbol_variant.h"
+#include "model_profiles.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <cmath>
@@ -175,6 +178,15 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
         }
         const auto matches = j.value( "matches", JSON::object() );
         m.libraryIds = matches.value( "library_ids", std::vector<std::string>{} );
+        m.automaticAssociation = matches.value("automatic",true);
+        m.excludedLibraryIds = matches.value( "excluded_library_ids", std::vector<std::string>{} );
+        const auto variants=j.value("symbol_variants",JSON::object());
+        if(!variants.is_object()||variants.size()>512)throw std::runtime_error("Invalid symbol variants");
+        for(auto it=variants.begin();it!=variants.end();++it)
+        {
+            if(it.key().empty()||it.key().size()>512||!it.value().is_object())throw std::runtime_error("Invalid symbol variant");
+            m.symbolVariants[it.key()]=it.value().dump();
+        }
         m.symbolNames = matches.value( "symbol_names", std::vector<std::string>{} );
         m.deviceHints = matches.value( "device_hints", std::vector<std::string>{} );
         m.partNames = matches.value( "part_names", std::vector<std::string>{} );
@@ -245,22 +257,38 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
             if( r.at( "api_version" ) != 1 ) throw std::runtime_error( "Unsupported programmable runtime API" );
             descriptor.engine = r.at( "engine" );
             descriptor.device = r.at( "device" );
-            descriptor.modules = r.at( "modules" ).get<std::vector<std::string>>();
-            descriptor.clockParameter = r.at( "clock_parameter" );
-            descriptor.firmwareResource = r.at( "firmware_resource" );
-            descriptor.firmwareBytes = r.at( "firmware_bytes" );
+            descriptor.modules = r.value( "modules", std::vector<std::string>{} );
+            descriptor.clockParameter = r.value( "clock_parameter", "" );
+            descriptor.firmwareResource = r.value( "firmware_resource", "" );
+            descriptor.firmwareBytes = r.value( "firmware_bytes", std::size_t(0) );
             descriptor.eepromResource = r.value( "eeprom_resource", "" );
             descriptor.eepromBytes = r.value( "eeprom_bytes", std::size_t( 0 ) );
             descriptor.optionsJson = r.value( "options", JSON::object() ).dump();
+            descriptor.optionParameters = r.value( "option_parameters", std::map<std::string, std::string>{} );
+            if( descriptor.optionParameters.size() > 64 )
+                throw std::runtime_error( "Too many programmable option parameters" );
+            for( const auto& [option, parameter] : descriptor.optionParameters )
+                if( !Identifier( option ) || !parameters.contains( parameter ) )
+                    throw std::runtime_error( "Invalid programmable option parameter: " + option );
             descriptor.vcc = r.at( "vcc" );
             descriptor.ground = r.at( "gnd" );
             descriptor.minimumSupply = r.value( "min_supply", 1.8 );
             descriptor.maximumSupply = r.value( "max_supply", 5.5 );
-            if( descriptor.engine != "javascript" || !Identifier( descriptor.device )
-                || descriptor.modules.empty() || descriptor.modules.size() > 8
-                || !parameters.contains( descriptor.clockParameter )
-                || !resourceIds.contains( descriptor.firmwareResource )
-                || !descriptor.firmwareBytes || descriptor.firmwareBytes > MAX_MEMORY_BYTES
+            descriptor.minimumSupplyParameter = r.value( "min_supply_parameter", "" );
+            descriptor.maximumSupplyParameter = r.value( "max_supply_parameter", "" );
+            descriptor.supplyCurrentParameter = r.value( "supply_current_parameter", "" );
+            for( const auto& parameter : { descriptor.minimumSupplyParameter, descriptor.maximumSupplyParameter,
+                                          descriptor.supplyCurrentParameter } )
+                if( !parameter.empty() && !parameters.contains( parameter ) )
+                    throw std::runtime_error( "Unknown programmable supply parameter: " + parameter );
+            const bool native = descriptor.engine == "native";
+            if( ( descriptor.engine != "javascript" && !native ) || !Identifier( descriptor.device )
+                || ( native && ( (descriptor.device != "ir_demodulator"&&descriptor.device!="hd44780") || !descriptor.modules.empty()
+                                  || !descriptor.firmwareResource.empty() ) )
+                || ( !native && descriptor.modules.empty() ) || descriptor.modules.size() > 8
+                || ( !descriptor.clockParameter.empty() && !parameters.contains( descriptor.clockParameter ) )
+                || ( !descriptor.firmwareResource.empty() && ( !resourceIds.contains( descriptor.firmwareResource ) || !descriptor.firmwareBytes ) )
+                || ( descriptor.firmwareResource.empty() && descriptor.firmwareBytes ) || descriptor.firmwareBytes > MAX_MEMORY_BYTES
                 || descriptor.eepromBytes > MAX_MEMORY_BYTES
                 || ( descriptor.eepromBytes && !resourceIds.contains( descriptor.eepromResource ) )
                 || !ports.contains( descriptor.vcc ) || !ports.contains( descriptor.ground )
@@ -271,7 +299,7 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
                 throw std::runtime_error( "Invalid programmable runtime descriptor" );
             const auto firmware = std::find_if( m.resources.begin(), m.resources.end(),
                 [&]( const auto& resource ) { return resource.id == descriptor.firmwareResource; } );
-            if( !firmware->required ) throw std::runtime_error( "Programmable firmware resource must be required" );
+            if( firmware != m.resources.end() && !firmware->required ) throw std::runtime_error( "Programmable firmware resource must be required" );
             for( const auto& module : descriptor.modules )
                 if( module.empty() || module.size() > 4096 || module.find_first_of( "\r\n" ) != std::string::npos )
                     throw std::runtime_error( "Invalid programmable runtime module path" );
@@ -279,6 +307,12 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
             for( const auto& p : r.at( "pins" ) )
             {
                 MODEL_RUNTIME_PIN pin{ p.at( "id" ), p.at( "port" ), p.value( "drive", false ) };
+                pin.driveParameter = p.value( "drive_when_parameter", "" );
+                pin.driveMask = p.value( "drive_mask", 0u );
+                pin.driveValue = p.value( "drive_value", 0u );
+                if( !pin.driveParameter.empty() && ( !pin.drive || !parameters.contains( pin.driveParameter )
+                    || !pin.driveMask || ( pin.driveValue & ~pin.driveMask ) ) )
+                    throw std::runtime_error( "Invalid programmable pin drive condition" );
                 if( !Identifier( pin.id ) || !ports.contains( pin.port )
                     || !signalIds.insert( pin.id ).second || !mappedPorts.insert( pin.port ).second )
                     throw std::runtime_error( "Invalid programmable runtime pin mapping" );
@@ -316,6 +350,44 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
                     throw std::runtime_error( "Invalid or repeated electrical-group port" );
         }
         if( grouped != ports ) throw std::runtime_error( "Electrical groups must cover all model ports" );
+        std::set<std::string> segmentIds;
+        for( const auto& item : j.value( "segments", JSON::array() ) )
+        {
+            MODEL_SEGMENT segment = ReadLuminousSegment( item );
+            if(!segment.fullScaleParameter.empty()&&!parameters.contains(segment.fullScaleParameter))throw std::runtime_error("Unknown segment scale parameter");
+            if( !Identifier( segment.id ) || !segmentIds.insert( segment.id ).second || segmentIds.size() > 256
+                || segment.signal.empty() || segment.signal.size() > 4096
+                || !std::isfinite(segment.fullScale) || segment.fullScale <= 0 )
+                throw std::runtime_error( "Invalid luminous segment" );
+            for( double color : {segment.red,segment.green,segment.blue} )
+                if(!std::isfinite(color)||color<0||color>1)throw std::runtime_error("Invalid segment color");
+            m.segments.push_back( std::move(segment) );
+        }
+        if( j.contains("display") )
+        {
+            const auto& item=j.at("display"); m.display.type=item.at("type");
+            m.display.visual=ReadControlVisual(item.value("visual",JSON::object()));
+            if(m.display.type!="hd44780" || !m.runtime)throw std::runtime_error("Invalid display descriptor");
+        }
+        if( j.contains("audio") )
+        {
+            const auto& item=j.at("audio");m.audio.signal=item.at("signal");
+            m.audio.fullScale=item.value("full_scale",5.0);m.audio.volume=item.value("volume",.2);
+            m.audio.fullScaleParameter=item.value("full_scale_parameter","");m.audio.volumeParameter=item.value("volume_parameter","");
+            for(const auto& p:{m.audio.fullScaleParameter,m.audio.volumeParameter})if(!p.empty()&&!parameters.contains(p))throw std::runtime_error("Unknown audio parameter");
+            if(m.audio.signal.empty()||m.audio.signal.size()>4096||!std::isfinite(m.audio.fullScale)||m.audio.fullScale<=0
+                ||!std::isfinite(m.audio.volume)||m.audio.volume<0||m.audio.volume>1)throw std::runtime_error("Invalid audio descriptor");
+        }
+        if( j.contains("link") )
+        {
+            const auto& item=j.at("link");m.link.medium=item.at("medium");m.link.role=item.at("role");
+            m.link.signal=item.value("signal","");m.link.input=item.value("input","");
+            if(!Identifier(m.link.medium)||(m.link.role!="transmit"&&m.link.role!="receive"&&m.link.role!="transceiver")
+                ||(m.link.Transmits()&&m.link.signal.empty())||(m.link.Receives()&&(!m.runtime||!Identifier(m.link.input)))
+                ||m.link.signal.size()>4096)throw std::runtime_error("Invalid component link endpoint");
+            if(m.runtime && std::any_of(m.runtime->pins.begin(),m.runtime->pins.end(),[&](const auto& p){return p.id==m.link.input;}))
+                throw std::runtime_error("Link input collides with an electrical pin");
+        }
         if( j.contains( "indicator" ) )
         {
             const auto& i = j.at( "indicator" );
@@ -387,6 +459,7 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
                 || !std::isfinite( control.on ) || !std::isfinite( control.off ) || control.on == control.off
                 || control.source == m.controlSource )
                 throw std::runtime_error( "Invalid interactive button" );
+            control.initiallyOpenSymbols=c.value("initially_open_symbols",std::vector<std::string>{});
             m.controls.push_back( std::move( control ) );
         }
         if( j.value("live_updates",JSON::array()).size()>1024 ) throw std::runtime_error("Too many live parameter updates");
@@ -512,6 +585,7 @@ SIMULATION_MODEL MODEL_REPOSITORY::LoadText( const std::string& text, const fs::
                 if( !m.driverEnable.contains( port ) || expression.empty() )
                     throw std::runtime_error( "Invalid logic driver value: " + port );
         }
+        for(const auto& [symbol,variant]:m.symbolVariants)m.ForSymbol(symbol);
         return m;
     }
     catch( const std::exception& e )
@@ -546,6 +620,8 @@ const std::vector<SIMULATION_MODEL>& MODEL_REPOSITORY::List() const
 SIMULATION_MODEL MODEL_REPOSITORY::SelectModel( const CIRCUIT_COMPONENT& c ) const
 {
     SIMULATION_MODEL selected;
+    if(c.modelFile.empty())
+        if(const auto file=MODEL_PROFILES().BoundModel(c.libraryId))return Load(*file).ForSymbol(c.libraryId);
     if( !c.modelFile.empty() && !c.modelFile.starts_with( "builtin:" ) )
     {
         auto path = fs::u8path( c.modelFile );
@@ -560,6 +636,9 @@ SIMULATION_MODEL MODEL_REPOSITORY::SelectModel( const CIRCUIT_COMPONENT& c ) con
         const auto shortName = c.libraryId.substr( c.libraryId.find_last_of( ':' ) + 1 );
         for( const auto& model : models )
         {
+            if(c.modelFile.empty()&&!model.automaticAssociation)continue;
+            if(std::find(model.excludedLibraryIds.begin(),model.excludedLibraryIds.end(),c.libraryId)!=model.excludedLibraryIds.end()
+               && c.modelFile.empty())continue;
             auto has = []( const auto& list, const auto& value )
                 { return std::find( list.begin(), list.end(), value ) != list.end(); };
             int score = 0;
@@ -591,7 +670,37 @@ SIMULATION_MODEL MODEL_REPOSITORY::SelectModel( const CIRCUIT_COMPONENT& c ) con
         if( !best ) throw std::runtime_error( "No simulation model associated with " + c.libraryId
                 + ". Select the symbol and use Simulation model..." );
     }
-    return selected;
+    return selected.ForSymbol(c.libraryId);
+}
+
+SIMULATION_MODEL SIMULATION_MODEL::ForSymbol(const std::string& libraryId) const
+{
+    auto result=*this;const auto found=symbolVariants.find(libraryId);
+    if(found==symbolVariants.end())return result;
+    const auto variant=JSON::parse(found->second);
+    ApplySymbolParameterDefaults(result.parameters,variant);
+    const auto mapping=variant.value("pin_map",std::map<std::string,std::string>{});
+    std::set<std::string> physical;
+    for(auto& pin:result.pins)
+    {
+        if(mapping.contains(pin.id))pin.defaultPin=mapping.at(pin.id);
+        if(pin.defaultPin.empty()||!physical.insert(pin.defaultPin).second)
+            throw std::runtime_error("Symbol variant must map each port to a distinct physical pin: "+libraryId);
+    }
+    for(const auto& [id,pin]:mapping)
+        if(std::none_of(pins.begin(),pins.end(),[&](const auto& p){return p.id==id;}))
+            throw std::runtime_error("Unknown symbol variant port: "+id);
+    const auto controls=variant.value("controls",JSON::object());
+    if(controls.contains("switch"))result.controlVisual=ReadControlVisual(controls.at("switch"));
+    for(auto& control:result.controls)
+        if(controls.contains("control:"+control.id))control.visual=ReadControlVisual(controls.at("control:"+control.id));
+    for(auto& control:result.adjustments)
+        if(controls.contains("adjust:"+control.id))control.visual=ReadControlVisual(controls.at("adjust:"+control.id));
+    const auto segments=variant.value("segments",JSON::object());
+    for(auto& segment:result.segments)
+        if(segments.contains(segment.id))ApplySegmentPresentation(segment,segments.at(segment.id));
+    if(variant.contains("display_visual"))result.display.visual=ReadControlVisual(variant.at("display_visual"));
+    return result;
 }
 
 RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
@@ -602,6 +711,22 @@ RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
     const auto symbol = c.libraryId.substr( c.libraryId.find( ':' ) + 1 );
     for( const auto& identity : r.model.controlInitiallyOpenSymbols )
         if( identity == c.libraryId || identity == symbol ) r.controlInitiallyClosed = false;
+    for(auto& control:r.model.controls)
+        for(const auto& identity:control.initiallyOpenSymbols)
+            if(identity==c.libraryId||identity==symbol)
+            {
+                control.initiallyClosed=false;
+                for(auto& line:r.model.instance)
+                {
+                    std::istringstream fields(line);std::string source,p,n;fields>>source>>p>>n;
+                    if(source==control.source&&!p.empty()&&!n.empty())
+                    {
+                        std::ostringstream number;number.imbue(std::locale::classic());number<<std::setprecision(17)<<control.off;
+                        line=source+" "+p+" "+n+" DC "+number.str();
+                    }
+                }
+                break;
+            }
     for( std::size_t i = 0; i < r.model.memories.size(); ++i )
         r.memorySlots[r.model.memories[i].id] = i;
     for( const auto& [id, selection] : c.resources )
@@ -629,7 +754,7 @@ RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
         if( error || size > spec.maxBytes )
             throw std::runtime_error( "Missing or oversized resource: " + path.string() );
     }
-    const bool explicitFile = !c.modelFile.empty();
+    const bool explicitFile = !c.modelFile.empty()||MODEL_PROFILES().BoundModel(c.libraryId).has_value();
     if( !explicitFile && c.explicitSpiceModel && !r.model.ignoreLegacyFields )
     {
         if( c.legacySpiceFields.empty() ) throw std::runtime_error( "Custom SPICE fields require an explicit model file" );
@@ -697,7 +822,13 @@ RESOLVED_MODEL MODEL_REPOSITORY::Resolve( const CIRCUIT_COMPONENT& c ) const
         r.parameters[p.id] = value;
     }
     for( const auto& [id, value] : c.modelParameters )
+    {
+        // Existing IR instances may retain the old interpreter polling period.
+        // Native receivers observe electrical events and have no sampling clock.
+        if( id == "sample_period" && r.model.runtime && r.model.runtime->engine == "native"
+            && r.model.runtime->device == "ir_demodulator" ) continue;
         if( !r.parameters.contains( id ) ) throw std::runtime_error( "Unknown model parameter: " + id );
+    }
     if( !r.model.brightnessParameter.empty() && r.parameters.at( r.model.brightnessParameter ) <= 0 )
         throw std::runtime_error( "Brightness current must be positive" );
     if( !r.model.logicThresholdReference.empty() && r.parameters.at( r.model.logicThresholdReference ) <= 0 )
@@ -788,11 +919,23 @@ PROGRAMMABLE_DEVICE_CONFIG InitialModelRuntime( const CIRCUIT_COMPONENT& compone
     config.id = component.reference;
     config.engine = descriptor.engine;
     config.device = descriptor.device;
-    config.clockHz = model.parameters.at( descriptor.clockParameter );
+    config.clockHz = descriptor.clockParameter.empty() ? 1000000 : model.parameters.at( descriptor.clockParameter );
     if( config.clockHz <= 0 ) throw std::runtime_error( "Runtime clock must be positive" );
     auto options = JSON::parse( descriptor.optionsJson );
-    options["supplyMin"] = descriptor.minimumSupply;
-    options["supplyMax"] = descriptor.maximumSupply;
+    for( const auto& [option, parameter] : descriptor.optionParameters )
+        options[option] = model.parameters.at( parameter );
+    const double minimumSupply = descriptor.minimumSupplyParameter.empty() ? descriptor.minimumSupply
+            : model.parameters.at( descriptor.minimumSupplyParameter );
+    const double maximumSupply = descriptor.maximumSupplyParameter.empty() ? descriptor.maximumSupply
+            : model.parameters.at( descriptor.maximumSupplyParameter );
+    if( !std::isfinite( minimumSupply ) || !std::isfinite( maximumSupply )
+        || minimumSupply <= 0 || maximumSupply < minimumSupply )
+        throw std::runtime_error( "Invalid programmable supply voltage range" );
+    if( !descriptor.supplyCurrentParameter.empty()
+        && model.parameters.at( descriptor.supplyCurrentParameter ) < 0 )
+        throw std::runtime_error( "Programmable supply current must not be negative" );
+    options["supplyMin"] = minimumSupply;
+    options["supplyMax"] = maximumSupply;
     options["hasEepromImage"] = component.resources.contains( descriptor.eepromResource )
         && !component.resources.at( descriptor.eepromResource ).path.empty();
     if( model.parameters.contains( "sample_period" ) )
@@ -837,7 +980,7 @@ PROGRAMMABLE_DEVICE_CONFIG InitialModelRuntime( const CIRCUIT_COMPONENT& compone
         if( required && !loaded ) throw std::runtime_error( "Firmware image contains no data" );
         return contents.data;
     };
-    config.firmware = image( descriptor.firmwareResource, descriptor.firmwareBytes, true );
+    if( descriptor.firmwareBytes ) config.firmware = image( descriptor.firmwareResource, descriptor.firmwareBytes, true );
     if( descriptor.eepromBytes ) config.eeprom = image( descriptor.eepromResource, descriptor.eepromBytes, false );
     return config;
 }

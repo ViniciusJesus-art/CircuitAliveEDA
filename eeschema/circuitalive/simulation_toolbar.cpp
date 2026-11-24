@@ -37,6 +37,16 @@ TOOL_ACTION SIMULATION_ACTIONS::logicLevels( TOOL_ACTION_ARGS().Name( "circuital
         .Scope( AS_GLOBAL ).FriendlyName( wxTRANSLATE( "Pin logic levels" ) )
         .Tooltip( wxTRANSLATE( "Show pin levels: 1 red, 0 blue, Z gray, X yellow, ~ purple for fast switching; configure cutoffs in Real-time Simulation preferences" ) ).Icon( BITMAPS::sim_run ) );
 
+TOOL_ACTION SIMULATION_ACTIONS::linkComponents( TOOL_ACTION_ARGS().Name("circuitalive.Interactive.linkComponents")
+        .Scope(AS_GLOBAL).Flags(AF_ACTIVATE).FriendlyName(wxTRANSLATE("Link simulation components…"))
+        .Tooltip(wxTRANSLATE("Select two compatible components, or click an emitter and receiver. Esc finishes." )).Icon(BITMAPS::sim_run) );
+TOOL_ACTION SIMULATION_ACTIONS::unlinkComponents( TOOL_ACTION_ARGS().Name("circuitalive.Interactive.unlinkComponents")
+        .Scope(AS_GLOBAL).Flags(AF_ACTIVATE).FriendlyName(wxTRANSLATE("Unlink simulation components…"))
+        .Tooltip(wxTRANSLATE("Remove the link between two selected components, or all links of one component" )).Icon(BITMAPS::sim_stop) );
+TOOL_ACTION SIMULATION_ACTIONS::audio( TOOL_ACTION_ARGS().Name("circuitalive.Interactive.audio")
+        .Scope(AS_GLOBAL).FriendlyName(wxTRANSLATE("Simulation audio"))
+        .Tooltip(wxTRANSLATE("Enable or mute speaker and buzzer playback" )).Icon(BITMAPS::sim_run) );
+
 void EnsureSimulationToolbar( SCH_EDIT_FRAME& aFrame )
 {
     auto* manager = wxAuiManager::GetManager( &aFrame );
@@ -49,11 +59,11 @@ void EnsureSimulationToolbar( SCH_EDIT_FRAME& aFrame )
         && !toolbar->FindTool( SIMULATION_ACTIONS::stop.GetUIId() ) )
         toolbar->AddScaledSeparator( &aFrame );
     for( const auto* action : { &SIMULATION_ACTIONS::play, &SIMULATION_ACTIONS::pause,
-                               &SIMULATION_ACTIONS::stop, &SIMULATION_ACTIONS::logicLevels } )
+                               &SIMULATION_ACTIONS::stop, &SIMULATION_ACTIONS::logicLevels, &SIMULATION_ACTIONS::audio } )
     {
         if( !toolbar->FindTool( action->GetUIId() ) )
         {
-            toolbar->Add( *action, action == &SIMULATION_ACTIONS::logicLevels );
+            toolbar->Add( *action, action == &SIMULATION_ACTIONS::logicLevels || action == &SIMULATION_ACTIONS::audio );
             added = true;
         }
     }
@@ -70,7 +80,7 @@ void EnsureSimulationToolbar( SCH_EDIT_FRAME& aFrame )
     auto* item = toolbar->FindTool( SIMULATION_ACTIONS::pause.GetUIId() );
     if( item && !item->GetBitmapBundle().IsSameAs( icon->second ) )
         toolbar->SetToolBitmap( SIMULATION_ACTIONS::pause, icon->second );
-    static std::map<int, wxBitmapBundle> logicIcons, probeIcons;
+    static std::map<int, wxBitmapBundle> logicIcons, probeIcons, linkIcons, unlinkIcons, audioIcons;
     auto setIcon = [&]( ACTION_TOOLBAR* bar, const TOOL_ACTION& action,
                         std::map<int, wxBitmapBundle>& icons, const char* svg )
     {
@@ -82,6 +92,9 @@ void EnsureSimulationToolbar( SCH_EDIT_FRAME& aFrame )
     setIcon( toolbar, SIMULATION_ACTIONS::logicLevels, logicIcons,
         "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><circle cx='6' cy='6' r='4' fill='#eb4034'/>"
         "<circle cx='18' cy='6' r='4' fill='#3286ed'/><path d='M2 20h5v-7h10v7h5' fill='none' stroke='#92999e' stroke-width='2'/></svg>" );
+    setIcon(toolbar,SIMULATION_ACTIONS::audio,audioIcons,
+        "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M3 9h5l6-5v16l-6-5H3z' fill='#318fd8'/>"
+        "<path d='M17 7q7 5 0 10M17 10q3 2 0 4' fill='none' stroke='#318fd8' stroke-width='2'/></svg>");
     auto* right = dynamic_cast<ACTION_TOOLBAR*>( manager->GetPane( "RightToolbar" ).window );
     if( right )
     {
@@ -90,6 +103,14 @@ void EnsureSimulationToolbar( SCH_EDIT_FRAME& aFrame )
             right->AddScaledSeparator( &aFrame ); right->Add( SIMULATION_ACTIONS::probes, true );
             right->KiRealize(); added = true;
         }
+        for(const auto* action:{&SIMULATION_ACTIONS::linkComponents,&SIMULATION_ACTIONS::unlinkComponents})
+            if(!right->FindTool(action->GetUIId())){right->Add(*action);right->KiRealize();added=true;}
+        setIcon(right,SIMULATION_ACTIONS::linkComponents,linkIcons,
+            "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M7 14l10-5' stroke='#21b85c' stroke-width='3'/>"
+            "<circle cx='5' cy='16' r='4' fill='none' stroke='#318fd8' stroke-width='2'/><circle cx='19' cy='7' r='4' fill='none' stroke='#21b85c' stroke-width='2'/></svg>");
+        setIcon(right,SIMULATION_ACTIONS::unlinkComponents,unlinkIcons,
+            "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><circle cx='5' cy='16' r='4' fill='none' stroke='#21b85c' stroke-width='2'/>"
+            "<circle cx='19' cy='7' r='4' fill='none' stroke='#21b85c' stroke-width='2'/><path d='M9 7l7 10M16 7L9 17' stroke='#e65339' stroke-width='2'/></svg>");
         setIcon( right, SIMULATION_ACTIONS::probes, probeIcons,
             "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><path d='M3 21L20 4M9 4h11v11' "
             "fill='none' stroke='#318fd8' stroke-width='2'/></svg>" );

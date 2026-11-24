@@ -3,6 +3,7 @@
 #include <circuitalive/scope_acquisition.h>
 #include <circuitalive/scope_waveform.h>
 #include <cmath>
+#include <clocale>
 #include <functional>
 
 using namespace CIRCUITALIVE;
@@ -180,6 +181,28 @@ BOOST_AUTO_TEST_CASE( SiControlsAcceptUnitsAndRejectInvalidNumbers )
     for( double n : { 1e-9, 2e-6, 5e-3, 1., 20., 500., 1e6 } )
     { const auto parsed = ScopeParse( ScopeFormat( n, "s" ), "s" ); BOOST_REQUIRE( parsed ); BOOST_CHECK_CLOSE( *parsed, n, 1e-8 ); }
     BOOST_CHECK_CLOSE( ScopeNiceScale( .0031 ), .005, 1e-8 ); BOOST_CHECK_EQUAL( ScopeNiceScale( 2 ), 2 );
+}
+BOOST_AUTO_TEST_CASE( SiEntriesKeepDecimalsInLocalizedUi )
+{
+    struct RESTORE_NUMERIC_LOCALE
+    {
+        std::string previous = std::setlocale( LC_NUMERIC, nullptr );
+        ~RESTORE_NUMERIC_LOCALE() { std::setlocale( LC_NUMERIC, previous.c_str() ); }
+    } restore;
+    unsigned checked = 0;
+    for( const char* name : { "pt_BR.UTF-8", "de_DE.UTF-8", "French_France.1252" } )
+    {
+        if( !std::setlocale( LC_NUMERIC, name ) || std::localeconv()->decimal_point[0] != ',' ) continue;
+        ++checked;
+        BOOST_TEST_CONTEXT( name )
+        {
+            for( const char* text : { "1.65 V", "1,65 V" } )
+            { const auto value = ScopeParse( text, "V" ); BOOST_REQUIRE( value ); BOOST_CHECK_CLOSE( *value, 1.65, 1e-8 ); }
+            for( const char* text : { "0.5 ms", "0,5 ms" } )
+            { const auto value = ScopeParse( text, "s" ); BOOST_REQUIRE( value ); BOOST_CHECK_CLOSE( *value, .0005, 1e-8 ); }
+        }
+    }
+    if( !checked ) BOOST_TEST_MESSAGE( "No comma-decimal C locale installed; localized UI check skipped" );
 }
 BOOST_AUTO_TEST_CASE( AcquisitionRejectsInvalidConfiguration )
 {

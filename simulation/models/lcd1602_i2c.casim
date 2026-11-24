@@ -1,0 +1,122 @@
+{
+  "schema_version": 2,
+  "backend": "ngspice+runtime",
+  "id": "lcd1602_i2c",
+  "name": "LCD 16\u00d72 \u2014 I2C PCF8574 backpack",
+  "description": "LCD 16\u00d72 \u2014 I2C PCF8574 backpack",
+  "license": "GPL-3.0-or-later",
+  "category": "Simulation outputs",
+  "family": "Functional peripherals",
+  "pins": [
+    {
+      "id": "gnd",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "1"
+    },
+    {
+      "id": "vcc",
+      "label": "VCC",
+      "role": "power",
+      "default_pin": "2"
+    },
+    {
+      "id": "sda",
+      "label": "SDA",
+      "role": "bidirectional",
+      "default_pin": "3"
+    },
+    {
+      "id": "scl",
+      "label": "SCL",
+      "role": "bidirectional",
+      "default_pin": "4"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "sample_period",
+      "label": "Electrical sampling period",
+      "default": "1u",
+      "min": 1e-08,
+      "max": 0.0001,
+      "unit": "s"
+    },
+    {
+      "id": "address",
+      "label": "7-bit I2C address (decimal)",
+      "default": "39",
+      "min": 0,
+      "max": 127,
+      "unit": ""
+    },
+    {
+      "id": "supply_current",
+      "label": "Logic supply current",
+      "default": "1m",
+      "min": 0,
+      "max": 0.2,
+      "unit": "A"
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Ridle_${id} ${pin:vcc} ${pin:gnd} 1e12"
+    ],
+    "definitions": []
+  },
+  "runtime": {
+    "api_version": 1,
+    "engine": "javascript",
+    "device": "hd44780_pcf8574",
+    "modules": [
+      "../runtime/mcu-serial.js",
+      "../runtime/simulation-devices.js"
+    ],
+    "vcc": "vcc",
+    "gnd": "gnd",
+    "min_supply": 2.7,
+    "max_supply": 5.5,
+    "supply_current_parameter": "supply_current",
+    "option_parameters": {
+      "address": "address"
+    },
+    "pins": [
+      {
+        "id": "GND",
+        "port": "gnd",
+        "drive": false
+      },
+      {
+        "id": "VCC",
+        "port": "vcc",
+        "drive": false
+      },
+      {
+        "id": "SDA",
+        "port": "sda",
+        "drive": true
+      },
+      {
+        "id": "SCL",
+        "port": "scl",
+        "drive": true
+      }
+    ]
+  },
+  "display": {
+    "type": "hd44780",
+    "visual": {
+      "target": "rectangle",
+      "x": 0.05,
+      "y": 0.15,
+      "width": 0.9,
+      "height": 0.7
+    }
+  },
+  "matches": {
+    "library_ids": [
+      "CircuitAlive_Simulation:LCD1602_I2C"
+    ]
+  }
+}

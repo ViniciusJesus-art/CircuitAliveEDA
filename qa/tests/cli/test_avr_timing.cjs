@@ -9,15 +9,15 @@ const source = fs.readFileSync(path.join(root, 'simulation/runtime/avr8js.js'), 
 // Retain the original adapter's per-instruction time comparison and peripheral
 // calls as an independent reference for the optimized execution loop.
 let referenceSource = source;
-for (const [optimized, original] of [
+for (const [optimized, original, occurrences = 1] of [
     ['while(cpu.cycles<limit-rounding || at()<time)', 'while(at()<time)'],
     ['if(cpu.nextInterrupt>=0 || (cpu.nextClockEvent && cpu.nextClockEvent.cycles<=cpu.cycles))cpu.tick();',
-     'cpu.tick();'],
-    ['if(txQueue.length || rx || (cpu.data[0x55]&0x10)!==previousPud)peripherals();',
+     'cpu.tick();', 2],
+    ['if((cpu.data[0x55]&0x10)!==previousPud)peripherals();',
      'peripherals();'],
 ]) {
-    assert.equal(referenceSource.split(optimized).length, 2, 'Revalidate the adapter comparison');
-    referenceSource = referenceSource.replace(optimized, original);
+    assert.equal(referenceSource.split(optimized).length, occurrences + 1, 'Revalidate the adapter comparison');
+    referenceSource = referenceSource.replaceAll(optimized, original);
 }
 
 const supply = [{pin: 'VCC', voltage: 5}, {pin: 'GND', voltage: 0}, {pin: 'RESET', voltage: 5}];

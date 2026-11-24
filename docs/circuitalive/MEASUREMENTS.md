@@ -54,7 +54,7 @@ Na mesma aba **Probes**, a seção **Digital debug and signal sources (GND)** of
 | --- | --- |
 | **Digital 0 / 1** | Fonte lógica ativa. Configure tensões de 0 e 1 (padrão 0 V e 5 V) e o estado inicial. Durante a simulação, clique no corpo para alternar: azul = 0, vermelho = 1, com o número no próprio símbolo. |
 | **PWM** | Ajuste frequência, duty cycle de 0 a 100%, níveis baixo/alto, atraso e tempos de subida/descida. Clique no corpo durante a simulação para ajustar o duty cycle sem reiniciar o circuito. |
-| **Square wave** | Mesmo gerador de pulsos, inicialmente com 50% de duty cycle; os mesmos ajustes estão disponíveis. |
+| **Square wave / CLK** | Clock com duty cycle fixo em 50%. Permite configurar frequência, níveis, atraso e tempos de subida/descida; não possui slider de duty cycle. Probes CLK antigas são normalizadas para 50% ao carregar. |
 | **Sine wave** | Configure frequência, amplitude de pico, offset DC, fase em graus e atraso. Por exemplo, amplitude 2,5 V e offset 2,5 V produzem uma senoide de 0 a 5 V sem carga. |
 
 Escolha a ferramenta, preencha a janela e confirme. Clique diretamente em um fio

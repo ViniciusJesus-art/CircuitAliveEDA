@@ -5,6 +5,7 @@
 #include "session_runner.h"
 #include "visual_signals.h"
 #include "simulation_overlay.h"
+#include "simulation_audio.h"
 #include "simulation_toolbar.h"
 #include "model_dialog.h"
 #include "memory_viewer.h"
@@ -16,11 +17,16 @@
 #include <tools/ee_grid_helper.h>
 #include <tools/sch_tool_utils.h>
 #include <sch_pin.h>
+#include <sch_field.h>
+#include <nlohmann/json.hpp>
 #include <view/view_controls.h>
 #include <gal/graphics_abstraction_layer.h>
 #include <tool/tool_manager.h>
 #include "live_control_popup.h"
 #include "control_references.h"
+#include "display_geometry.h"
+#include "display_presentation.h"
+#include <scoped_set_reset.h>
 #include <tool/actions.h>
 #include <wx/textdlg.h>
 #include <algorithm>
@@ -48,6 +54,7 @@
 #include <wx/stdpaths.h>
 #include <wx/timer.h>
 #include <wx/weakref.h>
+#include <wx/eventfilter.h>
 
 namespace CIRCUITALIVE
 {
@@ -58,7 +65,7 @@ TOOL_ACTION placeProbes( TOOL_ACTION_ARGS().Name( "circuitalive.Interactive.plac
 }
 
 class EDITOR_SIMULATION_TOOL : public wxEvtHandler, public SCH_TOOL_BASE<SCH_EDIT_FRAME>,
-                               public SCHEMATIC_LISTENER
+                               public SCHEMATIC_LISTENER, public wxEventFilter
 {
 public:
     EDITOR_SIMULATION_TOOL() : SCH_TOOL_BASE<SCH_EDIT_FRAME>( "circuitalive.Interactive" ),
@@ -84,12 +91,19 @@ public:
             Invalidate();
         SCH_TOOL_BASE<SCH_EDIT_FRAME>::Reset( aReason );
     }
-    void OnSchSheetChanged( SCHEMATIC& ) override { dismissControl(); redraw(); }
+    void OnSchSheetChanged( SCHEMATIC& ) override { finishDisplayDrag( false ); dismissControl(); redraw(); }
     void OnSchCurrentVariantChanged( SCHEMATIC& ) override { Invalidate(); }
 
 private:
     void setTransitions() override
     {
+        Go(&EDITOR_SIMULATION_TOOL::LinkComponents,SIMULATION_ACTIONS::linkComponents.MakeEvent());
+        Go(&EDITOR_SIMULATION_TOOL::LinkComponents,SIMULATION_ACTIONS::unlinkComponents.MakeEvent());
+        Go(&EDITOR_SIMULATION_TOOL::Audio,SIMULATION_ACTIONS::audio.MakeEvent());
+        Go(&EDITOR_SIMULATION_TOOL::LinkSelectionChanged,EVENTS::SelectedEvent);
+        Go(&EDITOR_SIMULATION_TOOL::LinkSelectionChanged,EVENTS::PointSelectedEvent);
+        Go(&EDITOR_SIMULATION_TOOL::LinkSelectionChanged,EVENTS::UnselectedEvent);
+        Go(&EDITOR_SIMULATION_TOOL::LinkSelectionChanged,EVENTS::ClearedEvent);
         Go( &EDITOR_SIMULATION_TOOL::Play, SIMULATION_ACTIONS::play.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Pause, SIMULATION_ACTIONS::pause.MakeEvent() );
         Go( &EDITOR_SIMULATION_TOOL::Stop, SIMULATION_ACTIONS::stop.MakeEvent() );
@@ -101,6 +115,11 @@ private:
         Go( &EDITOR_SIMULATION_TOOL::ToggleLogic, SIMULATION_ACTIONS::logicLevels.MakeEvent() );
     }
     int Play( const TOOL_EVENT& );
+    int LinkComponents(const TOOL_EVENT&);
+    int LinkSelectionChanged(const TOOL_EVENT&);
+    int Audio(const TOOL_EVENT&);
+    void applyLinks(const std::vector<SCH_SYMBOL*>&, bool);
+    void redrawLinks();
     int Pause( const TOOL_EVENT& );
     int Stop( const TOOL_EVENT& );
     int Configure( const TOOL_EVENT& );
@@ -113,6 +132,11 @@ private:
     void saveInstrumentLayout();
     void tick( wxTimerEvent& );
     void click( wxMouseEvent& );
+    void displayMotion( wxMouseEvent& );
+    void displayRelease( wxMouseEvent& );
+    void displayCaptureLost( wxMouseCaptureLostEvent& );
+    int FilterEvent( wxEvent& ) override;
+    void finishDisplayDrag( bool aSave );
     void chooseProbe( PROBE_KIND );
     void redraw( bool aForce = true );
     void setStatus( const wxString& aText );
@@ -129,6 +153,11 @@ private:
     bool m_statusPending = false;
     std::shared_ptr<SESSION_RUNNER> m_runner;
     std::unique_ptr<SIMULATION_OVERLAY> m_overlay;
+    std::unique_ptr<KIGFX::VIEW_OVERLAY> m_linkOverlay;
+    std::string m_linkVisualKey;
+    bool m_linking=false,m_audioEnabled=true;
+    std::unique_ptr<SIMULATION_AUDIO> m_audio;
+
     std::unique_ptr<INSTRUMENT_PANEL> m_instruments;
     std::optional<PROBE_KIND> m_placing;
     std::map<PROBE_KIND, SOURCE_PROBE_SETTINGS> m_sourceSettings;
@@ -146,12 +175,24 @@ private:
     bool m_overlayCached = false, m_overlayVisible = false, m_overlayLogic = false;
     wxString m_overlaySheet;
     std::vector<int> m_overlayBrightness;
+    std::vector<int> m_overlaySegments;
+    std::map<std::string, std::string> m_overlayPresentations;
     std::vector<bool> m_overlaySwitches;
     std::vector<double> m_overlayAdjustments;
     std::vector<LOGIC_LEVEL> m_overlayLevels;
     std::vector<bool> m_overlayRapid;
     std::vector<bool> m_overlayContentions;
     wxWeakRef<LIVE_CONTROL_POPUP> m_liveControl;
+    struct DISPLAY_DRAG
+    {
+        std::size_t index;
+        VECTOR2D start;
+        wxPoint pixels;
+        CONTROL_VISUAL original;
+        bool moved = false;
+    };
+    std::optional<DISPLAY_DRAG> m_displayDrag;
+    bool m_savingDisplayPosition = false;
 };
 
 void EDITOR_SIMULATION_TOOL::Install()
@@ -161,6 +202,8 @@ void EDITOR_SIMULATION_TOOL::Install()
     m_runner = std::make_shared<SESSION_RUNNER>( FindSessionWorker(
             wxStandardPaths::Get().GetExecutablePath().ToStdString(wxConvUTF8) ) );
     m_overlay = std::make_unique<SIMULATION_OVERLAY>();
+    m_linkOverlay=std::make_unique<KIGFX::VIEW_OVERLAY>();
+    m_audio=std::make_unique<SIMULATION_AUDIO>();
     m_frame->Schematic().AddListener( this );
     m_installed = true;
     auto* selection = m_toolMgr->GetTool<SCH_SELECTION_TOOL>();
@@ -182,7 +225,16 @@ void EDITOR_SIMULATION_TOOL::Install()
                 return !MODEL_REPOSITORY(MODEL_REPOSITORY::DefaultDirectories(component.projectDirectory)).SelectModel(component).memories.empty();
             }catch(const std::exception&){return false;}
         } );
+    auto symbolsOnly=[](const SELECTION& selected)
+    {
+        if(selected.Size()<1||selected.Size()>2)return false;
+        for(auto* item:selected)if(item->Type()!=SCH_SYMBOL_T||ProbeSymbolForItem(item))return false;
+        return true;
+    };
+    selection->GetToolMenu().GetMenu().AddItem(SIMULATION_ACTIONS::linkComponents,[symbolsOnly](const SELECTION& s){return s.Size()==2&&symbolsOnly(s);});
+    selection->GetToolMenu().GetMenu().AddItem(SIMULATION_ACTIONS::unlinkComponents,symbolsOnly);
     auto* actions = m_toolMgr->GetActionManager();
+    actions->SetConditions(SIMULATION_ACTIONS::audio,ACTION_CONDITIONS().Check([this](const SELECTION&){return m_audioEnabled;}));
     actions->SetConditions( SIMULATION_ACTIONS::probes, ACTION_CONDITIONS().Check(
         [this]( const SELECTION& ) { return m_instrumentsVisible; } ) );
     actions->SetConditions( SIMULATION_ACTIONS::logicLevels, ACTION_CONDITIONS().Check(
@@ -226,6 +278,9 @@ void EDITOR_SIMULATION_TOOL::Install()
     setStatus( _( "Stopped — t = 0 s" ) );
     Bind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
     m_frame->GetCanvas()->Bind( wxEVT_LEFT_DOWN, &EDITOR_SIMULATION_TOOL::click, this );
+    m_frame->GetCanvas()->Bind( wxEVT_MOTION, &EDITOR_SIMULATION_TOOL::displayMotion, this );
+    m_frame->GetCanvas()->Bind( wxEVT_LEFT_UP, &EDITOR_SIMULATION_TOOL::displayRelease, this );
+    m_frame->GetCanvas()->Bind( wxEVT_MOUSE_CAPTURE_LOST, &EDITOR_SIMULATION_TOOL::displayCaptureLost, this );
     ReloadPreferences();
 }
 
@@ -246,11 +301,15 @@ void EDITOR_SIMULATION_TOOL::Shutdown()
     if( !m_installed )
         return;
     m_timer.Stop();
+    finishDisplayDrag( false );
     rememberInstruments();
     saveInstrumentLayout();
     dismissControl();
     Unbind( wxEVT_TIMER, &EDITOR_SIMULATION_TOOL::tick, this );
     m_frame->GetCanvas()->Unbind( wxEVT_LEFT_DOWN, &EDITOR_SIMULATION_TOOL::click, this );
+    m_frame->GetCanvas()->Unbind( wxEVT_MOTION, &EDITOR_SIMULATION_TOOL::displayMotion, this );
+    m_frame->GetCanvas()->Unbind( wxEVT_LEFT_UP, &EDITOR_SIMULATION_TOOL::displayRelease, this );
+    m_frame->GetCanvas()->Unbind( wxEVT_MOUSE_CAPTURE_LOST, &EDITOR_SIMULATION_TOOL::displayCaptureLost, this );
     if( m_instruments )
     {
         if( auto* manager = wxAuiManager::GetManager( m_frame ) ) manager->DetachPane( m_instruments.get() );
@@ -259,7 +318,10 @@ void EDITOR_SIMULATION_TOOL::Shutdown()
     m_frame->Schematic().RemoveListener( this );
     if( m_overlay && m_frame->GetCanvas()->GetView()->HasItem( m_overlay.get() ) )
         m_frame->GetCanvas()->GetView()->Remove( m_overlay.get() );
+    if(m_linkOverlay&&m_frame->GetCanvas()->GetView()->HasItem(m_linkOverlay.get()))m_frame->GetCanvas()->GetView()->Remove(m_linkOverlay.get());
+    m_linkOverlay.reset();
     m_overlay.reset();
+    m_audio.reset();
     m_runner.reset(); // bounded IPC shutdown; no queued callbacks refer to GUI objects
     m_installed = false;
 }
@@ -284,7 +346,13 @@ void EDITOR_SIMULATION_TOOL::publishStatus()
 
 void EDITOR_SIMULATION_TOOL::Invalidate()
 {
+    // OnModify still marks the schematic dirty and records undo for this
+    // visual-only commit; its frozen electrical circuit remains valid.
+    if( m_savingDisplayPosition ) return;
+    finishDisplayDrag( false );
     dismissControl();
+    if(m_audio)m_audio->Flush();
+    m_linkVisualKey.clear();
     if( !m_runner || !m_active )
         return;
     m_runner->Stop();
@@ -300,6 +368,8 @@ void EDITOR_SIMULATION_TOOL::Invalidate()
 
 int EDITOR_SIMULATION_TOOL::Play( const TOOL_EVENT& )
 {
+    finishDisplayDrag( false );
+    if(m_audio)m_audio->Flush();
     // Finish the placement coroutine before clearing its state or hiding its
     // controls. Otherwise its preview/cursor capture survives Play on MSW.
     m_toolMgr->RunAction( ACTIONS::cancelInteractive );
@@ -429,6 +499,7 @@ int EDITOR_SIMULATION_TOOL::ToggleLogic( const TOOL_EVENT& )
 
 int EDITOR_SIMULATION_TOOL::Pause( const TOOL_EVENT& )
 {
+    if(m_audio)m_audio->Submit({},false);
     if( m_runner )
         m_runner->Pause();
     return 0;
@@ -436,6 +507,8 @@ int EDITOR_SIMULATION_TOOL::Pause( const TOOL_EVENT& )
 
 int EDITOR_SIMULATION_TOOL::Stop( const TOOL_EVENT& )
 {
+    finishDisplayDrag( false );
+    if(m_audio)m_audio->Submit({},false);
     dismissControl();
     if( m_runner )
         m_runner->Stop();
@@ -576,7 +649,7 @@ int EDITOR_SIMULATION_TOOL::Configure( const TOOL_EVENT& )
 
 void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
 {
-    if( m_placing )
+    if( m_placing || m_linking )
     {
         // The native placement tool handles these clicks, including its moving preview.
         aEvent.Skip();
@@ -616,8 +689,114 @@ void EDITOR_SIMULATION_TOOL::click( wxMouseEvent& aEvent )
             m_runner->ToggleSwitch( static_cast<std::size_t>( index ) );
             return; // This click is an electrical event, not a schematic selection/edit.
         }
+        const int display = m_overlay->DisplayAt( m_circuit, m_session,
+                m_frame->GetCurrentSheet().Path().AsString(), VECTOR2I( position ) );
+        if( display >= 0 && !m_frame->GetCanvas()->HasCapture() )
+        {
+            dismissControl();
+            m_displayDrag = DISPLAY_DRAG{ static_cast<std::size_t>( display ), position,
+                    aEvent.GetPosition(), m_circuit.circuit.displays[display].appearance.visual };
+            wxEvtHandler::AddFilter( this );
+            m_frame->GetCanvas()->SetFocus();
+            m_frame->GetCanvas()->SetCurrentCursor( KICURSOR::MOVING );
+            m_frame->GetCanvas()->CaptureMouse();
+            return;
+        }
     }
     aEvent.Skip();
+}
+
+void EDITOR_SIMULATION_TOOL::displayMotion( wxMouseEvent& event )
+{
+    if( !m_displayDrag ) { event.Skip(); return; }
+    if( !event.LeftIsDown() ) { finishDisplayDrag( false ); return; }
+    auto& drag = *m_displayDrag;
+    const auto pixels = event.GetPosition() - drag.pixels;
+    if( !drag.moved && std::abs( pixels.x ) < 3 && std::abs( pixels.y ) < 3 ) return;
+    drag.moved = true;
+    const auto position = getView()->ToWorld( VECTOR2D( event.GetPosition().x, event.GetPosition().y ) );
+    auto& display = m_circuit.circuit.displays.at( drag.index );
+    display.appearance.visual = MoveDisplayVisual( m_circuit.locations.at( display.component ).body,
+                                                   drag.original, position - drag.start );
+    m_frame->GetCanvas()->SetCurrentCursor( KICURSOR::MOVING );
+    redraw();
+}
+
+void EDITOR_SIMULATION_TOOL::displayRelease( wxMouseEvent& event )
+{
+    if( !m_displayDrag ) { event.Skip(); return; }
+    // A release may arrive without a final motion event.
+    const auto position = getView()->ToWorld( VECTOR2D( event.GetPosition().x, event.GetPosition().y ) );
+    auto& drag = *m_displayDrag;
+    const auto pixels = event.GetPosition() - drag.pixels;
+    drag.moved |= std::abs( pixels.x ) >= 3 || std::abs( pixels.y ) >= 3;
+    if( drag.moved )
+    {
+        auto& display = m_circuit.circuit.displays.at( drag.index );
+        display.appearance.visual = MoveDisplayVisual( m_circuit.locations.at( display.component ).body,
+                                                       drag.original, position - drag.start );
+    }
+    finishDisplayDrag( true );
+}
+
+void EDITOR_SIMULATION_TOOL::displayCaptureLost( wxMouseCaptureLostEvent& event )
+{
+    if( m_displayDrag ) finishDisplayDrag( false );
+    else event.Skip();
+}
+
+int EDITOR_SIMULATION_TOOL::FilterEvent( wxEvent& event )
+{
+    // The schematic tool dispatcher consumes Escape before canvas key
+    // handlers. Intercept it only for the duration of this mouse capture.
+    if( m_displayDrag && ( event.GetEventType() == wxEVT_CHAR_HOOK || event.GetEventType() == wxEVT_KEY_DOWN )
+        && static_cast<wxKeyEvent&>( event ).GetKeyCode() == WXK_ESCAPE )
+    {
+        finishDisplayDrag( false );
+        return Event_Processed;
+    }
+    return Event_Skip;
+}
+
+void EDITOR_SIMULATION_TOOL::finishDisplayDrag( bool save )
+{
+    if( !m_displayDrag ) return;
+    const auto drag = *m_displayDrag;
+    m_displayDrag.reset();
+    wxEvtHandler::RemoveFilter( this );
+    auto* canvas = m_frame->GetCanvas();
+    if( canvas->HasCapture() ) canvas->ReleaseMouse();
+    canvas->SetCurrentCursor( KICURSOR::ARROW );
+    auto& display = m_circuit.circuit.displays.at( drag.index );
+    const auto& location = m_circuit.locations.at( display.component );
+    const bool changed = drag.moved && ControlBounds( location.body, drag.original ).GetOrigin()
+                        != ControlBounds( location.body, display.appearance.visual ).GetOrigin();
+    if( !save || !changed ) display.appearance.visual = drag.original;
+    else
+    {
+        bool saved = false;
+        try
+        {
+            for( auto* item : m_frame->GetScreen()->Items().OfType( SCH_SYMBOL_T ) )
+            {
+                auto* symbol = static_cast<SCH_SYMBOL*>( item );
+                if( symbol->m_Uuid.AsString() != location.uuid ) continue;
+                SCH_COMMIT commit( m_frame );
+                commit.Modify( symbol, m_frame->GetScreen() );
+                WriteSymbolDisplayPosition( *symbol, display.appearance.visual );
+                SCOPED_SET_RESET<bool> visualOnly( m_savingDisplayPosition, true );
+                commit.Push( _( "Move simulation display" ) );
+                saved = true;
+                break;
+            }
+        }
+        catch( const std::exception& error )
+        {
+            setStatus( DiagnosticText( error.what() ) );
+        }
+        if( !saved ) display.appearance.visual = drag.original;
+    }
+    redraw();
 }
 
 void EDITOR_SIMULATION_TOOL::dismissControl()
@@ -782,8 +961,170 @@ int EDITOR_SIMULATION_TOOL::PlaceProbes( const TOOL_EVENT& action )
     return 0;
 }
 
+int EDITOR_SIMULATION_TOOL::Audio(const TOOL_EVENT&)
+{
+    m_audioEnabled=!m_audioEnabled;if(m_audio)m_audio->Submit({},false);return 0;
+}
+
+int EDITOR_SIMULATION_TOOL::LinkSelectionChanged(const TOOL_EVENT&)
+{
+    redrawLinks();return 0;
+}
+
+void EDITOR_SIMULATION_TOOL::applyLinks(const std::vector<SCH_SYMBOL*>& symbols,bool remove)
+{
+    if(symbols.empty()||symbols.size()>2)return;
+    const auto project=m_frame->Prj().GetProjectPath().ToStdString(wxConvUTF8);
+    const auto variant=m_frame->Schematic().GetCurrentVariant();
+    std::vector<CIRCUIT_COMPONENT> selected;
+    for(auto* s:symbols)selected.push_back(ReadSymbolModelSettings(*s,m_frame->GetCurrentSheet(),variant,project,true));
+    if(!remove)
+    {
+        if(selected.size()!=2)return;
+        MODEL_REPOSITORY repository(MODEL_REPOSITORY::DefaultDirectories(project));
+        if(!repository.SelectModel(selected[0]).link.Compatible(repository.SelectModel(selected[1]).link))
+            throw std::runtime_error("Choose compatible transmitter/receiver components with the same link medium");
+    }
+    struct UPDATE { SCH_SYMBOL* symbol; SCH_SCREEN* screen; CIRCUIT_COMPONENT settings; };
+    std::vector<UPDATE> updates;
+    std::set<SCH_SYMBOL*> modified;
+    for(auto& sheet:m_frame->Schematic().Hierarchy())for(auto* item:sheet.LastScreen()->Items().OfType(SCH_SYMBOL_T))
+    {
+        auto* symbol=static_cast<SCH_SYMBOL*>(item);
+        auto settings=ReadSymbolModelSettings(*symbol,sheet,variant,project,true);
+        const auto before=settings.linkedComponents;
+        for(const auto& source:selected)
+        {
+            if(remove)
+            {
+                if(selected.size()==1)
+                {
+                    if(settings.identity==source.identity)settings.linkedComponents.clear();
+                    else std::erase(settings.linkedComponents,source.identity);
+                }
+                else for(const auto& peer:selected)if(settings.identity==source.identity&&peer.identity!=source.identity)
+                    std::erase(settings.linkedComponents,peer.identity);
+            }
+            else if(settings.identity==source.identity)
+                for(const auto& peer:selected)if(peer.identity!=source.identity
+                    &&std::find(settings.linkedComponents.begin(),settings.linkedComponents.end(),peer.identity)==settings.linkedComponents.end())
+                {
+                    if(settings.linkedComponents.size()>=64)throw std::runtime_error("A component supports at most 64 links");
+                    settings.linkedComponents.push_back(peer.identity);
+                }
+        }
+        if(before==settings.linkedComponents)continue;
+        if(modified.insert(symbol).second)updates.push_back({symbol,sheet.LastScreen(),std::move(settings)});
+    }
+    if(!updates.empty())
+    {
+        SCH_COMMIT commit(m_frame);
+        for(const auto& update:updates)
+        {
+            commit.Modify(update.symbol,update.screen);
+            if(update.settings.linkedComponents.empty())update.symbol->RemoveField("CA.Links");
+            else
+            {
+                auto* field=update.symbol->GetField("CA.Links");
+                if(!field)field=update.symbol->AddField(SCH_FIELD(update.symbol,FIELD_T::USER,"CA.Links"));
+                field->SetText(wxString::FromUTF8(nlohmann::json(update.settings.linkedComponents).dump()));field->SetVisible(false);
+            }
+        }
+        commit.Push(remove?_("Unlink simulation components"):_("Link simulation components"));
+        Invalidate();m_linkVisualKey.clear();redrawLinks();
+    }
+}
+
+int EDITOR_SIMULATION_TOOL::LinkComponents(const TOOL_EVENT& action)
+{
+    const bool remove=action.IsAction(&SIMULATION_ACTIONS::unlinkComponents);
+    auto* selection=m_toolMgr->GetTool<SCH_SELECTION_TOOL>();
+    std::vector<SCH_SYMBOL*> symbols;
+    for(auto* item:selection->GetSelection())if(item->Type()==SCH_SYMBOL_T)symbols.push_back(static_cast<SCH_SYMBOL*>(item));
+    auto apply=[&](const std::vector<SCH_SYMBOL*>& pair)
+    {
+        try{applyLinks(pair,remove);return true;}
+        catch(const std::exception& e){wxMessageBox(DiagnosticText(e.what()),_("Component links"),wxOK,m_frame);return false;}
+    };
+    if(symbols.size()==2||(remove&&symbols.size()==1)){apply(symbols);return 0;}
+    m_linking=true;dismissControl();m_frame->PushTool(action);Activate();
+    std::string first=symbols.size()==1?symbols.front()->m_Uuid.AsString().ToStdString():std::string();
+    setStatus(remove?_("Click a component to remove its simulation links. Esc finishes.")
+                    :_("Click the transmitter and receiver to link. Esc finishes."));publishStatus();
+    auto* screen=m_frame->GetScreen();
+    while(TOOL_EVENT* event=Wait())
+    {
+        if(event->IsCancelInteractive()||event->IsActivate()||m_frame->GetScreen()!=screen)break;
+        if(event->IsClick(BUT_LEFT))
+        {
+            EDA_ITEM* hit=nullptr;
+            selection->ClearSelection();
+            selection->SelectPoint(VECTOR2I(event->Position()),{SCH_SYMBOL_T},&hit);
+            if(!hit||hit->Type()!=SCH_SYMBOL_T)continue;
+            auto* symbol=static_cast<SCH_SYMBOL*>(hit);
+            if(remove)apply({symbol});
+            else
+            {
+                SCH_SYMBOL* origin=nullptr;
+                for(auto* item:screen->Items().OfType(SCH_SYMBOL_T))
+                    if(item->m_Uuid.AsString().ToStdString()==first){origin=static_cast<SCH_SYMBOL*>(item);break;}
+                if(!origin)first=symbol->m_Uuid.AsString().ToStdString();
+                else if(origin!=symbol&&apply({origin,symbol}))first.clear();
+            }
+            redrawLinks();
+        }
+        else event->SetPassEvent();
+    }
+    m_linking=false;m_frame->PopTool(action);m_frame->GetCanvas()->SetCurrentCursor(KICURSOR::ARROW);
+    setStatus(_("Component link tool finished"));return 0;
+}
+
+void EDITOR_SIMULATION_TOOL::redrawLinks()
+{
+    if(!m_linkOverlay||!m_frame->GetScreen())return;
+    struct ENTRY { SCH_SYMBOL* symbol; std::string id; std::vector<std::string> peers; };
+    std::vector<ENTRY> entries;std::set<std::string> selected;std::string key;
+    const auto path=m_frame->GetCurrentSheet().Path().AsString().ToStdString()+"/";
+    for(auto* item:m_toolMgr->GetTool<SCH_SELECTION_TOOL>()->GetSelection())if(item->Type()==SCH_SYMBOL_T)
+        selected.insert(path+item->m_Uuid.AsString().ToStdString());
+    for(auto* item:m_frame->GetScreen()->Items().OfType(SCH_SYMBOL_T))
+    {
+        auto* symbol=static_cast<SCH_SYMBOL*>(item);auto* field=symbol->GetField("CA.Links");
+        if(!field)continue;
+        try
+        {
+            auto peers=nlohmann::json::parse(field->GetText().ToStdString()).get<std::vector<std::string>>();
+            const auto id=path+symbol->m_Uuid.AsString().ToStdString();
+            const auto box=symbol->GetBodyBoundingBox();
+            key+=id+field->GetText().ToStdString()+std::to_string(box.GetX())+","+std::to_string(box.GetY())+","+std::to_string(box.GetWidth())+","+std::to_string(box.GetHeight());
+            entries.push_back({symbol,id,std::move(peers)});
+        }catch(const std::exception&){}
+    }
+    for(const auto& id:selected)key+=id;
+    const bool active=m_active&&m_session.state!=EDITOR_SESSION_STATE::FAILED;
+    key+=active?"running":"stopped";
+    if(key==m_linkVisualKey)return;
+    m_linkVisualKey=std::move(key);
+    auto* overlay=m_linkOverlay.get();overlay->Clear();overlay->SetIsFill(false);overlay->SetIsStroke(true);
+    overlay->SetStrokeColor(KIGFX::COLOR4D(.05,.85,.25,1));overlay->SetLineWidth(schIUScale.mmToIU(.18));
+    for(const auto& entry:entries)for(const auto& peer:entry.peers)
+    {
+        auto found=std::find_if(entries.begin(),entries.end(),[&](const auto& e){return e.id==peer;});
+        if(found==entries.end()||std::find(found->peers.begin(),found->peers.end(),entry.id)==found->peers.end())continue;
+        if(selected.contains(entry.id)&&!selected.contains(peer))
+        {
+            auto box=found->symbol->GetBodyBoundingBox();box.Inflate(schIUScale.mmToIU(.5));
+            overlay->Rectangle(VECTOR2D(box.GetOrigin()),VECTOR2D(box.GetEnd()));
+        }
+        if(active&&entry.id<peer)overlay->Line(VECTOR2D(entry.symbol->GetBodyBoundingBox().Centre()),VECTOR2D(found->symbol->GetBodyBoundingBox().Centre()));
+    }
+    auto* view=m_frame->GetCanvas()->GetView();if(!view->HasItem(overlay))view->Add(overlay);
+    view->Update(overlay);m_frame->GetCanvas()->Refresh();
+}
+
 void EDITOR_SIMULATION_TOOL::redraw( bool force )
 {
+    redrawLinks();
     if( !m_overlay )
         return;
     const bool visible = m_session.state != EDITOR_SESSION_STATE::STOPPED
@@ -800,17 +1141,32 @@ void EDITOR_SIMULATION_TOOL::redraw( bool force )
         for( const auto& pin : m_circuit.pins )
             if( pin.sheet == sheet && pin.logicIndex < m_session.logicLevels.size() )
             {
-                levels.push_back( m_session.logicLevels[pin.logicIndex] );
-                rapid.push_back( pin.logicIndex < m_session.logicRapid.size() && m_session.logicRapid[pin.logicIndex] );
+                const bool fast = pin.logicIndex < m_session.logicRapid.size() && m_session.logicRapid[pin.logicIndex];
+                // A rapid pin is displayed as '~'; its instantaneous 0/1
+                // does not change that drawing or require another paint.
+                levels.push_back( fast ? LOGIC_LEVEL::HIGH_Z : m_session.logicLevels[pin.logicIndex] );
+                rapid.push_back( fast );
             }
+    std::vector<int> segments;
+    for( std::size_t i = 0; visible && i < m_circuit.circuit.segments.size(); ++i )
+        if( m_circuit.locations[m_circuit.circuit.segments[i].component].sheet == sheet )
+            segments.push_back( int( std::lround( 255 * std::sqrt( std::clamp(
+                    i < m_session.segmentLevels.size() ? m_session.segmentLevels[i] : 0., 0., 1. ) ) ) ) );
+    std::map<std::string, std::string> presentations;
+    if( visible ) for( const auto& display : m_circuit.circuit.displays )
+        if( display.appearance.visual.visible && m_circuit.locations[display.component].sheet == sheet )
+            if( const auto found = m_session.sample.presentation.find( display.reference ); found != m_session.sample.presentation.end() )
+                presentations.emplace( found->first, DisplayPresentationKey( found->second ) );
     if( !force && m_overlayCached && visible == m_overlayVisible && sheet == m_overlaySheet
         && m_logicLevels == m_overlayLogic && brightness == m_overlayBrightness
+        && segments == m_overlaySegments && presentations == m_overlayPresentations
         && m_session.switches == m_overlaySwitches
         && m_session.adjustments == m_overlayAdjustments
         && m_session.netContentions == m_overlayContentions
         && levels == m_overlayLevels && rapid == m_overlayRapid ) return;
     m_overlayCached = true; m_overlayVisible = visible; m_overlaySheet = sheet; m_overlayLogic = m_logicLevels;
     m_overlayBrightness = std::move( brightness ); m_overlaySwitches = m_session.switches;
+    m_overlaySegments = std::move( segments ); m_overlayPresentations = std::move( presentations );
     m_overlayAdjustments = m_session.adjustments;
     m_overlayContentions = m_session.netContentions;
     m_overlayLevels = std::move( levels );
@@ -828,6 +1184,7 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     if( !m_runner )
         return;
     const auto now = std::chrono::steady_clock::now();
+    redrawLinks();
     rememberInstruments();
     if( m_instrumentLayoutPending && now - m_instrumentLayoutChanged >= std::chrono::milliseconds( 400 ) )
         saveInstrumentLayout();
@@ -840,6 +1197,11 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
     const auto oldPreferences = m_session.preferences;
     m_session = m_runner->View();
     const auto state = m_session.state;
+    if(m_audio)
+    {
+        const bool enabled=m_audioEnabled&&state==EDITOR_SESSION_STATE::RUNNING;
+        m_audio->Submit(m_runner->TakeAudio(),enabled);
+    }
     bool rateChanged = false;
     if( state != EDITOR_SESSION_STATE::RUNNING || oldState != state || oldSpeed != m_session.speed )
     {
@@ -875,6 +1237,7 @@ void EDITOR_SIMULATION_TOOL::tick( wxTimerEvent& )
                                        m_session.sample.latest.time, m_session.speed );
     if( state == EDITOR_SESSION_STATE::RUNNING && m_rateValid )
         status += wxString::Format( _( "   actual %.2g×" ), m_realSpeed );
+    if(m_audio&&!m_audio->Error().empty())status+="   "+DiagnosticText(m_audio->Error());
     for( std::size_t i = 0; i < std::min<std::size_t>( 2, m_session.warnings.size() ); ++i )
         status += "   " + DiagnosticText( m_session.warnings[i] );
     if( m_session.warnings.size() > 2 ) status += wxString::Format( _( "   +%zu warnings" ), m_session.warnings.size() - 2 );

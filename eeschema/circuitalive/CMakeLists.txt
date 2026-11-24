@@ -26,7 +26,7 @@ if( TARGET circuitalive_sim_session )
     target_include_directories( eeschema_kiface_objects SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann_json )
     target_sources( eeschema_kiface_objects PRIVATE
         editor_simulation.cpp schematic_adapter.cpp simulation_overlay.cpp simulation_toolbar.cpp model_dialog.cpp resource_dialog.cpp memory_viewer.cpp model_browser.cpp live_control_popup.cpp
-        instrument_panel.cpp scope_panel.cpp scope_plot.cpp probe_placement.cpp source_probe_dialog.cpp model_author.cpp model_design_canvas.cpp panel_led_appearance.cpp panel_model_interactions.cpp panel_model_pin_mapping.cpp panel_simulation_preferences.cpp )
+        instrument_panel.cpp scope_panel.cpp scope_plot.cpp probe_placement.cpp source_probe_dialog.cpp model_author.cpp model_design_canvas.cpp panel_led_appearance.cpp panel_model_interactions.cpp panel_model_outputs.cpp simulation_audio.cpp panel_model_pin_mapping.cpp panel_simulation_preferences.cpp )
     target_link_libraries( eeschema_kiface_objects PUBLIC ${CIRCUITALIVE_DESKTOP_LIBRARY} )
     add_dependencies( eeschema circuitalive-sim-worker )
     install( DIRECTORY ${PROJECT_SOURCE_DIR}/simulation/models/

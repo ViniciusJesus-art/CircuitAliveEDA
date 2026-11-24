@@ -1,12 +1,13 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #pragma once
 #include "model_routing.h"
-#include <wx/scrolwin.h>
+#include "model_viewport.h"
+#include <wx/panel.h>
 #include <functional>
 #include <optional>
 namespace CIRCUITALIVE
 {
-class DESIGN_CANVAS : public wxScrolledWindow
+class DESIGN_CANVAS : public wxPanel
 {
 public:
     DESIGN_CANVAS( wxWindow* aParent, MODEL_DESIGN& aDesign );
@@ -20,7 +21,7 @@ public:
 private:
     wxPoint logicalPosition( wxPoint aPoint ) const;
     wxSize contentSize() const;
-    void updateExtent();
+    void zoomAt( double aFactor, wxPoint aAnchor );
     const SIMULATION_MODEL& visualModel( const DESIGN_BLOCK& aBlock ) const;
     int height( const DESIGN_BLOCK& aBlock ) const;
     std::vector<DESIGN_TERMINAL> terminals() const;
@@ -40,6 +41,9 @@ private:
     std::string m_geometry;
     int m_drag = -1, m_selectedWire = -1, m_segment = -1;
     wxPoint m_offset;
-    double m_zoom = 1;
+    MODEL_VIEWPORT m_viewport;
+    bool m_panning = false;
+    wxPoint m_panStart;
+    VECTOR2D m_panOriginal;
 };
 }

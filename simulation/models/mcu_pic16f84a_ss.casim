@@ -145,6 +145,30 @@
       "default": "1u",
       "min": 1e-09,
       "max": 0.001
+    },
+    {
+      "id": "supply_min",
+      "label": "Minimum operating supply voltage",
+      "unit": "V",
+      "default": "4",
+      "min": 0.1,
+      "max": 100
+    },
+    {
+      "id": "supply_max",
+      "label": "Maximum operating supply voltage",
+      "unit": "V",
+      "default": "5.5",
+      "min": 0.1,
+      "max": 100
+    },
+    {
+      "id": "supply_current",
+      "label": "Approximate supply current",
+      "unit": "A",
+      "default": "2m",
+      "min": 0,
+      "max": 10
     }
   ],
   "resources": [
@@ -273,7 +297,10 @@
         "port": "ra1",
         "drive": true
       }
-    ]
+    ],
+    "min_supply_parameter": "supply_min",
+    "max_supply_parameter": "supply_max",
+    "supply_current_parameter": "supply_current"
   },
   "spice": {
     "instance": [

@@ -143,10 +143,10 @@ if( TARGET circuitalive_sim_session )
         test_small_logic_models.cpp
         test_diode_reverse_bias.cpp
         test_live_controls.cpp test_source_probes.cpp test_digital_pipeline.cpp test_digital_bus.cpp test_memory_resources.cpp test_memory_viewer.cpp test_visual_signals.cpp
-        test_programmable_devices.cpp test_compiled_expressions.cpp test_analog_partition.cpp )
+        test_programmable_devices.cpp test_simulation_outputs.cpp test_compiled_expressions.cpp test_analog_partition.cpp )
     target_link_libraries( qa_interactive_sim PRIVATE
         circuitalive_interactive circuitalive_sim_session circuitalive_programmable_runtime
-        Boost::unit_test_framework )
+        kimath Boost::unit_test_framework )
     target_include_directories( qa_interactive_sim SYSTEM PRIVATE
         ${PROJECT_SOURCE_DIR}/thirdparty/nlohmann_json )
     target_compile_definitions( qa_interactive_sim PRIVATE
@@ -156,6 +156,15 @@ if( TARGET circuitalive_sim_session )
         CIRCUITALIVE_TEST_PIC_RUNTIME="${PROJECT_SOURCE_DIR}/simulation/runtime/pic16.js"
         CIRCUITALIVE_TEST_DEMO="${PROJECT_SOURCE_DIR}/demos/simulation/circuitalive/rc_switch_led.cir" )
     add_dependencies( qa_interactive_sim circuitalive-sim-worker )
+    # Optional developer checks; Node is never an installed runtime dependency.
+    find_program( CIRCUITALIVE_TEST_NODE NAMES node nodejs )
+    if( CIRCUITALIVE_TEST_NODE )
+        foreach( check IN ITEMS simulation_devices mcu_serial avr_serial avr_peripherals avr_decoder avr_timing )
+            add_test( NAME qa_${check} COMMAND ${CIRCUITALIVE_TEST_NODE}
+                ${PROJECT_SOURCE_DIR}/qa/tests/cli/test_${check}.cjs )
+            set_tests_properties( qa_${check} PROPERTIES TIMEOUT 120 )
+        endforeach()
+    endif()
     add_executable( qa_memory_viewer test_memory_viewer_gui.cpp
         ${PROJECT_SOURCE_DIR}/eeschema/circuitalive/memory_viewer.cpp )
     target_link_libraries( qa_memory_viewer PRIVATE circuitalive_interactive

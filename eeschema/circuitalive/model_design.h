@@ -37,6 +37,19 @@ struct MODEL_DESIGN
     bool interactionsConfigured = false;
     std::string baseJson; // Preserves an existing SPICE/behavioral core and its metadata.
     std::string coreBlock; // Block owning the imported component's observations and controls.
+    bool automaticAssociation = true;
+    std::vector<std::string> linkedSymbols;
+    std::vector<std::string> excludedSymbols;
+    std::map<std::string,std::string> symbolVariants;
+    std::vector<MODEL_PARAMETER> SymbolParameters() const;
+    // Definitions are shared; edits to existing defaults belong to the selected symbol.
+    void SetSymbolParameters( const std::vector<MODEL_PARAMETER>& aParameters );
+    void StoreSymbolVariant();
+    void SelectSymbol( const std::string& aLibraryId );
+    void AddSymbol( const std::string& aLibraryId, const std::vector<MODEL_PIN>& aPhysicalPins );
+    void RemoveSymbol( const std::string& aLibraryId );
+    std::map<std::string,std::string> SymbolPinMap() const;
+    void SetSymbolPinMap( const std::map<std::string,std::string>& aMapping );
     static MODEL_DESIGN Open( const std::string& aJson );
     std::string Export() const;
     // Expose an imported electrical core as a wired, parameter-bound block.

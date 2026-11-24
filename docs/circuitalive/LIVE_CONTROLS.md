@@ -51,6 +51,81 @@ canais e cursores usam o mesmo controle de lista: clique para abrir, solte o
 botão e clique no item desejado. As células do editor visual também usam esse
 controle, incluindo as que permitem digitar valores próprios.
 
+Na janela **Modelo de simulação**, **OK** aplica a escolha e os ajustes somente
+ao componente selecionado. O botão **Tornar padrão**, no topo, grava a associação
+do símbolo com o modelo, os valores padrão dos parâmetros existentes, a pinagem
+e as opções de medição, recursos e exclusão. Não há caixa de seleção para salvar
+essas configurações automaticamente.
+
+Os valores e a pinagem são gravados diretamente no arquivo `.casim`. Assim, o
+editor de modelos abre os mesmos dados atualizados; alterações posteriores no
+editor também atualizam os padrões usados pelos componentes sem substituições
+individuais. O funcionamento e as definições dos parâmetros são compartilhados;
+os valores padrão, a pinagem e as demais opções ficam na variação de cada
+símbolo, identificado pelo nome completo na biblioteca. Assim, um único modelo
+de LED pode atender LEDs difusos e de alto brilho com valores padrão diferentes.
+A janela do esquema altera valores de parâmetros existentes; novos parâmetros e mudanças no comportamento
+continuam sendo feitos no editor de modelos.
+
+## Editar um modelo existente e seus símbolos
+
+No editor de modelos, **Arquivo → Abrir… (Ctrl+O)** abre o mesmo catálogo de
+modelos. **Salvar (Ctrl+S)** atualiza o arquivo selecionado, conservando seu ID,
+vínculos, metadados e as configurações de parâmetros já salvas para os símbolos.
+**Abrir arquivo de modelo… (Ctrl+Shift+O)** permite escolher um `.casim` fora do catálogo.
+
+**Salvar como…** cria outro arquivo com ID próprio. A cópia conserva a lista de
+símbolos e suas disposições, mas começa com a associação automática desativada
+para preservar os vínculos do original. Marque **Usar este modelo por padrão
+para todos os símbolos vinculados** para torná-la o padrão de novas colocações.
+Os componentes já colocados continuam com seus campos individuais.
+
+Na aba **Símbolos vinculados**, adicione ou remova símbolos de biblioteca. O
+seletor **Símbolo**, acima do ID, acompanha essa lista. Escolher um símbolo na
+lista ou no seletor troca a pinagem física, o símbolo de referência e a disposição
+dos botões, sliders e partes luminosas. O diagrama em blocos, os sinais elétricos
+e as definições dos parâmetros públicos permanecem compartilhados. A aba
+**Parâmetros** mostra os valores padrão do símbolo selecionado: editar um valor
+não altera os outros símbolos vinculados. Novos símbolos começam com os padrões
+gerais do modelo.
+
+Ao adicionar um símbolo, o editor associa primeiro os pinos pelo nome, depois
+pelo número e, por fim, pelos pinos restantes. Confira a aba **Pinos do componente**;
+a lista de cada célula permite corrigir a associação. Escolher um número ocupado
+troca os dois pinos. Os símbolos vinculados devem ter a mesma quantidade de pinos
+físicos que os terminais do modelo compartilhado. Todas as unidades são consideradas.
+
+As variações são gravadas em `symbol_variants`, por ID completo de biblioteca:
+
+```json
+"symbol_variants": {
+  "Custom:Display": {
+    "pin_map": { "anode": "2", "cathode": "1" },
+    "parameter_defaults": { "forward_voltage": "2.1" },
+    "controls": {},
+    "segments": {
+      "A": {
+        "shape": "line",
+        "geometry": {
+          "start": [0.2, 0.3], "end": [0.7, 0.3],
+          "thickness": 0.04, "filled": false
+        }
+      }
+    }
+  }
+}
+```
+
+`parameter_defaults` substitui valores dos parâmetros existentes apenas para
+esse símbolo; parâmetros sem substituição usam os padrões gerais do modelo.
+Substituições individuais no esquema têm prioridade sobre os padrões do símbolo.
+`pin_map` usa os IDs lógicos do diagrama. `segments` altera apenas a apresentação;
+o sinal de cada segmento continua no modelo comum. `controls` usa `control:ID`
+para botões e `adjust:ID` para sliders, com os retângulos visuais já existentes.
+Arquivos antigos sem variações continuam usando suas posições e pinagem originais.
+Modelos com runtime podem ser abertos e salvos preservando o módulo existente;
+a composição desse runtime como um bloco elétrico continua indisponível.
+
 ## Metadados nos arquivos `.casim`
 
 A organização vem de campos opcionais no próprio modelo:
@@ -97,3 +172,6 @@ ser compatíveis. Um componente pode declarar mais de um ajuste no painel.
 Movimentos consecutivos do mesmo controle são agrupados antes do envio ao
 worker, mantendo o valor mais recente e a ordem em relação a Pause/Stop.
 A interface não realiza operações bloqueantes com o ngspice.
+
+Displays com segmentos posicionáveis, LCDs, som e associações ópticas estão
+em [Displays, áudio e vínculos de simulação](SIMULATION_OUTPUTS_AND_LINKS.md).

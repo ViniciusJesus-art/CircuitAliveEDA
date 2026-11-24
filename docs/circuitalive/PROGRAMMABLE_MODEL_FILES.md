@@ -31,6 +31,16 @@ sampling period** limita o intervalo entre leituras do circuito: o padrão é
 da atualização da interface. As transições de saída conservam os tempos do
 runtime; a amostragem das entradas tem essa granularidade configurada.
 
+Os modelos fornecidos também expõem **Minimum operating supply voltage**,
+**Maximum operating supply voltage** e **Approximate supply current**. O consumo
+é uma carga funcional ajustável (padrões de exemplo: 5 mA no AVR e 2 mA no PIC),
+não uma especificação de consumo do fabricante. Os drivers dos pinos consomem
+adicionalmente a corrente exigida pelo circuito externo. Abaixo da tensão mínima,
+a carga se torna proporcional à tensão para não exigir corrente ideal de uma
+fonte desligada. Ela permanece durante RESET; estados de baixo consumo
+usam gating funcional de clocks, mantendo essa carga aproximada constante. Uma fonte com resistência/limite insuficiente sofre
+queda de tensão e o runtime interrompe a CPU quando sai da faixa configurada.
+
 HEX contém endereços absolutos da Flash. BIN usa o endereço de carga informado
 em hexadecimal, normalmente `0` para uma aplicação AVR. Regiões fora da memória
 do alvo, arquivos vazios e checksums Intel HEX inválidos são recusados. Bytes
@@ -42,7 +52,11 @@ VCC duplicados do encapsulamento são ligados internamente. RESET tem pull-up
 fraco para VCC; não é preciso ligá-lo permanentemente em nível alto. Um RESET
 externo baixo desabilita os drivers e reinicia a execução quando liberado. AREF
 tem um caminho fraco para VCC quando não existir referência externa. O relógio é
-ideal: PB6/PB7 podem ser GPIO, pois fuses e oscilador físico não são modelados.
+ideal e sua frequência nominal vem de **CPU clock**. Fuses são configuráveis em
+decimal nos parâmetros `fuse_low`, `fuse_high`, `fuse_extended` e `lock_bits`.
+CKDIV8 divide a frequência; CKOUT aciona PB0; RSTDISBL permite usar RESET como PC6;
+WDTON, BOD e BOOTSZ/BOOTRST afetam o comportamento correspondente. O Timer2
+assíncrono usa `timer2_hz` (32768 Hz por padrão), ou bordas externas em PB6/EXCLK.
 
 No Arduino UNO R3, alimente **+5V** e **GND**. VIN, reguladores de 3V3 e interface
 USB não são simulados. IOREF acompanha +5V. SDA/A4 e SCL/A5 duplicados são aliases
@@ -74,6 +88,9 @@ como um conjunto de resistores. Exemplo da extensão:
     "gnd": "gnd",
     "min_supply": 1.8,
     "max_supply": 5.5,
+    "min_supply_parameter": "supply_min",
+    "max_supply_parameter": "supply_max",
+    "supply_current_parameter": "supply_current",
     "options": {},
     "pins": [
       {"id": "PB5", "port": "pb5", "drive": true},
@@ -91,6 +108,9 @@ recursos e SPICE. `port` identifica um port do modelo e não o número físico d
 símbolo; `id` identifica o sinal visto pelo módulo. IDs são únicos por instância.
 O mapa normal `CA.Pins` continua permitindo adaptar o modelo a outro símbolo
 compatível. Não associar encapsulamentos só pela semelhança do desenho.
+Os três campos `*_parameter` de alimentação são opcionais e devem apontar para
+parâmetros declarados. Sem eles, `min_supply`/`max_supply` continuam definindo a
+faixa e nenhuma carga adicional é criada, mantendo modelos externos existentes.
 
 Os módulos são concatenados na ordem declarada, com caminhos relativos ao
 arquivo `.casim`. O runtime recebe `device`, `clockHz`, `firmware`, `eeprom`,
@@ -99,6 +119,14 @@ arquivo `.casim`. O runtime recebe `device`, `clockHz`, `firmware`, `eeprom`,
 substituído ou acrescido para implementar outra arquitetura sem mudar o
 protocolo elétrico; um mapa de pinos sozinho não implementa uma CPU.
 
+`runtime.option_parameters` mapeia nomes de opções para parâmetros numéricos
+declarados, por exemplo `{"fuseHigh":"fuse_high", "timer2Hz":"timer2_hz"}`.
+Esses valores são congelados por instância no Play, junto com firmware e módulos.
+Um pino pode usar `drive_when_parameter`, `drive_mask` e `drive_value` para criar
+o driver somente quando `(parâmetro & máscara) == valor`. O RESET dos AVR usa a
+condição `fuse_high & 128 == 0`; a faixa inteira da Flash continua pertencendo ao
+dispositivo e as regras de boot vêm do perfil/fuses.
+
 GPIO com `drive: true` ganha três comandos externos ao ngspice: saída alta,
 saída baixa e pull-up. Os comandos acionam caminhos com resistência finita
 (25 Ω para drivers, 30 kΩ para pull-up), e entrada/Hi-Z libera ambos os drivers.
@@ -106,7 +134,9 @@ Cada sinal de entrada é medido em relação ao GND do modelo. A fonte de energi
 do driver continua sendo a alimentação do circuito, não uma fonte ideal
 independente que gere 5 V com o chip desligado.
 
-O editor visual de blocos recusa a composição de modelos com runtime nesta
+O editor de modelos permite abrir e salvar modelos com runtime, editar seus
+vínculos e suas disposições por símbolo, preservando o runtime. A composição
+desses modelos como blocos elétricos continua indisponível nesta
 versão, para não salvar um chip sem sua CPU. Edite o descritor e o módulo em
 arquivos separados; o fluxo normal de associação/configuração no esquema aceita
 os modelos programáveis.
@@ -129,12 +159,20 @@ são implementados. O oscilador e o consumo físico não são simulados.
 ## Limites do backend AVR
 
 O módulo AVR inclui instruções, GPIO/direção/pull-up, timers e PWM, interrupções,
-ADC, EEPROM e USART com ponte elétrica. Os tamanhos de memória e vetores de
+ADC, EEPROM, USART, SPI e TWI/I²C com ponte elétrica. SPI implementa controlador
+e alvo, quatro modos e duas ordens de bits. I²C implementa controlador e alvo de
+7 bits, máscara de endereço/general call, ACK/NACK, repeated START, STOP e clock
+stretching. O barramento precisa de pull-ups. Os tamanhos de memória e vetores de
 interrupção diferem entre os quatro alvos e são configurados por dispositivo.
-Fuses, bootloader selecionado por fuse, oscilador físico, consumo exato,
-programação ISP e USB não são modelados. SPI, TWI/I²C, watchdog, sleep e
-self-programming ainda não têm integração completa e geram erro explícito quando
-solicitados, em vez de aparentar uma execução correta.
+Também estão implementados watchdog com reset/interrupção/WDR, seis modos de
+sleep com wake-up, PRR/GTCCR, comparador analógico, captura do Timer1 com filtro,
+ADC automático, USART de 9 bits/síncrona/MSPIM, Timer2 assíncrono e autoprogramação
+SPM com buffer/erase/write/RWW/locks. Fuses escolhem boot, reset, watchdog e BOD.
+I²C sincroniza clocks e detecta arbitragem; o comparador de endereço do hardware
+é de 7 bits e sequências de 10 bits precisam de firmware.
+O modelo usa clocks ideais e consumo aproximado. Programadores externos ISP/alta
+tensão e debugWIRE não fazem parte do motor de execução de firmware. Consulte
+os detalhes de timing e capacidades no contrato do runtime.
 
 Play/Stop inicializa as imagens originais; escrever na EEPROM simulada não
 reescreve o arquivo escolhido no computador. Os arquivos `.casim`, módulos JS e

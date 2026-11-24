@@ -21,3 +21,8 @@ pastas `.pretty`. Os caminhos distribuídos usam `${KICAD10_SYMBOL_DIR}`,
 `${KICAD10_FOOTPRINT_DIR}` e `${KICAD10_3DMODEL_DIR}`.
 
 Veja [o fluxo de incorporação de componentes](../../docs/circuitalive/CUSTOM_COMPONENTS.md).
+
+`CircuitAlive_Simulation` contém símbolos próprios para LCD 16×2 I2C, display de
+onze segmentos e buzzer ativo. Esses símbolos são licenciados sob GPL-3.0-or-later
+e associados aos blocos funcionais descritos em
+[Displays, áudio e vínculos](../../docs/circuitalive/SIMULATION_OUTPUTS_AND_LINKS.md).

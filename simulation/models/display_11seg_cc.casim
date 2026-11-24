@@ -1,0 +1,253 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "display_11seg_cc",
+  "name": "11 segment LED \u2014 common cathode",
+  "description": "11 segment LED \u2014 common cathode",
+  "license": "GPL-3.0-or-later",
+  "category": "Simulation outputs",
+  "family": "Functional peripherals",
+  "pins": [
+    {
+      "id": "a",
+      "label": "A",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "b",
+      "label": "B",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "c",
+      "label": "C",
+      "role": "passive",
+      "default_pin": "3"
+    },
+    {
+      "id": "d",
+      "label": "D",
+      "role": "passive",
+      "default_pin": "4"
+    },
+    {
+      "id": "e",
+      "label": "E",
+      "role": "passive",
+      "default_pin": "5"
+    },
+    {
+      "id": "f",
+      "label": "F",
+      "role": "passive",
+      "default_pin": "6"
+    },
+    {
+      "id": "g",
+      "label": "G",
+      "role": "passive",
+      "default_pin": "7"
+    },
+    {
+      "id": "h",
+      "label": "H",
+      "role": "passive",
+      "default_pin": "8"
+    },
+    {
+      "id": "i",
+      "label": "I",
+      "role": "passive",
+      "default_pin": "9"
+    },
+    {
+      "id": "j",
+      "label": "J",
+      "role": "passive",
+      "default_pin": "10"
+    },
+    {
+      "id": "k",
+      "label": "K",
+      "role": "passive",
+      "default_pin": "11"
+    },
+    {
+      "id": "common",
+      "label": "Common cathode",
+      "role": "passive",
+      "default_pin": "12"
+    }
+  ],
+  "parameters": [],
+  "spice": {
+    "instance": [
+      "VsA_${id} ${pin:a} seg_A_${id} 0",
+      "DA_${id} seg_A_${id} ${pin:common} segment_${id}",
+      "VsB_${id} ${pin:b} seg_B_${id} 0",
+      "DB_${id} seg_B_${id} ${pin:common} segment_${id}",
+      "VsC_${id} ${pin:c} seg_C_${id} 0",
+      "DC_${id} seg_C_${id} ${pin:common} segment_${id}",
+      "VsD_${id} ${pin:d} seg_D_${id} 0",
+      "DD_${id} seg_D_${id} ${pin:common} segment_${id}",
+      "VsE_${id} ${pin:e} seg_E_${id} 0",
+      "DE_${id} seg_E_${id} ${pin:common} segment_${id}",
+      "VsF_${id} ${pin:f} seg_F_${id} 0",
+      "DF_${id} seg_F_${id} ${pin:common} segment_${id}",
+      "VsG_${id} ${pin:g} seg_G_${id} 0",
+      "DG_${id} seg_G_${id} ${pin:common} segment_${id}",
+      "VsH_${id} ${pin:h} seg_H_${id} 0",
+      "DH_${id} seg_H_${id} ${pin:common} segment_${id}",
+      "VsI_${id} ${pin:i} seg_I_${id} 0",
+      "DI_${id} seg_I_${id} ${pin:common} segment_${id}",
+      "VsJ_${id} ${pin:j} seg_J_${id} 0",
+      "DJ_${id} seg_J_${id} ${pin:common} segment_${id}",
+      "VsK_${id} ${pin:k} seg_K_${id} 0",
+      "DK_${id} seg_K_${id} ${pin:common} segment_${id}"
+    ],
+    "definitions": [
+      ".model segment_${id} D(Is=1e-18 N=2 Rs=5)"
+    ]
+  },
+  "segments": [
+    {
+      "id": "A",
+      "signal": "i(VsA_${id})",
+      "shape": "horizontal",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.2,
+        "y": 0.15,
+        "width": 0.6,
+        "height": 0.05
+      }
+    },
+    {
+      "id": "B",
+      "signal": "i(VsB_${id})",
+      "shape": "vertical",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.8,
+        "y": 0.2,
+        "width": 0.05,
+        "height": 0.28
+      }
+    },
+    {
+      "id": "C",
+      "signal": "i(VsC_${id})",
+      "shape": "vertical",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.8,
+        "y": 0.53,
+        "width": 0.05,
+        "height": 0.28
+      }
+    },
+    {
+      "id": "D",
+      "signal": "i(VsD_${id})",
+      "shape": "horizontal",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.2,
+        "y": 0.82,
+        "width": 0.6,
+        "height": 0.05
+      }
+    },
+    {
+      "id": "E",
+      "signal": "i(VsE_${id})",
+      "shape": "vertical",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.15,
+        "y": 0.53,
+        "width": 0.05,
+        "height": 0.28
+      }
+    },
+    {
+      "id": "F",
+      "signal": "i(VsF_${id})",
+      "shape": "vertical",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.15,
+        "y": 0.2,
+        "width": 0.05,
+        "height": 0.28
+      }
+    },
+    {
+      "id": "G",
+      "signal": "i(VsG_${id})",
+      "shape": "horizontal",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.2,
+        "y": 0.48,
+        "width": 0.6,
+        "height": 0.05
+      }
+    },
+    {
+      "id": "H",
+      "signal": "i(VsH_${id})",
+      "shape": "backslash",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.22,
+        "y": 0.21,
+        "width": 0.26,
+        "height": 0.25
+      }
+    },
+    {
+      "id": "I",
+      "signal": "i(VsI_${id})",
+      "shape": "slash",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.52,
+        "y": 0.21,
+        "width": 0.26,
+        "height": 0.25
+      }
+    },
+    {
+      "id": "J",
+      "signal": "i(VsJ_${id})",
+      "shape": "slash",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.22,
+        "y": 0.54,
+        "width": 0.26,
+        "height": 0.25
+      }
+    },
+    {
+      "id": "K",
+      "signal": "i(VsK_${id})",
+      "shape": "backslash",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.52,
+        "y": 0.54,
+        "width": 0.26,
+        "height": 0.25
+      }
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "CircuitAlive_Simulation:LED_11Segment_CC"
+    ]
+  }
+}

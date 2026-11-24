@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "display_7seg_ca12",
+  "name": "7 segment LED \u2014 common anode (39-12 pinout)",
+  "description": "7 segment LED \u2014 common anode",
+  "license": "GPL-3.0-or-later",
+  "category": "Simulation outputs",
+  "family": "Functional peripherals",
+  "pins": [
+    {
+      "id": "p3",
+      "label": "G",
+      "role": "passive",
+      "default_pin": "3"
+    },
+    {
+      "id": "p2",
+      "label": "F",
+      "role": "passive",
+      "default_pin": "2"
+    },
+    {
+      "id": "p1",
+      "label": "CA",
+      "role": "passive",
+      "default_pin": "1"
+    },
+    {
+      "id": "p4",
+      "label": "E",
+      "role": "passive",
+      "default_pin": "4"
+    },
+    {
+      "id": "p5",
+      "label": "D",
+      "role": "passive",
+      "default_pin": "5"
+    },
+    {
+      "id": "p7",
+      "label": "DP",
+      "role": "passive",
+      "default_pin": "7"
+    },
+    {
+      "id": "p8",
+      "label": "C",
+      "role": "passive",
+      "default_pin": "8"
+    },
+    {
+      "id": "p6",
+      "label": "CA",
+      "role": "passive",
+      "default_pin": "6"
+    },
+    {
+      "id": "p9",
+      "label": "B",
+      "role": "passive",
+      "default_pin": "9"
+    },
+    {
+      "id": "p10",
+      "label": "A",
+      "role": "passive",
+      "default_pin": "10"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "forward_voltage",
+      "label": "Forward voltage",
+      "default": "2",
+      "min": 1,
+      "max": 5,
+      "unit": "V"
+    },
+    {
+      "id": "full_current",
+      "label": "Current for full brightness",
+      "default": "10m",
+      "min": 1e-06,
+      "max": 1,
+      "unit": "A"
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Rcommon8_${id} ${pin:p6} ${pin:p1} 1m",
+      "VsG_${id} ${pin:p1} seg_G_${id} 0",
+      "DG_${id} seg_G_${id} ${pin:p3} segment_${id}",
+      "VsF_${id} ${pin:p1} seg_F_${id} 0",
+      "DF_${id} seg_F_${id} ${pin:p2} segment_${id}",
+      "VsE_${id} ${pin:p1} seg_E_${id} 0",
+      "DE_${id} seg_E_${id} ${pin:p4} segment_${id}",
+      "VsD_${id} ${pin:p1} seg_D_${id} 0",
+      "DD_${id} seg_D_${id} ${pin:p5} segment_${id}",
+      "VsDP_${id} ${pin:p1} seg_DP_${id} 0",
+      "DDP_${id} seg_DP_${id} ${pin:p7} segment_${id}",
+      "VsC_${id} ${pin:p1} seg_C_${id} 0",
+      "DC_${id} seg_C_${id} ${pin:p8} segment_${id}",
+      "VsB_${id} ${pin:p1} seg_B_${id} 0",
+      "DB_${id} seg_B_${id} ${pin:p9} segment_${id}",
+      "VsA_${id} ${pin:p1} seg_A_${id} 0",
+      "DA_${id} seg_A_${id} ${pin:p10} segment_${id}"
+    ],
+    "definitions": [
+      ".model segment_${id} D(Is={0.01/(exp(${param:forward_voltage}/(2*0.0258649258))-1)} N=2 Rs=5)"
+    ]
+  },
+  "segments": [
+    {
+      "id": "G",
+      "signal": "i(VsG_${id})",
+      "full_scale": 0.01,
+      "shape": "horizontal",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.38,
+        "y": 0.497,
+        "width": 0.21,
+        "height": 0.022
+      },
+      "full_scale_parameter": "full_current"
+    },
+    {
+      "id": "F",
+      "signal": "i(VsF_${id})",
+      "full_scale": 0.01,
+      "shape": "vertical",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.337,
+        "y": 0.4,
+        "width": 0.035,
+        "height": 0.08
+      },
+      "full_scale_parameter": "full_current"
+    },
+    {
+      "id": "E",
+      "signal": "i(VsE_${id})",
+      "full_scale": 0.01,
+      "shape": "vertical",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.313,
+        "y": 0.52,
+        "width": 0.035,
+        "height": 0.08
+      },
+      "full_scale_parameter": "full_current"
+    },
+    {
+      "id": "D",
+      "signal": "i(VsD_${id})",
+      "full_scale": 0.01,
+      "shape": "horizontal",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.37,
+        "y": 0.604,
+        "width": 0.21,
+        "height": 0.022
+      },
+      "full_scale_parameter": "full_current"
+    },
+    {
+      "id": "DP",
+      "signal": "i(VsDP_${id})",
+      "full_scale": 0.01,
+      "shape": "dot",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.8,
+        "y": 0.6,
+        "width": 0.055,
+        "height": 0.025
+      },
+      "full_scale_parameter": "full_current"
+    },
+    {
+      "id": "C",
+      "signal": "i(VsC_${id})",
+      "full_scale": 0.01,
+      "shape": "vertical",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.62,
+        "y": 0.52,
+        "width": 0.035,
+        "height": 0.08
+      },
+      "full_scale_parameter": "full_current"
+    },
+    {
+      "id": "B",
+      "signal": "i(VsB_${id})",
+      "full_scale": 0.01,
+      "shape": "vertical",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.648,
+        "y": 0.4,
+        "width": 0.035,
+        "height": 0.08
+      },
+      "full_scale_parameter": "full_current"
+    },
+    {
+      "id": "A",
+      "signal": "i(VsA_${id})",
+      "full_scale": 0.01,
+      "shape": "horizontal",
+      "visual": {
+        "target": "rectangle",
+        "x": 0.39,
+        "y": 0.392,
+        "width": 0.21,
+        "height": 0.022
+      },
+      "full_scale_parameter": "full_current"
+    }
+  ],
+  "matches": {
+    "library_ids": [
+      "Display_Character:SA39-12EWA",
+      "Display_Character:SA39-12GWA",
+      "Display_Character:SA39-12SRWA",
+      "Display_Character:SA39-12YWA"
+    ]
+  }
+}

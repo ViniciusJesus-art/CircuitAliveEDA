@@ -13,6 +13,12 @@ struct ANALOG_PARTITION
     std::set<std::string> elements, models, memories;
 };
 
+struct SIM_SNAPSHOT_OBSERVATIONS
+{
+    std::set<std::size_t> history;
+    std::map<std::size_t,double> warningLimits;
+};
+
 /// Conservative, compiler-certified decomposition. Unsupported syntax returns the original deck.
 /// Fixed grounded DC sources may be replicated; branch-current observations add their contributions.
 std::vector<ANALOG_PARTITION> BuildAnalogPartitions( const std::string& netlist,
@@ -31,7 +37,8 @@ public:
     void SetSourceValue( const std::string& reference, double value,
                         const std::vector<SIM_PARAMETER_CHANGE>& changes = {} );
     MEMORY_SNAPSHOT ReadMemory( const std::string& id, std::size_t offset, std::size_t length );
-    SIM_SESSION_SNAPSHOT Snapshot( bool drain = false );
+    SIM_SESSION_SNAPSHOT Snapshot( bool drain = false,
+            const std::optional<SIM_SNAPSHOT_OBSERVATIONS>& observations = {} );
     std::size_t PartitionCount() const;
 private:
     struct IMPL;

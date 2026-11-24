@@ -15,5 +15,7 @@ public:
                   const VECTOR2I& aPosition ) const;
     int AdjustmentAt( const SCHEMATIC_SNAPSHOT& aCircuit, const wxString& aCurrentSheet,
                       const VECTOR2I& aPosition ) const;
+    int DisplayAt( const SCHEMATIC_SNAPSHOT& aCircuit, const EDITOR_SESSION_VIEW& aSession,
+                   const wxString& aCurrentSheet, const VECTOR2I& aPosition ) const;
 };
 }

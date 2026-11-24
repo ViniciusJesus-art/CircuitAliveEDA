@@ -8,6 +8,7 @@
 #include <sim/memory_image.h>
 #include <sim/programmable_runtime.h>
 #include <sim/programmable_pipeline.h>
+#include <sim/interactive_sim_protocol.h>
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -18,6 +19,22 @@
 
 using namespace CIRCUITALIVE;
 namespace fs = std::filesystem;
+
+BOOST_AUTO_TEST_CASE(AuditSavedAvrRuntimeThroughput,*boost::unit_test::disabled())
+{
+    const char* path=std::getenv("CIRCUITALIVE_AVR_AUDIT_CONFIG");BOOST_REQUIRE(path);
+    std::ifstream input(path);const auto json=nlohmann::json::parse(input);
+    const auto selected=std::find_if(json.at("devices").begin(),json.at("devices").end(),
+        [](const auto& d){return d.at("device")=="atmega328p";});
+    BOOST_REQUIRE(selected!=json.at("devices").end());auto device=PROTOCOL::DeserializeProgrammableDevice(*selected);
+    PROGRAMMABLE_RUNTIME runtime;runtime.Configure({device});
+    std::vector<PROGRAMMABLE_PIN_INPUT> pins;
+    for(const auto& pin:device.pins)pins.push_back({device.id,pin,pin=="VCC"||pin=="AVCC"||pin=="AREF"||pin=="RESET"?5.:0.});
+    const auto begin=std::chrono::steady_clock::now();
+    unsigned events=0;while(runtime.Time()<.1)events+=runtime.AdvanceTo(.1,pins).size();
+    const double wall=std::chrono::duration<double>(std::chrono::steady_clock::now()-begin).count();
+    BOOST_TEST_MESSAGE("AVR runtime: speed="<<.1/wall<<" windows="<<runtime.Statistics().windows<<" events="<<events);
+}
 
 namespace
 {
@@ -76,6 +93,7 @@ std::uint16_t Out( unsigned io, unsigned reg )
     return 0xb800 | ( ( io & 0x30 ) << 5 ) | ( reg << 4 ) | ( io & 15 );
 }
 std::uint16_t Rjmp( int displacement ) { return 0xc000 | ( displacement & 0xfff ); }
+std::uint16_t Sts( unsigned reg ) { return 0x9200 | (reg<<4); }
 std::uint16_t Sbi( unsigned io, unsigned bit ) { return 0x9a00 | ( io << 3 ) | bit; }
 std::uint16_t Cbi( unsigned io, unsigned bit ) { return 0x9800 | ( io << 3 ) | bit; }
 std::vector<std::uint16_t> DigitalOutput( bool high )
@@ -310,6 +328,130 @@ CIRCUIT_SNAPSHOT AvrCircuit( const CIRCUIT_COMPONENT& u, const std::string& inpu
 }
 } // namespace
 
+namespace
+{
+void WriteAvrRegister( std::vector<std::uint16_t>& code, unsigned address, unsigned value )
+{
+    code.push_back( Ldi( 16, value ) );
+    if( address < 0x60 ) code.push_back( Out( address - 32, 16 ) );
+    else { code.push_back( 0x9300 ); code.push_back( address ); }
+}
+void WaitAvrFlag( std::vector<std::uint16_t>& code, unsigned address, unsigned bit )
+{
+    code.insert( code.end(), { 0x9100, std::uint16_t( address ),
+                             std::uint16_t( 0xff00 | bit ), Rjmp( -4 ) } );
+}
+void CopyAvrRegisterToPortD( std::vector<std::uint16_t>& code, unsigned address )
+{
+    code.insert( code.end(), { 0x9110, std::uint16_t( address ), Out( 0x0b, 17 ) } );
+}
+void MapAvrResult( CIRCUIT_COMPONENT& symbol, const std::string& prefix )
+{
+    const std::vector<std::string> pins{ "2", "3", "4", "5", "6", "11", "12", "13" };
+    for( unsigned bit = 0; bit < pins.size(); ++bit ) symbol.pins[pins[bit]] = prefix + std::to_string( bit );
+}
+void CheckAvrResult( const CIRCUIT_SNAPSHOT& circuit, const SIM_SESSION_SNAPSHOT& snapshot,
+                     std::size_t component, unsigned expected )
+{
+    const std::vector<std::string> pins{ "2", "3", "4", "5", "6", "11", "12", "13" };
+    for( unsigned bit = 0; bit < pins.size(); ++bit )
+    {
+        const auto signal = "v(" + circuit.pinNodes.at( component ).at( pins[bit] ) + ")";
+        const auto at = std::find( circuit.config.signals.begin(), circuit.config.signals.end(), signal );
+        BOOST_REQUIRE( at != circuit.config.signals.end() );
+        const auto voltage = snapshot.latest.values.at( at - circuit.config.signals.begin() );
+        BOOST_CHECK_MESSAGE( expected & ( 1 << bit ) ? voltage > 4 : voltage < 1,
+                             signal << " = " << voltage << ", expected byte " << expected );
+    }
+}
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableSpiExchangesFirmwareBytesThroughTheAnalogCircuit, PROGRAM_FILES )
+{
+    for( unsigned mode = 0; mode < 4; ++mode )
+    {
+        BOOST_TEST_CONTEXT( "SPI mode " << mode )
+        {
+            std::vector<std::uint16_t> controller, target;
+            WriteAvrRegister( controller, 0x25, 4 ); // Keep SS HIGH while configuring CPOL.
+            WriteAvrRegister( controller, 0x24, 0x2c ); // SS/MOSI/SCK outputs.
+            WriteAvrRegister( target, 0x24, 0x10 ); // MISO output.
+            WriteAvrRegister( controller, 0x2a, 255 ); WriteAvrRegister( target, 0x2a, 255 );
+            const auto options = ( mode & 2 ? 8 : 0 ) | ( mode & 1 ? 4 : 0 );
+            WriteAvrRegister( controller, 0x4c, 0x52 | options );
+            WriteAvrRegister( target, 0x4c, 0x40 | options );
+            WriteAvrRegister( target, 0x4e, 0xa6 );
+            controller.insert( controller.end(), 128, 0 );
+            controller.push_back( Cbi( 5, 2 ) );
+            controller.insert( controller.end(), 16, 0 ); // SS setup before the first clock.
+            WriteAvrRegister( controller, 0x4e, 0x39 );
+            for( auto* code : { &controller, &target } )
+            {
+                WaitAvrFlag( *code, 0x4d, 7 ); CopyAvrRegisterToPortD( *code, 0x4e );
+                code->push_back( Rjmp( -1 ) );
+            }
+            auto first = AvrSymbol( Firmware( "spi-controller", controller ) );
+            auto second = AvrSymbol( Firmware( "spi-target", target ), "U2" );
+            for( auto* symbol : { &first, &second } )
+            {
+                symbol->pins["16"] = "ss"; symbol->pins["17"] = "mosi";
+                symbol->pins["18"] = "miso"; symbol->pins["19"] = "sck";
+                symbol->modelParameters["sample_period"] = "100n";
+            }
+            MapAvrResult( first, "controller" ); MapAvrResult( second, "target" );
+            auto circuit = BuildCircuitSnapshot( { Supply( "VCC", "vcc", "5" ), first, second } );
+            circuit.config.step = circuit.config.maxStep = 1e-7; circuit.config.horizon = .001;
+            INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+            session.Configure( circuit.netlist, circuit.config ); session.AdvanceTo( 100e-6 );
+            CheckAvrResult( circuit, session.Snapshot(), 1, 0xa6 );
+            CheckAvrResult( circuit, session.Snapshot(), 2, 0x39 );
+        }
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableI2cFirmwareReadsAndWritesAnElectricalPeerWithPullups, PROGRAM_FILES )
+{
+    std::vector<std::uint16_t> controller, target;
+    WriteAvrRegister( target, 0x2a, 255 );
+    WriteAvrRegister( target, 0xba, 0x84 ); WriteAvrRegister( target, 0xbc, 0x44 );
+    // Build the explicit START/address/write/repeated START/address/read sequence.
+    WriteAvrRegister( controller, 0x2a, 255 );
+    WriteAvrRegister( controller, 0xb8, 72 ); WriteAvrRegister( controller, 0xbc, 4 );
+    controller.insert( controller.end(), 128, 0 );
+    const auto command = [&]( unsigned value ) {
+        WriteAvrRegister( controller, 0xbc, value ); WaitAvrFlag( controller, 0xbc, 7 );
+    };
+    command( 0xa4 ); WriteAvrRegister( controller, 0xbb, 0x84 ); command( 0x84 );
+    WriteAvrRegister( controller, 0xbb, 0x53 ); command( 0x84 );
+    command( 0xa4 ); WriteAvrRegister( controller, 0xbb, 0x85 ); command( 0x84 );
+    command( 0x84 ); CopyAvrRegisterToPortD( controller, 0xbb );
+    WriteAvrRegister( controller, 0xbc, 0x94 ); controller.push_back( Rjmp( -1 ) );
+    WaitAvrFlag( target, 0xbc, 7 ); // Own address + write.
+    WriteAvrRegister( target, 0xbc, 0xc4 ); WaitAvrFlag( target, 0xbc, 7 );
+    CopyAvrRegisterToPortD( target, 0xbb ); // Received 0x53.
+    WriteAvrRegister( target, 0xbc, 0xc4 ); WaitAvrFlag( target, 0xbc, 7 ); // Repeated START.
+    WriteAvrRegister( target, 0xbc, 0xc4 ); WaitAvrFlag( target, 0xbc, 7 ); // Own address + read.
+    WriteAvrRegister( target, 0xbb, 0x96 ); WriteAvrRegister( target, 0xbc, 0xc4 );
+    WaitAvrFlag( target, 0xbc, 7 ); WriteAvrRegister( target, 0xbc, 0xc4 );
+    target.push_back( Rjmp( -1 ) );
+    auto first = AvrSymbol( Firmware( "i2c-controller", controller ) );
+    auto second = AvrSymbol( Firmware( "i2c-target", target ), "U2" );
+    for( auto* symbol : { &first, &second } )
+    {
+        symbol->pins["27"] = "sda"; symbol->pins["28"] = "scl";
+        symbol->modelParameters["sample_period"] = "100n";
+    }
+    MapAvrResult( first, "controller" ); MapAvrResult( second, "target" );
+    auto circuit = BuildCircuitSnapshot( { Supply( "VCC", "vcc", "5" ), first, second,
+        { "R1", "Device:R", "4.7k", {{"1","vcc"},{"2","sda"}} },
+        { "R2", "Device:R", "4.7k", {{"1","vcc"},{"2","scl"}} } } );
+    circuit.config.step = circuit.config.maxStep = 1e-7; circuit.config.horizon = .002;
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config ); session.AdvanceTo( 600e-6 );
+    CheckAvrResult( circuit, session.Snapshot(), 1, 0x96 );
+    CheckAvrResult( circuit, session.Snapshot(), 2, 0x53 );
+}
+
 BOOST_FIXTURE_TEST_CASE( ProgrammableAvrExecutesHexAndBinOnEveryDeclaredCpuVariant, PROGRAM_FILES )
 {
     const auto hex = Firmware( "high", DigitalOutput( true ) );
@@ -333,6 +475,132 @@ BOOST_FIXTURE_TEST_CASE( ProgrammableAvrExecutesHexAndBinOnEveryDeclaredCpuVaria
     }
 }
 
+BOOST_FIXTURE_TEST_CASE( ProgrammableSupplyLoadAndVoltageRangeFollowSymbolParameters, PROGRAM_FILES )
+{
+    for( const bool enoughPower : { true, false } )
+    {
+        auto symbol = AvrSymbol( Firmware( "supply-load", DigitalOutput( true ) ) );
+        symbol.modelParameters["supply_current"] = "10m";
+        symbol.modelParameters["supply_min"] = "4.5";
+        symbol.modelParameters["supply_max"] = "5.5";
+        symbol.measurements.voltage = false;
+        symbol.measurements.current = true;
+        auto circuit = BuildCircuitSnapshot( { Supply( "VSOURCE", "source", "5" ),
+            { "Rsource", "Device:R", enoughPower ? "10" : "1k", {{"1","source"},{"2","vcc"}} },
+            symbol, { "Rload", "Device:R", "10k", {{"1","out"},{"2","0"}} } } );
+        const auto outputSignal = "v(" + circuit.pinNodes[2].at( "19" ) + ")";
+        const auto outputAt = std::find( circuit.config.signals.begin(), circuit.config.signals.end(), outputSignal );
+        BOOST_REQUIRE( outputAt != circuit.config.signals.end() );
+        circuit.config.horizon = .001;
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+        session.Configure( circuit.netlist, circuit.config ); session.AdvanceTo( 20e-6 );
+        const auto snapshot = session.Snapshot();
+        const auto output = snapshot.latest.values.at( outputAt - circuit.config.signals.begin() );
+        if( enoughPower )
+        {
+            BOOST_CHECK_GT( output, 4.5 );
+            const auto current = std::find_if( circuit.measurements.begin(), circuit.measurements.end(),
+                []( const auto& channel ) { return channel.name == "U1" && channel.quantity == MEASURE_QUANTITY::CURRENT; } );
+            BOOST_REQUIRE( current != circuit.measurements.end() );
+            // Quiescent current plus the load driven by PB5, supplied by VCC.
+            BOOST_CHECK_CLOSE( MeasurementValue( *current, snapshot.latest ),
+                               .010 + output / 10000, .1 );
+        }
+        else BOOST_CHECK_SMALL( output, .001 );
+    }
+    auto invalid = AvrSymbol( Firmware( "invalid-range", DigitalOutput( true ) ) );
+    invalid.modelParameters["supply_min"] = "6";
+    invalid.modelParameters["supply_max"] = "5";
+    BOOST_CHECK_THROW( BuildCircuitSnapshot( { Supply( "VCC", "vcc", "5" ), invalid } ), std::runtime_error );
+    auto descriptor = nlohmann::json::parse( Text( MODEL_REPOSITORY().SelectModel( invalid ).file ) );
+    descriptor["runtime"]["supply_current_parameter"] = "missing";
+    BOOST_CHECK_THROW( MODEL_REPOSITORY::LoadText( descriptor.dump() ), std::runtime_error );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableWatchdogWakesPowerDownFirmwareInTheAnalogWorker, PROGRAM_FILES )
+{
+    std::vector<std::uint16_t> code;
+    WriteAvrRegister( code, 0x24, 0x20 ); WriteAvrRegister( code, 0x60, 0x40 );
+    WriteAvrRegister( code, 0x53, 5 ); // SE + Power-down; global interrupts remain disabled.
+    code.insert( code.end(), { 0x9588, Sbi( 5, 5 ), Rjmp( -1 ) } );
+    auto circuit = AvrCircuit( AvrSymbol( Firmware( "wdt-sleep", code ) ) );
+    circuit.config.horizon = .05;
+    INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+    session.Configure( circuit.netlist, circuit.config ); session.AdvanceTo( .010 );
+    BOOST_CHECK_LT( session.Snapshot().latest.values[0], .1 );
+    session.AdvanceTo( .020 ); BOOST_CHECK_GT( session.Snapshot().latest.values[0], 4.8 );
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableComparatorReadsTheActualAnalogPinVoltages, PROGRAM_FILES )
+{
+    for( const bool high : { false, true } )
+    {
+        // Read ACO and mirror it to PB5 without enabling the comparator interrupt.
+        std::vector<std::uint16_t> code{ Ldi(16,0x20), Out(4,16),
+            std::uint16_t( 0xb000 | (0x30 << 5) | (16 << 4) ), // IN r16, ACSR (I/O 30h).
+            0xff05, Rjmp(2), Sbi(5,5), Rjmp(-5), Cbi(5,5), Rjmp(-7) };
+        auto symbol = AvrSymbol( Firmware( "comparator", code ) );
+        symbol.pins["12"] = "positive"; symbol.pins["13"] = "negative";
+        auto circuit = BuildCircuitSnapshot( { Supply("VCC","vcc","5"),
+            Supply("VP","positive",high?"3":".5"),Supply("VN","negative","1"),symbol,
+            {"Rload","Device:R","10k",{{"1","out"},{"2","0"}}} } );
+        SelectSignals( circuit, { "v(" + circuit.pinNodes[3].at("19") + ")" } );
+        circuit.config.horizon = .001;
+        INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
+        session.Configure(circuit.netlist,circuit.config);session.AdvanceTo(20e-6);
+        if(high)BOOST_CHECK_GT(session.Snapshot().latest.values[0],4.8);
+        else BOOST_CHECK_LT(session.Snapshot().latest.values[0],.1);
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableBootFirmwareErasesWritesAndReadsBackAFlashPage, PROGRAM_FILES )
+{
+    constexpr unsigned boot=0x7e00/2;
+    std::vector<std::uint16_t> code(16384,0xffff);
+    code[0]=0x940c;code[1]=boot;code[128]=0; // Reset JMP; target page initially contains zeros.
+    std::vector<std::uint16_t> loader;
+    WriteAvrRegister(loader,0x24,0x20);
+    loader.insert(loader.end(),{Ldi(30,0),Ldi(31,1)});
+    const auto spm=[&](unsigned command) {
+        WriteAvrRegister(loader,0x57,command);loader.push_back(0x95e8);
+    };
+    const auto wait=[&] {
+        loader.insert(loader.end(),{std::uint16_t(0xb000 | (0x30 << 5) | (16 << 4) | 7),
+                                   0xfd00,Rjmp(-3)});
+    };
+    spm(3);wait();spm(0x11);
+    loader.insert(loader.end(),{Ldi(16,0x34),0x2e00,Ldi(16,0x12),0x2e10});
+    spm(1);spm(5);wait();spm(0x11);
+    loader.insert(loader.end(),{0x9104,0x3304,0xf409,Sbi(5,5),Rjmp(-1)});
+    std::copy(loader.begin(),loader.end(),code.begin()+boot);
+    auto circuit=AvrCircuit(AvrSymbol(Firmware("bootloader-spm",code)));
+    circuit.config.horizon=.05;
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);
+    session.Configure(circuit.netlist,circuit.config);session.AdvanceTo(.012);
+    BOOST_CHECK_GT(session.Snapshot().latest.values[0],4.8);
+}
+
+BOOST_FIXTURE_TEST_CASE( ProgrammableAvrResetFuseEnablesPc6ElectricalDrive, PROGRAM_FILES )
+{
+    const auto firmware=Firmware("pc6-output",{Ldi(16,0x40),Out(7,16),Out(8,16),Rjmp(-1)});
+    auto symbol=AvrSymbol(firmware);symbol.pins["1"]="pc6";
+    const auto binding=[](const auto& circuit)->int {
+        const auto& pins=circuit.config.programmableDevices.at(0).bindings;
+        const auto found=std::find_if(pins.begin(),pins.end(),[](const auto& pin){return pin.id=="RESET";});
+        BOOST_REQUIRE(found!=pins.end());return found->driverSlot;
+    };
+    const auto normal=BuildCircuitSnapshot({Supply("VCC","vcc","5"),symbol});
+    BOOST_CHECK_EQUAL(binding(normal),-1);
+    symbol.modelParameters["fuse_high"]="95"; // RSTDISBL programmed; WDTON unprogrammed.
+    auto circuit=BuildCircuitSnapshot({Supply("VCC","vcc","5"),symbol,
+        {"Rload","Device:R","10k",{{"1","pc6"},{"2","0"}}}});
+    BOOST_CHECK_GE(binding(circuit),0);
+    SelectSignals(circuit,{"v("+circuit.pinNodes[1].at("1")+")"});circuit.config.horizon=.001;
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);
+    session.Configure(circuit.netlist,circuit.config);session.AdvanceTo(20e-6);
+    BOOST_CHECK_GT(session.Snapshot().latest.values[0],4.8);
+}
+
 BOOST_AUTO_TEST_CASE( ProgrammableNativeAvrInstructionsMatchReferenceDecoder )
 {
     PROGRAMMABLE_DEVICE_CONFIG config;
@@ -347,18 +615,23 @@ BOOST_AUTO_TEST_CASE( ProgrammableNativeAvrInstructionsMatchReferenceDecoder )
           for(let end=Math.min(131072,cursor+256);cursor<end;cursor++) {
             const opcode=cursor&65535, seed=cursor<65536?0:165;
             program[0]=opcode;program[1]=0x100;
-            for(const cpu of [a,b]) {
-              cpu.data.set(templates[cursor<65536?0:1]);cpu.pc=0;cpu.cycles=123;cpu.SP=0x600;cpu.data[95]=seed;
-              for(const reg of [26,28,30])cpu.dataView.setUint16(reg,0x100,true);
+            for(const fill of [false,true]) {
+              for(const cpu of [a,b]) {
+                cpu.data.set(templates[cursor<65536?0:1]);cpu.pc=0;cpu.cycles=123;cpu.SP=0x600;cpu.data[95]=seed;
+                for(const reg of [26,28,30])cpu.dataView.setUint16(reg,0x100,true);
+              }
+              const deadline=fill?124+(opcode%6):129;
+              const result=__circuitaliveAvrRun(b.data,b.progBytes,b.pc,b.cycles,deadline,-1,0,0,seed===165?1:0,(seed===165?3:0)+(fill?4:0));
+              if(result[2])for(let i=0;i<result[2].length;i+=3)b.data[result[2][i]]=result[2][i+1];
+              if(result[1]===123) {
+                for(let i=0;i<wordsA.length;i++)if(wordsA[i]!==wordsB[i])throw Error('Bailout mutated memory '+opcode);
+                continue;
+              }
+              if(fill&&result[1]>deadline)throw Error('Native crossed hardware deadline '+opcode);
+              do {AVR8js.avrInstruction(a);executed++;} while(a.cycles<result[1]);
+              if(result[0]!==a.pc || result[1]!==a.cycles)throw Error('Native PC/cycles mismatch '+opcode);
+              for(let i=0;i<wordsA.length;i++)if(wordsA[i]!==wordsB[i])throw Error('Native memory mismatch '+opcode+' at word '+i);
             }
-            const result=__circuitaliveAvrRun(b.data,b.progBytes,b.pc,b.cycles,129,-1,0,0);
-            if(result[1]===123) {
-              for(let i=0;i<wordsA.length;i++)if(wordsA[i]!==wordsB[i])throw Error('Bailout mutated memory '+opcode);
-              continue;
-            }
-            AVR8js.avrInstruction(a);executed++;
-            if(result[0]!==a.pc || result[1]!==a.cycles)throw Error('Native PC/cycles mismatch '+opcode);
-            for(let i=0;i<wordsA.length;i++)if(wordsA[i]!==wordsB[i])throw Error('Native memory mismatch '+opcode+' at word '+i);
           }
           confirmed=time;
           if(cursor===131072 && executed<50000)throw Error('Too few native instructions checked');
@@ -368,6 +641,39 @@ BOOST_AUTO_TEST_CASE( ProgrammableNativeAvrInstructionsMatchReferenceDecoder )
     )JS";
     PROGRAMMABLE_RUNTIME runtime; runtime.Configure({config});
     for(int i=1;i<=512;i++)BOOST_CHECK_NO_THROW(runtime.AdvanceTo(i*1e-6));
+}
+
+BOOST_AUTO_TEST_CASE(ProgrammableNativeDelayLoopsKeepRegistersFlagsAndDeadlineCycles)
+{
+    PROGRAMMABLE_DEVICE_CONFIG config;config.id="WAIT";config.device="delay-audit";config.pins={"TEST"};
+    config.source=Text(CIRCUITALIVE_TEST_AVR_RUNTIME)+R"JS(
+      globalThis.createDevice=function() {
+        const program=new Uint16Array(16384),a=new AVR8js.CPU(program,2048),b=new AVR8js.CPU(program,2048);
+        const patterns=[0x9701,0x9711,0x9721,0x9731,0x950a,0x958a,0x95fa,0xcfff];
+        const counts=[0,1,2,3,127,128,129,255,256,32767,32768,32769,65535];
+        const limits=[6,7,12,13,17,64,511,4096,65540];let cursor=0,confirmed=0;
+        return {nextEventTime:()=>confirmed+1e-6,advanceTo:time=>{
+          let index=cursor++,seed=index%2?165:0;index=Math.floor(index/2);
+          const deadline=limits[index%limits.length];index=Math.floor(index/limits.length);
+          const count=counts[index%counts.length];index=Math.floor(index/counts.length);
+          const opcode=patterns[index%patterns.length],word=(opcode&0xffcf)===0x9701;
+          const reg=word?24+((opcode>>3)&6):(opcode>>4)&31;
+          program[0]=opcode;program[1]=0xf7f1;program[2]=0xcfff;
+          for(const cpu of [a,b]) {
+            cpu.data.fill(seed);cpu.pc=0;cpu.cycles=0;cpu.data[reg]=count&255;
+            if(word)cpu.data[reg+1]=count>>8;cpu.data[95]=seed;
+          }
+          const result=__circuitaliveAvrRun(b.data,b.progBytes,0,0,deadline,-1,0,0);
+          while(a.cycles<result[1])AVR8js.avrInstruction(a);
+          if(a.pc!==result[0]||a.cycles!==result[1]||result[1]>deadline)
+            throw Error('Delay PC/cycle mismatch '+opcode+' count '+count+' deadline '+deadline);
+          for(let i=0;i<a.data.length;i++)if(a.data[i]!==b.data[i])throw Error('Delay register/flag mismatch '+opcode+' at '+i);
+          confirmed=time;return [];
+        }};
+      };
+    )JS";
+    PROGRAMMABLE_RUNTIME runtime;runtime.Configure({config});
+    for(unsigned i=1;i<=8*13*9*2;++i)BOOST_CHECK_NO_THROW(runtime.AdvanceTo(i*1e-6));
 }
 
 BOOST_AUTO_TEST_CASE( ProgrammableNativeHelperKeepsScriptLimitsAndRejectsCoercion )
@@ -755,6 +1061,57 @@ BOOST_FIXTURE_TEST_CASE( ProgrammableTimerFlagPollingPreservesReadHooksAndCycleT
         }
         if( hooked ) BOOST_CHECK_EQUAL( highs, 0 );
         else BOOST_CHECK_GT( highs, 10 );
+    }
+}
+BOOST_FIXTURE_TEST_CASE(ProgrammableBatchedGpioKeepsPortHooksAndTimerConfigurationTimes,PROGRAM_FILES)
+{
+    std::vector<std::uint16_t> program={Ldi(16,0x38),Out(4,16),Ldi(16,0xfc),Out(10,16),
+        Ldi(16,3),Out(0x24,16),Out(0x25,16),Ldi(16,1),Sts(16),0x80,Ldi(16,3),Sts(16),0x81};
+    const auto loop=program.size();
+    const std::vector<std::uint16_t> body={Ldi(16,1),Sts(16),0x80,Ldi(16,3),Out(0x24,16),
+        Ldi(16,0x54),Out(11,16),0x9a2b,0,0,0x982b, // E on PB3, data on PORTD.
+        0x9120,0x100,Out(5,18),Ldi(16,0xa8),Out(11,16),0x9a2b,0,0,0x982b};
+    program.insert(program.end(),body.begin(),body.end());program.push_back(Rjmp(int(loop)-int(program.size())-1));
+    for(bool customHook:{false,true})
+    {
+        auto config=AvrConfig(Firmware("batched-gpio",program));config.autonomousWindowSeconds=.001;
+        config.pins.insert(config.pins.end(),{"PB3","PB0","PD3","PD4","PD5"});
+        auto options=nlohmann::json::parse(config.optionsJson);options["unconnectedPins"]={"PB0"};config.optionsJson=options.dump();
+        if(customHook)
+        {
+            const std::string marker="clocksChanged();++clockRevision;";const auto at=config.source.find(marker);BOOST_REQUIRE(at!=std::string::npos);
+            config.source.insert(at+marker.size(),"const extraHook=cpu.writeHooks[0x2b];cpu.writeHooks[0x2b]=(...args)=>{cpu.data[0x100]++;return extraHook(...args);};");
+        }
+        auto reference=config;const std::string marker="typeof global.__circuitaliveAvrRun==='function'";
+        reference.source.replace(reference.source.find(marker),marker.size(),"false");
+        PROGRAMMABLE_RUNTIME expected,actual;expected.Configure({reference});actual.Configure({config});
+        for(unsigned frame=1;frame<=8;++frame)
+        {
+            const auto target=frame*20e-6;
+            std::vector<PROGRAMMABLE_PIN_STATE> a,b;
+            while(expected.Time()<target){const auto events=expected.AdvanceTo(target,AvrInputs());a.insert(a.end(),events.begin(),events.end());}
+            while(actual.Time()<target){const auto events=actual.AdvanceTo(target,AvrInputs());b.insert(b.end(),events.begin(),events.end());}
+            BOOST_REQUIRE_EQUAL(a.size(),b.size());
+            for(std::size_t i=0;i<a.size();++i){BOOST_CHECK_EQUAL(a[i].pin,b[i].pin);BOOST_CHECK(a[i].drive==b[i].drive);BOOST_CHECK_SMALL(a[i].time-b[i].time,1e-12);}
+        }
+    }
+}
+BOOST_FIXTURE_TEST_CASE(ProgrammableInternalTimersOnlySampleChangingCapturePads,PROGRAM_FILES)
+{
+    auto program=std::vector<std::uint16_t>{Ldi(16,1),Sts(16),0x80,Ldi(16,3),Sts(16),0x81,0xcfff};
+    for(bool wired:{false,true})
+    {
+        auto symbol=AvrSymbol(Firmware("internal-timer",program));
+        symbol.pins["14"]=wired?"capture":"";
+        std::vector<CIRCUIT_COMPONENT> parts{Supply("VCC","vcc","5"),Supply("VRESET","reset","5"),symbol};
+        if(wired)parts.push_back({"Rcapture","Device:R","10k",{{"1","capture"},{"2","0"}}});
+        auto circuit=BuildCircuitSnapshot(parts);const auto& config=circuit.config.programmableDevices[0];
+        const auto options=nlohmann::json::parse(config.optionsJson);
+        BOOST_CHECK_EQUAL(std::count(options.at("unconnectedPins").begin(),options.at("unconnectedPins").end(),"PB0"),wired?0:1);
+        PROGRAMMABLE_RUNTIME runtime;runtime.Configure({config});auto inputs=AvrInputs();inputs.push_back({"U1","PB0",0});
+        while(runtime.Time()<.001)runtime.AdvanceTo(.001,inputs);
+        if(wired)BOOST_CHECK_GT(runtime.Statistics().windows,900);
+        else BOOST_CHECK_LT(runtime.Statistics().windows,20);
     }
 }
 
@@ -1278,6 +1635,57 @@ BOOST_FIXTURE_TEST_CASE( ProgrammableWorkerPreservesPwmTransitionsThroughTheAnal
         }
     }
     BOOST_CHECK_GT( high, 10 ); BOOST_CHECK_GT( low, 10 );
+}
+BOOST_FIXTURE_TEST_CASE(ProgrammableCachedGpioKeepsAudioPulseAreaAndAnalogLoading,PROGRAM_FILES)
+{
+    auto circuit=AvrCircuit(AvrSymbol(Firmware("cached-pwm-audio",PwmOutput())));
+    circuit.config.audioChannels={{2,5,.2}};
+    INTERACTIVE_SIM_SESSION fast(CIRCUITALIVE_TEST_WORKER),reference(CIRCUITALIVE_TEST_WORKER);
+    fast.Configure(circuit.netlist,circuit.config);circuit.config.accelerateStateless=false;reference.Configure(circuit.netlist,circuit.config);
+    std::vector<std::int16_t> a,b;
+    for(unsigned frame=1;frame<=10;++frame)
+    {
+        fast.AdvanceTo(frame*.0005);reference.AdvanceTo(frame*.0005);
+        const auto x=fast.Snapshot(true),y=reference.Snapshot(true);
+        BOOST_CHECK_SMALL(x.latest.values[2]-y.latest.values[2],.006);
+        a.insert(a.end(),x.audio.begin(),x.audio.end());b.insert(b.end(),y.audio.begin(),y.audio.end());
+    }
+    BOOST_REQUIRE_GT(a.size(),200);BOOST_REQUIRE_GT(b.size(),200);
+    BOOST_CHECK_LE(std::abs(static_cast<int>(a.size())-static_cast<int>(b.size())),1);
+    double difference=0;for(std::size_t i=0;i<std::min(a.size(),b.size());++i)difference+=std::abs(int(a[i])-int(b[i]));
+    BOOST_CHECK_LT(difference/std::min(a.size(),b.size()),20);
+}
+
+BOOST_FIXTURE_TEST_CASE(ProgrammableDcNetworkAdvancesAtEventsWithoutRepeatingTheAnalogGrid,PROGRAM_FILES)
+{
+    const auto circuit=AvrCircuit(AvrSymbol(Firmware("dc-event-grid",DigitalOutput(true))));
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);
+    session.Configure(circuit.netlist,circuit.config);session.AdvanceTo(.005);
+    const auto state=session.Snapshot();
+    BOOST_CHECK_GT(state.latest.values[0],4.8);
+    BOOST_CHECK_SMALL(state.latest.time-.005,1e-12);
+    BOOST_CHECK_LT(state.samplesReceived,100u); // A 1 us grid would repeat 5000 DC solutions.
+}
+BOOST_FIXTURE_TEST_CASE(ProgrammableDriveAtAcceptedFrontierIsObservedBeforeItsNextTransition,PROGRAM_FILES)
+{
+    auto circuit=AvrCircuit(AvrSymbol(Firmware("frontier-pulse",DigitalOutput(false))));
+    auto& device=circuit.config.programmableDevices[0];device.device="frontier-pulse";
+    device.source=R"JS(globalThis.createDevice=function(){
+      let confirmed=0,sent=false;
+      function advance(time){
+        const events=[];
+        if(!sent&&confirmed>=8){sent=true;events.push({pin:'PB5',drive:2,time:confirmed},{pin:'PB5',drive:1,time:confirmed+50e-6});}
+        confirmed=time;return {time,events,needsInputs:false};
+      }
+      return {reset:()=>{confirmed=0;sent=false;},nextEventTime:()=>confirmed+.001,
+        advanceTo:time=>advance(time).events,prepareWindow:advance};
+    };)JS";
+    circuit.config.horizon=9;circuit.config.historySignals=std::vector<std::size_t>{0};
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(circuit.netlist,circuit.config);
+    session.AdvanceTo(8);session.Snapshot(true);session.AdvanceTo(8.0001);const auto result=session.Snapshot();
+    const auto high=std::find_if(result.history.begin(),result.history.end(),[](const auto& point){return point.values[0]>4.8;});
+    BOOST_REQUIRE(high!=result.history.end());BOOST_CHECK_LT(high->time,8+1e-9);
+    BOOST_CHECK_LT(result.latest.values[0],.1);
 }
 
 BOOST_FIXTURE_TEST_CASE( ProgrammableUnoSymbolUsesTheSameFirmwareWithItsOwnConnectorMap, PROGRAM_FILES )

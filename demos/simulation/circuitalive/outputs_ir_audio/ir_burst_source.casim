@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "backend": "ngspice",
+  "id": "demo_ir_bursts",
+  "name": "Demo infrared burst generator",
+  "description": "38 kHz carrier, 1 ms bursts every 10 ms.",
+  "pins": [
+    {
+      "id": "p",
+      "label": "Output",
+      "role": "power",
+      "default_pin": "1"
+    },
+    {
+      "id": "n",
+      "label": "Return",
+      "role": "reference",
+      "default_pin": "2"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "step",
+      "label": "Maximum solver step",
+      "default": "1u",
+      "min": 1e-08,
+      "max": 1e-05
+    }
+  ],
+  "spice": {
+    "instance": [
+      "B${id} ${pin:p} ${pin:n} V={(sin(238761.0416728243*time)>0 && (time-0.01*floor(time/0.01))<0.001) ? 5 : 0}"
+    ]
+  },
+  "max_step_parameter": "step"
+}

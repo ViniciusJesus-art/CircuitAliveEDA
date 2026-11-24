@@ -7,6 +7,7 @@
 
 #include "programmable_device.h"
 #include <memory>
+#include <map>
 
 namespace CIRCUITALIVE
 {
@@ -40,6 +41,8 @@ public:
     std::vector<PROGRAMMABLE_PIN_STATE> States() const;
     double NextEventTime() const;
     double Time() const;
+    /// Optional bounded presentation state, read only at a confirmed execution boundary.
+    std::map<std::string, std::string> Presentation() const;
     /// False only when the cooperative backend guarantees no input observation
     /// before its next barrier. Enables bounded, causal CPU prefetch.
     bool NeedsInputs() const;

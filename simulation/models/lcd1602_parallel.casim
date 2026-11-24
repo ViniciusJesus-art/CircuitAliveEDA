@@ -1,0 +1,277 @@
+{
+  "backend": "ngspice+runtime",
+  "category": "Simulation outputs",
+  "description": "LCD 16×2 HD44780 — parallel 4/8 bit",
+  "display": {
+    "type": "hd44780",
+    "visual": {
+      "height": 0.5,
+      "target": "rectangle",
+      "width": 4,
+      "x": 1.2,
+      "y": 0.25
+    }
+  },
+  "family": "Functional peripherals",
+  "id": "lcd1602_parallel",
+  "license": "GPL-3.0-or-later",
+  "matches": {
+    "excluded_library_ids": [],
+    "library_ids": [
+      "Display_Character:WC1602A",
+      "Display_Character:RC1602A",
+      "Display_Character:HY1602E"
+    ]
+  },
+  "name": "LCD 16×2 HD44780 — parallel 4/8 bit",
+  "parameters": [
+    {
+      "default": "1u",
+      "id": "sample_period",
+      "label": "Electrical sampling period",
+      "max": 0.0001,
+      "min": 1e-08,
+      "unit": "s"
+    },
+    {
+      "default": "1m",
+      "id": "supply_current",
+      "label": "Logic supply current",
+      "max": 0.2,
+      "min": 0,
+      "unit": "A"
+    }
+  ],
+  "pins": [
+    {
+      "default_pin": "1",
+      "id": "gnd",
+      "label": "VSS",
+      "role": "reference"
+    },
+    {
+      "default_pin": "2",
+      "id": "vcc",
+      "label": "VDD",
+      "role": "power"
+    },
+    {
+      "default_pin": "3",
+      "id": "contrast",
+      "label": "VO",
+      "role": "input"
+    },
+    {
+      "default_pin": "4",
+      "id": "rs",
+      "label": "RS",
+      "role": "input"
+    },
+    {
+      "default_pin": "5",
+      "id": "rw",
+      "label": "R/W",
+      "role": "input"
+    },
+    {
+      "default_pin": "6",
+      "id": "e",
+      "label": "E",
+      "role": "input"
+    },
+    {
+      "default_pin": "7",
+      "id": "d0",
+      "label": "D0",
+      "role": "bidirectional"
+    },
+    {
+      "default_pin": "8",
+      "id": "d1",
+      "label": "D1",
+      "role": "bidirectional"
+    },
+    {
+      "default_pin": "9",
+      "id": "d2",
+      "label": "D2",
+      "role": "bidirectional"
+    },
+    {
+      "default_pin": "10",
+      "id": "d3",
+      "label": "D3",
+      "role": "bidirectional"
+    },
+    {
+      "default_pin": "11",
+      "id": "d4",
+      "label": "D4",
+      "role": "bidirectional"
+    },
+    {
+      "default_pin": "12",
+      "id": "d5",
+      "label": "D5",
+      "role": "bidirectional"
+    },
+    {
+      "default_pin": "13",
+      "id": "d6",
+      "label": "D6",
+      "role": "bidirectional"
+    },
+    {
+      "default_pin": "14",
+      "id": "d7",
+      "label": "D7",
+      "role": "bidirectional"
+    },
+    {
+      "default_pin": "15",
+      "id": "leda",
+      "label": "LED(+)",
+      "role": "input"
+    },
+    {
+      "default_pin": "16",
+      "id": "ledk",
+      "label": "LED(-)",
+      "role": "input"
+    }
+  ],
+  "runtime": {
+    "api_version": 1,
+    "device": "hd44780",
+    "engine": "native",
+    "gnd": "gnd",
+    "max_supply": 5.5,
+    "min_supply": 2.7,
+    "pins": [
+      {
+        "drive": false,
+        "id": "GND",
+        "port": "gnd"
+      },
+      {
+        "drive": false,
+        "id": "VCC",
+        "port": "vcc"
+      },
+      {
+        "drive": false,
+        "id": "RS",
+        "port": "rs"
+      },
+      {
+        "drive": false,
+        "id": "RW",
+        "port": "rw"
+      },
+      {
+        "drive": false,
+        "id": "E",
+        "port": "e"
+      },
+      {
+        "drive": true,
+        "id": "D0",
+        "port": "d0"
+      },
+      {
+        "drive": true,
+        "id": "D1",
+        "port": "d1"
+      },
+      {
+        "drive": true,
+        "id": "D2",
+        "port": "d2"
+      },
+      {
+        "drive": true,
+        "id": "D3",
+        "port": "d3"
+      },
+      {
+        "drive": true,
+        "id": "D4",
+        "port": "d4"
+      },
+      {
+        "drive": true,
+        "id": "D5",
+        "port": "d5"
+      },
+      {
+        "drive": true,
+        "id": "D6",
+        "port": "d6"
+      },
+      {
+        "drive": true,
+        "id": "D7",
+        "port": "d7"
+      },
+      {
+        "drive": false,
+        "id": "LEDA",
+        "port": "leda"
+      },
+      {
+        "drive": false,
+        "id": "LEDK",
+        "port": "ledk"
+      }
+    ],
+    "supply_current_parameter": "supply_current",
+    "vcc": "vcc"
+  },
+  "schema_version": 2,
+  "spice": {
+    "definitions": [
+      ".model lcdled_${id} D(Is=1e-20 N=2 Rs=100)"
+    ],
+    "instance": [
+      "Dbacklight_${id} ${pin:leda} ${pin:ledk} lcdled_${id}",
+      "Rcontrast_${id} ${pin:contrast} ${pin:gnd} 10Meg"
+    ]
+  },
+  "symbol_variants": {
+    "Display_Character:HY1602E": {
+      "parameter_defaults": {
+        "sample_period": "1u",
+        "supply_current": "1m"
+      },
+      "pin_map": {
+        "contrast": "5",
+        "d0": "9",
+        "d1": "10",
+        "d2": "11",
+        "d3": "12",
+        "d4": "13",
+        "d5": "14",
+        "d6": "15",
+        "d7": "16",
+        "e": "8",
+        "gnd": "3",
+        "leda": "2",
+        "ledk": "1",
+        "rs": "6",
+        "rw": "7",
+        "vcc": "4"
+      },
+      "settings": {
+        "excluded": false,
+        "measurements": {
+          "current": false,
+          "negative": "gnd",
+          "positive": "vcc",
+          "power": false,
+          "voltage": false
+        },
+        "resources": {}
+      }
+    }
+  }
+}

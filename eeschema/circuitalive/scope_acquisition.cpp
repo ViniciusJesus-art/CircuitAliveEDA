@@ -323,7 +323,13 @@ std::optional<double> ScopeParse( std::string text, const std::string& unit )
         const std::string prefix = match[2]; const std::string letters = "pnum kMG";
         double scale = 1;
         if( !prefix.empty() ) scale = std::pow( 1000., int( letters.find( prefix ) ) - 4 );
-        const double result = std::stod( match[1] ) * scale;
+        // wxWidgets selects the UI's C locale. std::stod would silently stop
+        // at the normalized decimal point in a comma-decimal locale.
+        std::istringstream numeric( match[1].str() );
+        numeric.imbue( std::locale::classic() );
+        double value;
+        if( !( numeric >> value ) || numeric.peek() != std::char_traits<char>::eof() ) return {};
+        const double result = value * scale;
         if( std::isfinite( result ) ) return result;
     }
     catch( const std::exception& ) {}

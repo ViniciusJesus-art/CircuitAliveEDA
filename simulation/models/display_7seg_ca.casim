@@ -1,0 +1,1308 @@
+{
+  "authoring": {
+    "base": "{\"backend\":\"ngspice\",\"category\":\"Simulation outputs\",\"description\":\"7 segment LED — common anode\",\"family\":\"Functional peripherals\",\"id\":\"display_7seg_ca\",\"license\":\"GPL-3.0-or-later\",\"matches\":{\"library_ids\":[\"Display_Character:SA39-11EWA\",\"Display_Character:SA39-11GWA\",\"Display_Character:SA39-11SRWA\",\"Display_Character:SA39-11YWA\"]},\"name\":\"7 segment LED — common anode\",\"parameters\":[{\"default\":\"2\",\"id\":\"forward_voltage\",\"label\":\"Forward voltage\",\"max\":5,\"min\":1,\"unit\":\"V\"},{\"default\":\"10m\",\"id\":\"full_current\",\"label\":\"Current for full brightness\",\"max\":1,\"min\":1e-06,\"unit\":\"A\"}],\"pins\":[{\"default_pin\":\"1\",\"id\":\"p1\",\"label\":\"G\",\"role\":\"passive\"},{\"default_pin\":\"2\",\"id\":\"p2\",\"label\":\"F\",\"role\":\"passive\"},{\"default_pin\":\"3\",\"id\":\"p3\",\"label\":\"CA\",\"role\":\"passive\"},{\"default_pin\":\"4\",\"id\":\"p4\",\"label\":\"E\",\"role\":\"passive\"},{\"default_pin\":\"5\",\"id\":\"p5\",\"label\":\"D\",\"role\":\"passive\"},{\"default_pin\":\"6\",\"id\":\"p6\",\"label\":\"DP\",\"role\":\"passive\"},{\"default_pin\":\"7\",\"id\":\"p7\",\"label\":\"C\",\"role\":\"passive\"},{\"default_pin\":\"8\",\"id\":\"p8\",\"label\":\"CA\",\"role\":\"passive\"},{\"default_pin\":\"9\",\"id\":\"p9\",\"label\":\"B\",\"role\":\"passive\"},{\"default_pin\":\"10\",\"id\":\"p10\",\"label\":\"A\",\"role\":\"passive\"}],\"schema_version\":1,\"segments\":[{\"blue\":0.02,\"full_scale\":0.01,\"full_scale_parameter\":\"full_current\",\"geometry\":{\"end\":[0.6043943751382682,0.4963134776105149],\"filled\":false,\"start\":[0.3943943751382682,0.4963134776105149],\"thickness\":0.05419512195121951},\"green\":0.12,\"id\":\"G\",\"red\":1.0,\"shape\":\"line\",\"signal\":\"i(VsG_b_Core_${id})\",\"visual\":{\"height\":0.022,\"target\":\"rectangle\",\"visible\":true,\"width\":0.21,\"x\":0.38,\"y\":0.497}},{\"blue\":0.02,\"full_scale\":0.01,\"full_scale_parameter\":\"full_current\",\"geometry\":{\"end\":[0.3521009374769553,0.47707836940262877],\"filled\":false,\"start\":[0.37609156270740235,0.3970783694026287],\"thickness\":0.035},\"green\":0.12,\"id\":\"F\",\"red\":1.0,\"shape\":\"line\",\"signal\":\"i(VsF_b_Core_${id})\",\"visual\":{\"height\":0.08,\"target\":\"rectangle\",\"visible\":true,\"width\":0.035,\"x\":0.337,\"y\":0.4}},{\"blue\":0.02,\"full_scale\":0.01,\"full_scale_parameter\":\"full_current\",\"geometry\":{\"end\":[0.3281009374769553,0.5951306156710479],\"filled\":false,\"start\":[0.35449062523044705,0.5141567388052575],\"thickness\":0.035},\"green\":0.12,\"id\":\"E\",\"red\":1.0,\"shape\":\"line\",\"signal\":\"i(VsE_b_Core_${id})\",\"visual\":{\"height\":0.08,\"target\":\"rectangle\",\"visible\":true,\"width\":0.035,\"x\":0.313,\"y\":0.52}},{\"blue\":0.02,\"full_scale\":0.01,\"full_scale_parameter\":\"full_current\",\"green\":0.12,\"id\":\"D\",\"red\":1.0,\"shape\":\"horizontal\",\"signal\":\"i(VsD_b_Core_${id})\",\"visual\":{\"height\":0.022,\"target\":\"rectangle\",\"visible\":true,\"width\":0.21,\"x\":0.37,\"y\":0.604}},{\"blue\":0.02,\"full_scale\":0.01,\"full_scale_parameter\":\"full_current\",\"geometry\":{\"end\":[0.7758309367395247,0.6124999999999999],\"filled\":true,\"start\":[0.7208309367395248,0.6124999999999999],\"thickness\":0.061585365853658536},\"green\":0.12,\"id\":\"DP\",\"red\":1.0,\"shape\":\"circle\",\"signal\":\"i(VsDP_b_Core_${id})\",\"visual\":{\"height\":0.025,\"target\":\"rectangle\",\"visible\":true,\"width\":0.055,\"x\":0.8,\"y\":0.6}},{\"blue\":0.02,\"full_scale\":0.01,\"full_scale_parameter\":\"full_current\",\"geometry\":{\"end\":[0.620706562338687,0.5961044925368383],\"filled\":false,\"start\":[0.6422981250460894,0.5170783694026287],\"thickness\":0.035},\"green\":0.12,\"id\":\"C\",\"red\":1.0,\"shape\":\"line\",\"signal\":\"i(VsC_b_Core_${id})\",\"visual\":{\"height\":0.08,\"target\":\"rectangle\",\"visible\":true,\"width\":0.035,\"x\":0.62,\"y\":0.52}},{\"blue\":0.02,\"full_scale\":0.01,\"full_scale_parameter\":\"full_current\",\"geometry\":{\"end\":[0.6463074998156424,0.47707836940262877],\"filled\":false,\"start\":[0.6750962500921788,0.3951306156710479],\"thickness\":0.035},\"green\":0.12,\"id\":\"B\",\"red\":1.0,\"shape\":\"line\",\"signal\":\"i(VsB_b_Core_${id})\",\"visual\":{\"height\":0.08,\"target\":\"rectangle\",\"visible\":true,\"width\":0.035,\"x\":0.648,\"y\":0.4}},{\"blue\":0.02,\"full_scale\":0.01,\"full_scale_parameter\":\"full_current\",\"geometry\":{\"end\":[0.6215915627074023,0.3767053246236585],\"filled\":false,\"start\":[0.4115915627074024,0.3767053246236585],\"thickness\":0.05419512195121951},\"green\":0.12,\"id\":\"A\",\"red\":1.0,\"shape\":\"line\",\"signal\":\"i(VsA_b_Core_${id})\",\"visual\":{\"height\":0.022,\"target\":\"rectangle\",\"visible\":true,\"width\":0.21,\"x\":0.39,\"y\":0.392}}],\"spice\":{\"definitions\":[],\"instance\":[]}}",
+    "blocks": [
+      {
+        "connections": {
+          "p1": "@p1",
+          "p10": "@p10",
+          "p2": "@p2",
+          "p3": "@p3",
+          "p4": "@p4",
+          "p5": "@p5",
+          "p6": "@p6",
+          "p7": "@p7",
+          "p8": "@p8",
+          "p9": "@p9"
+        },
+        "id": "Core",
+        "model": {
+          "backend": "ngspice",
+          "category": "Simulation outputs",
+          "description": "7 segment LED — common anode",
+          "family": "Functional peripherals",
+          "id": "display_7seg_ca",
+          "license": "GPL-3.0-or-later",
+          "matches": {
+            "library_ids": [
+              "Display_Character:SA39-11EWA",
+              "Display_Character:SA39-11GWA",
+              "Display_Character:SA39-11SRWA",
+              "Display_Character:SA39-11YWA"
+            ]
+          },
+          "name": "7 segment LED — common anode",
+          "parameters": [
+            {
+              "default": "2",
+              "id": "forward_voltage",
+              "label": "Forward voltage",
+              "max": 5,
+              "min": 1,
+              "unit": "V"
+            },
+            {
+              "default": "10m",
+              "id": "full_current",
+              "label": "Current for full brightness",
+              "max": 1,
+              "min": 1e-06,
+              "unit": "A"
+            }
+          ],
+          "pins": [
+            {
+              "default_pin": "1",
+              "id": "p1",
+              "label": "G",
+              "role": "passive"
+            },
+            {
+              "default_pin": "2",
+              "id": "p2",
+              "label": "F",
+              "role": "passive"
+            },
+            {
+              "default_pin": "3",
+              "id": "p3",
+              "label": "CA",
+              "role": "passive"
+            },
+            {
+              "default_pin": "4",
+              "id": "p4",
+              "label": "E",
+              "role": "passive"
+            },
+            {
+              "default_pin": "5",
+              "id": "p5",
+              "label": "D",
+              "role": "passive"
+            },
+            {
+              "default_pin": "6",
+              "id": "p6",
+              "label": "DP",
+              "role": "passive"
+            },
+            {
+              "default_pin": "7",
+              "id": "p7",
+              "label": "C",
+              "role": "passive"
+            },
+            {
+              "default_pin": "8",
+              "id": "p8",
+              "label": "CA",
+              "role": "passive"
+            },
+            {
+              "default_pin": "9",
+              "id": "p9",
+              "label": "B",
+              "role": "passive"
+            },
+            {
+              "default_pin": "10",
+              "id": "p10",
+              "label": "A",
+              "role": "passive"
+            }
+          ],
+          "schema_version": 1,
+          "segments": [
+            {
+              "full_scale": 0.01,
+              "full_scale_parameter": "full_current",
+              "id": "G",
+              "shape": "horizontal",
+              "signal": "i(VsG_${id})",
+              "visual": {
+                "height": 0.022,
+                "target": "rectangle",
+                "width": 0.21,
+                "x": 0.38,
+                "y": 0.497
+              }
+            },
+            {
+              "full_scale": 0.01,
+              "full_scale_parameter": "full_current",
+              "id": "F",
+              "shape": "vertical",
+              "signal": "i(VsF_${id})",
+              "visual": {
+                "height": 0.08,
+                "target": "rectangle",
+                "width": 0.035,
+                "x": 0.337,
+                "y": 0.4
+              }
+            },
+            {
+              "full_scale": 0.01,
+              "full_scale_parameter": "full_current",
+              "id": "E",
+              "shape": "vertical",
+              "signal": "i(VsE_${id})",
+              "visual": {
+                "height": 0.08,
+                "target": "rectangle",
+                "width": 0.035,
+                "x": 0.313,
+                "y": 0.52
+              }
+            },
+            {
+              "full_scale": 0.01,
+              "full_scale_parameter": "full_current",
+              "id": "D",
+              "shape": "horizontal",
+              "signal": "i(VsD_${id})",
+              "visual": {
+                "height": 0.022,
+                "target": "rectangle",
+                "width": 0.21,
+                "x": 0.37,
+                "y": 0.604
+              }
+            },
+            {
+              "full_scale": 0.01,
+              "full_scale_parameter": "full_current",
+              "id": "DP",
+              "shape": "dot",
+              "signal": "i(VsDP_${id})",
+              "visual": {
+                "height": 0.025,
+                "target": "rectangle",
+                "width": 0.055,
+                "x": 0.8,
+                "y": 0.6
+              }
+            },
+            {
+              "full_scale": 0.01,
+              "full_scale_parameter": "full_current",
+              "id": "C",
+              "shape": "vertical",
+              "signal": "i(VsC_${id})",
+              "visual": {
+                "height": 0.08,
+                "target": "rectangle",
+                "width": 0.035,
+                "x": 0.62,
+                "y": 0.52
+              }
+            },
+            {
+              "full_scale": 0.01,
+              "full_scale_parameter": "full_current",
+              "id": "B",
+              "shape": "vertical",
+              "signal": "i(VsB_${id})",
+              "visual": {
+                "height": 0.08,
+                "target": "rectangle",
+                "width": 0.035,
+                "x": 0.648,
+                "y": 0.4
+              }
+            },
+            {
+              "full_scale": 0.01,
+              "full_scale_parameter": "full_current",
+              "id": "A",
+              "shape": "horizontal",
+              "signal": "i(VsA_${id})",
+              "visual": {
+                "height": 0.022,
+                "target": "rectangle",
+                "width": 0.21,
+                "x": 0.39,
+                "y": 0.392
+              }
+            }
+          ],
+          "spice": {
+            "definitions": [
+              ".model segment_${id} D(Is={0.01/(exp(${param:forward_voltage}/(2*0.0258649258))-1)} N=2 Rs=5)"
+            ],
+            "instance": [
+              "Rcommon8_${id} ${pin:p8} ${pin:p3} 1m",
+              "VsG_${id} ${pin:p3} seg_G_${id} 0",
+              "DG_${id} seg_G_${id} ${pin:p1} segment_${id}",
+              "VsF_${id} ${pin:p3} seg_F_${id} 0",
+              "DF_${id} seg_F_${id} ${pin:p2} segment_${id}",
+              "VsE_${id} ${pin:p3} seg_E_${id} 0",
+              "DE_${id} seg_E_${id} ${pin:p4} segment_${id}",
+              "VsD_${id} ${pin:p3} seg_D_${id} 0",
+              "DD_${id} seg_D_${id} ${pin:p5} segment_${id}",
+              "VsDP_${id} ${pin:p3} seg_DP_${id} 0",
+              "DDP_${id} seg_DP_${id} ${pin:p6} segment_${id}",
+              "VsC_${id} ${pin:p3} seg_C_${id} 0",
+              "DC_${id} seg_C_${id} ${pin:p7} segment_${id}",
+              "VsB_${id} ${pin:p3} seg_B_${id} 0",
+              "DB_${id} seg_B_${id} ${pin:p9} segment_${id}",
+              "VsA_${id} ${pin:p3} seg_A_${id} 0",
+              "DA_${id} seg_A_${id} ${pin:p10} segment_${id}"
+            ]
+          }
+        },
+        "values": {
+          "forward_voltage": "@forward_voltage",
+          "full_current": "@full_current"
+        },
+        "x": 400,
+        "y": 70
+      }
+    ],
+    "core_block": "Core",
+    "interactions": [],
+    "interactions_configured": true,
+    "symbol": "Display_Character:SA39-11GWA",
+    "version": 1,
+    "wire_routes": []
+  },
+  "backend": "ngspice",
+  "category": "Simulation outputs",
+  "description": "7 segment LED — common anode",
+  "family": "Functional peripherals",
+  "id": "display_7seg_ca",
+  "license": "GPL-3.0-or-later",
+  "matches": {
+    "automatic": true,
+    "excluded_library_ids": [],
+    "library_ids": [
+      "Display_Character:SA39-11EWA",
+      "Display_Character:SA39-11GWA",
+      "Display_Character:SA39-11SRWA",
+      "Display_Character:SA39-11YWA"
+    ]
+  },
+  "name": "7 segment LED — common anode",
+  "parameters": [
+    {
+      "default": "2",
+      "id": "forward_voltage",
+      "label": "Forward voltage",
+      "max": 5.0,
+      "min": 1.0,
+      "unit": "V"
+    },
+    {
+      "default": "10m",
+      "id": "full_current",
+      "label": "Current for full brightness",
+      "max": 1.0,
+      "min": 1e-06,
+      "unit": "A"
+    }
+  ],
+  "pins": [
+    {
+      "default_pin": "1",
+      "id": "p1",
+      "label": "G",
+      "role": "passive"
+    },
+    {
+      "default_pin": "2",
+      "id": "p2",
+      "label": "F",
+      "role": "passive"
+    },
+    {
+      "default_pin": "3",
+      "id": "p3",
+      "label": "CA",
+      "role": "passive"
+    },
+    {
+      "default_pin": "4",
+      "id": "p4",
+      "label": "E",
+      "role": "passive"
+    },
+    {
+      "default_pin": "5",
+      "id": "p5",
+      "label": "D",
+      "role": "passive"
+    },
+    {
+      "default_pin": "6",
+      "id": "p6",
+      "label": "DP",
+      "role": "passive"
+    },
+    {
+      "default_pin": "7",
+      "id": "p7",
+      "label": "C",
+      "role": "passive"
+    },
+    {
+      "default_pin": "8",
+      "id": "p8",
+      "label": "CA",
+      "role": "passive"
+    },
+    {
+      "default_pin": "9",
+      "id": "p9",
+      "label": "B",
+      "role": "passive"
+    },
+    {
+      "default_pin": "10",
+      "id": "p10",
+      "label": "A",
+      "role": "passive"
+    }
+  ],
+  "schema_version": 1,
+  "segments": [
+    {
+      "blue": 0.02,
+      "full_scale": 0.01,
+      "full_scale_parameter": "full_current",
+      "geometry": {
+        "end": [
+          0.6043943751382682,
+          0.4963134776105149
+        ],
+        "filled": false,
+        "start": [
+          0.3943943751382682,
+          0.4963134776105149
+        ],
+        "thickness": 0.05419512195121951
+      },
+      "green": 0.12,
+      "id": "G",
+      "red": 1.0,
+      "shape": "line",
+      "signal": "i(VsG_b_Core_${id})",
+      "visual": {
+        "height": 0.022,
+        "target": "rectangle",
+        "visible": true,
+        "width": 0.21,
+        "x": 0.38,
+        "y": 0.497
+      }
+    },
+    {
+      "blue": 0.02,
+      "full_scale": 0.01,
+      "full_scale_parameter": "full_current",
+      "geometry": {
+        "end": [
+          0.3521009374769553,
+          0.47707836940262877
+        ],
+        "filled": false,
+        "start": [
+          0.37609156270740235,
+          0.3970783694026287
+        ],
+        "thickness": 0.035
+      },
+      "green": 0.12,
+      "id": "F",
+      "red": 1.0,
+      "shape": "line",
+      "signal": "i(VsF_b_Core_${id})",
+      "visual": {
+        "height": 0.08,
+        "target": "rectangle",
+        "visible": true,
+        "width": 0.035,
+        "x": 0.337,
+        "y": 0.4
+      }
+    },
+    {
+      "blue": 0.02,
+      "full_scale": 0.01,
+      "full_scale_parameter": "full_current",
+      "geometry": {
+        "end": [
+          0.3281009374769553,
+          0.5951306156710479
+        ],
+        "filled": false,
+        "start": [
+          0.35449062523044705,
+          0.5141567388052575
+        ],
+        "thickness": 0.035
+      },
+      "green": 0.12,
+      "id": "E",
+      "red": 1.0,
+      "shape": "line",
+      "signal": "i(VsE_b_Core_${id})",
+      "visual": {
+        "height": 0.08,
+        "target": "rectangle",
+        "visible": true,
+        "width": 0.035,
+        "x": 0.313,
+        "y": 0.52
+      }
+    },
+    {
+      "blue": 0.02,
+      "full_scale": 0.01,
+      "full_scale_parameter": "full_current",
+      "green": 0.12,
+      "id": "D",
+      "red": 1.0,
+      "shape": "horizontal",
+      "signal": "i(VsD_b_Core_${id})",
+      "visual": {
+        "height": 0.022,
+        "target": "rectangle",
+        "visible": true,
+        "width": 0.21,
+        "x": 0.37,
+        "y": 0.604
+      }
+    },
+    {
+      "blue": 0.02,
+      "full_scale": 0.01,
+      "full_scale_parameter": "full_current",
+      "geometry": {
+        "end": [
+          0.7758309367395247,
+          0.6124999999999999
+        ],
+        "filled": true,
+        "start": [
+          0.7208309367395248,
+          0.6124999999999999
+        ],
+        "thickness": 0.061585365853658536
+      },
+      "green": 0.12,
+      "id": "DP",
+      "red": 1.0,
+      "shape": "circle",
+      "signal": "i(VsDP_b_Core_${id})",
+      "visual": {
+        "height": 0.025,
+        "target": "rectangle",
+        "visible": true,
+        "width": 0.055,
+        "x": 0.8,
+        "y": 0.6
+      }
+    },
+    {
+      "blue": 0.02,
+      "full_scale": 0.01,
+      "full_scale_parameter": "full_current",
+      "geometry": {
+        "end": [
+          0.620706562338687,
+          0.5961044925368383
+        ],
+        "filled": false,
+        "start": [
+          0.6422981250460894,
+          0.5170783694026287
+        ],
+        "thickness": 0.035
+      },
+      "green": 0.12,
+      "id": "C",
+      "red": 1.0,
+      "shape": "line",
+      "signal": "i(VsC_b_Core_${id})",
+      "visual": {
+        "height": 0.08,
+        "target": "rectangle",
+        "visible": true,
+        "width": 0.035,
+        "x": 0.62,
+        "y": 0.52
+      }
+    },
+    {
+      "blue": 0.02,
+      "full_scale": 0.01,
+      "full_scale_parameter": "full_current",
+      "geometry": {
+        "end": [
+          0.6463074998156424,
+          0.47707836940262877
+        ],
+        "filled": false,
+        "start": [
+          0.6750962500921788,
+          0.3951306156710479
+        ],
+        "thickness": 0.035
+      },
+      "green": 0.12,
+      "id": "B",
+      "red": 1.0,
+      "shape": "line",
+      "signal": "i(VsB_b_Core_${id})",
+      "visual": {
+        "height": 0.08,
+        "target": "rectangle",
+        "visible": true,
+        "width": 0.035,
+        "x": 0.648,
+        "y": 0.4
+      }
+    },
+    {
+      "blue": 0.02,
+      "full_scale": 0.01,
+      "full_scale_parameter": "full_current",
+      "geometry": {
+        "end": [
+          0.6215915627074023,
+          0.3767053246236585
+        ],
+        "filled": false,
+        "start": [
+          0.4115915627074024,
+          0.3767053246236585
+        ],
+        "thickness": 0.05419512195121951
+      },
+      "green": 0.12,
+      "id": "A",
+      "red": 1.0,
+      "shape": "line",
+      "signal": "i(VsA_b_Core_${id})",
+      "visual": {
+        "height": 0.022,
+        "target": "rectangle",
+        "visible": true,
+        "width": 0.21,
+        "x": 0.39,
+        "y": 0.392
+      }
+    }
+  ],
+  "spice": {
+    "definitions": [
+      ".model segment_b_Core_${id} D(Is={0.01/(exp(${param:forward_voltage}/(2*0.0258649258))-1)} N=2 Rs=5)"
+    ],
+    "instance": [
+      "Rcommon8_b_Core_${id} ${pin:p8} ${pin:p3} 1m",
+      "VsG_b_Core_${id} ${pin:p3} seg_G_b_Core_${id} 0",
+      "DG_b_Core_${id} seg_G_b_Core_${id} ${pin:p1} segment_b_Core_${id}",
+      "VsF_b_Core_${id} ${pin:p3} seg_F_b_Core_${id} 0",
+      "DF_b_Core_${id} seg_F_b_Core_${id} ${pin:p2} segment_b_Core_${id}",
+      "VsE_b_Core_${id} ${pin:p3} seg_E_b_Core_${id} 0",
+      "DE_b_Core_${id} seg_E_b_Core_${id} ${pin:p4} segment_b_Core_${id}",
+      "VsD_b_Core_${id} ${pin:p3} seg_D_b_Core_${id} 0",
+      "DD_b_Core_${id} seg_D_b_Core_${id} ${pin:p5} segment_b_Core_${id}",
+      "VsDP_b_Core_${id} ${pin:p3} seg_DP_b_Core_${id} 0",
+      "DDP_b_Core_${id} seg_DP_b_Core_${id} ${pin:p6} segment_b_Core_${id}",
+      "VsC_b_Core_${id} ${pin:p3} seg_C_b_Core_${id} 0",
+      "DC_b_Core_${id} seg_C_b_Core_${id} ${pin:p7} segment_b_Core_${id}",
+      "VsB_b_Core_${id} ${pin:p3} seg_B_b_Core_${id} 0",
+      "DB_b_Core_${id} seg_B_b_Core_${id} ${pin:p9} segment_b_Core_${id}",
+      "VsA_b_Core_${id} ${pin:p3} seg_A_b_Core_${id} 0",
+      "DA_b_Core_${id} seg_A_b_Core_${id} ${pin:p10} segment_b_Core_${id}"
+    ]
+  },
+  "symbol_variants": {
+    "Display_Character:SA39-11EWA": {
+      "controls": {},
+      "pin_map": {
+        "p1": "1",
+        "p10": "10",
+        "p2": "2",
+        "p3": "3",
+        "p4": "4",
+        "p5": "5",
+        "p6": "6",
+        "p7": "7",
+        "p8": "8",
+        "p9": "9"
+      },
+      "segments": {
+        "A": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.6287887502765367,
+              0.3767053246236585
+            ],
+            "filled": false,
+            "start": [
+              0.4187887502765368,
+              0.3767053246236585
+            ],
+            "thickness": 0.05419512195121951
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.39,
+            "y": 0.392
+          }
+        },
+        "B": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.6463074998156424,
+              0.4751306156710479
+            ],
+            "filled": false,
+            "start": [
+              0.6702981250460894,
+              0.3951306156710479
+            ],
+            "thickness": 0.035
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.648,
+            "y": 0.4
+          }
+        },
+        "C": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.620706562338687,
+              0.5951306156710479
+            ],
+            "filled": false,
+            "start": [
+              0.6470962500921787,
+              0.5141567388052575
+            ],
+            "thickness": 0.035
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.62,
+            "y": 0.52
+          }
+        },
+        "D": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "horizontal",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.37,
+            "y": 0.604
+          }
+        },
+        "DP": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.7710328116934351,
+              0.6144477537315808
+            ],
+            "filled": true,
+            "start": [
+              0.7160328116934351,
+              0.6144477537315808
+            ],
+            "thickness": 0.061585365853658536
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "circle",
+          "visual": {
+            "height": 0.025,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.055,
+            "x": 0.8,
+            "y": 0.6
+          }
+        },
+        "E": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.3257018749539106,
+              0.5970783694026287
+            ],
+            "filled": false,
+            "start": [
+              0.35449062523044705,
+              0.5122089850736766
+            ],
+            "thickness": 0.035
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.313,
+            "y": 0.52
+          }
+        },
+        "F": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.3521009374769553,
+              0.47707836940262877
+            ],
+            "filled": false,
+            "start": [
+              0.3808896877534918,
+              0.3941567388052575
+            ],
+            "thickness": 0.035
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.337,
+            "y": 0.4
+          }
+        },
+        "G": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.6067934376613129,
+              0.49339184701314365
+            ],
+            "filled": false,
+            "start": [
+              0.39679343766131286,
+              0.49339184701314365
+            ],
+            "thickness": 0.05419512195121951
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.38,
+            "y": 0.497
+          }
+        }
+      }
+    },
+    "Display_Character:SA39-11GWA": {
+      "controls": {},
+      "pin_map": {
+        "p1": "1",
+        "p10": "10",
+        "p2": "2",
+        "p3": "3",
+        "p4": "4",
+        "p5": "5",
+        "p6": "6",
+        "p7": "7",
+        "p8": "8",
+        "p9": "9"
+      },
+      "segments": {
+        "A": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.6215915627074023,
+              0.3767053246236585
+            ],
+            "filled": false,
+            "start": [
+              0.4115915627074024,
+              0.3767053246236585
+            ],
+            "thickness": 0.05419512195121951
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.39,
+            "y": 0.392
+          }
+        },
+        "B": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.6463074998156424,
+              0.47707836940262877
+            ],
+            "filled": false,
+            "start": [
+              0.6750962500921788,
+              0.3951306156710479
+            ],
+            "thickness": 0.035
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.648,
+            "y": 0.4
+          }
+        },
+        "C": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.620706562338687,
+              0.5961044925368383
+            ],
+            "filled": false,
+            "start": [
+              0.6422981250460894,
+              0.5170783694026287
+            ],
+            "thickness": 0.035
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.62,
+            "y": 0.52
+          }
+        },
+        "D": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "horizontal",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.37,
+            "y": 0.604
+          }
+        },
+        "DP": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.7758309367395247,
+              0.6124999999999999
+            ],
+            "filled": true,
+            "start": [
+              0.7208309367395248,
+              0.6124999999999999
+            ],
+            "thickness": 0.061585365853658536
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "circle",
+          "visual": {
+            "height": 0.025,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.055,
+            "x": 0.8,
+            "y": 0.6
+          }
+        },
+        "E": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.3281009374769553,
+              0.5951306156710479
+            ],
+            "filled": false,
+            "start": [
+              0.35449062523044705,
+              0.5141567388052575
+            ],
+            "thickness": 0.035
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.313,
+            "y": 0.52
+          }
+        },
+        "F": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.3521009374769553,
+              0.47707836940262877
+            ],
+            "filled": false,
+            "start": [
+              0.37609156270740235,
+              0.3970783694026287
+            ],
+            "thickness": 0.035
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.337,
+            "y": 0.4
+          }
+        },
+        "G": {
+          "blue": 0.02,
+          "geometry": {
+            "end": [
+              0.6043943751382682,
+              0.4963134776105149
+            ],
+            "filled": false,
+            "start": [
+              0.3943943751382682,
+              0.4963134776105149
+            ],
+            "thickness": 0.05419512195121951
+          },
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "line",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.38,
+            "y": 0.497
+          }
+        }
+      }
+    },
+    "Display_Character:SA39-11SRWA": {
+      "controls": {},
+      "pin_map": {
+        "p1": "1",
+        "p10": "10",
+        "p2": "2",
+        "p3": "3",
+        "p4": "4",
+        "p5": "5",
+        "p6": "6",
+        "p7": "7",
+        "p8": "8",
+        "p9": "9"
+      },
+      "segments": {
+        "A": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "horizontal",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.39,
+            "y": 0.392
+          }
+        },
+        "B": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "vertical",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.648,
+            "y": 0.4
+          }
+        },
+        "C": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "vertical",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.62,
+            "y": 0.52
+          }
+        },
+        "D": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "horizontal",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.37,
+            "y": 0.604
+          }
+        },
+        "DP": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "dot",
+          "visual": {
+            "height": 0.025,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.055,
+            "x": 0.8,
+            "y": 0.6
+          }
+        },
+        "E": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "vertical",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.313,
+            "y": 0.52
+          }
+        },
+        "F": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "vertical",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.337,
+            "y": 0.4
+          }
+        },
+        "G": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "horizontal",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.38,
+            "y": 0.497
+          }
+        }
+      }
+    },
+    "Display_Character:SA39-11YWA": {
+      "controls": {},
+      "pin_map": {
+        "p1": "1",
+        "p10": "10",
+        "p2": "2",
+        "p3": "3",
+        "p4": "4",
+        "p5": "5",
+        "p6": "6",
+        "p7": "7",
+        "p8": "8",
+        "p9": "9"
+      },
+      "segments": {
+        "A": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "horizontal",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.39,
+            "y": 0.392
+          }
+        },
+        "B": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "vertical",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.648,
+            "y": 0.4
+          }
+        },
+        "C": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "vertical",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.62,
+            "y": 0.52
+          }
+        },
+        "D": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "horizontal",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.37,
+            "y": 0.604
+          }
+        },
+        "DP": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "dot",
+          "visual": {
+            "height": 0.025,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.055,
+            "x": 0.8,
+            "y": 0.6
+          }
+        },
+        "E": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "vertical",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.313,
+            "y": 0.52
+          }
+        },
+        "F": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "vertical",
+          "visual": {
+            "height": 0.08,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.035,
+            "x": 0.337,
+            "y": 0.4
+          }
+        },
+        "G": {
+          "blue": 0.02,
+          "green": 0.12,
+          "red": 1.0,
+          "shape": "horizontal",
+          "visual": {
+            "height": 0.022,
+            "target": "rectangle",
+            "visible": true,
+            "width": 0.21,
+            "x": 0.38,
+            "y": 0.497
+          }
+        }
+      }
+    }
+  }
+}

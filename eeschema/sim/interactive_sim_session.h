@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <map>
 #include <optional>
 #include <string>
 #include <utility>
@@ -35,6 +36,8 @@ struct SIM_PARAMETER_CHANGE
     bool model = false;
 };
 
+struct SIM_AUDIO_CHANNEL { std::size_t signal; double fullScale = 5, volume = .2; };
+
 struct SIM_SESSION_CONFIG
 {
     double                   step = 1e-5;
@@ -46,10 +49,15 @@ struct SIM_SESSION_CONFIG
     std::vector<MEMORY_REGION_CONFIG> memories;
     std::vector<SIM_ACTIVITY_MONITOR> activityMonitors;
     std::vector<PROGRAMMABLE_DEVICE_CONFIG> programmableDevices;
+    std::vector<SIM_AUDIO_CHANNEL> audioChannels;
     /// nullopt retains every signal; an empty list transfers timestamps only.
     std::optional<std::vector<std::size_t>> historySignals;
     /// Compile supported immutable behavioral sources once instead of walking their syntax per iteration.
     bool accelerateExpressions = false;
+    /// Reuse DC solutions only for proven memoryless native-peripheral networks.
+    bool accelerateStateless = true;
+    /// Host opt-in for memoryless LED display networks without a runtime peripheral.
+    bool accelerateDisplayNetwork = false;
     std::vector<std::string> mutableElements;
     /// Host-only provenance from the schematic compiler. Never inferred for arbitrary SPICE.
     bool partitionable = false;
@@ -71,6 +79,9 @@ struct SIM_SESSION_SNAPSHOT
     std::uint64_t            generation = 0;
     SIM_SAMPLE               latest;
     std::vector<SIM_SAMPLE>   history;
+    std::vector<double> historyMinimum,historyMaximum; ///< Frame extrema of retained signals, in configured order.
+    std::uint64_t historyToken = 0; ///< Raw history remains available until the next accepted point/snapshot.
+    std::vector<double> warningMaxima; ///< Exact per-signal peaks, or proven-safe bounds for summed currents.
     std::vector<SIM_SIGNAL_ACTIVITY> activity;
     std::uint64_t            samplesReceived = 0;
     std::uint64_t            samplesOverwritten = 0;
@@ -79,6 +90,9 @@ struct SIM_SESSION_SNAPSHOT
     std::size_t              engineRetainedPoints = 0; ///< Measured when paused; 0 while running.
     std::uint64_t            residentBytes = 0;
     std::string              error;
+    std::map<std::string,std::string> presentation;
+    std::vector<std::int16_t> audio; // 48 kHz mono PCM, independent of scope decimation.
+    std::uint64_t audioOverwritten = 0;
 };
 
 /**
@@ -119,7 +133,9 @@ public:
                         const std::vector<SIM_PARAMETER_CHANGE>& aChanges = {} );
     MEMORY_SNAPSHOT ReadMemory( const std::string& id, std::size_t offset, std::size_t length );
 
-    SIM_SESSION_SNAPSHOT Snapshot( bool aDrainHistory = false );
+    SIM_SESSION_SNAPSHOT Snapshot( bool aDrainHistory = false,
+            const std::optional<std::vector<std::size_t>>& aHistorySignals = {} );
+    std::vector<SIM_SAMPLE> FetchHistory( std::uint64_t aToken );
     int WorkerPid() const;
 
 private:

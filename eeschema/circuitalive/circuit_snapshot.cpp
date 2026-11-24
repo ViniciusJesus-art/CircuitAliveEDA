@@ -2,6 +2,7 @@
 #include "circuit_snapshot.h"
 #include "simulation_model.h"
 #include "circuit_topology.h"
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <charconv>
@@ -13,11 +14,32 @@
 
 namespace CIRCUITALIVE
 {
+namespace
+{
+bool RuntimePinDrives( const MODEL_RUNTIME_PIN& pin, const RESOLVED_MODEL& model )
+{
+    if( !pin.drive ) return false;
+    if( pin.driveParameter.empty() ) return true;
+    const double value = model.parameters.at( pin.driveParameter );
+    if( value < 0 || value > 0xffffffffu || std::floor( value ) != value )
+        throw std::runtime_error( "Programmable pin drive condition requires an unsigned integer" );
+    return ( static_cast<unsigned>( value ) & pin.driveMask ) == pin.driveValue;
+}
+}
+
 double ParseComponentValue( const std::string& aValue )
 {
     std::string value = aValue;
     value.erase( std::remove_if( value.begin(), value.end(),
                                []( unsigned char c ) { return c == ' ' || c == '\t'; } ), value.end() );
+    // UI scalars may use either decimal separator, independently of LC_NUMERIC.
+    // Reject mixed/repeated separators instead of guessing thousands grouping.
+    if( value.find( ',' ) != std::string::npos )
+    {
+        if( value.find( '.' ) != std::string::npos || std::count( value.begin(), value.end(), ',' ) != 1 )
+            throw std::runtime_error( "Invalid numeric value: " + aValue );
+        std::replace( value.begin(), value.end(), ',', '.' );
+    }
     // Floating-point from_chars accepts '-', but not '+'. Accept one explicit
     // positive sign in every component/model editor, without accepting '+-5'.
     if( value.starts_with( "+" ) )
@@ -252,6 +274,18 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         if( it != result.config.signals.end() ) return it - result.config.signals.begin();
         result.config.signals.push_back( name ); return result.config.signals.size() - 1;
     };
+    auto outputSignal = [&]( std::string expression )
+    {
+        // The worker saves individual vectors. A differential observation is
+        // evaluated by SPICE, so floating display/audio returns work as well.
+        if(expression.starts_with("v(")&&expression.find(',')!=std::string::npos)
+        {
+            const auto node="ca_output_monitor_"+std::to_string(result.config.signals.size());
+            deck<<"B"<<node<<" "<<node<<" 0 V={"<<expression<<"}\n";
+            expression="v("+node+")";
+        }
+        return signal(expression);
+    };
     auto voltage = [&]( const std::string& node )
         { return node == "0" ? NO_SIGNAL : signal( "v(" + node + ")" ); };
     std::map<std::string, std::size_t> expressionSignals;
@@ -292,7 +326,7 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         for( const auto& pin : model.pins )
         {
             const bool programmable = model.runtime && std::any_of( model.runtime->pins.begin(), model.runtime->pins.end(),
-                    [&]( const auto& p ) { return p.port == pin.id && p.drive; } );
+                    [&]( const auto& p ) { return p.port == pin.id && RuntimePinDrives( p, models[i] ); } );
             if( model.driverEnable.contains( pin.id ) || programmable
                 || ( model.logicVcc.empty() && pin.role == "output" )
                 || ( !model.voltageConstraint.empty() && pin.id == model.measurePositive ) )
@@ -406,7 +440,8 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 // This caps smooth-source sampling; ngspice's truncation error
                 // still shortens the step as needed. Pulse and firmware edges
                 // have their own breakpoints and do not wait for this interval.
-                result.config.step = result.config.maxStep = std::min( result.config.maxStep, 1 / ( frequency * 24 ) );
+                if( !c.sourceProbe || *c.sourceProbe == PROBE_KIND::SINE )
+                    result.config.step = result.config.maxStep = std::min( result.config.maxStep, 1 / ( frequency * 24 ) );
                 result.config.horizon = std::min( result.config.horizon, result.config.maxStep * 9e7 );
             }
             auto modelNodes = topology.nodes.at( i );
@@ -453,6 +488,17 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                 const auto ground = modelNodes.at( model.pins.at( descriptor.ground ) );
                 const auto vcc = modelNodes.at( model.pins.at( descriptor.vcc ) );
                 const auto prefix = "ca" + std::to_string( i + 1 );
+                if( !descriptor.supplyCurrentParameter.empty() )
+                {
+                    const double current = model.parameters.at( descriptor.supplyCurrentParameter );
+                    const double minimum = descriptor.minimumSupplyParameter.empty() ? descriptor.minimumSupply
+                            : model.parameters.at( descriptor.minimumSupplyParameter );
+                    // Functional quiescent load: constant above Vmin, resistive
+                    // below it. No negative current or singularity at zero volts.
+                    deck << 'B' << prefix << "_supply " << vcc << ' ' << ground
+                         << " I={" << current << "*min(1,max(0,v(" << vcc << ',' << ground
+                         << ")/" << minimum << "))}\n";
+                }
                 for( const auto& pin : descriptor.pins )
                 {
                     PROGRAMMABLE_PIN_BINDING binding;
@@ -464,19 +510,28 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
                     // Read existing nodes directly. The backend subtracts its
                     // GND input, avoiding one extra voltage source per pin.
                     if( node != "0" ) { binding.signal = "v(" + node + ")"; signal( binding.signal ); }
-                    if( pin.drive )
+                    if( RuntimePinDrives( pin, model ) )
                     {
                         binding.driverSlot = programmableDriverSlot++;
                         deck << ".model " << stem << " ca_programmable_pin(slot=" << binding.driverSlot << ")\n";
                         deck << 'A' << stem << " %gd " << node << ' ' << ground
                              << " %gd " << node << ' ' << vcc << ' ' << stem << '\n';
                     }
-                    else if( pin.id == "RESET" )
+                    if( pin.id == "RESET" )
                         deck << "R" << stem << "_pullup " << node << ' ' << vcc << " 30000\n";
                     else if( pin.id == "AREF" )
                         deck << "R" << stem << "_default " << node << ' ' << vcc << " 1Meg\n";
                     deck << "R" << stem << "_input " << node << ' ' << ground << " 1e12\n";
                     runtime.bindings.push_back( std::move( binding ) );
+                }
+                if(model.model.link.Receives())
+                {
+                    const auto input=model.model.link.input;
+                    const auto node="ca_link_"+std::to_string(i+1);
+                    runtime.pins.push_back(input);
+                    PROGRAMMABLE_PIN_BINDING optical;optical.id=input;
+                    if( runtime.engine != "native" ) { optical.signal="v("+node+")"; signal(optical.signal); }
+                    runtime.bindings.push_back(std::move(optical));
                 }
                 if( result.config.programmableDevices.size() >= 32 )
                     throw std::runtime_error( "Circuit supports at most 32 programmable devices" );
@@ -494,6 +549,24 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
             }
             for(const auto& t:model.model.liveTexts)result.liveTexts.push_back({i,t.target,t.field,expand(t.source),
                 t.onText,t.offText,ParseComponentValue(expand(t.initial)),t.on,t.off,t.slider});
+            for(auto segment:model.model.segments)
+            {
+                if(!segment.fullScaleParameter.empty())segment.fullScale=model.parameters.at(segment.fullScaleParameter);
+                if(segment.fullScale<=0)throw std::runtime_error("Segment scale must be positive");
+                result.segments.push_back({i,outputSignal(expand(segment.signal)),segment});
+            }
+            if(!model.model.display.type.empty())result.displays.push_back({i,c.reference,model.model.display});
+            if(!model.model.audio.signal.empty())
+            {
+                const auto& audio=model.model.audio;
+                const double scale=audio.fullScaleParameter.empty()?audio.fullScale:model.parameters.at(audio.fullScaleParameter);
+                const double volume=audio.volumeParameter.empty()?audio.volume:model.parameters.at(audio.volumeParameter);
+                if(scale<=0||volume<0||volume>1)throw std::runtime_error("Audio scale/volume outside range");
+                result.config.audioChannels.push_back({outputSignal(expand(audio.signal)),scale,volume});
+                // AUDIO_SAMPLER integrates accepted intervals into fixed-rate
+                // PCM. Source edges, source frequency and the electrical solver
+                // set the required step; a speaker must not clock the whole circuit.
+            }
             if( !model.model.indicatorSignal.empty() )
             {
                 result.leds.push_back( { i, result.config.signals.size(),
@@ -640,8 +713,57 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         }
         return true;
     };
+    std::map<std::string,std::size_t> identities;
+    for(std::size_t i=0;i<aComponents.size();++i)if(!aComponents[i].identity.empty())identities.emplace(aComponents[i].identity,i);
+    std::set<std::pair<std::size_t,std::size_t>> pairs;
+    for(std::size_t i=0;i<aComponents.size();++i)for(const auto& peer:aComponents[i].linkedComponents)
+    {
+        auto found=identities.find(peer);
+        if(found==identities.end()||found->second==i)continue; // Deleted/excluded peers are inactive.
+        const auto k=found->second;
+        if(std::find(aComponents[k].linkedComponents.begin(),aComponents[k].linkedComponents.end(),aComponents[i].identity)==aComponents[k].linkedComponents.end())continue;
+        if(!models[i].model.link.Compatible(models[k].model.link))continue;
+        auto pair=std::minmax(i,k);
+        if(pairs.emplace(pair.first,pair.second).second)result.links.push_back({pair.first,pair.second,models[i].model.link.medium});
+    }
+    // Optical/radio dependencies are expressed below as runtime bindings or
+    // behavioral source reads. The partition planner follows those edges,
+    // keeping linked peers together without joining unrelated circuit islands.
+    for(std::size_t i=0;i<aComponents.size();++i)if(models[i].model.link.Receives())
+    {
+        auto runtime = std::find_if( result.config.programmableDevices.begin(), result.config.programmableDevices.end(),
+                [&]( const auto& d ) { return d.id == aComponents[i].reference && d.engine == "native"; } );
+        std::size_t emitters = 0;
+        std::string expression="0";
+        for(const auto& pair:result.links)
+        {
+            const auto k=pair.first==i?pair.second:pair.second==i?pair.first:aComponents.size();
+            if(k==aComponents.size()||!models[k].model.link.Transmits())continue;
+            const auto observed = ExpandModelTemplate(models[k].model.link.signal,models[k],topology.nodes[k],k);
+            if( runtime != result.config.programmableDevices.end() )
+            {
+                if( models[i].model.link.input != "IR" )
+                    throw std::runtime_error( "Native IR receiver requires optical input IR" );
+                const auto name = emitters++ ? "IR_" + std::to_string( emitters ) : "IR";
+                const auto signalName = result.config.signals.at( outputSignal( observed ) );
+                if( name == "IR" )
+                {
+                    const auto binding = std::find_if( runtime->bindings.begin(), runtime->bindings.end(),
+                            []( const auto& b ) { return b.id == "IR"; } );
+                    if( binding == runtime->bindings.end() ) throw std::runtime_error( "Native IR optical binding is missing" );
+                    binding->signal = signalName;
+                }
+                else { runtime->pins.push_back( name ); runtime->bindings.push_back( { name, signalName } ); }
+            }
+            else expression+="+max(0,"+observed+")";
+        }
+        if( runtime != result.config.programmableDevices.end() ) continue;
+        const auto node="ca_link_"+std::to_string(i+1);
+        deck<<"B"<<node<<" "<<node<<" 0 V={"<<expression<<"}\n";
+    }
     for( auto& runtime : result.config.programmableDevices )
     {
+        if( runtime.engine == "native" ) continue; // Accepted-point peripherals have no polling clock.
         const auto component = std::find_if( aComponents.begin(), aComponents.end(),
                 [&]( const auto& item ) { return item.reference == runtime.id; } );
         const auto index = std::size_t( component - aComponents.begin() );
@@ -650,6 +772,19 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
         const auto& nodes = topology.nodes.at( index );
         const auto& ground = nodes.at( model.pins.at( descriptor.ground ) );
         const auto& vcc = nodes.at( model.pins.at( descriptor.vcc ) );
+        // Runtime peripherals only need continuous pad samples when the net
+        // can change independently. Keep this topology metadata separate from
+        // register state: an open GPIO can still become a driven output later.
+        auto options=nlohmann::json::parse(runtime.optionsJson);
+        options["constantInputs"]=nlohmann::json::array();
+        options["unconnectedPins"]=nlohmann::json::array();
+        for(const auto& pin:descriptor.pins)
+        {
+            const auto& node=nodes.at(model.pins.at(pin.port));
+            if(supplies.Difference(node,ground))options["constantInputs"].push_back(pin.id);
+            else if(terminals.at(node).size()==1)options["unconnectedPins"].push_back(pin.id);
+        }
+        runtime.optionsJson=options.dump();
         bool fixed = supplies.Difference( vcc, ground ).has_value();
         const auto reset = std::find_if( descriptor.pins.begin(), descriptor.pins.end(),
                 []( const auto& pin ) { return pin.id == "RESET"; } );
@@ -789,6 +924,8 @@ CIRCUIT_SNAPSHOT BuildCircuitSnapshot( const std::vector<CIRCUIT_COMPONENT>& aCo
     }
     if( result.config.signals.size() > MAX_SESSION_SIGNALS )
         throw std::runtime_error( "Too many saved signals; reduce the circuit or measurements" );
+    result.config.accelerateDisplayNetwork=!result.segments.empty();
+    result.config.horizon=std::min(result.config.horizon,result.config.maxStep*9e7);
     result.config.historyCapacity = std::min<std::size_t>( 256, MAX_SESSION_HISTORY_VALUES / result.config.signals.size() );
     if( std::any_of( result.measurements.begin(), result.measurements.end(), []( const auto& c ) { return c.scope; } ) )
         result.config.historyCapacity = std::min<std::size_t>( 4096, MAX_SESSION_HISTORY_VALUES / result.config.signals.size() );

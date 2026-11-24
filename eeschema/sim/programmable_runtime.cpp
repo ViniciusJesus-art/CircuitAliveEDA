@@ -541,6 +541,26 @@ std::vector<PROGRAMMABLE_PIN_STATE> PROGRAMMABLE_RUNTIME::States() const
     return result;
 }
 
+std::map<std::string, std::string> PROGRAMMABLE_RUNTIME::Presentation() const
+{
+    std::map<std::string, std::string> result;
+    for( const auto& device : m_impl->devices )
+    {
+        auto& d = *device;
+        if(d.frontier>m_impl->time+1e-15)continue;
+        JS_UpdateStackTop(d.runtime);
+        VALUE fn(d.context,JS_GetPropertyStr(d.context,d.object,"presentation"));
+        if(!JS_IsFunction(d.context,fn.value))continue;
+        VALUE value(d.context,d.Call("presentation"));
+        VALUE encoded(d.context,JS_JSONStringify(d.context,value.value,JS_UNDEFINED,JS_UNDEFINED));
+        d.Check(encoded.value);
+        auto json=String(d.context,encoded.value);
+        if(json.size()>16384)d.Error("presentation state exceeds 16384 bytes");
+        result.emplace(d.config.id,std::move(json));
+    }
+    return result;
+}
+
 double PROGRAMMABLE_RUNTIME::NextEventTime() const
 {
     double next = std::numeric_limits<double>::infinity();

@@ -76,9 +76,9 @@
     "instance": [
       "Vposition_${id} position_${id} 0 ${param:position}",
       "Bupper1_${id} ${pin:top1} ${pin:wiper1} I={v(${pin:top1},${pin:wiper1})/max(1u,${param:resistance}*(1-min(1,max(0,v(position_${id})))) )}",
-      "Blower1_${id} ${pin:wiper1} ${pin:bottom1} I={v(${pin:wiper1},${pin:bottom1})/max(1u,${param:resistance}*min(1,max(0,v(position_${id})))))}",
+      "Blower1_${id} ${pin:wiper1} ${pin:bottom1} I={v(${pin:wiper1},${pin:bottom1})/max(1u,${param:resistance}*min(1,max(0,v(position_${id}))))}",
       "Bupper2_${id} ${pin:top2} ${pin:wiper2} I={v(${pin:top2},${pin:wiper2})/max(1u,${param:resistance}*(1-min(1,max(0,v(position_${id})))) )}",
-      "Blower2_${id} ${pin:wiper2} ${pin:bottom2} I={v(${pin:wiper2},${pin:bottom2})/max(1u,${param:resistance}*min(1,max(0,v(position_${id})))))}"
+      "Blower2_${id} ${pin:wiper2} ${pin:bottom2} I={v(${pin:wiper2},${pin:bottom2})/max(1u,${param:resistance}*min(1,max(0,v(position_${id}))))}"
     ],
     "definitions": []
   },

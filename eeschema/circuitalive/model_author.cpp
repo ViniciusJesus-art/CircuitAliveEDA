@@ -6,6 +6,7 @@
 #include "model_design_presets.h"
 #include "panel_led_appearance.h"
 #include "panel_model_interactions.h"
+#include "panel_model_outputs.h"
 #include <cctype>
 #include <charconv>
 #include "model_profiles.h"
@@ -20,6 +21,7 @@
 #include <lib_symbol.h>
 #include <sch_pin.h>
 #include <pin_type.h>
+#include <widgets/symbol_preview_widget.h>
 #include <nlohmann/json.hpp>
 #include <wx/button.h>
 #include <wx/checkbox.h>
@@ -77,7 +79,7 @@ wxGrid* Grid( wxWindow* parent, const wxArrayString& columns )
 void Reset( wxGrid* grid ) { if( grid->GetNumberRows() ) grid->DeleteRows( 0, grid->GetNumberRows() ); }
 void CommitGrid( wxGrid* grid ) { grid->SaveEditControlValue(); grid->HideCellEditControl(); }
 struct TEMPLATE { std::string name, json; fs::path file; };
-std::vector<TEMPLATE> Templates( const std::string& project )
+std::vector<TEMPLATE> Templates( const std::string& project, bool includeRuntime = false )
 {
     auto dirs = MODEL_DESIGN::BlockDirectories(); auto models = MODEL_REPOSITORY::DefaultDirectories( project );
     dirs.insert( dirs.end(), models.begin(), models.end() ); std::set<std::string> ids; std::vector<TEMPLATE> result;
@@ -87,7 +89,7 @@ std::vector<TEMPLATE> Templates( const std::string& project )
         for( const auto& file : fs::directory_iterator( dir ) ) if( file.is_regular_file() && file.path().extension() == ".casim" )
         {
             auto text = Read( file.path() ); auto model = MODEL_REPOSITORY::LoadText( text );
-            if( model.runtime ) continue;
+            if( model.runtime && !includeRuntime ) continue;
             if( ids.insert( model.id ).second ) result.push_back( { model.name, std::move( text ), file.path() } );
         }
     }
@@ -146,7 +148,7 @@ public:
             {
                 const auto it=std::find(m_parameters.begin(),m_parameters.end(),id);const auto r=it-m_parameters.begin();
                 auto value=m_values->GetCellValue(r,1).ToStdString(wxConvUTF8);
-                if(value.starts_with('@'))for(const auto& p:design.parameters)if(p.id==value.substr(1)){value=p.defaultValue;break;}
+            if(value.starts_with('@'))for(const auto& p:design.SymbolParameters())if(p.id==value.substr(1)){value=p.defaultValue;break;}
                 try{return ParseComponentValue(value);}catch(const std::exception&){return ParseComponentValue(model.parameters.at(r).defaultValue);}
             },[this](const std::string& id,const std::string& value)
             {auto it=std::find(m_parameters.begin(),m_parameters.end(),id);if(it!=m_parameters.end())m_values->SetCellValue(it-m_parameters.begin(),1,W(value));});
@@ -182,14 +184,17 @@ public:
         s->Add( createToolbar(), 0, wxEXPAND | wxBOTTOM, 10 );
         auto* fields = new wxBoxSizer( wxHORIZONTAL );
         fields->Add( new wxStaticText( this, wxID_ANY, _( "Name:" ) ), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 6 );
-        m_name = new wxTextCtrl( this, wxID_ANY ); fields->Add( m_name, 2, wxRIGHT, 12 );
-        fields->Add( new wxStaticText( this, wxID_ANY, _( "Model ID:" ) ), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 6 );
-        m_id = new wxTextCtrl( this, wxID_ANY ); fields->Add( m_id, 1 ); s->Add( fields, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 10 );
-        m_symbol = new wxStaticText( this, wxID_ANY, "" ); s->Add( m_symbol, 0, wxLEFT | wxRIGHT | wxBOTTOM, 10 );
+        m_name = new wxTextCtrl( this, wxID_ANY ); fields->Add( m_name, 2, wxALIGN_CENTER_VERTICAL | wxRIGHT, 12 );
+        auto* identity=new wxFlexGridSizer(2,6,6);identity->AddGrowableCol(1);
+        identity->Add(new wxStaticText(this,wxID_ANY,_("Symbol:")),0,wxALIGN_CENTER_VERTICAL);
+        m_symbol=new CLICK_CHOICE(this);m_symbol->SetMinSize({360,-1});identity->Add(m_symbol,1,wxEXPAND);
+        identity->Add(new wxStaticText(this,wxID_ANY,_("Model ID:")),0,wxALIGN_CENTER_VERTICAL);
+        m_id=new wxTextCtrl(this,wxID_ANY);identity->Add(m_id,1,wxEXPAND);
+        fields->Add(identity,1,wxEXPAND);s->Add(fields,0,wxEXPAND|wxLEFT|wxRIGHT|wxBOTTOM,10);
         m_pages = new wxNotebook( this, wxID_ANY );
         auto* behavior = new wxPanel( m_pages ); auto* layout = new wxBoxSizer( wxVERTICAL );
         auto* hint = new wxStaticText( behavior, wxID_ANY,
-            _( "Connect: click two terminals. Move: drag a block or wire. Double left-click edits a block; double right-click deletes a block or wire. Esc cancels a connection." ) );
+            _( "Wheel: zoom at pointer. Middle drag: pan. Connect: click two terminals. Move: drag a block or wire. Double left-click edits; double right-click deletes. Esc cancels a connection." ) );
         hint->Wrap( 1240 ); layout->Add( hint, 0, wxALL, 8 );
         auto* workspace = new wxBoxSizer( wxHORIZONTAL );
         m_canvas = new DESIGN_CANVAS( behavior, m_design );
@@ -208,6 +213,7 @@ public:
         auto* add = new wxButton( params, wxID_ANY, _( "Add parameter" ) ); auto* remove = new wxButton( params, wxID_ANY, _( "Remove selected parameter" ) );
         pt->Add( add, 0, wxRIGHT, 6 ); pt->Add( remove ); vs->Add( pt, 0, wxALL, 10 );
         vs->Add( new wxStaticText( params, wxID_ANY, _( "Public parameters appear in Simulation model... on the schematic. Use @ID in a block's value to link it to a public parameter." ) ), 0, wxLEFT | wxRIGHT, 10 );
+        vs->Add( new wxStaticText( params, wxID_ANY, _( "Default values apply to the selected symbol. Parameter definitions and the block diagram are shared." ) ), 0, wxLEFT | wxRIGHT | wxTOP, 10 );
         m_parameters = Grid( params, { _( "ID" ), _( "Name" ), _( "Default" ), _( "Unit" ), _( "Minimum" ), _( "Maximum" ) } );
         m_parameters->SetColSize( 1, 280 ); vs->Add( m_parameters, 1, wxEXPAND | wxALL, 10 ); params->SetSizer( vs ); m_pages->AddPage( params, _( "Parameters" ) );
         add->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& )
@@ -231,14 +237,50 @@ public:
         run->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& ) { try { testModel(); } catch( const std::exception& e ) { Error( this, e ); } } );
         m_interactions = new PANEL_MODEL_INTERACTIONS( m_pages, kiway, m_design, [this] { changed(); } );
         m_pages->AddPage( m_interactions, _( "Interactive controls" ) );
+        m_outputs=new PANEL_MODEL_OUTPUTS(m_pages,kiway,m_design,[this]{changed();});
+        m_pages->AddPage(m_outputs,_("Luminous segments"));
+        auto* symbols=new wxPanel(m_pages);auto* symbolLayout=new wxBoxSizer(wxVERTICAL);
+        auto* symbolHint=new wxStaticText(symbols,wxID_ANY,_("Default library symbols for this model. Select a symbol to edit its physical pin mapping, controls and luminous positions. The block diagram is shared."));
+        symbolHint->Wrap(1000);symbolLayout->Add(symbolHint,0,wxALL,10);
+        auto* symbolContent=new wxBoxSizer(wxHORIZONTAL);
+        m_symbols=new wxListBox(symbols,wxID_ANY);symbolContent->Add(m_symbols,3,wxEXPAND|wxRIGHT,10);
+        auto* previewLayout=new wxBoxSizer(wxVERTICAL);
+        previewLayout->Add(new wxStaticText(symbols,wxID_ANY,_("Preview")),0,wxBOTTOM,6);
+        m_symbolPreview=new SYMBOL_PREVIEW_WIDGET(symbols,kiway,true,EDA_DRAW_PANEL_GAL::GAL_TYPE_CAIRO);
+        m_symbolPreview->SetMinSize({300,220});previewLayout->Add(m_symbolPreview,1,wxEXPAND);
+        symbolContent->Add(previewLayout,2,wxEXPAND);
+        symbolLayout->Add(symbolContent,1,wxEXPAND|wxLEFT|wxRIGHT,10);
+        auto* symbolButtons=new wxBoxSizer(wxHORIZONTAL);auto* addSymbol=new wxButton(symbols,wxID_ANY,_("Add symbol..."));
+        auto* removeSymbol=new wxButton(symbols,wxID_ANY,_("Remove link"));symbolButtons->Add(addSymbol,0,wxRIGHT,6);symbolButtons->Add(removeSymbol);
+        symbolLayout->Add(symbolButtons,0,wxALL,10);symbols->SetSizer(symbolLayout);m_pages->AddPage(symbols,_("Linked symbols"));
+        addSymbol->Bind(wxEVT_BUTTON,[this](wxCommandEvent&){try{chooseSymbol();}catch(const std::exception& e){Error(this,e);}});
+        removeSymbol->Bind(wxEVT_BUTTON,[this](wxCommandEvent&){try{
+            const int selected=m_symbols->GetSelection();if(selected==wxNOT_FOUND)return;
+            collect();m_design.RemoveSymbol(m_symbols->GetString(selected).ToStdString(wxConvUTF8));refreshFields(false);changed();
+        }catch(const std::exception& e){Error(this,e);}});
+        auto selectSymbol=[this](wxCommandEvent& event){if(m_loading)return;try{
+            collect();m_design.SelectSymbol(event.GetString().ToStdString(wxConvUTF8));refreshFields(false);
+        }catch(const std::exception& e){Error(this,e);}};
+        m_symbol->Bind(wxEVT_COMBOBOX,selectSymbol);m_symbols->Bind(wxEVT_LISTBOX,selectSymbol);
         s->Add( m_pages, 1, wxEXPAND | wxLEFT | wxRIGHT, 10 );
-        m_associate = new wxCheckBox( this, wxID_ANY, _( "Use this model for new symbols of the selected component" ) ); m_associate->SetValue( true );
+        m_associate = new wxCheckBox( this, wxID_ANY, _( "Use this model by default for all linked symbols" ) ); m_associate->SetValue( true );
         s->Add( m_associate, 0, wxALL, 10 ); m_status = new wxStaticText( this, wxID_ANY, "" ); s->Add( m_status, 0, wxLEFT | wxRIGHT | wxBOTTOM, 10 );
         auto* close = new wxButton( this, wxID_CLOSE, _( "Close" ) ); s->Add( close, 0, wxALIGN_RIGHT | wxRIGHT | wxBOTTOM, 10 ); SetSizer( s );
         const auto display = wxGetClientDisplayRect(); SetSize( std::min( 1400, display.width - 60 ), std::min( 950, display.height - 60 ) ); SetMinSize( { 950, 620 } ); Centre();
         m_name->Bind( wxEVT_TEXT, [this]( wxCommandEvent& ) { if( !m_loading ) m_dirty = true; } ); m_id->Bind( wxEVT_TEXT, [this]( wxCommandEvent& ) { if( !m_loading ) m_dirty = true; } );
         for( auto* g : { m_pins, m_parameters } ) g->Bind( wxEVT_GRID_CELL_CHANGED, [this]( wxGridEvent& e ) { m_dirty = true; e.Skip(); } );
-        m_pages->Bind( wxEVT_NOTEBOOK_PAGE_CHANGED, [this]( wxBookCtrlEvent& e ) { if( !m_loading ) { try { collect(); m_canvas->Refresh(); inspectSelection(); if( e.GetSelection() == 4 ) m_interactions->Reload(); } catch( const std::exception& error ) { Error( this, error ); } } e.Skip(); } );
+        m_pins->Bind(wxEVT_GRID_CELL_CHANGED,[this](wxGridEvent& event){
+            if(!m_loading&&event.GetCol()==0){
+                const int row=event.GetRow();const auto previous=m_design.SymbolPinMap();
+                const auto port=m_pins->GetCellValue(row,1).ToStdString(wxConvUTF8);
+                const auto number=m_pins->GetCellValue(row,0);
+                for(int other=0;other<m_pins->GetNumberRows();++other)
+                    if(other!=row&&m_pins->GetCellValue(other,0)==number)m_pins->SetCellValue(other,0,W(previous.at(port)));
+                CallAfter([this]{try{collect();refreshFields(false);}catch(const std::exception& e){Error(this,e);}});
+            }
+            m_dirty=true;event.Skip();
+        });
+        m_pages->Bind( wxEVT_NOTEBOOK_PAGE_CHANGED, [this]( wxBookCtrlEvent& e ) { if( !m_loading ) { try { collect(); m_canvas->Refresh(); inspectSelection(); if( e.GetSelection() == 4 ) m_interactions->Reload(); if(e.GetSelection()==5)m_outputs->Reload(); } catch( const std::exception& error ) { Error( this, error ); } } e.Skip(); } );
         close->Bind( wxEVT_BUTTON, [this]( wxCommandEvent& ) { if( discard() ) EndModal( wxID_CLOSE ); } );
         Bind( wxEVT_CLOSE_WINDOW, [this]( wxCloseEvent& e ) { if( discard() ) EndModal( wxID_CLOSE ); else if( e.CanVeto() ) e.Veto(); } );
         Bind( wxEVT_BUTTON, [this]( wxCommandEvent& ) { if( discard() ) EndModal( wxID_CANCEL ); }, wxID_CANCEL );
@@ -265,6 +307,7 @@ private:
         };
         command( file, _( "New\tCtrl+N" ), [this] { if( discard() ) { m_design = {}; m_file.clear(); refreshFields(); m_dirty = false; } }, wxACCEL_CTRL, 'N' );
         command( file, _( "Open...\tCtrl+O" ), [this] { open(); }, wxACCEL_CTRL, 'O' );
+        command( file, _( "Open model file...\tCtrl+Shift+O" ), [this] { openFile(); }, wxACCEL_CTRL | wxACCEL_SHIFT, 'O' );
         command( file, _( "Save\tCtrl+S" ), [this] { save( false ); }, wxACCEL_CTRL, 'S' );
         command( file, _( "Save as...\tCtrl+Shift+S" ), [this] { save( true ); }, wxACCEL_CTRL | wxACCEL_SHIFT, 'S' );
         command( model, _( "Choose component symbol..." ), [this] { chooseSymbol(); } );
@@ -352,7 +395,7 @@ private:
         {
             auto it = b.values.find(p.id); auto value = it==b.values.end() ? p.defaultValue : it->second;
             if( value.starts_with('@') )
-                for( const auto& q : m_design.parameters ) if( q.id==value.substr(1) ) { value += " = " + q.defaultValue; break; }
+                for( const auto& q : m_design.SymbolParameters() ) if( q.id==value.substr(1) ) { value += " = " + q.defaultValue; break; }
             text += ModelText(p.label) + ": " + W(value);
             if(!p.unit.empty() && !value.ends_with(p.unit) && !(p.unit=="V" && value.ends_with("v"))) text += " " + W(p.unit);
             text += "\n";
@@ -371,40 +414,65 @@ private:
     void collect()
     {
         CommitGrid( m_pins ); CommitGrid( m_parameters ); m_design.name = m_name->GetValue().ToStdString(wxConvUTF8); m_design.id = m_id->GetValue().ToStdString(wxConvUTF8);
-        m_design.pins.clear(); m_design.parameters.clear();
-        for( int r = 0; r < m_pins->GetNumberRows(); ++r ) m_design.pins.push_back( {
-            m_pins->GetCellValue( r, 1 ).ToStdString(wxConvUTF8), m_pins->GetCellValue( r, 2 ).ToStdString(wxConvUTF8),
-            roleId(m_pins->GetCellValue(r,3)), m_pins->GetCellValue( r, 0 ).ToStdString(wxConvUTF8) } );
-        for( int r = 0; r < m_parameters->GetNumberRows(); ++r ) m_design.parameters.push_back( {
+        m_design.automaticAssociation=m_associate->GetValue();
+        std::vector<MODEL_PARAMETER> parameters;
+        std::map<std::string,std::string> mapping;
+        for(int r=0;r<m_pins->GetNumberRows();++r)
+            mapping[m_pins->GetCellValue(r,1).ToStdString(wxConvUTF8)]=m_pins->GetCellValue(r,0).ToStdString(wxConvUTF8);
+        m_design.SetSymbolPinMap(mapping);
+        for( int r = 0; r < m_parameters->GetNumberRows(); ++r ) parameters.push_back( {
             m_parameters->GetCellValue( r, 0 ).ToStdString(wxConvUTF8), m_parameters->GetCellValue( r, 1 ).ToStdString(wxConvUTF8),
             m_parameters->GetCellValue( r, 3 ).ToStdString(wxConvUTF8), m_parameters->GetCellValue( r, 2 ).ToStdString(wxConvUTF8),
             ParseComponentValue( m_parameters->GetCellValue( r, 4 ).ToStdString(wxConvUTF8) ), ParseComponentValue( m_parameters->GetCellValue( r, 5 ).ToStdString(wxConvUTF8) ) } );
+        m_design.SetSymbolParameters(parameters);
     }
-    void refreshFields()
+    void refreshFields(bool resetCanvas=true)
     {
         m_loading = true; m_name->SetValue( W( m_design.name ) ); m_id->SetValue( W( m_design.id ) );
-        m_symbol->SetLabel( m_design.libraryId.empty() ? _( "Component: choose a symbol to import its pins" ) : _( "Component: " ) + W( m_design.libraryId ) );
+        m_symbol->Clear();m_symbols->Clear();
+        for(const auto& symbol:m_design.linkedSymbols){m_symbol->Append(W(symbol));m_symbols->Append(W(symbol));}
+        m_symbol->SetStringSelection(W(m_design.libraryId));m_symbols->SetStringSelection(W(m_design.libraryId));
+        if(m_design.libraryId.empty())m_symbolPreview->SetStatusText(_("Preview"));
+        else
+        {
+            LIB_ID symbolId;symbolId.Parse(W(m_design.libraryId));
+            m_symbolPreview->DisplaySymbol(symbolId,1);
+        }
+        const auto mapping=m_design.SymbolPinMap();
+        std::map<std::string,MODEL_PIN> physical;
+        if(!m_design.libraryId.empty())
+        {
+            try{for(const auto& pin:physicalPins(m_design.libraryId))physical[pin.defaultPin]=pin;}
+            catch(const std::exception&){
+                if(m_design.symbolVariants.contains(m_design.libraryId))
+                    for(const auto& pin:JSON::parse(m_design.symbolVariants.at(m_design.libraryId)).value("physical_pins",JSON::array()))
+                        physical[pin.at("number")]=MODEL_PIN{"",pin.at("name"),pin.at("role"),pin.at("number")};
+            }
+        }
+        wxArrayString pinChoices;for(const auto& [number,pin]:physical)pinChoices.Add(W(number));
+        if(pinChoices.empty())for(const auto& [port,number]:mapping)pinChoices.Add(W(number));
         Reset( m_pins ); Reset( m_parameters ); Reset( m_stimuli );
         for( const auto& p : m_design.pins )
         {
-            const int r = m_pins->GetNumberRows(); m_pins->AppendRows(); m_pins->SetCellValue( r, 0, W( p.defaultPin ) );
+            const int r = m_pins->GetNumberRows(); m_pins->AppendRows(); m_pins->SetCellValue( r, 0, W( mapping.at(p.id) ) );
             m_pins->SetCellValue( r, 1, W( p.id ) ); m_pins->SetCellValue( r, 2, W( p.label ) ); m_pins->SetCellValue( r, 3, ModelText( p.role ) );
-            wxArrayString roles;
-            for( const auto* role : {"input", "output", "bidirectional", "passive", "power", "reference"} ) roles.Add(ModelText(role));
-            m_pins->SetCellEditor( r, 3, new CLICK_CHOICE_EDITOR( roles, false ) );
-            m_stimuli->AppendRows(); m_stimuli->SetCellValue( r, 0, W(p.defaultPin) + " — " + ModelText(p.label) ); m_stimuli->SetReadOnly( r, 0 );
+            const auto actual=physical.find(mapping.at(p.id));
+            if(actual!=physical.end()){m_pins->SetCellValue(r,2,W(actual->second.label));m_pins->SetCellValue(r,3,ModelText(actual->second.role));}
+            m_pins->SetCellEditor(r,0,new CLICK_CHOICE_EDITOR(pinChoices,false));
+            for(int column=1;column<4;++column)m_pins->SetReadOnly(r,column);
+            m_stimuli->AppendRows(); m_stimuli->SetCellValue( r, 0, W(mapping.at(p.id)) + " — " + m_pins->GetCellValue(r,2) ); m_stimuli->SetReadOnly( r, 0 );
             m_stimuli->SetCellValue( r, 1, p.role == "power" ? "5V" : p.role == "reference" || p.role == "input" ? "0V" : p.role == "output" ? "load:10k" : "" );
         }
-        for( const auto& p : m_design.parameters )
+        for( const auto& p : m_design.SymbolParameters() )
         {
             int r = m_parameters->GetNumberRows(); m_parameters->AppendRows();
             m_parameters->SetCellValue( r, 0, W( p.id ) ); m_parameters->SetCellValue( r, 1, W( p.label ) ); m_parameters->SetCellValue( r, 2, W( p.defaultValue ) );
             m_parameters->SetCellValue( r, 3, W( p.unit ) ); m_parameters->SetCellValue( r, 4, ParameterNumber(p.minimum) ); m_parameters->SetCellValue( r, 5, ParameterNumber(p.maximum) );
         }
-        m_canvas->selected = m_design.blocks.size()==1 ? 0 : -1;
-        m_canvas->CancelConnection(); m_canvas->Refresh(); m_results->Clear(); inspectSelection();
+        if(resetCanvas){m_canvas->selected = m_design.blocks.size()==1 ? 0 : -1;m_canvas->CancelConnection();} m_canvas->Refresh(); m_results->Clear(); inspectSelection();
         m_interactions->Reload();
-        m_associate->Enable( !m_design.libraryId.empty() ); m_status->SetLabel( m_file.empty() ? _( "Not saved" ) : W( m_file.string() ) ); m_loading = false; Layout();
+        m_outputs->Reload();
+        m_associate->SetValue(m_design.automaticAssociation);m_associate->Enable( !m_design.linkedSymbols.empty() ); m_status->SetLabel( m_file.empty() ? _( "Not saved" ) : W( m_file.string() ) ); m_loading = false; Layout();
     }
     bool discard()
     {
@@ -416,6 +484,15 @@ private:
     }
     void open()
     {
+        if(!discard())return;
+        auto choices=Templates(m_project,true);std::vector<SIMULATION_MODEL> models;
+        for(const auto& choice:choices)models.push_back(MODEL_REPOSITORY::LoadText(choice.json,choice.file));
+        const auto selected=ChooseSimulationModel(this,models);if(!selected)return;
+        const auto& choice=choices.at(*selected);auto design=MODEL_DESIGN::Open(choice.json);design.MakeCoreVisible();
+        m_design=std::move(design);m_file=choice.file;refreshFields();m_pages->SetSelection(0);m_canvas->FitContent();m_dirty=false;
+    }
+    void openFile()
+    {
         if( !discard() ) return;
         wxFileDialog picker( this, _( "Open simulation model" ), W( m_project ), "", _("CircuitAlive model (*.casim)|*.casim"), wxFD_OPEN | wxFD_FILE_MUST_EXIST );
         if( picker.ShowModal() != wxID_OK ) return;
@@ -425,29 +502,58 @@ private:
     }
     bool save( bool as )
     {
-        collect(); const auto text = m_design.Export(); auto path = m_file;
+        collect(); auto path = m_file;auto document=m_design;
         if( path.empty() || as )
         {
             fs::path folder = path.empty() ? fs::path( m_project ) / "models" : path.parent_path();
             // The user chooses the destination; opening the picker creates no directory.
             if( !fs::is_directory( folder ) ) folder = m_project;
-            wxFileDialog picker( this, _( "Save simulation model" ), W( folder.string() ), W( m_design.id + ".casim" ),
+            wxFileDialog picker( this, _( "Save simulation model" ), W( folder.string() ), W( m_design.id + (as?"_copy.casim":".casim") ),
                 _("CircuitAlive model (*.casim)|*.casim"), wxFD_SAVE | wxFD_OVERWRITE_PROMPT );
             if( picker.ShowModal() != wxID_OK ) return false;
             path = picker.GetPath().ToStdString(wxConvUTF8); if( path.extension() != ".casim" ) path += ".casim";
         }
+        const bool copy=as&&(!m_file.empty()&&fs::absolute(path).lexically_normal()!=fs::absolute(m_file).lexically_normal());
+        if(copy)
+        {
+            auto id=path.stem().string();
+            for(auto& c:id)if(!std::isalnum(static_cast<unsigned char>(c))&&c!='_')c='_';
+            if(id.empty())id=m_design.id+"_copy";
+            if(id==m_design.id)id+="_copy";
+            if(id.size()>60)id=id.substr(0,55)+"_copy";
+            document.id=id;document.automaticAssociation=false;
+        }
+        if(!m_file.empty()&&path.parent_path()!=m_file.parent_path()&&!document.baseJson.empty())
+        {
+            auto base=JSON::parse(document.baseJson);
+            if(base.contains("runtime")&&base.at("runtime").contains("modules"))
+                for(auto& module:base["runtime"]["modules"])
+                {
+                    auto source=fs::path(module.get<std::string>());
+                    if(source.is_relative())source=fs::absolute(m_file.parent_path()/source).lexically_normal();
+                    std::error_code error;const auto relative=fs::relative(source,fs::absolute(path.parent_path()),error);
+                    module=error?source.generic_string():relative.generic_string();
+                }
+            document.baseJson=base.dump();
+        }
+        const auto text=document.Export();
         const auto temporary = path.string() + ".tmp." + std::to_string( ProcessId() );
         try
         {
             std::ofstream out( temporary ); out.exceptions( std::ios::failbit | std::ios::badbit ); out << text; out.close(); ReplaceSavedFile( temporary, path );
         }
         catch( ... ) { std::error_code error; fs::remove( temporary, error ); throw; }
-        m_file = path;
-        if( m_associate->GetValue() && !m_design.libraryId.empty() )
+        m_file = path;m_design=std::move(document);m_id->ChangeValue(W(m_design.id));m_associate->SetValue(m_design.automaticAssociation);
         {
-            CIRCUIT_COMPONENT c; c.libraryId = m_design.libraryId; c.modelFile = fs::absolute( path ).string(); c.projectDirectory = m_project;
-            for( const auto& p : m_design.pins ) c.modelPins[p.id] = p.defaultPin;
-            MODEL_PROFILES().Save( c );
+            const auto model=MODEL_REPOSITORY::LoadText(text);std::map<std::string,std::map<std::string,std::string>> mappings;
+            auto removed=m_design.excludedSymbols;
+            if(m_associate->GetValue())
+            {
+                for(const auto& symbol:m_design.linkedSymbols)
+                    for(const auto& pin:model.ForSymbol(symbol).pins)mappings[symbol][pin.id]=pin.defaultPin;
+            }
+            else removed.insert(removed.end(),m_design.linkedSymbols.begin(),m_design.linkedSymbols.end());
+            MODEL_PROFILES().UpdateLinks(path,m_design.id,mappings,removed,!copy);
         }
         m_dirty = false; m_status->SetLabel( _( "Saved: " ) + W( path.string() ) ); return true;
     }
@@ -456,7 +562,12 @@ private:
         collect(); wxString picked = W( m_design.libraryId );
         auto* chooser = m_kiway->Player( FRAME_SYMBOL_CHOOSER, true, this ); if( !chooser ) return;
         bool accepted = chooser->ShowModal( &picked, this ); chooser->Destroy(); if( !accepted ) return;
-        LIB_ID id; id.Parse( picked, true );
+        m_design.AddSymbol(picked.ToStdString(wxConvUTF8),physicalPins(picked.ToStdString(wxConvUTF8)));
+        refreshFields(false);changed();
+    }
+    std::vector<MODEL_PIN> physicalPins(const std::string& libraryId)
+    {
+        LIB_ID id; id.Parse( W(libraryId), true );
         auto* symbol = PROJECT_SCH::SymbolLibAdapter( &m_kiway->Prj() )->LoadSymbol( id );
         if( !symbol ) throw std::runtime_error( _("Cannot load chosen symbol").ToStdString(wxConvUTF8) );
         auto flat = symbol->Flatten(); auto physical = flat->GetPins();
@@ -465,8 +576,6 @@ private:
         for( const auto* p : physical )
         {
             const auto number = p->GetNumber().ToStdString(wxConvUTF8); if( !numbers.insert( number ).second ) continue;
-            auto existing = std::find_if( m_design.pins.begin(), m_design.pins.end(), [&]( const auto& pin ) { return pin.defaultPin == number; } );
-            if( existing != m_design.pins.end() ) { ports.push_back( *existing ); used.insert( existing->id ); continue; }
             std::string label = p->GetName().ToStdString(wxConvUTF8), logical;
             for( unsigned char c : label ) if( ( c >= 'A' && c <= 'Z' ) || ( c >= 'a' && c <= 'z' ) || ( c >= '0' && c <= '9' ) || c == '_' ) logical += char( std::tolower( c ) );
             if( logical.empty() || used.contains( logical ) ) logical = "pin" + number;
@@ -485,7 +594,7 @@ private:
             if( logical == "gnd" || logical == "vss" || logical == "vee" ) role = "reference";
             ports.push_back( { logical, label.empty() ? number : label, role, number } );
         }
-        m_design.pins = std::move( ports ); m_design.libraryId = picked.ToStdString(wxConvUTF8); refreshFields(); changed();
+        return ports;
     }
     void fromTemplate()
     {
@@ -495,7 +604,7 @@ private:
         for( const auto& c : choices ) models.push_back( MODEL_REPOSITORY::LoadText( c.json, c.file ) );
         const auto selected = ChooseSimulationModel( this, models ); if( !selected ) return;
         m_design = MODEL_DESIGN::Open( choices.at( *selected ).json ); m_design.MakeCoreVisible(); m_design.id = "custom_" + m_design.id;
-        m_design.name = "Custom " + m_design.name; m_file.clear(); refreshFields(); m_pages->SetSelection(0); m_canvas->FitContent(); changed();
+        m_design.name = "Custom " + m_design.name;m_design.automaticAssociation=false; m_file.clear(); refreshFields(); m_pages->SetSelection(0); m_canvas->FitContent(); changed();
     }
     void timerExample()
     {
@@ -540,14 +649,15 @@ private:
     void testModel()
     {
         collect(); CommitGrid( m_stimuli ); const auto text = m_design.Export();
+        const auto selectedModel=MODEL_REPOSITORY::LoadText(text).ForSymbol(m_design.libraryId);
         const auto file = fs::temp_directory_path() / ( "circuitalive-author-test-" + std::to_string( ProcessId() ) + ".casim" );
         struct CLEANUP { fs::path path; ~CLEANUP() { std::error_code error; fs::remove( path, error ); } } cleanup{ file };
         { std::ofstream out( file ); out << text; if( !out ) throw std::runtime_error( _("Cannot prepare model test").ToStdString(wxConvUTF8) ); }
         CIRCUIT_COMPONENT root; root.reference = "U1"; root.libraryId = m_design.libraryId; root.modelFile = file.string(); root.value = m_testValue->GetValue().ToStdString(wxConvUTF8); root.projectDirectory = m_project;
         std::vector<CIRCUIT_COMPONENT> circuit;
-        for( std::size_t i = 0; i < m_design.pins.size(); ++i )
+        for( std::size_t i = 0; i < selectedModel.pins.size(); ++i )
         {
-            const auto& p = m_design.pins[i]; const auto stimulus = i < std::size_t( m_stimuli->GetNumberRows() ) ? m_stimuli->GetCellValue( i, 1 ).ToStdString(wxConvUTF8) : "";
+            const auto& p = selectedModel.pins[i]; const auto stimulus = i < std::size_t( m_stimuli->GetNumberRows() ) ? m_stimuli->GetCellValue( i, 1 ).ToStdString(wxConvUTF8) : "";
             auto node = "pin" + std::to_string( i + 1 ); if( p.role == "reference" && ( stimulus == "0V" || stimulus == "0" ) ) node = "0";
             root.pins[p.defaultPin] = node;
             if( stimulus.empty() || stimulus == "open" || node == "0" ) continue;
@@ -557,7 +667,7 @@ private:
         }
         const auto index = circuit.size(); circuit.push_back( root ); auto snapshot = BuildCircuitSnapshot( circuit );
         std::vector<std::size_t> channels; snapshot.config.signals.clear();
-        for( const auto& p : m_design.pins )
+        for( const auto& p : selectedModel.pins )
         {
             const auto node = snapshot.pinNodes[index].at( p.defaultPin );
             if( node == "0" ) channels.push_back( NO_SIGNAL );
@@ -570,15 +680,17 @@ private:
         INTERACTIVE_SIM_SESSION session( FindSessionWorker( PathUtf8(ExecutablePath()) ) );
         session.Configure( snapshot.netlist, snapshot.config ); session.AdvanceTo( duration ); const auto sample = session.Snapshot().latest;
         wxString report = wxString::Format(_("Test completed at t = %g s\n\n"), sample.time);
-        for( std::size_t i = 0; i < m_design.pins.size(); ++i ) report += W(m_design.pins[i].defaultPin) + " — " + ModelText(m_design.pins[i].label) + ": "
+        for( std::size_t i = 0; i < selectedModel.pins.size(); ++i ) report += W(selectedModel.pins[i].defaultPin) + " — " + ModelText(selectedModel.pins[i].label) + ": "
             + W(FormatMeasurement( channels[i] == NO_SIGNAL ? 0 : sample.values.at( channels[i] ), MEASURE_QUANTITY::VOLTAGE )) + "\n";
         m_results->SetValue( report );
     }
     KIWAY* m_kiway; std::string m_project; MODEL_DESIGN m_design; fs::path m_file;
     wxTextCtrl *m_name, *m_id, *m_testValue, *m_testTime, *m_results, *m_inspector;
-    wxStaticText *m_symbol, *m_status; wxNotebook* m_pages; wxGrid *m_pins, *m_parameters, *m_stimuli;
+    CLICK_CHOICE* m_symbol; wxListBox* m_symbols; wxStaticText* m_status; wxNotebook* m_pages; wxGrid *m_pins, *m_parameters, *m_stimuli;
     DESIGN_CANVAS* m_canvas; wxCheckBox* m_associate; bool m_loading = false, m_dirty = false;
     PANEL_MODEL_INTERACTIONS* m_interactions;
+    PANEL_MODEL_OUTPUTS* m_outputs;
+    SYMBOL_PREVIEW_WIDGET* m_symbolPreview;
 };
 }
 void ShowModelAuthor( wxWindow* parent, KIWAY* kiway )

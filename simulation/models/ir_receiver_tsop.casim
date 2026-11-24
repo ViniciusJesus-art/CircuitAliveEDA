@@ -1,0 +1,103 @@
+{
+  "schema_version": 2,
+  "backend": "ngspice+runtime",
+  "id": "ir_receiver_tsop",
+  "name": "IR receiver \u2014 carrier demodulator",
+  "description": "IR receiver \u2014 carrier demodulator",
+  "license": "GPL-3.0-or-later",
+  "category": "Sensors/Infrared",
+  "family": "Infrared links",
+  "pins": [
+    {
+      "id": "out",
+      "label": "OUT",
+      "role": "output",
+      "default_pin": "1"
+    },
+    {
+      "id": "gnd",
+      "label": "GND",
+      "role": "reference",
+      "default_pin": "2"
+    },
+    {
+      "id": "vcc",
+      "label": "VS",
+      "role": "power",
+      "default_pin": "3"
+    }
+  ],
+  "parameters": [
+    {
+      "id": "carrier",
+      "label": "Carrier frequency",
+      "default": "38000",
+      "min": 1000,
+      "max": 100000,
+      "unit": "Hz"
+    },
+    {
+      "id": "threshold",
+      "label": "Minimum linked LED current",
+      "default": "1m",
+      "min": 1e-07,
+      "max": 1,
+      "unit": "A"
+    },
+    {
+      "id": "supply_current",
+      "label": "Supply current",
+      "default": "350u",
+      "min": 0,
+      "max": 0.1,
+      "unit": "A"
+    }
+  ],
+  "spice": {
+    "instance": [
+      "Ridle_${id} ${pin:vcc} ${pin:gnd} 1e12"
+    ],
+    "definitions": []
+  },
+  "runtime": {
+    "api_version": 1,
+    "engine": "native",
+    "device": "ir_demodulator",
+    "vcc": "vcc",
+    "gnd": "gnd",
+    "min_supply": 2.5,
+    "max_supply": 5.5,
+    "supply_current_parameter": "supply_current",
+    "option_parameters": {
+      "carrierHz": "carrier",
+      "thresholdCurrent": "threshold"
+    },
+    "pins": [
+      {
+        "id": "OUT",
+        "port": "out",
+        "drive": true
+      },
+      {
+        "id": "GND",
+        "port": "gnd",
+        "drive": false
+      },
+      {
+        "id": "VCC",
+        "port": "vcc",
+        "drive": false
+      }
+    ]
+  },
+  "link": {
+    "medium": "ir",
+    "role": "receive",
+    "input": "IR"
+  },
+  "matches": {
+    "library_ids": [
+      "Interface_Optical:TSOP331xx"
+    ]
+  }
+}

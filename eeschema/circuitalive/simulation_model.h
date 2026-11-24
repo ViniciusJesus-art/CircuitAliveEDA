@@ -10,6 +10,7 @@
 #include <sim/programmable_device.h>
 #include "led_appearance.h"
 #include "control_visual.h"
+#include "simulation_outputs.h"
 
 namespace CIRCUITALIVE
 {
@@ -46,6 +47,7 @@ struct MODEL_CONTROL
     double on = 5, off = 0;
     bool initiallyClosed = false;
     CONTROL_VISUAL visual;
+    std::vector<std::string> initiallyOpenSymbols = {};
 };
 
 struct MODEL_RESOURCE
@@ -81,6 +83,8 @@ struct MODEL_RUNTIME_PIN
 {
     std::string id, port;
     bool drive = false;
+    std::string driveParameter;
+    unsigned driveMask = 0, driveValue = 0;
 };
 struct MODEL_RUNTIME
 {
@@ -88,9 +92,11 @@ struct MODEL_RUNTIME
     std::vector<std::string> modules;
     std::size_t firmwareBytes = 0, eepromBytes = 0;
     std::string optionsJson = "{}";
+    std::map<std::string, std::string> optionParameters;
     std::vector<MODEL_RUNTIME_PIN> pins;
     std::string vcc, ground;
     double minimumSupply = 1.8, maximumSupply = 5.5;
+    std::string minimumSupplyParameter, maximumSupplyParameter, supplyCurrentParameter;
 };
 
 struct SIMULATION_MODEL
@@ -103,6 +109,10 @@ struct SIMULATION_MODEL
     std::vector<MODEL_PIN> pins;
     std::vector<MODEL_PARAMETER> parameters;
     std::vector<std::string> libraryIds, symbolNames, deviceHints;
+    bool automaticAssociation = true;
+    std::vector<std::string> excludedLibraryIds;
+    // Per-library physical pin mapping and presentation; the electrical core is shared.
+    std::map<std::string, std::string> symbolVariants;
     std::vector<std::string> partNames;
     std::map<std::string, std::vector<std::string>> pinNames;
     std::map<std::string, std::string> legacyParameterMap, legacyParameterDefaults;
@@ -124,6 +134,10 @@ struct SIMULATION_MODEL
     std::vector<MODEL_MEMORY> memories;
     std::vector<MODEL_LIVE_UPDATE> liveUpdates;
     std::vector<MODEL_LIVE_TEXT> liveTexts;
+    std::vector<MODEL_SEGMENT> segments;
+    MODEL_DISPLAY display;
+    MODEL_AUDIO audio;
+    MODEL_LINK link;
     std::optional<MODEL_RUNTIME> runtime;
     bool ignoreLegacyFields = false;
     std::map<std::string, std::string> legacyFields;
@@ -146,6 +160,7 @@ struct SIMULATION_MODEL
     std::map<std::string, std::string> driverEnable;
     std::map<std::string, std::string> driverValue;
     std::map<std::string, std::string> internalDrive;
+    SIMULATION_MODEL ForSymbol( const std::string& aLibraryId ) const;
 };
 
 struct RESOLVED_MODEL

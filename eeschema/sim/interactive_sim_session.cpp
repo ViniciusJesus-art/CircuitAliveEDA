@@ -245,10 +245,14 @@ void INTERACTIVE_SIM_SESSION::Configure( const std::string& aNetlist,
                       { "max_step", aConfig.maxStep }, { "uic", aConfig.useInitialConditions },
                       { "capacity", aConfig.historyCapacity }, { "signals", aConfig.signals } };
     request["accelerate_expressions"] = aConfig.accelerateExpressions;
+    request["accelerate_stateless"] = aConfig.accelerateStateless;
     request["synchronize_advances"] = aConfig.synchronizeAdvances;
+    request["display_network"] = aConfig.accelerateDisplayNetwork;
     request["mutable_elements"] = aConfig.mutableElements;
     if( aConfig.historySignals )
         request["history_signals"] = *aConfig.historySignals;
+    request["audio_channels"]=JSON::array();
+    for(const auto& c:aConfig.audioChannels)request["audio_channels"].push_back({{"signal",c.signal},{"full_scale",c.fullScale},{"volume",c.volume}});
     request["activity_monitors"] = JSON::array();
     for( const auto& monitor : aConfig.activityMonitors )
         request["activity_monitors"].push_back( {
@@ -334,10 +338,52 @@ MEMORY_SNAPSHOT INTERACTIVE_SIM_SESSION::ReadMemory(const std::string& id,std::s
     return {id,response.at("time"),{MemoryUnhex(response.at("data")),MemoryUnhex(response.at("known"))}};
 }
 
-SIM_SESSION_SNAPSHOT INTERACTIVE_SIM_SESSION::Snapshot( bool aDrainHistory )
+static std::vector<SIM_SAMPLE> DecodeHistory(const JSON& response,std::size_t width)
+{
+    std::optional<std::vector<std::size_t>> indices;
+    if(response.contains("history_signals"))
+    {
+        const auto& selected=response.at("history_signals");
+        if(!selected.is_array())throw std::runtime_error("Invalid simulation history signal indices");
+        indices.emplace();std::vector<bool> seen(width);
+        for(const auto& entry:selected)
+        {
+            if(!entry.is_number_integer()||entry.get<double>()<0||entry.get<double>()>=static_cast<double>(width))
+                throw std::runtime_error("Invalid simulation history signal index");
+            const auto index=entry.get<std::size_t>();
+            if(seen[index])throw std::runtime_error("Repeated simulation history signal index");
+            seen[index]=true;indices->push_back(index);
+        }
+    }
+    std::vector<SIM_SAMPLE> result;
+    for(const auto& sample:response.at("history"))
+    {
+        auto values=sample.at("values").get<std::vector<double>>();
+        if(values.size()!=(indices?indices->size():width))throw std::runtime_error("Invalid simulation history sample width");
+        if(indices)
+        {
+            std::vector<double> expanded(width,std::numeric_limits<double>::quiet_NaN());
+            for(std::size_t i=0;i<indices->size();++i)expanded[(*indices)[i]]=values[i];
+            values=std::move(expanded);
+        }
+        result.push_back({sample.at("time"),std::move(values)});
+    }
+    return result;
+}
+
+std::vector<SIM_SAMPLE> INTERACTIVE_SIM_SESSION::FetchHistory(std::uint64_t token)
+{
+    std::lock_guard lock(m_impl->mutex);
+    return DecodeHistory(m_impl->Request({{"op","history"},{"token",token}}),m_impl->configuration.at("signals").size());
+}
+
+SIM_SESSION_SNAPSHOT INTERACTIVE_SIM_SESSION::Snapshot( bool aDrainHistory,
+        const std::optional<std::vector<std::size_t>>& aHistorySignals )
 {
     std::lock_guard lock( m_impl->mutex );
-    auto response = m_impl->Request( { { "op", "snapshot" }, { "drain", aDrainHistory } } );
+    JSON request={{"op","snapshot"},{"drain",aDrainHistory}};
+    if(aHistorySignals)request["history_signals"]=*aHistorySignals;
+    auto response = m_impl->Request(request);
     SIM_SESSION_SNAPSHOT result;
     result.state = ParseState( response.at( "state" ) );
     result.generation = response.at( "generation" ).get<std::uint64_t>()
@@ -351,52 +397,22 @@ SIM_SESSION_SNAPSHOT INTERACTIVE_SIM_SESSION::Snapshot( bool aDrainHistory )
     result.engineRetainedPoints = response.at( "retained" );
     result.residentBytes = response.at( "resident_bytes" );
     result.error = response.at( "error" );
+    result.presentation=response.value("presentation",std::map<std::string,std::string>{});
+    result.audio=response.value("audio",std::vector<std::int16_t>{});
+    result.audioOverwritten=response.value("audio_overwritten",std::uint64_t(0));
     if( response.contains( "activity" ) )
         for( const auto& activity : response.at( "activity" ) )
             result.activity.push_back( { activity.at( "period" ), activity.at( "last_transition" ),
                                          activity.at( "high_value" ) } );
 
-    std::optional<std::vector<std::size_t>> historySignals;
-    if( response.contains( "history_signals" ) )
-    {
-        const auto& indices = response.at( "history_signals" );
-        const auto width = m_impl->configuration.at( "signals" ).size();
-        if( !indices.is_array() )
-            throw std::runtime_error( "Invalid simulation history signal indices" );
-        historySignals.emplace();
-        std::vector<bool> seen( width );
-        for( const auto& entry : indices )
-        {
-            if( !entry.is_number_integer() || entry.get<double>() < 0
-                || entry.get<double>() >= static_cast<double>( width ) )
-                throw std::runtime_error( "Invalid simulation history signal index" );
-            const auto index = entry.get<std::size_t>();
-            if( seen[index] )
-                throw std::runtime_error( "Repeated simulation history signal index" );
-            seen[index] = true;
-            historySignals->push_back( index );
-        }
-    }
-    for( const auto& sample : response.at( "history" ) )
-    {
-        auto values = sample.at( "values" ).get<std::vector<double>>();
-        if( historySignals )
-        {
-            if( values.size() != historySignals->size() )
-                throw std::runtime_error( "Invalid simulation history sample width" );
-            std::vector<double> expanded( result.latest.values.size(),
-                                          std::numeric_limits<double>::quiet_NaN() );
-            for( std::size_t i = 0; i < historySignals->size(); ++i )
-            {
-                const auto index = ( *historySignals )[i];
-                if( index >= expanded.size() )
-                    throw std::runtime_error( "Invalid simulation history signal index" );
-                expanded[index] = values[i];
-            }
-            values = std::move( expanded );
-        }
-        result.history.push_back( { sample.at( "time" ), std::move( values ) } );
-    }
+    result.historyMinimum=response.value("history_minimum",std::vector<double>{});
+    result.historyMaximum=response.value("history_maximum",std::vector<double>{});
+    result.historyToken=response.value("history_token",std::uint64_t(0));
+    if((!result.historyMinimum.empty()||!result.historyMaximum.empty())
+        &&(result.historyMinimum.size()!=result.latest.values.size()||result.historyMaximum.size()!=result.latest.values.size()))
+        throw std::runtime_error("Invalid simulation history extrema width");
+    result.history=DecodeHistory(response,m_impl->configuration.contains("signals")
+        ?m_impl->configuration.at("signals").size():result.latest.values.size());
 
     return result;
 }

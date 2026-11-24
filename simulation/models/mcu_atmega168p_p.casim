@@ -3,7 +3,7 @@
   "backend": "ngspice+runtime",
   "id": "mcu_atmega168p_p",
   "name": "ATmega168P-20P firmware",
-  "description": "Firmware-driven AVR model. Load Intel HEX or BIN, choose clock and input sampling period. GPIO with finite drivers/pull-ups, timers, interrupts and ADC follow the emulated firmware. Supply and RESET are required. Fuses, oscillator circuitry, USB and precise supply consumption are not modeled.",
+  "description": "Firmware-driven AVR functional model: GPIO, timers/PWM/capture, ADC/comparator, USART, SPI/TWI, watchdog, sleep and Flash self-programming. Configure clock, fuses, supply range/current and input sampling. Oscillator, calibration and consumption use functional approximations.",
   "license": "GPL-3.0-or-later",
   "category": "Microcontrollers",
   "family": "AVR8",
@@ -193,6 +193,70 @@
       "default": "1u",
       "min": 1e-09,
       "max": 0.001
+    },
+    {
+      "id": "supply_min",
+      "label": "Minimum operating supply voltage",
+      "unit": "V",
+      "default": "1.8",
+      "min": 0.1,
+      "max": 100
+    },
+    {
+      "id": "supply_max",
+      "label": "Maximum operating supply voltage",
+      "unit": "V",
+      "default": "5.5",
+      "min": 0.1,
+      "max": 100
+    },
+    {
+      "id": "supply_current",
+      "label": "Approximate supply current",
+      "unit": "A",
+      "default": "5m",
+      "min": 0,
+      "max": 10
+    },
+    {
+      "id": "fuse_low",
+      "label": "Low fuse byte (decimal)",
+      "unit": "",
+      "default": "226",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "fuse_high",
+      "label": "High fuse byte (decimal)",
+      "unit": "",
+      "default": "223",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "fuse_extended",
+      "label": "Extended fuse byte (decimal)",
+      "unit": "",
+      "default": "255",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "lock_bits",
+      "label": "Initial lock byte (decimal)",
+      "unit": "",
+      "default": "255",
+      "min": 0,
+      "max": 255
+    },
+    {
+      "id": "timer2_hz",
+      "label": "Timer2 asynchronous oscillator",
+      "unit": "Hz",
+      "default": "32768",
+      "min": 1,
+      "max": 20000000
     }
   ],
   "resources": [
@@ -242,7 +306,10 @@
       {
         "id": "RESET",
         "port": "reset",
-        "drive": false
+        "drive": true,
+        "drive_when_parameter": "fuse_high",
+        "drive_mask": 128,
+        "drive_value": 0
       },
       {
         "id": "PD0",
@@ -374,7 +441,17 @@
         "port": "pc5",
         "drive": true
       }
-    ]
+    ],
+    "min_supply_parameter": "supply_min",
+    "max_supply_parameter": "supply_max",
+    "supply_current_parameter": "supply_current",
+    "option_parameters": {
+      "fuseLow": "fuse_low",
+      "fuseHigh": "fuse_high",
+      "fuseExtended": "fuse_extended",
+      "lockBits": "lock_bits",
+      "timer2Hz": "timer2_hz"
+    }
   },
   "spice": {
     "instance": [

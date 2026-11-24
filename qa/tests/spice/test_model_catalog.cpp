@@ -98,7 +98,7 @@ BOOST_AUTO_TEST_CASE( BundledCatalogResolvesAllDeclaredAssociationsWithoutAmbigu
         CIRCUIT_COMPONENT c{ "U1", "Custom:Explicit", "1", {} };
         for( const auto& pin : model.pins ) c.pins[pin.defaultPin] = "";
         c.modelFile = "builtin:" + model.id;
-        if( model.runtime )
+        if( model.runtime && !model.runtime->firmwareResource.empty() )
         {
             BOOST_CHECK_THROW( repository.Resolve( c ), std::runtime_error );
             c.resources[model.runtime->firmwareResource] = { PathUtf8( firmware.path ), "bin", 0 };

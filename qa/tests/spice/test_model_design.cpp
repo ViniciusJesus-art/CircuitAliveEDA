@@ -6,6 +6,7 @@
 #include <circuitalive/circuit_snapshot.h>
 #include <circuitalive/session_runner.h>
 #include <circuitalive/control_references.h>
+#include <circuitalive/model_profiles.h>
 #include <filesystem>
 #include <algorithm>
 #include <fstream>
@@ -90,7 +91,7 @@ BOOST_FIXTURE_TEST_CASE( VisualModelRoundTripKeepsEmbeddedBlocksAndPublicParamet
     BOOST_CHECK_EQUAL( restored.blocks[0].x, 300 ); BOOST_CHECK_EQUAL( restored.blocks[0].connections.at( "n" ), "@out" );
     BOOST_CHECK_EQUAL( restored.blocks[0].values.at( "resistance" ), "@upper" );
     BOOST_CHECK_EQUAL( restored.Export(), text );
-    auto model = MODEL_REPOSITORY::LoadText( text ); BOOST_CHECK( model.libraryIds.empty() ); // profiles bind alternatives without ambiguity
+    auto model = MODEL_REPOSITORY::LoadText( text ); BOOST_REQUIRE_EQUAL( model.libraryIds.size(),1 ); BOOST_CHECK_EQUAL(model.libraryIds[0],"Custom:Divider");
     CIRCUIT_COMPONENT u{ "U1", "Custom:Divider", "Divider", { { "10", "in" }, { "20", "out" }, { "30", "0" } } };
     u.modelFile = Write( restored ); auto u2 = u; u2.reference = "U2"; u2.pins["20"] = "out2"; u2.modelParameters["upper"] = "3k";
     auto c = BuildCircuitSnapshot( { Source( "V1", "in", "5" ), u, u2 } );
@@ -444,7 +445,12 @@ BOOST_FIXTURE_TEST_CASE( VisibleCoresKeepAllBundledElectricalModelsAndTheirMetad
         {
             if( MODEL_REPOSITORY::LoadText( text ).runtime )
             {
-                BOOST_CHECK_THROW( MODEL_DESIGN::Open( text ), std::runtime_error );
+                auto design=MODEL_DESIGN::Open(text);design.MakeCoreVisible();
+                const auto edited=MODEL_REPOSITORY::LoadText(design.Export());
+                const auto original=MODEL_REPOSITORY::LoadText(text);
+                BOOST_REQUIRE(edited.runtime);BOOST_CHECK(edited.runtime->modules==original.runtime->modules);
+                BOOST_CHECK_EQUAL(edited.pins.size(),original.pins.size());
+                BOOST_CHECK_EQUAL(edited.libraryIds.size(),original.libraryIds.size());
                 continue;
             }
             auto design = MODEL_DESIGN::Open( text ); design.MakeCoreVisible();
@@ -461,7 +467,9 @@ BOOST_FIXTURE_TEST_CASE( VisibleCoresKeepAllBundledElectricalModelsAndTheirMetad
             BOOST_CHECK_EQUAL( original.currentWarnings.size(), compiled.currentWarnings.size() );
             BOOST_CHECK( original.legacyParameterMap == compiled.legacyParameterMap );
             if( !original.indicatorSignal.empty() ) BOOST_CHECK( compiled.indicatorSignal.find("b_Core_") != std::string::npos );
-            if( !original.controlSource.empty() ) BOOST_CHECK( compiled.controlSource.find("b_Core_") != std::string::npos );
+            if(!original.controlSource.empty())
+                BOOST_CHECK(compiled.controlSource.find("b_Core_")!=std::string::npos
+                    ||std::any_of(compiled.controls.begin(),compiled.controls.end(),[](const auto& control){return control.source.find("b_Core_")!=std::string::npos;}));
             auto restored = MODEL_DESIGN::Open(design.Export());
             restored.MakeCoreVisible(); BOOST_CHECK_EQUAL( restored.blocks.size(), count );
             BOOST_CHECK_EQUAL( restored.Export(), design.Export() );
@@ -789,4 +797,231 @@ BOOST_FIXTURE_TEST_CASE( IdealDiodeConductsForwardAndBlocksReverseVoltage, DESIG
     INTERACTIVE_SIM_SESSION s(CIRCUITALIVE_TEST_WORKER);s.Configure(c.netlist,c.config);s.AdvanceTo(.01);
     BOOST_CHECK_CLOSE(s.Snapshot().latest.values[0],.702149, .001);
     s.SetSourceValue("Vca1",-5);s.AdvanceTo(.02);BOOST_CHECK_CLOSE(s.Snapshot().latest.values[0],-5,.001);
+}
+
+BOOST_FIXTURE_TEST_CASE(SymbolVariantsKeepSeparatePinMapsControlsAndLuminousGeometry,DESIGN_FILES)
+{
+    auto design=MODEL_DESIGN::Open(templates.at("display_7seg_ca"));design.MakeCoreVisible();
+    const auto originalSymbol=design.libraryId;BOOST_REQUIRE(!originalSymbol.empty());
+    const auto originalMapping=design.SymbolPinMap();const auto blockConnections=design.blocks[0].connections;
+    auto physical=design.pins;
+    for(std::size_t i=0;i<physical.size();++i)physical[i].defaultPin=std::to_string(100+i);
+    design.AddSymbol("Custom:OtherDisplay",physical);
+    const auto otherMapping=design.SymbolPinMap();BOOST_CHECK(otherMapping!=originalMapping);
+    for(std::size_t i=0;i<physical.size();++i)BOOST_CHECK_EQUAL(otherMapping.at(physical[i].id),physical[i].defaultPin);
+    auto json=nlohmann::json::parse(design.baseJson);const auto originalVisual=json.at("segments")[0].at("visual");
+    const auto segmentId=json.at("segments")[0].at("id").get<std::string>();
+    json["segments"][0]["visual"]["x"]=.72;json["segments"][0]["red"]=.3;design.baseJson=json.dump();
+    design.SelectSymbol(originalSymbol);BOOST_CHECK(design.SymbolPinMap()==originalMapping);
+    BOOST_CHECK(nlohmann::json::parse(design.baseJson).at("segments")[0].at("visual")==originalVisual);
+    BOOST_CHECK(design.blocks[0].connections==blockConnections);
+    auto text=design.Export();auto model=MODEL_REPOSITORY::LoadText(text);
+    const auto other=model.ForSymbol("Custom:OtherDisplay");
+    BOOST_CHECK_CLOSE(other.segments[0].visual.x,.72,1e-10);BOOST_CHECK_CLOSE(other.segments[0].red,.3,1e-10);
+    BOOST_CHECK_EQUAL(other.segments[0].signal,model.segments[0].signal);
+    BOOST_CHECK_EQUAL(other.pins[0].defaultPin,physical[0].defaultPin);
+    auto restored=MODEL_DESIGN::Open(text);restored.MakeCoreVisible();restored.SelectSymbol("Custom:OtherDisplay");
+    BOOST_CHECK_CLOSE(nlohmann::json::parse(restored.baseJson).at("segments")[0].at("visual").at("x").get<double>(),.72,1e-10);
+    restored.RemoveSymbol(originalSymbol);const auto removed=MODEL_REPOSITORY::LoadText(restored.Export());
+    BOOST_CHECK(std::find(removed.libraryIds.begin(),removed.libraryIds.end(),originalSymbol)==removed.libraryIds.end());
+    BOOST_CHECK(std::find(removed.excludedLibraryIds.begin(),removed.excludedLibraryIds.end(),originalSymbol)!=removed.excludedLibraryIds.end());
+    BOOST_CHECK(restored.blocks[0].connections==blockConnections);
+    auto invalid=nlohmann::json::parse(text);invalid["symbol_variants"]["Custom:OtherDisplay"]["pin_map"]["missing_port"]="999";
+    BOOST_CHECK_THROW(MODEL_REPOSITORY::LoadText(invalid.dump()),std::runtime_error);
+    invalid=nlohmann::json::parse(text);auto& mapping=invalid["symbol_variants"]["Custom:OtherDisplay"]["pin_map"];
+    for(auto& number:mapping)number="1";
+    BOOST_CHECK_THROW(MODEL_REPOSITORY::LoadText(invalid.dump()),std::runtime_error);
+}
+BOOST_FIXTURE_TEST_CASE(SymbolVariantsSwitchButtonsAndSlidersWithoutRewiringBlocks,DESIGN_FILES)
+{
+    for(const auto& id:{"switch","potentiometer"})
+    {
+        auto design=MODEL_DESIGN::Open(templates.at(id));design.MakeCoreVisible();design.ConfigureInteractions();
+        BOOST_REQUIRE(!design.interactions.empty());const auto original=design.libraryId;
+        if(original.empty()){design.AddSymbol("Custom:First",design.pins);}
+        const auto first=design.libraryId;const auto x=design.interactions[0].visual.x;
+        design.AddSymbol("Custom:Second",design.pins);design.interactions[0].visual.x=.63;design.interactions[0].visual.custom=true;
+        design.SelectSymbol(first);BOOST_CHECK_CLOSE(design.interactions[0].visual.x,x,1e-10);
+        const auto text=design.Export();auto model=MODEL_REPOSITORY::LoadText(text).ForSymbol("Custom:Second");
+        if(!model.controls.empty())BOOST_CHECK_CLOSE(model.controls[0].visual.x,.63,1e-10);
+        else{BOOST_REQUIRE(!model.adjustments.empty());BOOST_CHECK_CLOSE(model.adjustments[0].visual.x,.63,1e-10);}
+        auto restored=MODEL_DESIGN::Open(text);restored.MakeCoreVisible();restored.SelectSymbol("Custom:Second");
+        BOOST_CHECK_CLOSE(restored.interactions[0].visual.x,.63,1e-10);
+    }
+}
+BOOST_FIXTURE_TEST_CASE(EditorProfileUpdatesKeepDefaultsAndCopiesDoNotStealOriginalLinks,DESIGN_FILES)
+{
+    MODEL_PROFILES profiles(directory/"profiles.json");const auto original=directory/"original.casim",copy=directory/"copy.casim";
+    CIRCUIT_COMPONENT settings;settings.libraryId="Custom:One";settings.modelFile=original.string();
+    settings.modelPins={{"a","1"},{"b","2"}};settings.modelParameters={{"resistance","17k"}};settings.measurements.voltage=true;
+    profiles.Save(settings);auto second=settings;second.libraryId="Custom:Two";second.modelFile=copy.string();profiles.Save(second);
+    std::map<std::string,std::map<std::string,std::string>> mappings={{"Custom:One",{{"a","2"},{"b","1"}}}};
+    profiles.UpdateLinks(original,"test",mappings,{"Custom:Two"},true);
+    CIRCUIT_COMPONENT fresh;fresh.libraryId="Custom:One";BOOST_REQUIRE(profiles.Apply(fresh));
+    BOOST_CHECK_EQUAL(fresh.modelParameters.at("resistance"),"17k");BOOST_CHECK(fresh.measurements.voltage);BOOST_CHECK_EQUAL(fresh.modelPins.at("a"),"2");
+    profiles.UpdateLinks(copy,"test",mappings,{},false);fresh={};fresh.libraryId="Custom:One";BOOST_REQUIRE(profiles.Apply(fresh));
+    BOOST_CHECK_EQUAL(fresh.modelFile,original.string());
+    profiles.UpdateLinks(original,"test",{}, {"Custom:One","Custom:Two"},true);
+    fresh={};fresh.libraryId="Custom:One";BOOST_CHECK(!profiles.Apply(fresh));fresh.libraryId="Custom:Two";BOOST_REQUIRE(profiles.Apply(fresh));
+    BOOST_CHECK_EQUAL(fresh.modelFile,copy.string());
+}
+
+BOOST_FIXTURE_TEST_CASE(SymbolLinksPreserveMatchingRulesAndRespectRemovalAndCopyIsolation,DESIGN_FILES)
+{
+    auto design=MODEL_DESIGN::Open(templates.at("resistor"));design.MakeCoreVisible();
+    const auto original=nlohmann::json::parse(templates.at("resistor"));
+    const auto symbol=design.libraryId;BOOST_REQUIRE(!symbol.empty());
+    auto exported=nlohmann::json::parse(design.Export());
+    for(const auto& [key,value]:original.at("matches").items())
+        if(key!="library_ids")BOOST_CHECK(exported.at("matches").at(key)==value);
+    design.RemoveSymbol(symbol);Write(design);MODEL_REPOSITORY repository({directory});
+    CIRCUIT_COMPONENT component{"R1",symbol,"1k",{{"1","in"},{"2","0"}}};
+    BOOST_CHECK_THROW(repository.Resolve(component),std::runtime_error);
+    component.modelFile=(directory/(design.id+".casim")).string();BOOST_CHECK_NO_THROW(repository.Resolve(component));
+    auto copy=design;copy.id="copy";copy.automaticAssociation=false;copy.AddSymbol("Custom:Copy",copy.pins);Write(copy);
+    MODEL_REPOSITORY copies({directory});component.libraryId="Custom:Copy";component.modelFile.clear();
+    BOOST_CHECK_THROW(copies.Resolve(component),std::runtime_error);
+    component.modelFile=(directory/"copy.casim").string();BOOST_CHECK_NO_THROW(copies.Resolve(component));
+}
+
+BOOST_FIXTURE_TEST_CASE(EditedSwitchKeepsEachSymbolsNormallyOpenAndNormallyClosedState,DESIGN_FILES)
+{
+    auto design=MODEL_DESIGN::Open(templates.at("switch"));design.MakeCoreVisible();const auto file=Write(design);
+    for(bool push:{true,false})
+    {
+        CIRCUIT_COMPONENT button{"S1",push?"Switch:SW_Push":"Switch:SW_SPST","Switch",{{"1","in"},{"2","out"}}};button.modelFile=file;
+        auto circuit=BuildCircuitSnapshot({Source("V1","in","5"),button,{"R1","Device:R","1k",{{"1","out"},{"2","0"}}}});
+        BOOST_REQUIRE_EQUAL(circuit.switches.size(),1);BOOST_CHECK_EQUAL(circuit.switches[0].initiallyClosed,!push);
+        circuit.config.signals={"v("+circuit.pinNodes[1].at("2")+")"};
+        INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(circuit.netlist,circuit.config);session.AdvanceTo(.001);
+        const auto voltage=session.Snapshot().latest.values[0];if(push)BOOST_CHECK_SMALL(voltage,1e-4);else BOOST_CHECK_GT(voltage,4.99);
+    }
+}
+
+namespace
+{
+struct DEFAULT_PROFILE_ENV
+{
+    std::string old=std::getenv("CIRCUITALIVE_PROFILE_FILE")?std::getenv("CIRCUITALIVE_PROFILE_FILE"):"";
+    explicit DEFAULT_PROFILE_ENV(const fs::path& file){SetRuntimeEnvironment("CIRCUITALIVE_PROFILE_FILE",PathUtf8(file));}
+    ~DEFAULT_PROFILE_ENV(){if(old.empty())UnsetRuntimeEnvironment("CIRCUITALIVE_PROFILE_FILE");else SetRuntimeEnvironment("CIRCUITALIVE_PROFILE_FILE",old);}
+};
+}
+BOOST_FIXTURE_TEST_CASE(MakeDefaultWritesTheLiveModelAndAdvancedEditorSeesIt,DESIGN_FILES)
+{
+    const auto profileFile=directory/"default-bindings.json";DEFAULT_PROFILE_ENV environment(profileFile);MODEL_PROFILES profiles(profileFile);
+    auto design=Divider();const auto connections=design.blocks[0].connections;const auto file=Write(design);
+    auto model=MODEL_REPOSITORY::Load(file);
+    CIRCUIT_COMPONENT component{"U1","Custom:LinkedVariant","1k",{{"10","in"},{"20","0"},{"30","out"}}};
+    component.modelPins={{"in","30"},{"out","10"},{"gnd","20"}};component.modelParameters={{"upper","2k"}};
+    component.measurements={true,true,true,"in","gnd"};
+    profiles.MakeDefault(component,model,true);
+    BOOST_REQUIRE(profiles.BoundModel(component.libraryId));BOOST_CHECK_EQUAL(*profiles.BoundModel(component.libraryId),file);
+    BOOST_CHECK(profiles.DefaultExcluded(component.libraryId));
+    auto fresh=component;fresh.modelFile.clear();fresh.modelParameters.clear();fresh.modelPins.clear();fresh.measurements={};
+    BOOST_REQUIRE(profiles.Apply(fresh));BOOST_CHECK(fresh.modelParameters.empty());BOOST_CHECK(fresh.modelPins.empty());BOOST_CHECK(fresh.measurements.power);
+    auto resolved=MODEL_REPOSITORY().Resolve(fresh);BOOST_CHECK_EQUAL(resolved.parameterText.at("upper"),"2k");BOOST_CHECK_EQUAL(resolved.pins.at("in"),"30");
+    std::ifstream input(file);const std::string text(std::istreambuf_iterator<char>(input),{});auto edited=MODEL_DESIGN::Open(text);
+    BOOST_CHECK_EQUAL(edited.parameters[0].defaultValue,"1k");BOOST_CHECK(edited.blocks[0].connections==connections);
+    edited.SelectSymbol(component.libraryId);BOOST_CHECK_EQUAL(edited.SymbolPinMap().at("in"),"30");
+    auto parameters=edited.SymbolParameters();BOOST_CHECK_EQUAL(parameters[0].defaultValue,"2k");
+    parameters[0].defaultValue="3k";edited.SetSymbolParameters(parameters);std::ofstream(file)<<edited.Export();
+    BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(fresh).parameterText.at("upper"),"3k");
+    auto automatic=fresh;automatic.modelFile.clear();BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(automatic).model.id,design.id);
+    auto second=design;second.id="other_divider";const auto otherFile=Write(second);auto instance=automatic;instance.modelFile=otherFile;
+    instance.modelParameters={{"upper","4k"}};BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(instance).parameterText.at("upper"),"4k");
+    BOOST_CHECK_EQUAL(*profiles.BoundModel(component.libraryId),file); // Choosing an instance model does not persist defaults.
+    profiles.MakeDefault(instance,MODEL_REPOSITORY::Load(otherFile));BOOST_CHECK_EQUAL(*profiles.BoundModel(component.libraryId),otherFile);
+    BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(automatic).model.id,second.id);
+}
+BOOST_FIXTURE_TEST_CASE(MakeDefaultKeepsDifferentLedsInOneModel,DESIGN_FILES)
+{
+    const auto profileFile=directory/"led-defaults.json";DEFAULT_PROFILE_ENV environment(profileFile);MODEL_PROFILES profiles(profileFile);
+    auto design=MODEL_DESIGN::Open(templates.at("led"));design.MakeCoreVisible();const auto file=Write(design);
+    const auto original=MODEL_REPOSITORY::Load(file);
+    BOOST_REQUIRE(!original.brightnessParameter.empty());
+    const auto parameter=original.brightnessParameter;
+    CIRCUIT_COMPONENT diffuse{"D1","Custom:LED_Diffuse","LED",{{"1","0"},{"2","led"}}};
+    for(const auto& pin:original.pins)diffuse.modelPins[pin.id]=pin.defaultPin;
+    diffuse.modelParameters={{parameter,"10m"},{"forward_voltage","2"},{"color_red","255"},{"color_green","0"}};
+    auto bright=diffuse;bright.reference="D2";bright.libraryId="Custom:LED_Bright";bright.modelParameters={{parameter,"20m"},{"forward_voltage","3"},{"color_red","0"},{"color_green","255"}};
+    profiles.MakeDefault(diffuse,original);profiles.MakeDefault(bright,MODEL_REPOSITORY::Load(file));
+    auto freshDiffuse=diffuse,freshBright=bright;
+    for(auto* c:{&freshDiffuse,&freshBright}){c->modelParameters.clear();c->modelPins.clear();BOOST_REQUIRE(profiles.Apply(*c));}
+    const auto diffuseModel=MODEL_REPOSITORY().Resolve(freshDiffuse),brightModel=MODEL_REPOSITORY().Resolve(freshBright);
+    BOOST_CHECK_EQUAL(diffuseModel.model.file,brightModel.model.file);BOOST_CHECK_EQUAL(diffuseModel.model.id,brightModel.model.id);
+    BOOST_CHECK_EQUAL(diffuseModel.parameterText.at(parameter),"10m");BOOST_CHECK_EQUAL(brightModel.parameterText.at(parameter),"20m");
+    const auto diffuseAppearance=ResolveLedAppearance(diffuseModel.model.ledAppearance,diffuseModel.parameters);
+    const auto brightAppearance=ResolveLedAppearance(brightModel.model.ledAppearance,brightModel.parameters);
+    BOOST_CHECK_EQUAL(diffuseAppearance.red,1);BOOST_CHECK_EQUAL(diffuseAppearance.green,0);
+    BOOST_CHECK_EQUAL(brightAppearance.red,0);BOOST_CHECK_EQUAL(brightAppearance.green,1);
+    auto poweredBright=freshBright;poweredBright.pins["2"]="bright";
+    const auto circuit=BuildCircuitSnapshot({Source("V1","supply","5"),
+        {"R1","Device:R","330",{{"1","supply"},{"2","led"}}},freshDiffuse,
+        {"R2","Device:R","330",{{"1","supply"},{"2","bright"}}},poweredBright});
+    auto config=circuit.config;config.signals={"v("+circuit.pinNodes[2].at("2")+")","v("+circuit.pinNodes[4].at("2")+")"};
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(circuit.netlist,config);session.AdvanceTo(.001);
+    const auto sample=session.Snapshot().latest;
+    BOOST_CHECK_SMALL(sample.values[0]-2,.1);BOOST_CHECK_SMALL(sample.values[1]-3,.1);
+    const auto saved=MODEL_REPOSITORY::Load(file);
+    BOOST_CHECK(saved.instance==original.instance);BOOST_CHECK(saved.definitions==original.definitions);
+    for(std::size_t i=0;i<original.parameters.size();++i)BOOST_CHECK_EQUAL(saved.parameters[i].defaultValue,original.parameters[i].defaultValue);
+    auto automatic=bright;automatic.modelParameters.clear();automatic.modelPins.clear();automatic.modelFile.clear();
+    BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(automatic).parameterText.at(parameter),"20m");
+    freshDiffuse.modelParameters[parameter]="15m";BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(freshDiffuse).parameterText.at(parameter),"15m");
+    BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(freshBright).parameterText.at(parameter),"20m");
+    // Saving only another field must keep this symbol's existing defaults.
+    diffuse.modelParameters.clear();profiles.MakeDefault(diffuse,saved);
+    freshDiffuse.modelParameters.clear();BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(freshDiffuse).parameterText.at(parameter),"10m");
+    std::ifstream input(file);auto editor=MODEL_DESIGN::Open(std::string(std::istreambuf_iterator<char>(input),{}));
+    const auto blocks=editor.blocks.size();
+    editor.SelectSymbol(diffuse.libraryId);auto parameters=editor.SymbolParameters();
+    auto current=std::find_if(parameters.begin(),parameters.end(),[&](const auto& p){return p.id==parameter;});
+    BOOST_REQUIRE(current!=parameters.end());BOOST_CHECK_EQUAL(current->defaultValue,"10m");
+    current->defaultValue="12m";editor.SetSymbolParameters(parameters);
+    editor.SelectSymbol(bright.libraryId);
+    for(const auto& p:editor.SymbolParameters())if(p.id==parameter)BOOST_CHECK_EQUAL(p.defaultValue,"20m");
+    editor.SetSymbolParameters(editor.SymbolParameters()); // A UI collect with no edits must not change other symbols.
+    editor.AddSymbol("Custom:LED_New",editor.pins);
+    const auto baseline=original.ForSymbol("Custom:LED_New");
+    for(std::size_t i=0;i<baseline.parameters.size();++i)BOOST_CHECK_EQUAL(editor.SymbolParameters()[i].defaultValue,baseline.parameters[i].defaultValue);
+    BOOST_CHECK_EQUAL(editor.blocks.size(),blocks);std::ofstream(file)<<editor.Export();
+    BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(freshDiffuse).parameterText.at(parameter),"12m");
+    BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(freshBright).parameterText.at(parameter),"20m");
+}
+BOOST_FIXTURE_TEST_CASE(SymbolParameterDefaultsRejectInvalidValuesAndFollowValue,DESIGN_FILES)
+{
+    auto json=nlohmann::json::parse(Divider().Export());
+    auto& variant=json["symbol_variants"]["Custom:Divider"];
+    variant["parameter_defaults"]={{"upper","$value"}};
+    const auto file=directory/"value-default.casim";
+    std::ofstream(file)<<json.dump();
+    CIRCUIT_COMPONENT component{"U1","Custom:Divider","3k",{{"10","in"},{"20","out"},{"30","0"}}};component.modelFile=file.string();
+    BOOST_CHECK_EQUAL(MODEL_REPOSITORY().Resolve(component).parameters.at("upper"),3000);
+    for(const auto& value:{"0","2Meg","oops",""})
+    {
+        variant["parameter_defaults"]["upper"]=value;
+        BOOST_CHECK_THROW(MODEL_REPOSITORY::LoadText(json.dump()),std::runtime_error);
+    }
+    variant["parameter_defaults"]={{"missing","1k"}};
+    BOOST_CHECK_THROW(MODEL_REPOSITORY::LoadText(json.dump()),std::runtime_error);
+    variant["parameter_defaults"]={{"upper",1000}};
+    BOOST_CHECK_THROW(MODEL_REPOSITORY::LoadText(json.dump()),std::runtime_error);
+    auto editor=Divider();auto parameters=editor.SymbolParameters();parameters[0].defaultValue="2k";editor.SetSymbolParameters(parameters);
+    editor.blocks[0].values["resistance"]="2k";editor.SetSymbolParameters({});
+    BOOST_CHECK(MODEL_REPOSITORY::LoadText(editor.Export()).parameters.empty());
+}
+BOOST_FIXTURE_TEST_CASE(InvalidDefaultSettingsLeaveModelAndBindingUntouched,DESIGN_FILES)
+{
+    MODEL_PROFILES profiles(directory/"invalid-defaults.json");auto design=Divider();const auto file=Write(design);const auto model=MODEL_REPOSITORY::Load(file);
+    CIRCUIT_COMPONENT component{"U1","Custom:Invalid","1k",{{"10","in"},{"20","out"},{"30","0"}}};
+    std::ifstream input(file);const std::string before(std::istreambuf_iterator<char>(input),{});
+    for(bool pins:{false,true})
+    {
+        component.modelParameters=pins?std::map<std::string,std::string>{}:std::map<std::string,std::string>{{"upper","100Meg"}};
+        component.modelPins=pins?std::map<std::string,std::string>{{"in","10"},{"out","10"},{"gnd","30"}}:std::map<std::string,std::string>{};
+        BOOST_CHECK_THROW(profiles.MakeDefault(component,model),std::runtime_error);
+        std::ifstream verify(file);BOOST_CHECK_EQUAL(std::string(std::istreambuf_iterator<char>(verify),{}),before);
+        BOOST_CHECK(!profiles.BoundModel(component.libraryId));
+    }
 }

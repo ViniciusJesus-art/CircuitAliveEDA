@@ -5315,6 +5315,1136 @@ function load(id){
 }
 global.AVR8js=load('index');
 })(globalThis);
+/* Electrical serial engines, independent of CPU ISA/register layout.
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * env: read(pin), drive(pin, 0=release/1=LOW/2=HIGH, time), complete(value).
+ * All times are simulated seconds; reads observe the host's electrical snapshot.
+ */
+(function(global) {
+  'use strict';
+  class SPI {
+    constructor(env,pins) { this.env=env;this.pins=pins;this.reset(); }
+    reset() { this.busy=false;this.selected=false;this.tx=0;this.rx=0;this.bits=0;this.next=Infinity; }
+    configure(config,time) {
+      this.config=config;this.reset();
+      this.clock=!!config.cpol;
+      if(config.master)this.env.drive(this.pins.sck,this.clock?2:1,time);
+    }
+    bit(index) { return (this.tx>>(this.config.lsbFirst?index:7-index))&1; }
+    output(index,time,pin) { this.env.drive(pin,this.bit(index)?2:1,time); }
+    receive(pin,index) { if(this.env.read(pin))this.rx|=1<<(this.config.lsbFirst?index:7-index); }
+    start(value,time) {
+      this.tx=value;this.rx=0;this.bits=0;
+      if(!this.config.master) {
+        if(this.selected&&!this.config.cpha)this.output(0,time,this.pins.miso);
+        return;
+      }
+      this.busy=true;this.edge=0;this.next=time+this.config.halfPeriod;
+      if(!this.config.cpha)this.output(0,time,this.pins.mosi);
+    }
+    advance(time) {
+      if(!this.config || !this.config.master)return;
+      while(this.busy && this.next<=time+1e-15) {
+        const when=this.next,leading=(this.edge%2)===0,index=this.edge>>1;
+        this.clock=leading?!this.config.cpol:!!this.config.cpol;
+        this.env.drive(this.pins.sck,this.clock?2:1,when);
+        if(leading===!this.config.cpha)this.receive(this.pins.miso,index);
+        else if(this.config.cpha)this.output(index,when,this.pins.mosi);
+        else if(index<7)this.output(index+1,when,this.pins.mosi);
+        this.edge++;this.next+=this.config.halfPeriod;
+        if(this.edge===16) {
+          this.busy=false;this.next=Infinity;this.env.complete(this.rx,when);
+        }
+      }
+    }
+    sample(time) {
+      if(!this.config || this.config.master)return;
+      const selected=!this.env.read(this.pins.ss),clock=!!this.env.read(this.pins.sck);
+      if(!selected) {
+        this.selected=false;this.busy=false;this.bits=0;this.rx=0;this.clock=clock;
+        this.env.drive(this.pins.miso,0,time);return;
+      }
+      if(!this.selected) {
+        this.selected=true;this.clock=clock;this.bits=0;this.rx=0;
+        if(!this.config.cpha)this.output(0,time,this.pins.miso);
+        return;
+      }
+      if(clock===this.clock)return;
+      this.clock=clock;
+      const leading=clock!==!!this.config.cpol;
+      if(leading||this.bits)this.busy=true;
+      if(leading===!this.config.cpha) {
+        this.receive(this.pins.mosi,this.bits++);
+        if(this.bits===8) {
+          const value=this.rx;this.bits=0;this.rx=0;this.busy=false;
+          this.env.complete(value,time);
+        }
+      } else this.output(this.bits,time,this.pins.miso);
+    }
+  }
+
+  // Open-drain controller. HIGH is always a release: pull-ups, RC rise times
+  // and a peer holding SCL LOW are resolved by the electrical solver.
+  class I2CController {
+    constructor(env,pins) { this.env=env;this.pins=pins;this.reset(); }
+    reset() {
+      this.busy=false;this.owned=false;this.steps=[];this.index=0;this.next=Infinity;
+      this.lastClock=true;this.highData=true;this.clockFell=false;
+      this.lastData=true;this.startFree=false;this.startJoined=false;
+    }
+    sample(time) {
+      const clock=!!this.env.read(this.pins.scl);
+      const data=!!this.env.read(this.pins.sda);
+      if(this.busy&&this.startFree&&clock&&this.lastData&&!data) {
+        const start=this.steps.findIndex(step=>step[0]==='start');
+        if(start>=this.index){this.index=start;this.next=time;this.startJoined=true;}
+      }
+      if(clock)this.highData=!!this.env.read(this.pins.sda);
+      const step=this.steps[this.index];
+      // Another controller can finish the HIGH phase first. Synchronize to its
+      // falling edge using the data observed while SCL was actually HIGH.
+      if(this.busy&&this.lastClock&&!clock&&step&&['read','arbitrate','ack','sentAck'].includes(step[0])) {
+        this.clockFell=true;this.next=Math.min(this.next,time);
+      }
+      this.lastClock=clock;
+      this.lastData=data;
+    }
+    line(pin,low,time) { this.env.drive(this.pins[pin],low?1:0,time); }
+    run(steps,halfPeriod,time,done) {
+      if(this.busy)throw new Error('I2C operation already active');
+      this.busy=true;this.steps=steps;this.index=0;this.half=halfPeriod;
+      this.next=time;this.done=done;this.received=0;this.ack=false;
+    }
+    start(repeated,half,time,done) {
+      this.startFree=!repeated&&!!this.env.read(this.pins.sda)&&!!this.env.read(this.pins.scl);
+      this.startJoined=false;
+      this.run([...(repeated?[['scl',true]]:[]),['sda',false],['raise'],['high'],['start'],['scl',true]],half,time,()=>{
+        this.owned=true;this.startFree=false;done('start');
+      });
+    }
+    stop(half,time,done) {
+      this.run([['scl',true],['sda',true],['raise'],['high'],['sda',false],['idle']],half,time,()=>{
+        this.owned=false;done('stop');
+      });
+    }
+    transfer(value,read,ack,half,time,done) {
+      const steps=[];
+      for(let bit=7;bit>=0;--bit)steps.push(['sda',read?false:!(value&(1<<bit))],
+        ['raise'],['high'],[read?'read':'arbitrate',bit,!!(value&(1<<bit))],['scl',true]);
+      steps.push(['sda',read&&ack],['raise'],['high'],[read?'sentAck':'ack'],['scl',true],['sda',false]);
+      this.run(steps,half,time,event=>event==='arbitration'?done(event):done('byte',read?this.received:this.ack));
+    }
+    advance(time) {
+      while(this.busy && this.next<=time+1e-15) {
+        const step=this.steps[this.index],when=this.next,op=step[0];
+        if(op==='raise') {
+          // The following HIGH barrier waits for the solver to resolve SCL.
+          this.line('scl',false,when);
+        } else if(op==='sda'||op==='scl')this.line(op,step[1],when);
+        else {
+          // Clock stretching and pull-up failure hold the operation here.
+          const synchronized=this.clockFell&&['read','arbitrate','ack','sentAck'].includes(op);
+          if(!this.env.read(this.pins.scl)&&!synchronized&&!(op==='start'&&this.startJoined)) {this.next=time+this.half/8;return;}
+          const data=synchronized?this.highData:!!this.env.read(this.pins.sda);
+          this.clockFell=false;
+          if(op==='start') {
+            if(!data&&!this.startJoined) {this.next=time+this.half;return;}
+            this.line('sda',true,when);
+          } else if(op==='read') {if(data)this.received|=1<<step[1];}
+          else if(op==='ack')this.ack=!data;
+          else if(op==='arbitrate' && step[2] && !data) {
+            this.busy=false;this.owned=false;this.next=Infinity;
+            this.line('sda',false,when);this.line('scl',false,when);
+            this.done('arbitration');return;
+          } else if(op==='idle'&&!data) {this.next=time+this.half;return;}
+        }
+        this.index++;
+        // SDA setup uses the LOW phase; sampling occurs halfway through HIGH.
+        // Each ordinary byte bit therefore has two half-periods, not four.
+        const delay=op==='sda'||op==='high'||op==='start'?this.half:0;
+        this.next=when+delay;
+        if(this.index===this.steps.length) {
+          const done=this.done;this.busy=false;this.next=Infinity;done();
+        }
+      }
+    }
+  }
+  class I2CTarget {
+    constructor(env,pins) {this.env=env;this.pins=pins;this.reset();}
+    reset() {
+      this.state='idle';this.bits=0;this.byte=0;this.selected=false;this.pending=false;
+      this.lastSDA=true;this.lastSCL=true;this.ackStage=0;this.general=false;
+      this.startCount=0;
+    }
+    line(pin,low,time) {this.env.drive(this.pins[pin],low?1:0,time);}
+    resume(config,time,clear=true) {
+      this.config=config;
+      if(!this.pending||!clear)return;
+      this.pending=false;
+      if(this.state==='send') {
+        this.byte=config.byte;this.bits=0;
+        this.line('sda',!(this.byte&0x80),time);
+      }
+      this.line('scl',false,time);
+    }
+    notify(status,time,byte,stretch=true) {
+      this.pending=true;
+      if(stretch)this.line('scl',true,time);
+      this.env.complete(status,byte,time);
+    }
+    sample(time) {
+      if(!this.config)return;
+      const sda=!!this.env.read(this.pins.sda),scl=!!this.env.read(this.pins.scl);
+      const rising=scl&&!this.lastSCL,falling=!scl&&this.lastSCL;
+      const start=scl&&this.lastSCL&&this.lastSDA&&!sda;
+      const stop=scl&&this.lastSCL&&!this.lastSDA&&sda;
+      this.lastSDA=sda;this.lastSCL=scl;
+      if(start||stop) {
+        if(start)this.startCount++;
+        const wasSelected=this.selected;
+        const illegal=wasSelected&&(this.bits!==0||this.ackStage!==0);
+        this.state=start?'address':'idle';this.bits=0;this.byte=0;this.selected=false;this.ackStage=0;
+        this.line('sda',false,time);
+        if(wasSelected)this.notify(illegal?0:0xa0,time,undefined,false);
+        return;
+      }
+      if(this.pending) {
+        if(falling&&this.state==='address')this.line('scl',true,time);
+        return;
+      }
+      if(this.state==='idle')return;
+      if(this.ackStage) {
+        if(falling && this.ackStage===1) {
+          this.line('sda',this.ack,time);this.ackStage=2;
+        } else if(rising && this.ackStage===2)this.ackStage=3;
+        else if(falling && this.ackStage===3) {
+          this.line('sda',false,time);this.ackStage=0;
+          const state=this.state;this.state=this.nextState;this.bits=0;this.byte=0;
+          if(this.selected) {
+            if(state==='address')this.notify(this.general?0x70:this.reading?0xa8:0x60,time);
+            else this.notify(this.general?(this.ack?0x90:0x98):(this.ack?0x80:0x88),time,this.received);
+          }
+        }
+        return;
+      }
+      if(this.state==='address'||this.state==='receive') {
+        if(!rising)return;
+        this.byte=(this.byte<<1)|(sda?1:0);
+        if(++this.bits!==8)return;
+        this.received=this.byte;
+        if(this.state==='address') {
+          const address=this.byte>>1;
+          this.general=address===0&&!(this.byte&1)&&this.config.generalCall;
+          this.selected=!!(this.config.ack&&(this.general
+            || (address!==0 && ((address^this.config.address)&~this.config.mask)===0)));
+          this.reading=!!(this.byte&1);
+          this.ack=this.selected;
+          this.nextState=this.selected?(this.reading?'send':'receive'):'idle';
+        } else {this.ack=!!this.config.ack;this.nextState=this.ack?'receive':'idle';}
+        this.ackStage=1;
+      } else if(this.state==='send') {
+        if(rising) {
+          if(this.bits<8)this.bits++;
+          else {
+            this.ack=!sda;this.state='sent';
+          }
+        } else if(falling) {
+          if(this.bits<8)this.line('sda',!(this.byte&(0x80>>this.bits)),time);
+          else this.line('sda',false,time);
+        }
+      } else if(this.state==='sent'&&falling) {
+        this.state=this.ack&&this.config.ack?'send':'idle';
+        this.notify(this.ack?(this.config.ack?0xb8:0xc8):0xc0,time);
+      }
+    }
+  }
+  global.CircuitAliveSerial=Object.freeze({SPI,I2CController,I2CTarget});
+})(globalThis);
+/* CircuitAliveEDA AVR device profiles. SPDX-License-Identifier: GPL-3.0-or-later */
+(function(global) {
+  'use strict';
+  const profiles=Object.create(null);
+  function registerDevice(id,profile) {
+    if(!/^[a-z][a-z0-9_]*$/.test(id) || profiles[id])throw new Error('Invalid or duplicate AVR device: '+id);
+    // A profile may reuse this register/peripheral layout, not invent a new ISA.
+    if(profile.family!=='atmega-x8')throw new Error('Unsupported AVR peripheral layout: '+profile.family);
+    for(const key of ['flash','sram','eeprom'])
+      if(!Number.isInteger(profile[key]) || profile[key]<=0 || profile[key]>32768)
+        throw new Error('Invalid AVR memory capacity: '+key);
+    if(profile.flash%2 || (profile.eeprom&(profile.eeprom-1))
+        || ![1,2].includes(profile.vectorDivisor))throw new Error('Invalid AVR device profile');
+    const pageBytes=profile.pageBytes || (profile.flash<=8192?64:128);
+    const bootMinBytes=profile.bootMinBytes===undefined?(profile.flash===4096?0:profile.flash>=32768?512:256):profile.bootMinBytes;
+    if(![64,128].includes(pageBytes)||![0,256,512].includes(bootMinBytes))throw new Error('Invalid AVR Flash layout');
+    const signature=profile.signature || [0x1e,profile.flash===4096?0x92:profile.flash===8192?0x93:profile.flash===16384?0x94:0x95,
+      profile.flash===4096?0x0a:profile.flash===8192?0x0f:profile.flash===16384?0x0b:0x0f];
+    profiles[id]=Object.freeze({family:profile.family,flash:profile.flash,sram:profile.sram,
+      eeprom:profile.eeprom,vectorDivisor:profile.vectorDivisor,pageBytes,bootMinBytes,
+      signature:Object.freeze([...signature]),fuseLayout:profile.flash>=32768?'328':'48-168'});
+  }
+  for(const [id,flash,sram,eeprom,vectorDivisor] of [
+    ['atmega48p',4096,512,256,2],['atmega88p',8192,1024,512,2],
+    ['atmega168p',16384,1024,512,1],['atmega328p',32768,2048,1024,1]])
+    registerDevice(id,{family:'atmega-x8',flash,sram,eeprom,vectorDivisor});
+  const capabilities=Object.freeze({
+    spi:Object.freeze(['controller','target','modes-0-3','msb-first','lsb-first']),
+    i2c:Object.freeze(['controller','target','7-bit','address-mask','general-call','clock-stretching',
+      'ack-nack','repeated-start','arbitration-loss']),
+    system:Object.freeze(['watchdog-reset-interrupt','six-sleep-modes','prr','clkpr','ivsel','reset-causes','bod','clock-output']),
+    adc:Object.freeze(['single','free-running','auto-triggers','result-lock','references']),
+    timers:Object.freeze(['timer1-capture','noise-canceller','asynchronous-timer2','external-clocks','tsm']),
+    usart:Object.freeze(['async-5-9-bit','parity-frame-overrun','mpcm','synchronous','mspim','rx-fifo','tx-buffer']),
+    flash:Object.freeze(['page-buffer','erase-write','spm','boot-reset','rww','fuses-lock-bits']),
+    notModeled:Object.freeze(['debugwire','external-isp-high-voltage-programmers','transistor-effects',
+      'oscillator-startup-jitter','precise-power-temperature-curves'])
+  });
+  global.CircuitAliveAVR=Object.freeze({registerDevice,capabilities,
+    device:id=>profiles[id],devices:()=>Object.keys(profiles)});
+})(globalThis);
+/* AVR register adapters for reusable electrical serial engines.
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+(function(global) {
+  'use strict';
+  global.createAVRSerial=function(cpu,clock,cf,io) {
+    const AVR=global.AVR8js,Serial=global.CircuitAliveSerial;
+    const drive=Object.create(null);
+    const set=(pin,value,time)=>{drive[pin]=value;io.publish(time);};
+    const read=pin=>io.read(pin);
+    const spiConfig=cf(AVR.spiConfig),twiConfig=cf(AVR.twiConfig);
+    const spiInterrupt={address:spiConfig.spiInterrupt,flagRegister:spiConfig.SPSR,flagMask:0x80,
+      enableRegister:spiConfig.SPCR,enableMask:0x80};
+    const twiInterrupt={address:twiConfig.twiInterrupt,flagRegister:twiConfig.TWCR,flagMask:0x80,
+      enableRegister:twiConfig.TWCR,enableMask:1,constant:true};
+    const {SPCR,SPSR,SPDR}=spiConfig,{TWBR,TWSR,TWAR,TWDR,TWCR,TWAMR}=twiConfig;
+    let spiEnabled=false,twiEnabled=false,spiFlagsRead=0,spiLatch=0;
+    let spiPaused=null,twiPaused=null;
+    let lostStart=-1;
+    const running=domain=>!io.running||io.running(domain);
+    const spi=new Serial.SPI({read,drive:set,complete:value=>{
+      cpu.data[SPDR]=value;cpu.setInterruptFlag(spiInterrupt);
+    }},{ss:'PB2',mosi:'PB3',miso:'PB4',sck:'PB5'});
+    const twi=new Serial.I2CController({read,drive:set},{sda:'PC4',scl:'PC5'});
+    const target=new Serial.I2CTarget({read,drive:(pin,value,time)=>{
+      if(!twi.busy&&!twi.owned)set(pin,value,time);
+    },complete:(value,byte)=>{
+      if(twi.busy||twi.owned)return;
+      if(lostStart===target.startCount)value=({96:0x68,112:0x78,168:0xb0})[value]??value;
+      if(byte!==undefined)cpu.data[TWDR]=byte;
+      status(value);
+    }},{sda:'PC4',scl:'PC5'});
+    const targetConfig=()=>({address:cpu.data[TWAR]>>1,mask:cpu.data[TWAMR]>>1,
+      generalCall:!!(cpu.data[TWAR]&1),ack:!!(cpu.data[TWCR]&0x40),byte:cpu.data[TWDR]});
+    function spiSetup(value) {
+      spiEnabled=!!(value&0x40);
+      for(const pin of ['PB3','PB4','PB5'])delete drive[pin];
+      spi.reset();
+      if(spiEnabled) {
+        const base=(cpu.data[SPSR]&1)?2:4,rate=[1,4,16,32][value&3];
+        spi.configure({master:!!(value&0x10),cpol:!!(value&8),cpha:!!(value&4),
+          lsbFirst:!!(value&0x20),halfPeriod:base*rate/(2*clock.frequency)},io.now());
+        spi.tx=spiLatch;
+      }
+      io.publish(io.now());
+    }
+    function clearSPIFlags() {
+      if(spiFlagsRead&0x80)cpu.clearInterrupt(spiInterrupt);
+      cpu.data[SPSR]&=~spiFlagsRead;spiFlagsRead=0;
+    }
+    cpu.writeHooks[SPCR]=value=>{
+      const old=cpu.data[SPCR];cpu.data[SPCR]=value;
+      cpu.updateInterruptEnable(spiInterrupt,value);
+      if((old^value)&0x7f)spiSetup(value);
+      if(spiEnabled)sample(io.now());
+      return true;
+    };
+    cpu.writeHooks[SPSR]=value=>{cpu.data[SPSR]=(cpu.data[SPSR]&0xc0)|(value&1);return true;};
+    cpu.readHooks[SPSR]=()=>{spiFlagsRead=cpu.data[SPSR]&0xc0;return cpu.data[SPSR];};
+    cpu.readHooks[SPDR]=()=>{const value=cpu.data[SPDR];clearSPIFlags();return value;};
+    cpu.writeHooks[SPDR]=value=>{
+      clearSPIFlags();
+      if(!spiEnabled){cpu.data[SPDR]=value;return true;}
+      if(spi.busy){cpu.data[SPSR]|=0x40;return true;}
+      spiLatch=value;
+      // Rate changes (including CLKPR) apply when starting the next byte.
+      if(spi.config.master) {
+        const value=cpu.data[SPCR],base=(cpu.data[SPSR]&1)?2:4;
+        spi.config.halfPeriod=base*[1,4,16,32][value&3]/(2*clock.frequency);
+      }
+      spi.start(value,io.now());return true;
+    };
+
+    function status(value) {
+      cpu.data[TWSR]=(cpu.data[TWSR]&3)|value;cpu.setInterruptFlag(twiInterrupt);
+    }
+    cpu.data[TWSR]=0xf8;cpu.data[TWDR]=0xff;
+    cpu.writeHooks[TWSR]=value=>{cpu.data[TWSR]=(cpu.data[TWSR]&0xf8)|(value&3);return true;};
+    cpu.writeHooks[TWAR]=value=>{cpu.data[TWAR]=value;return true;};
+    cpu.writeHooks[TWAMR]=value=>{cpu.data[TWAMR]=value&0xfe;return true;};
+    cpu.writeHooks[TWDR]=value=>{
+      if(twi.busy || (twiEnabled && !(cpu.data[TWCR]&0x80) && target.selected))cpu.data[TWCR]|=8;
+      else {cpu.data[TWDR]=value;cpu.data[TWCR]&=~8;}
+      return true;
+    };
+    cpu.writeHooks[TWCR]=value=>{
+      const old=cpu.data[TWCR];
+      cpu.data[TWCR]=(value&0x75)|(old&0x88);
+      if(value&0x80)cpu.clearInterrupt(twiInterrupt);
+      cpu.updateInterruptEnable(twiInterrupt,cpu.data[TWCR]);
+      const enabled=!!(value&4);
+      if(enabled!==twiEnabled) {
+        twiEnabled=enabled;twi.reset();target.reset();
+        if(enabled){drive.PC4=0;drive.PC5=0;}
+        else {delete drive.PC4;delete drive.PC5;}
+        io.publish(io.now());
+      }
+      if(enabled)target.resume(targetConfig(),io.now(),!!(value&0x80));
+      if(!enabled || !(value&0x80) || twi.busy)return true;
+      const half=(16+2*cpu.data[TWBR]*[1,4,16,64][cpu.data[TWSR]&3])/(2*clock.frequency);
+      const previous=cpu.data[TWSR]&0xf8;
+      if(value&0x20) {
+        const repeated=twi.owned;
+        twi.start(repeated,half,io.now(),()=>{
+          cpu.data[TWCR]&=~0x20;status(repeated?0x10:8);
+        });
+      } else if(value&0x10) {
+        const stopped=()=>{cpu.data[TWCR]&=~0x10;cpu.data[TWSR]=(cpu.data[TWSR]&3)|0xf8;};
+        if(twi.owned)twi.stop(half,io.now(),stopped);
+        else {target.reset();set('PC4',0,io.now());set('PC5',0,io.now());stopped();}
+      } else if(twi.owned) {
+        const address=previous===8||previous===0x10,reading=!address&&(previous===0x40||previous===0x50);
+        const byte=cpu.data[TWDR],ack=!!(value&0x40);
+        twi.transfer(byte,reading,ack,half,io.now(),(event,result)=>{
+          if(event==='arbitration'){lostStart=target.startCount;status(0x38);return;}
+          if(reading){cpu.data[TWDR]=result;status(ack?0x50:0x58);}
+          else if(address)status(byte&1?(result?0x40:0x48):(result?0x18:0x20));
+          else status(result?0x28:0x30);
+        });
+      }
+      return true;
+    };
+    function sample(time) {
+      if(twiEnabled&&running('twi'))twi.sample(time);
+      if(spiEnabled&&running('spi')) {
+        if(spi.config.master && !(cpu.data[0x24]&4) && !read('PB2')) {
+          cpu.data[SPCR]&=~0x10;spiSetup(cpu.data[SPCR]);cpu.setInterruptFlag(spiInterrupt);
+        }
+        spi.sample(time);
+      }
+      if(twiEnabled&&running('twi')) {
+        const config=targetConfig();
+        target.config={...config,ack:config.ack&&!twi.busy&&!twi.owned};
+        target.sample(time);
+      }
+    }
+    function clocksChanged() {
+      const time=io.now();
+      if(!running('spi')){if(spiPaused===null)spiPaused=time;}
+      else if(spiPaused!==null){spi.next+=time-spiPaused;spiPaused=null;}
+      if(!running('twi-controller')){if(twiPaused===null)twiPaused=time;}
+      else if(twiPaused!==null){twi.next+=time-twiPaused;twiPaused=null;}
+    }
+    return {
+      sample,clocksChanged,frequencyChanged:(oldHz,newHz,time)=>{
+        const scale=oldHz/newHz;
+        const spiTime=spiPaused??time,twiTime=twiPaused??time;
+        if(spi.config&&spi.config.master){spi.config.halfPeriod*=scale;spi.next=spiTime+(spi.next-spiTime)*scale;}
+        if(twi.busy){twi.half*=scale;twi.next=twiTime+(twi.next-twiTime)*scale;}
+      },
+      active:()=>(spiEnabled&&running('spi'))||(twiEnabled&&running('twi')),
+      busy:()=>(spi.busy&&running('spi'))||(twi.busy&&running('twi-controller')),
+      advance:time=>{if(running('spi'))spi.advance(time);if(running('twi-controller'))twi.advance(time);},
+      pin:pin=>{
+        if(twiEnabled && (pin==='PC4'||pin==='PC5'))
+          return drive[pin] || (!(cpu.data[0x55]&0x10)&&(cpu.data[0x28]&(1<<(pin==='PC4'?4:5)))?3:0);
+        if(spiEnabled) {
+          const master=spi.config.master;
+          if(pin==='PB4') {
+            if(!master&&spi.selected&&!read('PB2')&&(cpu.data[0x24]&0x10))return drive[pin]||1;
+            return !(cpu.data[0x55]&0x10)&&(cpu.data[0x25]&0x10)&&!(cpu.data[0x24]&0x10)?3:0;
+          }
+          if(!master&&pin==='PB2')return !(cpu.data[0x55]&0x10)&&(cpu.data[0x25]&4)?3:0;
+          if(pin==='PB3'||pin==='PB5') {
+            const bit=pin==='PB3'?3:5;
+            if(master && (cpu.data[0x24]&(1<<bit)))return drive[pin]===undefined?1:drive[pin];
+            if(!master)return !(cpu.data[0x55]&0x10)&&(cpu.data[0x25]&(1<<bit))?3:0;
+          }
+        }
+        return undefined;
+      }
+    };
+  };
+})(globalThis);
+/* Functional AVR Flash, fuses/locks and EEPROM. SPDX-License-Identifier: GPL-3.0-or-later */
+(function(global) {
+  'use strict';
+  global.createAVRNVM=function(cpu,device,options,cf,io,eeprom) {
+    const byteOption=(key,fallback)=>{
+      const value=options[key]===undefined?fallback:Number(options[key]);
+      if(!Number.isInteger(value)||value<0||value>255)throw new Error('Invalid AVR '+key);
+      return value;
+    };
+    const fuses={low:byteOption('fuseLow',0xe2),high:byteOption('fuseHigh',0xdf),
+      extended:byteOption('fuseExtended',device.bootMinBytes?0xff:0xfe)};
+    let lock=byteOption('lockBits',255),buffer=new Uint8Array(device.pageBytes);buffer.fill(255);
+    const bootFuse=device.fuseLayout==='328'?fuses.high:fuses.extended;
+    const bootStart=device.bootMinBytes?device.flash-(device.bootMinBytes<<(3-((bootFuse>>1)&3))):0;
+    const nrwwStart=device.bootMinBytes?device.flash-device.bootMinBytes*8:0;
+    const ready={address:0x32/device.vectorDivisor,flagRegister:0x57,flagMask:1,
+      enableRegister:0x57,enableMask:0x80,inverseFlag:true,constant:true};
+    const eer=cf(global.AVR8js.eepromConfig);
+    const eeReady={address:eer.eepromReadyInterrupt,flagRegister:0x3f,flagMask:2,
+      enableRegister:0x3f,enableMask:8,inverseFlag:true,constant:true};
+    let spmUntil=-Infinity,flashDone=Infinity,flashAction=null,flashStall=false;
+    let eeUnlock=-Infinity,eeDone=Infinity,eeAction=null;
+    const now=io.now;
+    function sync() {
+      const time=now();
+      if(cpu.cycles>spmUntil&&flashDone===Infinity)cpu.data[0x57]&=0xc0;
+      if(cpu.cycles>eeUnlock)cpu.data[0x3f]&=~4;
+      if(time+1e-15>=eeDone) {
+        if(eeAction)eeAction();eeDone=Infinity;eeAction=null;cpu.setInterruptFlag(eeReady);
+      }
+      if(time+1e-15>=flashDone) {
+        if(flashAction)flashAction();flashDone=Infinity;flashAction=null;flashStall=false;
+        cpu.data[0x57]&=0xc0;cpu.setInterruptFlag(ready);
+      }
+    }
+    cpu.readHooks[0x57]=()=>{sync();return cpu.data[0x57];};
+    cpu.writeHooks[0x57]=value=>{
+      sync();
+      if(flashDone!==Infinity||eeDone!==Infinity)return true;
+      cpu.data[0x57]=(cpu.data[0x57]&0x40)|(value&(device.fuseLayout==='328'?0xbf:0x9f));
+      spmUntil=cpu.cycles+4;cpu.updateInterruptEnable(ready,value);return true;
+    };
+    cpu.readHooks[0x3f]=()=>{sync();return cpu.data[0x3f];};
+    cpu.writeHooks[0x3f]=value=>{
+      sync();const old=cpu.data[0x3f],address=((cpu.data[0x42]<<8)|cpu.data[0x41])&(device.eeprom-1);
+      cpu.data[0x3f]=(old&6)|(value&0x38);cpu.updateInterruptEnable(eeReady,value);
+      if(eeDone!==Infinity)return true;
+      if(value&1) {cpu.data[0x40]=eeprom.readMemory(address);cpu.cycles+=4;}
+      if(value&4) {eeUnlock=cpu.cycles+4;cpu.data[0x3f]|=4;}
+      // EEMPE must already have been set by a preceding instruction.
+      if((value&2)&&(old&4)&&cpu.cycles<=eeUnlock&&flashDone===Infinity) {
+        const mode=(value>>4)&3,data=cpu.data[0x40];
+        if(mode===3)return true; // Reserved EEPM combination.
+        eeDone=now()+(mode===0?.0034:.0018);
+        eeAction=()=>{if(mode!==2)eeprom.eraseMemory(address);if(mode!==1)eeprom.writeMemory(address,data);};
+        cpu.data[0x3f]=(cpu.data[0x3f]&~4)|2;cpu.clearInterrupt(eeReady,false);cpu.cycles+=2;
+      }
+      return true;
+    };
+    function specialRead(address) {
+      const mode=cpu.data[0x57];
+      if(!(mode&1)||cpu.cycles>spmUntil)return undefined;
+      if(mode&0x20) {
+        if(address===1)return byteOption('calibrationByte',128);
+        return address%2===0&&address<=4?device.signature[address>>1]:255;
+      }
+      if(mode&8)return ({0:fuses.low,1:lock,2:fuses.extended,3:fuses.high})[address]??255;
+      return undefined;
+    }
+    function instruction(opcode) {
+      sync();
+      const z=cpu.dataView.getUint16(30,true);
+      if(opcode===0x95e8||opcode===0x95f8) {
+        const mode=cpu.data[0x57],authorized=device.bootMinBytes?cpu.pc*2>=bootStart:!(fuses.extended&1);
+        if(authorized&&(mode&1)&&cpu.cycles<=spmUntil&&flashDone===Infinity&&eeDone===Infinity) {
+          const address=z&(device.flash-1),page=address&~(device.pageBytes-1);
+          if(mode&0x10) {cpu.data[0x57]&=~0x40;buffer.fill(255);}
+          else if(mode&8)lock&=cpu.data[0]|0xc0;
+          else if(mode&6) {
+            const allowed=!(device.bootMinBytes&&!(lock&(page>=bootStart?0x10:4)));
+            if(allowed) {
+              const copy=buffer.slice(),erase=!!(mode&2);
+              flashDone=now()+.0045;flashStall=!device.bootMinBytes||page>=nrwwStart;
+              if(!flashStall)cpu.data[0x57]|=0x40;
+              flashAction=()=>{
+                for(let i=0;i<device.pageBytes;i++)cpu.progBytes[page+i]=erase?255:cpu.progBytes[page+i]&copy[i];
+                if(!erase)buffer.fill(255);
+              };
+            }
+          } else {
+            const offset=address&(device.pageBytes-2);buffer[offset]=cpu.data[0];buffer[offset+1]=cpu.data[1];
+            cpu.data[0x57]&=~0x40;
+          }
+          cpu.data[0x57]&=0xc0;
+          if(flashDone!==Infinity)cpu.data[0x57]|=mode&7;
+          spmUntil=-Infinity;
+        }
+        if(opcode===0x95f8)cpu.dataView.setUint16(30,(z+2)&65535,true);
+        cpu.pc=(cpu.pc+1)%cpu.progMem.length;cpu.cycles+=4;return true;
+      }
+      if(opcode===0x95c8||(opcode&0xfe0e)===0x9004) {
+        let value=specialRead(z);
+        if(value===undefined&&device.bootMinBytes) {
+          const fromBoot=cpu.pc*2>=bootStart,toBoot=z>=bootStart;
+          if((fromBoot&&!toBoot&&!(lock&8))||(!fromBoot&&toBoot&&!(lock&0x20)))value=0;
+        }
+        if(value!==undefined) {
+          cpu.data[opcode===0x95c8?0:(opcode>>4)&31]=value;
+          if(opcode!==0x95c8&&(opcode&1))cpu.dataView.setUint16(30,(z+1)&65535,true);
+          cpu.pc=(cpu.pc+1)%cpu.progMem.length;cpu.cycles+=3;return true;
+        }
+      }
+      return false;
+    }
+    return {fuses,bootStart,resetPC:device.bootMinBytes&&!(bootFuse&1)?bootStart/2:0,
+      sync,instruction,nextTime:()=>Math.min(eeDone,flashDone),
+      stalled:()=>flashDone!==Infinity&&flashStall||!!((cpu.data[0x57]&0x40)&&cpu.pc*2<nrwwStart),
+      nativeSafe:()=>lock===255&&!(cpu.data[0x57]&0x69)&&flashDone===Infinity,
+      interruptsAllowed:()=>!device.bootMinBytes||!((!(lock&8)&&cpu.pc*2<bootStart&&(cpu.data[0x55]&2))
+        ||(!(lock&0x20)&&cpu.pc*2>=bootStart&&!(cpu.data[0x55]&2))),
+      retain:()=>({eeDone,eeAction,flashDone,flashAction,flashStall,rww:cpu.data[0x57]&0x40}),
+      restore:state=>{
+        ({eeDone,eeAction,flashDone,flashAction,flashStall}=state);
+        if(eeDone!==Infinity)cpu.data[0x3f]|=2;
+        if(flashDone!==Infinity)cpu.data[0x57]|=1;
+        cpu.data[0x57]|=state.rww;
+      },
+      get lock(){return lock;},set lock(value){lock=value;}};
+  };
+})(globalThis);
+/* AVR watchdog, sleep and clock/power control. SPDX-License-Identifier: GPL-3.0-or-later */
+(function(global) {
+  'use strict';
+  global.createAVRSystem=function(cpu,nvm,device,io,reason) {
+    const divisor=device.vectorDivisor,alwaysWatchdog=!(nvm.fuses.high&0x10);
+    const interrupt={address:0x0c/divisor,flagRegister:0x60,flagMask:0x80,enableRegister:0x60,enableMask:0x40};
+    let sleeping=false,mode=0,wdDeadline=Infinity,wdUnlock=-Infinity,ivUnlock=-Infinity;
+    let bodUnlock=-Infinity,bodReady=-Infinity,bodSleepOff=false;
+    let clockHalf=0,clockLevel=false;
+    const clockOutput=!(nvm.fuses.low&0x40);
+    cpu.data[0x54]=reason;cpu.data[0x66]=128;
+    if(alwaysWatchdog||reason&8)cpu.data[0x60]=8;
+    const wdEnabled=()=>!!(cpu.data[0x60]&0x48);
+    const wdPeriod=()=>.016*(2**Math.min(9,((cpu.data[0x60]>>2)&8)|(cpu.data[0x60]&7)));
+    function kick() {wdDeadline=wdEnabled()?io.now()+wdPeriod():Infinity;}
+    kick();cpu.onWatchdogReset=kick;
+    cpu.readHooks[0x60]=()=>{
+      if(cpu.cycles>wdUnlock)cpu.data[0x60]&=~0x10;
+      return cpu.data[0x60];
+    };
+    cpu.writeHooks[0x60]=value=>{
+      const old=cpu.data[0x60],open=cpu.cycles<=wdUnlock;
+      let next=(old&0x80)|(value&0x40);
+      if(value&0x80)cpu.clearInterrupt(interrupt);
+      next=(next&~0x80)|(cpu.data[0x60]&0x80);
+      if((value&0x18)===0x18) {wdUnlock=cpu.cycles+4;next|=(old&0x2f)|0x18;}
+      else next|=open?(value&0x2f):((old&0x27)|(value&8)|(old&8));
+      if(alwaysWatchdog||cpu.data[0x54]&8)next|=8;
+      cpu.data[0x60]=next;cpu.updateInterruptEnable(interrupt,next);
+      if(!wdEnabled())wdDeadline=Infinity;
+      else if(!(old&0x48)||open||(value&0x18)===0x18)kick();
+      return true;
+    };
+    cpu.writeHooks[0x54]=value=>{cpu.data[0x54]&=value;return true;};
+    cpu.writeHooks[0x55]=value=>{
+      const old=cpu.data[0x55];
+      if(value&1)ivUnlock=cpu.cycles+4;
+      if((value&0xc0)===0xc0)bodUnlock=cpu.cycles+4;
+      if((value&0x80)&&cpu.cycles<=bodUnlock)bodReady=cpu.cycles+3;
+      cpu.data[0x55]=(value&0x10)|(cpu.cycles<=bodUnlock?value&0xc0:0)
+        |(cpu.cycles<=ivUnlock?value&3:old&2);
+      io.clocksChanged();return true;
+    };
+    cpu.readHooks[0x55]=()=>{
+      if(cpu.cycles>ivUnlock)cpu.data[0x55]&=~1;
+      if(cpu.cycles>bodUnlock)cpu.data[0x55]&=~0x40;
+      if(!sleeping&&cpu.cycles>bodReady)cpu.data[0x55]&=~0x80;
+      return cpu.data[0x55];
+    };
+    cpu.writeHooks[0x64]=value=>{
+      io.beforeClocksChange();cpu.data[0x64]=value&0xef;io.clocksChanged();return true;
+    };
+    const powerBits={adc:0,usart:1,spi:2,timer1:3,timer0:5,timer2:6,twi:7,'twi-controller':7};
+    function running(domain) {
+      if(cpu.data[0x64]&(1<<powerBits[domain]))return false;
+      if(!sleeping||mode===0)return true;
+      if(domain==='twi')return true; // Address recognition is asynchronous.
+      if(domain==='adc')return mode===1;
+      return domain==='timer2'&&!!(cpu.data[0xb6]&0x20)&&[1,3,7].includes(mode);
+    }
+    function sleep() {
+      if(!(cpu.data[0x53]&1))return;
+      io.beforeClocksChange();mode=(cpu.data[0x53]>>1)&7;
+      if(mode===4||mode===5)throw new Error('Reserved AVR sleep mode');
+      bodSleepOff=cpu.cycles<=bodReady&&!!(cpu.data[0x55]&0x80)&&[2,3,6,7].includes(mode);
+      sleeping=true;io.clocksChanged();io.onSleep(mode);
+    }
+    function canWake(address) {
+      const vector=address*divisor;
+      if(mode===0)return true;
+      if(vector===0x02||vector===0x04) {
+        const shift=vector===2?0:2;return !(cpu.data[0x69]&(3<<shift));
+      }
+      if([6,8,10,12,0x30].includes(vector))return true;
+      if(mode===1&&[0x2a,0x2c,0x32].includes(vector))return true;
+      return [1,3,7].includes(mode)&&!!(cpu.data[0xb6]&0x20)&&[0x0e,0x10,0x12].includes(vector);
+    }
+    function wake() {
+      if(!sleeping)return false;
+      if(!cpu.pendingInterrupts.some((interrupt,address)=>interrupt&&canWake(address)))return false;
+      sleeping=false;bodSleepOff=false;io.clocksChanged();cpu.cycles+=4;return true;
+    }
+    function poll() {
+      if(clockOutput) {
+        if(!sleeping||mode===0) {
+          while((clockHalf+1)/2<=cpu.cycles) {
+            clockHalf++;clockLevel=!!(clockHalf&1);io.publish(io.timeForCycle(clockHalf/2));
+          }
+        } else {clockHalf=Math.floor(cpu.cycles*2);clockLevel=false;}
+      }
+      if(io.now()+1e-15>=wdDeadline) {
+        const value=cpu.data[0x60];
+        if(value&0x40)cpu.setInterruptFlag(interrupt);
+        else if(value&8){io.reset(8);return;}
+        kick();
+      }
+      wake();
+    }
+    function onInterrupt(address) {
+      if(address===interrupt.address&&(cpu.data[0x60]&8)) {
+        cpu.data[0x60]&=~0x40;cpu.updateInterruptEnable(interrupt,cpu.data[0x60]);
+      }
+      if(cpu.data[0x55]&2)cpu.pc+=nvm.bootStart/2;
+    }
+    return {running,sleep,poll,wake,onInterrupt,nextTime:()=>wdDeadline,
+      get sleeping(){return sleeping;},get mode(){return sleeping?mode:-1;},
+      get bodDisabled(){return bodSleepOff;},get clockOutput(){return clockOutput?clockLevel:undefined;}};
+  };
+})(globalThis);
+/* AVR timer clock domains, asynchronous Timer2 and Timer1 capture.
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+(function(global) {
+  'use strict';
+  global.createAVRTimers=function(cpu,timers,cf,io,options) {
+    let cmp=false,useComparator=false,previousCapture=false,candidate=null;
+    let asyncNext=Infinity,asyncPhase=0,lastAsync=false,lastExternal=false;
+    let syncEpoch=cpu.cycles,timer2Epoch=cpu.cycles;
+    const asyncHz=options.timer2Hz===undefined?32768:Number(options.timer2Hz);
+    if(!Number.isFinite(asyncHz)||asyncHz<=0||asyncHz>20000000)throw new Error('Invalid Timer2 oscillator frequency');
+    const states=timers.map((timer,index)=>({timer,index,running:true,paused:cpu.cycles,
+      base:timer.count,domain:'timer'+index}));
+    function permitted(index) {
+      if(!io.running('timer'+index))return false;
+      const hold=cpu.data[0x43];
+      return !((hold&0x80)&&(hold&(index===2?2:1)));
+    }
+    for(const state of states) {
+      const {timer,index,base}=state;
+      const eventTicks=()=>typeof timer.nextEventTicks==='function'?timer.nextEventTicks():1;
+      timer.count=(reschedule=true,external=false)=>{
+        if(!permitted(index)||(index===2&&(cpu.data[0xb6]&0x20))) {
+          if(timer.tcntUpdated){timer.tcnt=timer.tcntNext;timer.tcntUpdated=false;}
+          return;
+        }
+        // An atomic CPU instruction can cross compare AND wrap (notably tiny
+        // CTC TOP values). Deliver both boundaries before counting the tail.
+        const actual=cpu.cycles;
+        if(timer.updateDivider) {
+          const divider=timer.config.dividers[timer.CS],epoch=index===2?timer2Epoch:syncEpoch;
+          // Timer0/1 share their continuously running prescaler. Align its
+          // phase without removing/reusing the clock event currently executing.
+          if(divider)cpu.cycles=epoch+Math.floor((actual-epoch)/divider)*divider;
+          base(reschedule,external);cpu.cycles=actual;return;
+        }
+        if(!external&&!timer.updateDivider&&timer.divider&&!timer.tcntUpdated) {
+          let budget=0;
+          while(timer.lastCycle+eventTicks()*timer.divider<=actual) {
+            if(++budget>10000)throw new Error('AVR timer event window too large');
+            cpu.cycles=timer.lastCycle+eventTicks()*timer.divider;
+            base(false);
+            if(timer.TOP===0)timer.timerUpdated(0,1);
+          }
+          cpu.cycles=actual;
+        }
+        base(reschedule,external);
+      };
+      cpu.writeHooks[timer.config.TIFR]=value=>{
+        const flags=cpu.data[timer.config.TIFR];
+        for(const interrupt of [timer.OVF,timer.OCFA,timer.OCFB,...(index===1?[capture]:[])])
+          if(value&interrupt.flagMask)cpu.clearInterrupt(interrupt);
+        cpu.data[timer.config.TIFR]=flags&~value;return true;
+      };
+    }
+    const timer1=timers[1],capture={address:cf(global.AVR8js.timer1Config).captureInterrupt,
+      flagRegister:0x36,flagMask:0x20,enableRegister:0x6f,enableMask:0x20};
+    const maskHook=cpu.writeHooks[0x6f];
+    cpu.writeHooks[0x6f]=(value,...args)=>{cpu.updateInterruptEnable(capture,value);return maskHook(value,...args);};
+    cpu.readHooks[0x86]=()=>{timer1.highByteTemp=timer1.icr>>8;return timer1.icr&255;};
+    cpu.readHooks[0x87]=()=>timer1.highByteTemp;
+    // TCNT low reads latch the shared TEMP register used for atomic 16-bit reads.
+    const countLow=cpu.readHooks[0x84];
+    cpu.readHooks[0x84]=address=>{const low=countLow(address);timer1.highByteTemp=timer1.tcnt>>8;return low;};
+    cpu.readHooks[0x85]=()=>timer1.highByteTemp;
+    function clocksChanged() {
+      for(const state of states) {
+        const {timer,index}=state,next=permitted(index)&&!(index===2&&(cpu.data[0xb6]&0x20));
+        if(next===state.running)continue;
+        if(!next) {state.base(false);cpu.clearClockEvent(timer.count);state.paused=cpu.cycles;}
+        else {
+          timer.lastCycle+=cpu.cycles-state.paused;
+          if(timer.updateDivider||timer.divider)cpu.addClockEvent(timer.count,1);
+        }
+        state.running=next;
+      }
+      const asynchronous=!!(cpu.data[0xb6]&0x20)&&permitted(2);
+      if(asynchronous!==lastAsync) {asyncNext=asynchronous?io.now()+1/asyncHz:Infinity;lastAsync=asynchronous;}
+    }
+    cpu.writeHooks[0x43]=value=>{
+      io.beforeClocksChange();
+      const released=(cpu.data[0x43]&0x80)&&!(value&0x80)?cpu.data[0x43]&3:0;
+      if((value|released)&1){syncEpoch=cpu.cycles;for(const index of [0,1])timers[index].lastCycle=cpu.cycles;}
+      if((value|released)&2){timer2Epoch=cpu.cycles;timers[2].lastCycle=cpu.cycles;asyncPhase=0;}
+      cpu.data[0x43]=value&0x80?value&0x83:0;clocksChanged();return true;
+    };
+    cpu.writeHooks[0xb6]=value=>{
+      io.beforeClocksChange();cpu.data[0xb6]=value&0x60;
+      asyncPhase=0;clocksChanged();return true;
+    };
+    // ASSR update-busy bits live for two oscillator cycles. The new values are
+    // latched by the functional model immediately, and writes are serialized.
+    let updateDone=Infinity;
+    for(const [address,bit] of [[0xb2,4],[0xb3,3],[0xb4,2],[0xb0,1],[0xb1,0]]) {
+      const hook=cpu.writeHooks[address];
+      cpu.writeHooks[address]=(...args)=>{
+        const result=hook(...args);
+        if(cpu.data[0xb6]&0x20){cpu.data[0xb6]|=1<<bit;updateDone=io.now()+2/asyncHz;}
+        return result;
+      };
+    }
+    function tickAsync() {
+      const timer=timers[2],divider=[0,1,8,32,64,128,256,1024][cpu.data[0xb1]&7];
+      if(timer.tcntUpdated){timer.tcnt=timer.tcntNext;timer.tcntUpdated=false;}
+      timer.updateDivider=false;timer.divider=0;cpu.clearClockEvent(timer.count);
+      if(divider&&++asyncPhase>=divider) {
+        asyncPhase=0;states[2].base(false,true);if(timer.TOP===0)timer.timerUpdated(0,1);
+      }
+    }
+    function sample() {
+      if((cpu.data[0xb6]&0x60)===0x60&&permitted(2)) {
+        const level=io.read('PB6');if(level&&!lastExternal)tickAsync();lastExternal=level;
+      }
+      const level=useComparator?cmp:io.read('PB0');
+      if(level!==previousCapture) {
+        previousCapture=level;
+        candidate={level,cycle:cpu.cycles+((cpu.data[0x81]&0x80)?4:0)};
+      }
+      pollCapture();
+    }
+    function pollCapture() {
+      if(!candidate||cpu.cycles<candidate.cycle)return;
+      const level=candidate.level;candidate=null;
+      if(!permitted(1)||level!==!!(cpu.data[0x81]&0x40)||[8,10,12,14].includes(timer1.WGM))return;
+      timer1.count(false);timer1.icr=timer1.tcnt;
+      cpu.data[0x86]=timer1.icr&255;cpu.data[0x87]=timer1.icr>>8;cpu.setInterruptFlag(capture);
+    }
+    function poll() {
+      if(io.now()>=updateDone){cpu.data[0xb6]&=0x60;updateDone=Infinity;}
+      while(lastAsync&&!(cpu.data[0xb6]&0x40)&&asyncNext<=io.now()+1e-15) {
+        tickAsync();asyncNext+=1/asyncHz;
+      }
+      pollCapture();
+    }
+    return {clocksChanged,sample,poll,running:permitted,
+      captureSource:(value,enabled)=>{cmp=value;useComparator=enabled;sample();},
+      nextTime:()=>Math.min(updateDone,cpu.data[0xb6]&0x40?Infinity:asyncNext),
+      get nextCycle(){return candidate?candidate.cycle:Infinity;}};
+  };
+})(globalThis);
+/* AVR ADC/comparator/capture triggers. SPDX-License-Identifier: GPL-3.0-or-later */
+(function(global) {
+  'use strict';
+  global.createAVRAnalog=function(cpu,adc,cf,io) {
+    const adcInterrupt=adc.ADC,comparator={address:0x2e/io.vectorDivisor,flagRegister:0x50,flagMask:0x10,
+      enableRegister:0x50,enableMask:8};
+    let completeAt=Infinity,result=0,latchedAdjust=false,locked=false,generation=0;
+    let remaining=0,lastCycle=cpu.cycles,wasRunning=true,compare=false,initialized=false;
+    const triggers=[null,[0x50,0x10],[0x3c,1],[0x35,2],[0x35,1],[0x36,4],[0x36,1],[0x36,0x20]];
+    function start() {
+      if(adc.converting||!(cpu.data[0x7a]&0x80)||!io.running('adc'))return;
+      const channel=cpu.data[0x7c]&15;
+      const voltage=channel<8?adc.channelValues[channel]:channel===8?.378125:channel===14?1.1:0;
+      const reference=adc.referenceVoltage;
+      result=reference>0?Math.min(1023,Math.max(0,Math.floor(1024*voltage/reference))):0;
+      latchedAdjust=!!(cpu.data[0x7c]&0x20);adc.converting=true;cpu.data[0x7a]|=0x40;
+      remaining=adc.sampleCycles;lastCycle=cpu.cycles;wasRunning=true;++generation;
+      completeAt=cpu.cycles+remaining;
+    }
+    function trigger(register,mask) {
+      if(!(cpu.data[0x7a]&0x20))return;
+      const source=triggers[cpu.data[0x7b]&7];
+      if(source&&source[0]===register&&(source[1]&mask))start();
+    }
+    const setFlag=cpu.setInterruptFlag.bind(cpu);
+    cpu.setInterruptFlag=interrupt=>{
+      const rising=!(cpu.data[interrupt.flagRegister]&interrupt.flagMask);
+      setFlag(interrupt);
+      if(rising)trigger(interrupt.flagRegister,interrupt.flagMask);
+    };
+    cpu.writeHooks[0x7a]=value=>{
+      const old=cpu.data[0x7a];
+      cpu.data[0x7a]=(value&0xaf)|(old&0x50);
+      if(value&0x10)cpu.clearInterrupt(adcInterrupt);
+      cpu.updateInterruptEnable(adcInterrupt,value);
+      if(!(value&0x80)) {adc.converting=false;remaining=0;completeAt=Infinity;cpu.data[0x7a]&=~0x40;}
+      else {
+        if(!(old&0x80))adc.conversionCycles=25;
+        if(value&0x40)start();
+      }
+      updateComparator();return true;
+    };
+    cpu.writeHooks[0x7b]=value=>{
+      const old=cpu.data[0x7b];cpu.data[0x7b]=value&0x47;
+      if((old&7)!==(value&7)) {
+        const source=triggers[value&7];if(source&&(cpu.data[source[0]]&source[1]))trigger(...source);
+      }
+      updateComparator();return true;
+    };
+    cpu.readHooks[0x78]=()=>{locked=true;return cpu.data[0x78];};
+    cpu.readHooks[0x79]=()=>{locked=false;return cpu.data[0x79];};
+    cpu.writeHooks[0x50]=value=>{
+      const old=cpu.data[0x50];cpu.data[0x50]=(old&0x30)|(value&0xcf);
+      if(value&0x10)cpu.clearInterrupt(comparator);
+      cpu.updateInterruptEnable(comparator,value);updateComparator();return true;
+    };
+    function updateComparator() {
+      if(cpu.data[0x50]&0x80)return;
+      const positive=cpu.data[0x50]&0x40?1.1:io.voltage('PD6');
+      const mux=(cpu.data[0x7b]&0x40)&&!(cpu.data[0x7a]&0x80);
+      const negative=mux?(adc.channelValues[cpu.data[0x7c]&7]||0):io.voltage('PD7');
+      const next=positive>negative;
+      cpu.data[0x50]=(cpu.data[0x50]&~0x20)|(next?0x20:0);
+      if(initialized&&next!==compare) {
+        const mode=cpu.data[0x50]&3;
+        if(mode===0||(mode===2&&!next)||(mode===3&&next))cpu.setInterruptFlag(comparator);
+      }
+      compare=next;initialized=true;
+      io.captureSource(compare,!!(cpu.data[0x50]&4));
+    }
+    cpu.writeHooks[0x7c]=value=>{cpu.data[0x7c]=value;updateComparator();return true;};
+    function clocksChanged() {
+      const running=io.running('adc');
+      if(adc.converting) {
+        if(wasRunning)remaining=Math.max(0,remaining-(cpu.cycles-lastCycle));
+        lastCycle=cpu.cycles;wasRunning=running;completeAt=running?cpu.cycles+remaining:Infinity;
+      }
+    }
+    function poll() {
+      if(adc.converting&&cpu.cycles>=completeAt) {
+        adc.converting=false;remaining=0;completeAt=Infinity;adc.conversionCycles=13;
+        if(!locked) {
+          cpu.data[0x78]=latchedAdjust?(result<<6)&255:result&255;
+          cpu.data[0x79]=latchedAdjust?result>>2:result>>8;
+        }
+        cpu.data[0x7a]&=~0x40;cpu.setInterruptFlag(adcInterrupt);
+        if((cpu.data[0x7a]&0xa0)===0xa0&&!(cpu.data[0x7b]&7))start();
+      }
+    }
+    return {start,trigger,updateComparator,poll,clocksChanged,
+      get converting(){return adc.converting;},get nextCycle(){return completeAt;}};
+  };
+})(globalThis);
+/* Electrical AVR USART: async 5-9 bits, synchronous USART and MSPIM.
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+(function(global) {
+  'use strict';
+  global.createAVRUSART=function(cpu,clock,cf,io) {
+    const config=cf(global.AVR8js.usart0Config);
+    const irq=(address,flag,enable,constant=false)=>({address,flagRegister:0xc0,flagMask:flag,
+      enableRegister:0xc1,enableMask:enable,constant});
+    const RXC=irq(config.rxCompleteInterrupt,0x80,0x80,true),
+      UDRE=irq(config.dataRegisterEmptyInterrupt,0x20,0x20,true),TXC=irq(config.txCompleteInterrupt,0x40,0x40);
+    let buffer=null,tx=null,rx=null,fifo=[],txHigh=true,xck=false,previousRX=true,previousClock=false;
+    let syncNext=Infinity,syncTx=null,syncRx=null,paused=null,spi=null,txDrain=false;
+    let syncStarted=false,configuredMode=0,configuredPolarity=false;
+    const mode=()=>cpu.data[0xc2]>>6;
+    const bits=()=>mode()===3?8:([5,6,7,8,0,0,0,9][((cpu.data[0xc2]>>1)&3)|(cpu.data[0xc1]&4)]||8);
+    const parity=()=>!!(cpu.data[0xc2]&0x20),odd=()=>!!(cpu.data[0xc2]&0x10);
+    const stops=()=>cpu.data[0xc2]&8?2:1;
+    const divider=()=>1+((cpu.data[0xc5]&15)<<8|cpu.data[0xc4]);
+    const bitTime=()=>divider()*(mode()===0?(cpu.data[0xc0]&2?8:16):2)/clock.frequency;
+    const enabledTX=()=>!!(cpu.data[0xc1]&8),enabledRX=()=>!!(cpu.data[0xc1]&0x10);
+    const master=()=>!!(cpu.data[0x2a]&0x10);
+    cpu.data[0xc0]=0x20;cpu.data[0xc2]=6;
+    function refreshRX() {
+      cpu.clearInterrupt(RXC);
+      cpu.data[0xc0]&=~0x1c;cpu.data[0xc1]&=~2;
+      if(fifo.length) {
+        const head=fifo[0];cpu.data[0xc0]|=head.status;
+        cpu.data[0xc1]|=(head.value>>7)&2;cpu.setInterruptFlag(RXC);
+      }
+    }
+    function receive(value,status=0,ninth=false) {
+      if(!enabledRX())return;
+      if((cpu.data[0xc0]&1)&&ninth&&!(value&0x100))return;
+      if(fifo.length===2)fifo[0].status|=8;
+      else fifo.push({value,status});
+      refreshRX();
+    }
+    function frame(value) {
+      const length=bits(),out=[0];let p=odd()?1:0;
+      for(let bit=0;bit<length;bit++){const high=(value>>bit)&1;p^=high;out.push(high);}
+      if(parity())out.push(p);
+      for(let bit=0;bit<stops();bit++)out.push(1);
+      return out;
+    }
+    function setTX(value,time) {if(txHigh!==value){txHigh=value;io.publish(time);}}
+    function completed(time) {
+      if(buffer!==null&&(enabledTX()||txDrain))start(time);
+      else {txDrain=false;cpu.setInterruptFlag(TXC);io.publish(time);}
+    }
+    function start(time) {
+      if(buffer===null||!(enabledTX()||txDrain)||!io.running('usart'))return;
+      const value=buffer;buffer=null;cpu.setInterruptFlag(UDRE);cpu.clearInterrupt(TXC);
+      if(mode()===0) {
+        const output=frame(value),period=bitTime();
+        tx={output,index:1,next:time+period,period};setTX(false,time);
+      } else if(mode()===1) {
+        syncTx={output:frame(value),index:0};
+        if(master()&&syncNext===Infinity)syncNext=time+bitTime()/2;
+      } else if(mode()===3) {
+        spi=new global.CircuitAliveSerial.SPI({read:pin=>io.read(pin),drive:(pin,value,when)=>{
+          if(pin==='PD1')setTX(value===2,when);else {xck=value===2;io.publish(when);}
+        },complete:(received,when)=>{
+          spi=null;receive(received);completed(when);
+        }},{sck:'PD4',mosi:'PD1',miso:'PD0'});
+        spi.configure({master:true,cpol:!!(cpu.data[0xc2]&1),cpha:!!(cpu.data[0xc2]&2),
+          lsbFirst:!!(cpu.data[0xc2]&4),halfPeriod:bitTime()/2},time);spi.start(value,time);
+      }
+    }
+    function configuring() {
+      if(mode()===2)throw new Error('Reserved AVR USART mode');
+      if(!enabledRX()){rx=null;syncRx=null;fifo=[];refreshRX();}
+      if(mode()!==1)syncNext=Infinity;
+      else {
+        const polarity=!!(cpu.data[0xc2]&1);
+        if(configuredMode!==1||configuredPolarity!==polarity){xck=polarity;syncStarted=false;}
+        if(master()&&syncNext===Infinity&&(enabledTX()||enabledRX()))syncNext=io.now()+bitTime()/2;
+      }
+      configuredMode=mode();configuredPolarity=!!(cpu.data[0xc2]&1);
+      if(!tx&&!syncTx&&!spi)start(io.now());io.publish(io.now());
+    }
+    cpu.writeHooks[0xc0]=value=>{
+      if(value&0x40)cpu.clearInterrupt(TXC);
+      cpu.data[0xc0]=(cpu.data[0xc0]&0xfc)|(value&3);return true;
+    };
+    cpu.writeHooks[0xc1]=value=>{
+      if(enabledTX()&&!(value&8)&&(tx||syncTx||spi||buffer!==null))txDrain=true;
+      cpu.data[0xc1]=(value&0xfd)|(cpu.data[0xc1]&2);
+      for(const interrupt of [RXC,UDRE,TXC])cpu.updateInterruptEnable(interrupt,value);
+      configuring();return true;
+    };
+    cpu.writeHooks[0xc2]=value=>{cpu.data[0xc2]=value;configuring();return true;};
+    for(const address of [0xc4,0xc5])cpu.writeHooks[address]=value=>{
+      cpu.data[address]=address===0xc5?value&15:value;return true;
+    };
+    cpu.readHooks[0xc6]=()=>{
+      const value=fifo.length?fifo.shift().value&255:0;refreshRX();return value;
+    };
+    cpu.writeHooks[0xc6]=value=>{
+      if(!enabledTX())return true;
+      if(buffer!==null)return true;
+      buffer=value|((cpu.data[0xc1]&1)<<8);cpu.clearInterrupt(UDRE);cpu.clearInterrupt(TXC);
+      if(!tx&&!syncTx&&!spi)start(io.now());return true;
+    };
+    function finishRX(state,level) {
+      if((cpu.data[0xc0]&1)&&state.length!==9&&!level)return;
+      let status=level?0:0x10;
+      if(state.parityError)status|=4;
+      receive(state.value,status,state.length===9);
+    }
+    function sampleBit(state,level) {
+      if(state.bit<state.length) {
+        if(level)state.value|=1<<state.bit;
+        state.sum^=level?1:0;state.bit++;return false;
+      }
+      if(state.parity) {
+        state.parityError=level!==!!state.sum;state.parity=false;return false;
+      }
+      finishRX(state,level);return true;
+    }
+    const newRX=()=>({value:0,bit:0,length:bits(),parity:parity(),sum:odd()?1:0});
+    function syncEdge(level,time) {
+      xck=level;
+      const leading=level!==!!(cpu.data[0xc2]&1);
+      if(leading) {
+        syncStarted=true;
+        if(!syncTx)start(time);
+        setTX(syncTx?!!syncTx.output[syncTx.index]:true,time);
+      } else {
+        if(!syncStarted)return;
+        if(enabledRX()) {
+          const input=!!io.read('PD0');
+          if(!syncRx&&!input)syncRx=newRX();
+          else if(syncRx&&sampleBit(syncRx,input))syncRx=null;
+        }
+        if(syncTx&&++syncTx.index===syncTx.output.length) {syncTx=null;completed(time);}
+      }
+      io.publish(time);
+    }
+    function sample(time) {
+      if(!io.running('usart'))return;
+      const input=!!io.read('PD0');
+      if(mode()===0&&enabledRX()&&!rx&&previousRX&&!input)
+        rx={...newRX(),checkingStart:true,next:time+bitTime()/2,period:bitTime()};
+      previousRX=input;
+      if(mode()===1&&!master()) {
+        const level=!!io.read('PD4');if(level!==previousClock)syncEdge(level,time);previousClock=level;
+      }
+    }
+    function advance(time) {
+      if(!io.running('usart'))return;
+      while(tx&&tx.next<=time+1e-15) {
+        const when=tx.next;
+        if(tx.index===tx.output.length){tx=null;completed(when);}
+        else {setTX(!!tx.output[tx.index++],when);tx.next+=tx.period;}
+      }
+      while(rx&&rx.next<=time+1e-15) {
+        const level=!!io.read('PD0');
+        if(rx.checkingStart) {if(level){rx=null;break;}rx.checkingStart=false;}
+        else if(sampleBit(rx,level)){rx=null;break;}
+        if(rx)rx.next+=rx.period;
+      }
+      if(mode()===1&&master()&&(enabledTX()||enabledRX())) {
+        if(syncNext===Infinity)syncNext=time+bitTime()/2;
+        let edges=0;
+        while(syncNext<=time+1e-15) {
+          if(++edges>100000)throw new Error('USART synchronous window too large');
+          const when=syncNext;syncNext+=bitTime()/2;syncEdge(!xck,when);
+        }
+      }
+      if(spi)spi.advance(time);
+    }
+    function clocksChanged() {
+      if(!io.running('usart')){if(paused===null)paused=io.now();return;}
+      if(paused!==null) {
+        const delta=io.now()-paused;paused=null;
+        if(tx)tx.next+=delta;if(rx)rx.next+=delta;if(spi)spi.next+=delta;
+        if(syncNext!==Infinity)syncNext+=delta;
+      }
+      if(!tx&&!syncTx&&!spi)start(io.now());
+    }
+    function frequencyChanged(oldHz,newHz,time) {
+      const scale=oldHz/newHz;
+      time=paused??time;
+      if(tx){tx.next=time+(tx.next-time)*scale;tx.period*=scale;}
+      if(rx){rx.next=time+(rx.next-time)*scale;rx.period*=scale;}
+      if(syncNext!==Infinity)syncNext=time+(syncNext-time)*scale;
+      if(spi){spi.next=time+(spi.next-time)*scale;spi.config.halfPeriod*=scale;}
+    }
+    return {sample,advance,clocksChanged,frequencyChanged,
+      busy:()=>!!(tx||rx||spi||syncNext!==Infinity),
+      nextTime:()=>!io.running('usart')?Infinity:Math.min(tx?tx.next:Infinity,rx?rx.next:Infinity,spi?spi.next:Infinity,syncNext),
+      pin:pin=>pin==='PD1'&&(enabledTX()||tx||syncTx||spi)?(txHigh?2:1):
+        pin==='PD4'&&mode()!==0&&master()&&(enabledTX()||enabledRX())?(xck?2:1):undefined,
+      get txEnable(){return enabledTX();},get rxEnable(){return enabledRX();},
+      get bitsPerChar(){return bits();},get baudRate(){return 1/bitTime();}};
+  };
+})(globalThis);
 /* CircuitAliveEDA ATmega48P/88P/168P/328P adapter. SPDX-License-Identifier: GPL-3.0-or-later
  * Host protocol is architecture-independent; this is only one device backend.
  * Instructions are atomic; input voltages are held for the host sampling window.
@@ -5322,12 +6452,6 @@ global.AVR8js=load('index');
 (function(global) {
   'use strict';
   const AVR = global.AVR8js;
-  const devices = {
-    atmega48p: {flash:4096,sram:512,eeprom:256,vectorDivisor:2},
-    atmega88p: {flash:8192,sram:1024,eeprom:512,vectorDivisor:2},
-    atmega168p: {flash:16384,sram:1024,eeprom:512,vectorDivisor:1},
-    atmega328p: {flash:32768,sram:2048,eeprom:1024,vectorDivisor:1}
-  };
   // The smaller devices use one-word interrupt vectors, unlike the 168/328.
   function interrupts(config, divisor) {
     if(Array.isArray(config))return config.map(x=>interrupts(x,divisor));
@@ -5343,7 +6467,7 @@ global.AVR8js=load('index');
     return config;
   }
   global.createDevice = function(config) {
-    const device=devices[config.device];
+    const device=global.CircuitAliveAVR.device(config.device);
     if(!device)throw new Error('Unsupported AVR device: '+config.device);
     const options=config.options || {};
     if(options.sramBytes!==undefined && Number(options.sramBytes)!==device.sram)
@@ -5355,10 +6479,22 @@ global.AVR8js=load('index');
       if(/^P[BCD][0-7]$/.test(id)) {
         if(id==='PC7')throw new Error('PC7 is not an ATmega48/88/168/328 GPIO');
         gpioPins.push({id,port:id[1],bit:Number(id[2])});
-      } else if(!['VCC','AVCC','GND','AREF','RESET','ADC6','ADC7'].includes(id)) {
+      } else if(id==='RESET')gpioPins.push({id,port:'C',bit:6});
+      else if(!['VCC','AVCC','GND','AREF','ADC6','ADC7'].includes(id)) {
         throw new Error('Unsupported AVR pin: '+id);
       }
     }
+    const constantInputs=new Set(options.constantInputs||[]);
+    const unconnectedPins=new Set(options.unconnectedPins||[]);
+    const pinById=Object.fromEntries(gpioPins.map(pin=>[pin.id,pin]));
+    const pinsByPort={B:gpioPins.filter(pin=>pin.port==='B'),C:gpioPins.filter(pin=>pin.port==='C'),D:gpioPins.filter(pin=>pin.port==='D')};
+    const changedPinsByPort={};
+    for(const name of Object.keys(pinsByPort))
+      changedPinsByPort[name]=Array.from({length:256},(_,mask)=>pinsByPort[name].filter(pin=>mask&(1<<pin.bit)));
+    const gpioRegisters=[0x24,0x25,0x27,0x28,0x2a,0x2b];
+    let gpioWriteHooks;
+    const timerControlRegisters=[0x44,0x80,0xb0];
+    let timerControlHooks;
     const memory=new Uint8Array(device.flash);memory.fill(255);memory.set(config.firmware);
     const program=new Uint16Array(device.flash/2);
     for(let i=0;i<program.length;i++)program[i]=memory[2*i] | (memory[2*i+1]<<8);
@@ -5367,11 +6503,14 @@ global.AVR8js=load('index');
     eeprom.readMemory=address=>eeprom.memory[address&(device.eeprom-1)];
     eeprom.writeMemory=(address,value)=>{eeprom.memory[address&(device.eeprom-1)]&=value;};
     eeprom.eraseMemory=address=>{eeprom.memory[address&(device.eeprom-1)]=255;};
-    let cpu,clock,ports,adc,uart,timer0,clockRevision=0;
-    let confirmed=0,origin=0,active=false,events=[],last={};
-    let voltages=Object.create(null),txQueue=[],txHigh=true;
+    let cpu,clock,ports,adc,uart,timer0,timer1,timer2,serial,nvm,system,analog,timerBridge,clockRevision=0;
+    let resetRequested=0,suppressInterrupt=false,persistentLock=options.lockBits===undefined?255:options.lockBits;
+    let restartReason=1,brownout=false;
+    const initialProgram=program.slice(),initialEeprom=eeprom.memory.slice();
+    let confirmed=0,origin=0,active=false,events=[],last={},eventsOrdered=true;
+    let voltages=Object.create(null);
     let lastInputs=null;
-    let rx=null,previousRx=true,previousPud=0,inputBits=Object.create(null);
+    let previousPud=0,inputBits=Object.create(null),physicalMasks={B:0,C:0,D:0};
     const supplyMin=options.supplyMin===undefined ? 1.8 : Number(options.supplyMin);
     const supplyMax=options.supplyMax===undefined ? 5.5 : Number(options.supplyMax);
     if(!Number.isFinite(supplyMin)||!Number.isFinite(supplyMax)||supplyMin<=0||supplyMax<supplyMin)
@@ -5380,113 +6519,167 @@ global.AVR8js=load('index');
     function emit(pin,drive,time) {
       if(last[pin]===drive)return;
       last[pin]=drive;
-      events.push({pin,drive,time:Math.max(confirmed,time)});
+      const stamp=Math.max(confirmed,time);
+      if(events.length&&events[events.length-1].time>stamp)eventsOrdered=false;
+      events.push({pin,drive,time:stamp});
       if(events.length>100000)throw new Error('Too many GPIO transitions in one window');
     }
     function portState(pin) {
       if(!active)return 0;
-      if(pin.id==='PC6')return 0; // Reset fuse stays enabled in this implementation.
-      if(pin.id==='PD1' && uart && uart.txEnable)return txHigh ? 2 : 1;
+      if((pin.id==='PC6'||pin.id==='RESET')&&(!nvm||(nvm.fuses.high&0x80)))return 0;
+      if((pin.id==='PB6'||pin.id==='PB7')&&(cpu.data[0xb6]&0x20))return 0;
+      if(nvm&&(pin.id==='PB6'||pin.id==='PB7')) {
+        const source=nvm.fuses.low&15;if(source>=4||(source===0&&pin.id==='PB6'))return 0;
+      }
+      if(pin.id==='PB0'&&system&&system.clockOutput!==undefined)return system.clockOutput?2:1;
+      if(uart&&(pin.id==='PD1'||pin.id==='PD4')) {const state=uart.pin(pin.id);if(state!==undefined)return state;}
+      if(serial) {
+        const state=serial.pin(pin.id);
+        if(state!==undefined)return state;
+      }
       const state=ports[pin.port].pinState(pin.bit);
       if(state===AVR.PinState.Low)return 1;
       if(state===AVR.PinState.High)return 2;
       if(state===AVR.PinState.InputPullUp && !(cpu.data[0x55]&0x10))return 3;
       return 0;
     }
-    function publish(time) {
-      for(const pin of gpioPins)emit(pin.id,portState(pin),time);
+    function publish(time,pins=gpioPins) {
+      for(const pin of pins)emit(pin.id,portState(pin),time);
     }
-    function setup(time) {
-      origin=time;txQueue=[];txHigh=true;rx=null;previousPud=0;inputBits=Object.create(null);
+    function beforeClocksChange() {
+      if(timerBridge)for(const timer of [timer0,timer1,timer2])timer.count(false);
+      if(analog)analog.poll();
+    }
+    function clocksChanged() {
+      lastInputs=null;
+      if(timerBridge)timerBridge.clocksChanged();
+      if(analog)analog.clocksChanged();
+      if(serial&&serial.clocksChanged)serial.clocksChanged();
+      if(uart)uart.clocksChanged();
+    }
+    function setup(time,reason=1) {
+      const retained=cpu&&reason!==1?cpu.data.slice(256):null;
+      const resetFlags=reason|(cpu&&reason!==1?cpu.data[0x54]:0);
+      const retainedNVM=nvm&&reason!==1?nvm.retain():null;
+      if(nvm)persistentLock=nvm.lock;
+      serial=null;uart=null;analog=null;timerBridge=null;system=null;
+      origin=time;previousPud=0;inputBits=Object.create(null);
       cpu=new AVR.CPU(program,device.sram);
+      if(retained)cpu.data.set(retained,256);
       clock=new AVR.AVRClock(cpu,config.clockHz);
       const cf=x=>interrupts(x,device.vectorDivisor);
       ports={B:new AVR.AVRIOPort(cpu,cf(AVR.portBConfig)),
              C:new AVR.AVRIOPort(cpu,cf(AVR.portCConfig)),
              D:new AVR.AVRIOPort(cpu,cf(AVR.portDConfig))};
+      gpioWriteHooks=gpioRegisters.map(address=>cpu.writeHooks[address]);
       for(const name of Object.keys(ports)) {
         const port=ports[name],update=port.updatePinRegister.bind(port);
-        const mapped=gpioPins.filter(pin=>pin.port===name);
         port.updatePinRegister=ddr=>{
           // PINx observes pad voltage, including outputs under load. PORTx and
           // DDRx still command the electrical driver independently of this readback.
-          let physical=0;
-          for(const pin of mapped)if(voltages[pin.id]!==undefined)physical|=1<<pin.bit;
-          update(ddr&~physical);
+          update(ddr&~physicalMasks[name]);
+          const disabled=name==='C'?(cpu.data[0x7e]&0x3f)|((nvm&&nvm.fuses.high&0x80)?0x40:0)
+            :name==='D'?(cpu.data[0x7f]&3)<<6:0;
+          cpu.data[port.portConfig.PIN]&=~disabled;
         };
       }
+      cpu.writeHooks[0x7e]=value=>{cpu.data[0x7e]=value&0x3f;ports.C.updatePinRegister(cpu.data[0x27]);return true;};
+      cpu.writeHooks[0x7f]=value=>{cpu.data[0x7f]=value&3;ports.D.updatePinRegister(cpu.data[0x2a]);return true;};
       timer0=new AVR.AVRTimer(cpu,cf(AVR.timer0Config));
-      new AVR.AVRTimer(cpu,cf(AVR.timer1Config));
-      new AVR.AVRTimer(cpu,cf(AVR.timer2Config));
+      timer1=new AVR.AVRTimer(cpu,cf(AVR.timer1Config));
+      timer2=new AVR.AVRTimer(cpu,cf(AVR.timer2Config));
       adc=new AVR.AVRADC(cpu,cf(AVR.adcConfig));
       adc.channelValues.fill(0);
-      const adcWrite=cpu.writeHooks[AVR.adcConfig.ADCSRA];
-      cpu.writeHooks[AVR.adcConfig.ADCSRA]=(value,oldValue)=>{
-        if(value&0x20)throw new Error('ADC auto-trigger mode is not implemented in this backend');
-        return adcWrite(value,oldValue);
-      };
-      new AVR.AVREEPROM(cpu,eeprom,cf(AVR.eepromConfig));
-      uart=new AVR.AVRUSART(cpu,cf(AVR.usart0Config),config.clockHz);
-      uart.reset();
+      nvm=global.createAVRNVM(cpu,device,{...options,lockBits:persistentLock},cf,{now:at},eeprom);
+      if(retainedNVM)nvm.restore(retainedNVM);
+      cpu.pc=nvm.resetPC;
+      if(!(nvm.fuses.low&0x80)){clock.prescalerValue=8;cpu.data[0x61]=3;}
+      system=global.createAVRSystem(cpu,nvm,device,{
+        now:at,beforeClocksChange,clocksChanged,publish,
+        timeForCycle:cycle=>origin+(cycle+clock.cyclesDelta)/clock.frequency,
+        reset:reason=>{resetRequested=reason;},
+        onSleep:mode=>{if(mode===1&&analog)analog.start();}
+      },resetFlags);
+      const read=pin=>!!inputBits[pin],running=domain=>system.running(domain);
+      timerBridge=global.createAVRTimers(cpu,[timer0,timer1,timer2],cf,
+        {now:at,read,running,beforeClocksChange},options);
+      analog=global.createAVRAnalog(cpu,adc,cf,{running,vectorDivisor:device.vectorDivisor,
+        voltage:pin=>(voltages[pin]||0)-(voltages.GND||0),captureSource:timerBridge.captureSource});
+      uart=global.createAVRUSART(cpu,clock,cf,{now:at,read,running,publish});
+      serial=global.createAVRSerial(cpu,clock,cf,{now:at,publish,read,running});
       const clockWrite=cpu.writeHooks[0x61];
       cpu.writeHooks[0x61]=value=>{
-        const result=clockWrite(value);++clockRevision;uart.freqHz=clock.frequency;return result;
+        system.poll();
+        const old=clock.frequency,result=clockWrite(value);
+        uart.frequencyChanged(old,clock.frequency,at());serial.frequencyChanged(old,clock.frequency,at());
+        ++clockRevision;return result;
       };
-      for(const port of Object.values(ports))port.addListener(()=>publish(at()));
-      uart.onConfigurationChange=()=>{
-        if(!uart.txEnable){txQueue=[];txHigh=true;}
-        publish(at());
+      const calibrated=config.clockHz,calibration=Number(options.calibrationByte??128);
+      cpu.writeHooks[0x66]=value=>{
+        system.poll();const old=clock.frequency;
+        if((nvm.fuses.low&15)===2)clock.baseFreqHz=calibrated*Math.max(.1,1+(value-calibration)/256);
+        clock.cyclesDelta=(cpu.cycles+clock.cyclesDelta)*(clock.frequency/old)-cpu.cycles;
+        uart.frequencyChanged(old,clock.frequency,at());serial.frequencyChanged(old,clock.frequency,at());
+        cpu.data[0x66]=value;++clockRevision;return true;
       };
-      uart.onByteTransmit=value=>{
-        if(!uart.txEnable)return;
-        if(uart.bitsPerChar===9)throw new Error('9-bit USART electrical framing is not supported');
-        const bitTime=1/uart.baudRate;
-        const start=Math.max(at(),txQueue.length ? txQueue[txQueue.length-1].time : at());
-        let index=0,parity=0;
-        txQueue.push({time:start,high:false});
-        for(let bit=0;bit<uart.bitsPerChar;bit++){
-          const high=!!(value&(1<<bit));parity^=high ? 1:0;
-          txQueue.push({time:start+(++index)*bitTime,high});
-        }
-        if(uart.parityEnabled)txQueue.push({time:start+(++index)*bitTime,high:!!(parity^(uart.parityOdd?1:0))});
-        txQueue.push({time:start+(++index)*bitTime,high:true});
-        txQueue.push({time:start+(index+uart.stopBits)*bitTime,high:true});
+      const tick=cpu.tick.bind(cpu);
+      cpu.tick=()=>{
+        const pending=cpu.pendingInterrupts[cpu.nextInterrupt],enabled=cpu.interruptsEnabled;
+        const blocked=system.sleeping||suppressInterrupt||!nvm.interruptsAllowed();
+        if(blocked)cpu.data[95]&=~0x80;
+        tick();
+        if(enabled&&!blocked&&pending&&!(cpu.data[95]&0x80))
+          system.onInterrupt(pending.address);
+        if(enabled&&blocked)cpu.data[95]|=0x80;
       };
-      // Fail explicitly rather than silently pretending byte-only peripherals drive pins.
-      cpu.writeHooks[0x4c]=(value)=>{
-        if(value&0x40)throw new Error('SPI electrical bridge is not implemented in this backend');
-      };
-      cpu.writeHooks[0xbc]=(value)=>{
-        if(value&0x04)throw new Error('TWI/I2C electrical bridge is not implemented in this backend');
-      };
-      cpu.writeHooks[0x60]=(value)=>{
-        if(value&0x48)throw new Error('Watchdog is not implemented in this backend');
-      };
-      cpu.writeHooks[0x57]=(value)=>{
-        if(value&1)throw new Error('Self-programming flash is not implemented in this backend');
-      };
-      cpu.readHooks[0x50]=()=>{
-        throw new Error('Analog comparator is not implemented in this backend');
-      };
-      cpu.writeHooks[0x50]=(value)=>{
-        if(value&0x0c)throw new Error('Analog comparator is not implemented in this backend');
-      };
-      cpu.writeHooks[0xb6]=(value)=>{
-        if(value&0x20)throw new Error('Asynchronous Timer2 oscillator is not implemented in this backend');
-      };
+      for(const name of Object.keys(ports)) {
+        const port=ports[name],changedPins=changedPinsByPort[name];let previousDdr=cpu.data[port.portConfig.DDR];
+        port.addListener((value,previous)=>{
+          const ddr=cpu.data[port.portConfig.DDR],changed=(value^previous)|(ddr^previousDdr);
+          previousDdr=ddr;const time=at();
+          // A port write often changes one pad. Other pads keep their drive,
+          // including UART/SPI overrides, without reevaluating every function.
+          const ordinary=name==='D'?0xed:name==='B'?(serial.active()?2:0x3e):(serial.active()?0x0f:0x3f);
+          const low=ddr&~value,high=ddr&value&~port.openCollector;
+          const pullups=(cpu.data[0x55]&0x10)?0:cpu.data[port.portConfig.PORT];
+          for(const pin of changedPins[changed]) {
+            const mask=1<<pin.bit;
+            // Timer overrides already contribute to value. Dedicated serial,
+            // reset, oscillator and clock-output pads use their full resolver.
+            const drive=!active?0:(ordinary&mask)?((low&mask)?1:(high&mask)?2:(pullups&mask)?3:0):portState(pin);
+            emit(pin.id,drive,time);
+          }
+        });
+      }
+      timerControlHooks=timerControlRegisters.map(address=>cpu.writeHooks[address]);
+      clocksChanged();++clockRevision;
     }
     function apply(inputs,time) {
       // The host reuses immutable snapshots when pad voltages are unchanged.
       // DDR/register writes still refresh PINx through the installed hooks.
       if(inputs===lastInputs)return;
       lastInputs=inputs;
-      for(const input of inputs)voltages[input.pin]=input.voltage;
+      for(const input of inputs) {
+        voltages[input.pin]=input.voltage;
+        const pin=pinById[input.pin];
+        if(pin) {
+          if(input.voltage===undefined)physicalMasks[pin.port]&=~(1<<pin.bit);
+          else physicalMasks[pin.port]|=1<<pin.bit;
+        }
+      }
       const ground=voltages.GND===undefined ? 0:voltages.GND;
       const supply=(voltages.VCC===undefined ? 0:voltages.VCC)-ground;
       const reset=voltages.RESET===undefined ? supply : voltages.RESET-ground;
-      const enabled=supply>=supplyMin && supply<=supplyMax && reset>=supply*0.6;
-      if(enabled && !active){events=[];setup(time);active=true;}
-      else if(!enabled && active){events=[];active=false;txQueue=[];rx=null;publish(time);}
+      const resetDisabled=!(Number(options.fuseHigh===undefined?0xdf:options.fuseHigh)&0x80);
+      const bodFuse=device.fuseLayout==='328'?Number(options.fuseExtended??255):Number(options.fuseHigh??223);
+      const bodVoltage=({4:4.3,5:2.7,6:1.8})[bodFuse&7]||0;
+      if(bodVoltage)brownout=!(system&&system.bodDisabled)&&supply<(bodVoltage+(brownout?.05:0));
+      const enabled=supply>=supplyMin && supply<=supplyMax && !brownout && (resetDisabled||reset>=supply*0.6);
+      if(enabled && !active){events=[];setup(time,restartReason);active=true;}
+      else if(!enabled && active){
+        restartReason=brownout?4:(supply<supplyMin||supply>supplyMax)?1:2;
+        events=[];active=false;publish(time);
+      }
       if(!active)return;
       adc.avcc=(voltages.AVCC===undefined ? supply:voltages.AVCC-ground);
       adc.aref=(voltages.AREF===undefined ? supply:voltages.AREF-ground);
@@ -5499,38 +6692,39 @@ global.AVR8js=load('index');
           const level=!!inputBits[pin.id];
           inputBits[pin.id]=level;
           if(previous===undefined||previous!==level)ports[pin.port].setPin(pin.bit,level);
+          if(pin.id==='PD2'&&previous!==undefined&&!(cpu.data[0x3d]&1)) {
+            const sense=cpu.data[0x69]&3;
+            if((sense===1&&previous!==level)||(sense===2&&previous&&!level)||(sense===3&&!previous&&level))
+              cpu.setInterruptFlag({address:2/device.vectorDivisor,flagRegister:0x3c,flagMask:1,
+                enableRegister:0x3d,enableMask:1});
+          }
         }
-        if(pin.port==='C' && pin.bit<=5)adc.channelValues[pin.bit]=(voltages[pin.id]||ground)-ground;
+        if(pin.port==='C' && pin.bit<=5)adc.channelValues[pin.bit]=(voltages[pin.id]??ground)-ground;
       }
-      for(let bit=6;bit<8;bit++)adc.channelValues[bit]=(voltages['ADC'+bit]||ground)-ground;
-      const level=voltages.PD0===undefined ? true : voltages.PD0-ground>=supply*0.6;
-      if(uart.rxEnable && !rx && previousRx && !level) {
-        if(uart.bitsPerChar===9)throw new Error('9-bit USART electrical framing is not supported');
-        rx={next:time+1.5/uart.baudRate,bitTime:1/uart.baudRate,bit:0,value:0,
-            bits:uart.bitsPerChar,parity:uart.parityEnabled};
-      }
-      previousRx=level;
+      for(let bit=6;bit<8;bit++)adc.channelValues[bit]=(voltages['ADC'+bit]??ground)-ground;
+      analog.updateComparator();timerBridge.sample();uart.sample(time);
+      serial.sample(time);
     }
     function peripherals() {
       const pud=cpu.data[0x55]&0x10;
-      if(!txQueue.length&&!rx&&previousPud===pud)return;
+      if(previousPud===pud)return;
       const time=at();
-      while(txQueue.length && txQueue[0].time<=time) {
-        const edge=txQueue.shift();txHigh=edge.high;
-        const pin=gpioPins.find(p=>p.id==='PD1');
-        if(pin)emit(pin.id,portState(pin),edge.time);
-      }
-      if(rx && time>=rx.next) {
-        if(rx.bit<rx.bits){if(previousRx)rx.value|=1<<rx.bit;rx.bit++;rx.next+=rx.bitTime;}
-        else if(rx.parity){rx.parity=false;rx.next+=rx.bitTime;}
-        else {if(previousRx)uart.writeByte(rx.value,true);rx=null;}
-      }
       if(previousPud!==pud){previousPud=pud;publish(time);}
     }
     function inputSensitive() {
+      // Timer1's internal counter does not require an electrical poll. Only
+      // its capture input does; an undriven open pad cannot receive an edge.
+      // Unknown/custom topologies retain conservative sampling. Output/pull-up
+      // configuration restores sampling even on a physically open pad.
+      const capturePin=pinById.PB0;
+      const captureInput=!constantInputs.has('PB0') && (!unconnectedPins.has('PB0')
+        || (capturePin && portState(capturePin)!==0));
+      const capture=(cpu.data[0x81]&7) && ![8,10,12,14].includes(timer1.WGM) && captureInput;
       return (cpu.data[0x3d]&3) || (cpu.data[0x68]&7) || (cpu.data[0x7a]&0x40)
         || (cpu.data[0x6f]&0x20) || (cpu.data[0x45]&7)>=6 || (cpu.data[0x81]&7)>=6
-        || uart.rxEnable;
+        || uart.rxEnable || serial.active() || uart.busy()
+        || (!(cpu.data[0x50]&0x80)&&((cpu.data[0x50]&12)||((cpu.data[0x7a]&0xa0)===0xa0&&(cpu.data[0x7b]&7)===1)))
+        || capture || (cpu.data[0x7a]&0x20) || (cpu.data[0xb6]&0x40);
     }
     function observesInput(opcode) {
       let address=-1;
@@ -5549,7 +6743,18 @@ global.AVR8js=load('index');
       else if((opcode&0xfe0c)===0x9204)address=cpu.dataView.getUint16(30,true);
       // GPIO observations, starting ADC/RX/interrupts or selecting an external
       // timer clock need a fresh electrical snapshot at this instruction.
-      return [0x23,0x26,0x29,0x7a,0x3d,0x68,0xc1,0x45,0x81,0x6f].includes(address);
+      return [0x23,0x26,0x29,0x7a,0x3d,0x68,0xc1,0x45,0x81,0x6f,
+        0x4c,0x4d,0x4e,0xb8,0xb9,0xba,0xbb,0xbc,0xbd,0x50,0x53,0x55,0x60,0x64,0x7b,0x7c,
+        0xb6,0xc2,0xc6,0x81].includes(address) || opcode===0x9588;
+    }
+    function pollHardware() {
+      nvm.sync();timerBridge.poll();analog.poll();system.poll();
+      if(uart.busy())uart.advance(at());
+      if(serial.busy())serial.advance(at());
+    }
+    function hardwareDeadline() {
+      return Math.min(system.nextTime(),nvm.nextTime(),timerBridge.nextTime(),uart.nextTime(),
+        origin+(Math.min(analog.nextCycle,timerBridge.nextCycle)+clock.cyclesDelta)/clock.frequency);
     }
     function advance(time,inputs,adaptive) {
         if(!Number.isFinite(time)||time<confirmed)throw new Error('Invalid AVR simulated time');
@@ -5563,18 +6768,55 @@ global.AVR8js=load('index');
           let limit=scaledTime-clock.cyclesDelta;
           let rounding=Math.max(1e-6,(Math.abs(scaledTime)+Math.abs(clock.cyclesDelta)
             +(Math.abs(time)+Math.abs(origin))*clock.frequency)*Number.EPSILON*8);
+          pollHardware();
           while(cpu.cycles<limit-rounding || at()<time) {
+            if(lastInputs===null){apply(inputs,at());pollHardware();}
+            if(!active)break;
+            if(resetRequested) {
+              const reason=resetRequested;resetRequested=0;const now=at();setup(now,reason);
+              lastInputs=null;apply(inputs,now);publish(now);
+              pollHardware();
+            }
+            if(system.sleeping||nvm.stalled()) {
+              if(++instructions>1000000)throw new Error('AVR event budget exceeded');
+              const next=Math.min(time,hardwareDeadline(),cpu.nextClockEvent
+                ? origin+(cpu.nextClockEvent.cycles+clock.cyclesDelta)/clock.frequency:Infinity);
+              const cycles=(next-origin)*clock.frequency-clock.cyclesDelta;
+              if(cycles>cpu.cycles)cpu.cycles=cycles;
+              cpu.tick();pollHardware();
+              if(at()>=time-rounding/clock.frequency)break;
+              if(system.sleeping||nvm.stalled())continue;
+            }
             if(typeof global.__circuitaliveAvrRun==='function' && cpu.nextInterrupt<0
-                && !txQueue.length && !rx && cpu.cycles+8<limit-rounding) {
+                && !serial.busy() && !uart.busy() && nvm.nativeSafe() && cpu.cycles+8<limit-rounding) {
               const deadline=Math.min(limit-rounding, cpu.cycles+100000,
-                cpu.nextClockEvent ? cpu.nextClockEvent.cycles : Infinity);
+                cpu.nextClockEvent ? cpu.nextClockEvent.cycles : Infinity,
+                (hardwareDeadline()-origin)*clock.frequency-clock.cyclesDelta);
               if(deadline>cpu.cycles+8) {
-                const counter=timer0.divider && !timer0.tcntUpdated && !timer0.updateDivider
+                const counter=timerBridge.running(0) && timer0.divider && !timer0.tcntUpdated && !timer0.updateDivider
                   && !cpu.readHooks[0x35]
                   && timer0.TOP===255 && (timer0.timerMode===0 || timer0.timerMode===3);
                 const block=global.__circuitaliveAvrRun(cpu.data,cpu.progBytes,cpu.pc,cpu.cycles,deadline,
-                  counter ? timer0.tcnt : -1,timer0.lastCycle,timer0.divider);
+                  counter ? timer0.tcnt : -1,timer0.lastCycle,timer0.divider,
+                  !cpu.readHooks[0x24]&&!cpu.readHooks[0x25]&&!cpu.readHooks[0x27]&&!cpu.readHooks[0x28]
+                    &&!cpu.readHooks[0x2a]&&!cpu.readHooks[0x2b]&&!cpu.readHooks[0x44]
+                    &&!cpu.readHooks[0x80]&&!cpu.readHooks[0xb0] ? 1:0,
+                  4 + (adaptive&&!sampling ?
+                    (gpioRegisters.every((address,i)=>cpu.writeHooks[address]===gpioWriteHooks[i]) ? 1:0)
+                    + (!(cpu.data[0xb6]&0x20)&&timerControlRegisters.every((address,i)=>cpu.writeHooks[address]===timerControlHooks[i]) ? 2:0) : 0));
+                if(block[2])for(let i=0;i<block[2].length;i+=3) {
+                  cpu.cycles=block[2][i+2];cpu.writeData(block[2][i],block[2][i+1]);
+                }
                 cpu.pc=block[0];cpu.cycles=block[1];
+                if(cpu.cycles>=deadline) {
+                  // Native execution reached this exact boundary without
+                  // crossing it. Deliver its hardware events before another
+                  // instruction; SEI/RETI are handled below in the adapter.
+                  suppressInterrupt=false;
+                  if(cpu.nextInterrupt>=0 || (cpu.nextClockEvent && cpu.nextClockEvent.cycles<=cpu.cycles))cpu.tick();
+                  pollHardware();
+                  continue;
+                }
               }
             }
             if(++instructions>1000000)throw new Error('AVR instruction budget exceeded; use smaller windows');
@@ -5582,11 +6824,14 @@ global.AVR8js=load('index');
             const observes=adaptive && observesInput(opcode);
             if(observes && at()>confirmed+1e-15) { time=Math.min(time,at());break; }
             if(opcode===0xffff)throw new Error('Execution reached erased AVR flash at byte '+(cpu.pc*2));
-            if(opcode===0x9588)throw new Error('SLEEP mode is not implemented in this backend');
-            if(opcode===0x95e8 || opcode===0x95f8)throw new Error('Self-programming flash is not implemented in this backend');
-            AVR.avrInstruction(cpu);
+            suppressInterrupt=opcode===0x9478||opcode===0x9518;
+            if(opcode===0x9588) {
+              cpu.pc=(cpu.pc+1)%cpu.progMem.length;++cpu.cycles;system.sleep();
+            } else if(opcode===0x9598) {cpu.pc=(cpu.pc+1)%cpu.progMem.length;++cpu.cycles;}
+            else if(!nvm.instruction(opcode))AVR.avrInstruction(cpu);
             if(cpu.nextInterrupt>=0 || (cpu.nextClockEvent && cpu.nextClockEvent.cycles<=cpu.cycles))cpu.tick();
-            if(txQueue.length || rx || (cpu.data[0x55]&0x10)!==previousPud)peripherals();
+            if((cpu.data[0x55]&0x10)!==previousPud)peripherals();
+            pollHardware();
             // Enabling RX, ADC or an external interrupt can happen at the very
             // first instruction after an input barrier. Bound this window now,
             // rather than keeping its previously autonomous deadline.
@@ -5601,7 +6846,7 @@ global.AVR8js=load('index');
             }
           }
         }
-        events.sort((a,b)=>a.time-b.time);
+        if(!eventsOrdered){events.sort((a,b)=>a.time-b.time);eventsOrdered=true;}
         const ready=[],future=[];
         for(const event of events)(event.time<=time+1e-15 ? ready:future).push(event);
         events=future;confirmed=time;
@@ -5610,9 +6855,11 @@ global.AVR8js=load('index');
     }
     return {
       reset:function(){
-        active=false;confirmed=0;origin=0;events=[];last={};voltages=Object.create(null);
+        program.set(initialProgram);eeprom.memory.set(initialEeprom);nvm=null;cpu=null;
+        persistentLock=options.lockBits===undefined?255:options.lockBits;resetRequested=0;
+        restartReason=1;brownout=false;
+        active=false;confirmed=0;origin=0;events=[];last={};eventsOrdered=true;voltages=Object.create(null);physicalMasks={B:0,C:0,D:0};
         lastInputs=null;
-        txQueue=[];rx=null;previousRx=true;
       },
       nextEventTime:function(){return confirmed+config.quantumSeconds;},
       advanceTo:function(time,inputs){return advance(time,inputs,false);},

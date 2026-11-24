@@ -2,6 +2,7 @@
 #include "schematic_adapter.h"
 #include "probe_placement.h"
 #include "model_profiles.h"
+#include "display_geometry.h"
 #include <nlohmann/json.hpp>
 #include <project.h>
 #include <sch_connection.h>
@@ -14,6 +15,7 @@
 #include <schematic.h>
 #include <algorithm>
 #include <numeric>
+#include <limits>
 #include <tuple>
 #include <stdexcept>
 
@@ -41,6 +43,17 @@ CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& s
         const SCH_FIELD* f = symbol.GetField( name );
         return f ? f->GetShownText( &sheet, false, 0, variant ).ToStdString() : std::string();
     };
+    component.identity=(sheet.Path().AsString()+"/"+symbol.m_Uuid.AsString()).ToStdString();
+    if(const auto links=field("CA.Links");!links.empty())
+    {
+        try
+        {
+            component.linkedComponents=nlohmann::json::parse(links).get<std::vector<std::string>>();
+            if(component.linkedComponents.size()>64)throw std::runtime_error("Too many links");
+            for(const auto& peer:component.linkedComponents)if(peer.size()>128)throw std::runtime_error("Invalid peer identity");
+        }
+        catch(const std::exception&){if(!forEditing)throw std::runtime_error(component.reference+": invalid CA.Links");}
+    }
     component.deviceHint = field( "Sim.Device" );
     component.modelFile = field( "CA.Model" );
     auto map = [&]( const wxString& name ) -> std::map<std::string, std::string>
@@ -111,11 +124,12 @@ void WriteSymbolModelSettings( SCH_SYMBOL& symbol, const CIRCUIT_COMPONENT& sett
     for(const auto& [id,value]:settings.resources)if(!value.path.empty())
         resources[id]={{"path",value.path},{"format",value.format},{"address",value.address}};
     const std::map<wxString, std::string> fields = {
+        { "CA.Links", settings.linkedComponents.empty()?"":nlohmann::json(settings.linkedComponents).dump() },
         { "CA.Resources", resources.empty()?"":resources.dump() },
         { "CA.Model", settings.modelFile },
         { "CA.Pins", settings.modelPins.empty() ? "" : nlohmann::json( settings.modelPins ).dump() },
         { "CA.Parameters", settings.modelParameters.empty() ? "" : nlohmann::json( settings.modelParameters ).dump() },
-        { "CA.Measurements", !settings.measurements.Any() ? "" : nlohmann::json{
+        { "CA.Measurements", !settings.measurements.Any()&&settings.measurements.positive.empty()&&settings.measurements.negative.empty() ? "" : nlohmann::json{
             { "voltage", settings.measurements.voltage }, { "current", settings.measurements.current },
             { "power", settings.measurements.power }, { "positive", settings.measurements.positive },
             { "negative", settings.measurements.negative } }.dump() }
@@ -135,7 +149,43 @@ void ApplySavedSymbolModelSettings( SCH_SYMBOL& symbol, SCH_SHEET_PATH& sheet,
 {
     if( symbol.IsPower() || symbol.GetField( "CA.Probe" ) ) return;
     auto component = ReadSymbolModelSettings( symbol, sheet, variant, projectDirectory );
-    if( MODEL_PROFILES().Apply( component ) ) WriteSymbolModelSettings( symbol, component );
+    MODEL_PROFILES profiles;
+    if(profiles.Apply(component))
+    {
+        WriteSymbolModelSettings(symbol,component);
+        if(profiles.BoundModel(component.libraryId))symbol.SetExcludedFromSim(profiles.DefaultExcluded(component.libraryId),&sheet,variant);
+    }
+}
+
+void WriteSymbolDisplayPosition( SCH_SYMBOL& symbol, const CONTROL_VISUAL& visual )
+{
+    if( !std::isfinite( visual.x ) || !std::isfinite( visual.y ) )
+        throw std::runtime_error( "Invalid display position" );
+    auto* field = symbol.GetField( "CA.DisplayPosition" );
+    if( !field ) field = symbol.AddField( SCH_FIELD( &symbol, FIELD_T::USER, "CA.DisplayPosition" ) );
+    field->SetText( wxString::FromUTF8( nlohmann::json{
+            { "x", visual.x }, { "y", visual.y } }.dump() ) );
+    field->SetVisible( false );
+}
+
+void ApplySymbolDisplayPosition( const SCH_SYMBOL& symbol, const BOX2I& body, CONTROL_VISUAL& visual )
+{
+    const auto* field = symbol.GetField( "CA.DisplayPosition" );
+    if( !field ) return;
+    try
+    {
+        const auto saved = nlohmann::json::parse( field->GetText().ToStdString() );
+        auto positioned = MoveDisplayVisual( body, visual, { 0, 0 } );
+        positioned.x = saved.at( "x" ).get<double>();
+        positioned.y = saved.at( "y" ).get<double>();
+        // Check the final IU coordinates before the renderer converts to int.
+        const double x = body.GetX() + positioned.x * std::max<double>( body.GetWidth(), schIUScale.mmToIU( 1 ) );
+        const double y = body.GetY() + positioned.y * std::max<double>( body.GetHeight(), schIUScale.mmToIU( 1 ) );
+        const double limit = std::numeric_limits<int>::max() / 2.;
+        if( std::isfinite( x ) && std::isfinite( y ) && std::abs( x ) < limit && std::abs( y ) < limit )
+            visual = positioned;
+    }
+    catch( const std::exception& ) {} // A damaged visual position must not prevent electrical simulation.
 }
 
 SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
@@ -148,6 +198,7 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
     std::vector<CIRCUIT_PROBE> probes;
     std::vector<POWER_SYMBOL> powerSymbols;
     std::map<std::string, std::size_t> packages;
+    std::map<std::pair<wxString, wxString>, SCH_SYMBOL*> graphicalSymbols;
     const wxString variant = aSchematic.GetCurrentVariant();
     // PathAsString omits the first sheet UUID and is "/" for every top-level page.
     // Use the complete instance path for overlays and hit testing across pages.
@@ -220,7 +271,8 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
                     []( std::size_t sequence, const CIRCUIT_PROBE& p ) { return sequence < p.sequence; } ) - probes.begin();
                 probes.insert( probes.begin() + at, std::move( probe ) );
                 result.probes.insert( result.probes.begin() + at, { sheet.Path().AsString(), symbol->m_Uuid.AsString(),
-                    symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition() } );
+                    symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition(),
+                    symbol->GetTransform().TransformCoordinate(VECTOR2I(1,0)),symbol->GetTransform().TransformCoordinate(VECTOR2I(0,1)) } );
                 continue;
             }
             if( symbol->IsPower() || lib.starts_with( "power:" ) )
@@ -233,6 +285,7 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
 
             CIRCUIT_COMPONENT component = ReadSymbolModelSettings( *symbol, sheet, variant,
                     aSchematic.Project().GetProjectPath().ToStdString() );
+            graphicalSymbols[{ sheet.Path().AsString(), symbol->m_Uuid.AsString() }] = symbol;
 
             for( const SCH_PIN* pin : symbol->GetPins( &sheet ) )
             {
@@ -262,7 +315,14 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
                 if( symbol->IsMultiUnit() ) packages[component.reference] = index;
                 components.push_back( std::move( component ) );
                 result.locations.push_back( { sheet.Path().AsString(), symbol->m_Uuid.AsString(),
-                                              symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition() } );
+                                              symbol->GetRef( &sheet ), symbol->GetBodyBoundingBox(), symbol->GetPosition(),
+                    symbol->GetTransform().TransformCoordinate(VECTOR2I(1,0)),symbol->GetTransform().TransformCoordinate(VECTOR2I(0,1)) } );
+                // Some LEDs (CQY99/LD271) have an off-center library anchor.
+                // Their two terminals locate the junction; light-emission arrows
+                // must not shift its center. Pin positions already include rotation/mirroring.
+                const auto pins = symbol->GetPins( &sheet );
+                if( pins.size() == 2 )
+                    result.locations.back().lightPosition = ( pins[0]->GetPinRoot() + pins[1]->GetPinRoot() ) / 2;
             }
             if( aPinIndicators ) for( const SCH_PIN* pin : symbol->GetPins( &sheet ) )
                 result.pins.push_back( { index, pin->GetShownNumber().ToStdString(), sheet.Path().AsString(), pin->GetPosition() } );
@@ -288,6 +348,13 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators,
                      { return std::tie( a.net, a.reference ) < std::tie( b.net, b.reference ); } );
     result.circuit = BuildCircuitSnapshot( components, probes, aPinIndicators, powerSymbols,
                                           aPreferences, pinObservers );
+    for( auto& display : result.circuit.displays )
+    {
+        const auto& location = result.locations.at( display.component );
+        const auto symbol = graphicalSymbols.find( { location.sheet, location.uuid } );
+        if( symbol != graphicalSymbols.end() )
+            ApplySymbolDisplayPosition( *symbol->second, location.body, display.appearance.visual );
+    }
     const std::size_t observerStart = result.circuit.pinNodes.size() - pinObservers.size();
     for( auto& location : observerLocations )
     {

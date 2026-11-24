@@ -25,6 +25,7 @@ public:
     std::vector<PROGRAMMABLE_PIN_STATE> AdvanceTo( double aTime,
         const std::vector<PROGRAMMABLE_PIN_INPUT>& aInputs, double aBatchTarget = 0 );
     double Time() const { return m_time; }
+    std::map<std::string,std::string> Presentation() const { return m_future.valid() ? std::map<std::string,std::string>{} : m_runtime.Presentation(); }
     bool HasPrefetch() const { return m_future.valid(); }
 private:
     struct RESULT

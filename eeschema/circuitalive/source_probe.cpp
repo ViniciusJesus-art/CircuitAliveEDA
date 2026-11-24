@@ -34,7 +34,7 @@ void ValidateSourceProbe( PROBE_KIND kind, const SOURCE_PROBE_SETTINGS& s )
     range( s.delay, 0, 3600, "Start delay (0 to 3600 s)" );
     if( kind != PROBE_KIND::SINE )
     {
-        range( s.duty, 0, 1, "Duty cycle (0 to 100%)" );
+        if( kind == PROBE_KIND::PWM ) range( s.duty, 0, 1, "Duty cycle (0 to 100%)" );
         range( s.rise, 1e-12, 3600, "Rise time (1p to 3600 s)" );
         range( s.fall, 1e-12, 3600, "Fall time (1p to 3600 s)" );
         if( s.rise + s.fall >= 1 / s.frequency )
@@ -46,7 +46,8 @@ std::string SerializeSourceProbe( PROBE_KIND kind, const SOURCE_PROBE_SETTINGS& 
 {
     ValidateSourceProbe( kind, s );
     return nlohmann::json{ { "version", 1 }, { "low", s.low }, { "high", s.high },
-        { "initial_high", s.initialHigh }, { "frequency", s.frequency }, { "duty", s.duty },
+        { "initial_high", s.initialHigh }, { "frequency", s.frequency },
+        { "duty", kind == PROBE_KIND::SQUARE ? .5 : s.duty },
         { "amplitude", s.amplitude }, { "offset", s.offset }, { "phase", s.phase },
         { "delay", s.delay }, { "rise", s.rise }, { "fall", s.fall }, { "resistance", s.resistance } }.dump();
 }
@@ -63,6 +64,7 @@ SOURCE_PROBE_SETTINGS ParseSourceProbe( PROBE_KIND kind, const std::string& text
         s.offset = j.at( "offset" ); s.phase = j.at( "phase" ); s.delay = j.at( "delay" );
         s.rise = j.at( "rise" ); s.fall = j.at( "fall" ); s.resistance = j.at( "resistance" );
     }
+    if( kind == PROBE_KIND::SQUARE ) s.duty = .5; // Migrate old adjustable CLK probes.
     ValidateSourceProbe( kind, s );
     return s;
 }
@@ -77,7 +79,7 @@ CIRCUIT_COMPONENT SourceProbeComponent( PROBE_KIND kind, const SOURCE_PROBE_SETT
     // Only pin 1 exists on the schematic. Pin 2 is the instrument's internal ground reference.
     c.pins = { { "1", net }, { "2", "0" } };
     c.modelFile = "builtin:probe_" + std::string( kind == PROBE_KIND::LOGIC ? "logic"
-            : kind == PROBE_KIND::SINE ? "sine" : "pulse" );
+            : kind == PROBE_KIND::SINE ? "sine" : kind == PROBE_KIND::SQUARE ? "clock" : "pulse" );
     auto set = [&]( const char* key, double value )
     {
         std::ostringstream number; number.imbue( std::locale::classic() ); number << std::setprecision( 17 ) << value;
@@ -95,7 +97,8 @@ CIRCUIT_COMPONENT SourceProbeComponent( PROBE_KIND kind, const SOURCE_PROBE_SETT
         }
         else
         {
-            set( "period", 1 / s.frequency ); set( "duty", s.duty );
+            set( "period", 1 / s.frequency );
+            if( kind == PROBE_KIND::PWM ) set( "duty", s.duty );
             set( "rise", s.rise ); set( "fall", s.fall );
         }
     }

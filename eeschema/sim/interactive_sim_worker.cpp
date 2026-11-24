@@ -7,6 +7,8 @@
 #include "interactive_sim_protocol.h"
 #include "runtime_memory.h"
 #include "programmable_pipeline.h"
+#include "native_peripherals.h"
+#include "audio_sampler.h"
 #include "programmable_pin_backend.h"
 #include "compiled_expression.h"
 #include "expression_backend.h"
@@ -44,6 +46,7 @@
 #include <map>
 #include <mutex>
 #include <set>
+#include <regex>
 #include <signal.h>
 #include <sstream>
 
@@ -122,7 +125,18 @@ public:
         else if( op == "memory" )
             return Memory( aRequest );
         else if( op == "snapshot" )
-            return Snapshot( aRequest.value( "drain", false ) );
+            return Snapshot( aRequest.value( "drain", false ),aRequest.contains("history_signals")
+                ?std::optional<std::vector<std::size_t>>(aRequest.at("history_signals").get<std::vector<std::size_t>>())
+                :std::nullopt );
+        else if(op=="history")
+        {
+            std::lock_guard lock(m_mutex);
+            if(!m_retainedHistoryValid||aRequest.at("token").get<std::uint64_t>()!=m_historyToken)
+                throw std::runtime_error("The requested history snapshot has expired");
+            JSON result={{"history",HistoryRows(m_retainedHead,m_retainedSize)}};
+            if(m_config.historySignals)result["history_signals"]=*m_config.historySignals;
+            return result;
+        }
         else
             throw std::runtime_error( "Unknown simulation operation" );
 
@@ -148,6 +162,331 @@ public:
     }
 
 private:
+    static bool StatelessNetwork( const std::string& deck )
+    {
+        // Unknown models, subcircuits and dynamic expressions keep the full
+        // integration policy. In particular, never relax RC/RL/transistor
+        // circuits or diode models with junction/diffusion capacitance.
+        const auto lowered = Lower( deck );
+        std::set<std::string> sourceNodes{ "0" }, constantNodes{ "0" };
+        std::istringstream sources( lowered ); std::string source;
+        while( std::getline( sources, source ) )
+        {
+            std::istringstream words( source ); std::string name, p, n; words >> name >> p >> n;
+            if( name.empty() || name[0] != 'v' ) continue;
+            if( p != "0" && n != "0" ) continue;
+            const auto node = p == "0" ? n : p;
+            sourceNodes.insert( node );
+            if( source.find( '(' ) == std::string::npos ) constantNodes.insert( node );
+        }
+        std::istringstream lines( lowered );
+        std::string line;
+        std::set<std::string> pinModels;
+        std::vector<std::string> analogModels;
+        bool title = true;
+        const std::regex function( R"(([a-z_][a-z_0-9]*)\s*\()" );
+        const std::regex temporal( R"(\btime\b)" );
+        const std::regex parameter( R"(\b([a-z][a-z0-9_]*)\s*=)" );
+        const std::set<std::string> staticDiodeParameters{ "is", "n", "rs", "tnom" };
+        const std::set<std::string> functions{ "v", "min", "max", "abs", "tanh" };
+        const std::regex voltageRead( R"(\bv\s*\(\s*([^()]+)\))" );
+        while( std::getline( lines, line ) )
+        {
+            if( title ) { title = false; continue; }
+            std::istringstream words( line ); std::string name; words >> name;
+            if( name.empty() || name[0] == '*' ) continue;
+            if( std::regex_search( line, temporal ) ) return false;
+            if( name == ".model" )
+            {
+                std::string id, type; words >> id >> type;
+                type = type.substr( 0, type.find( '(' ) );
+                if( type == "ca_programmable_pin" || type == "ca_expression" ) pinModels.insert( id );
+                else if( type != "d" && type != "sw" ) return false;
+                if( type == "d" && ( line.find( "cjo" ) != std::string::npos
+                    || line.find( "cj0" ) != std::string::npos || line.find( "tt" ) != std::string::npos
+                    || line.find( "level" ) != std::string::npos ) ) return false;
+                if( type == "d" )
+                    for( std::sregex_iterator i( line.begin(), line.end(), parameter ), end; i != end; ++i )
+                        if( !staticDiodeParameters.contains( ( *i )[1].str() ) ) return false;
+            }
+            else if( name[0] == '.' )
+            {
+                if( name != ".param" && name != ".options" && name != ".end"
+                    && name != ".save" && name != ".tran" ) return false;
+            }
+            else if( name[0] == 'a' )
+            {
+                std::string token, model;
+                while( words >> token ) model = token;
+                analogModels.push_back( model );
+            }
+            else if( name[0] == 'b' )
+            {
+                std::string positive,negative;words>>positive>>negative;
+                std::string compact=line;
+                compact.erase(std::remove_if(compact.begin(),compact.end(),[](unsigned char c){return std::isspace(c);}),compact.end());
+                // The model compiler's potentiometer is a positive
+                // conductance controlled by an independent voltage source.
+                // Its one own-terminal voltage read is linear, without state
+                // or feedback in the coefficient. Other behavioral feedback
+                // remains outside this proof.
+                const auto conductance=compact.find("i={v("+positive+","+negative+")/max(1u,");
+                bool ownConductance=false;
+                if(conductance!=std::string::npos)
+                {
+                    const auto start=compact.find("max(",conductance)+4;unsigned depth=1;
+                    for(auto i=start;i<compact.size();++i)
+                    {
+                        if(compact[i]=='(')++depth;
+                        else if(compact[i]==')'&&!--depth){ownConductance=i+2==compact.size()&&compact.back()=='}';break;}
+                    }
+                }
+                for( std::sregex_iterator i( line.begin(), line.end(), function ), end; i != end; ++i )
+                    if( !functions.contains( ( *i )[1].str() ) ) return false;
+                for( std::sregex_iterator i( line.begin(), line.end(), voltageRead ), end; i != end; ++i )
+                {
+                    auto ports = ( *i )[1].str(); std::replace( ports.begin(), ports.end(), ',', ' ' );
+                    std::istringstream pair(ports);std::string a,b,extra;pair>>a>>b>>extra;
+                    if(ownConductance&&a==positive&&b==negative&&extra.empty()){ownConductance=false;continue;}
+                    std::istringstream inputs( ports ); std::string node;
+                    while( inputs >> node ) if( !sourceNodes.contains( node ) ) return false;
+                }
+            }
+            else if( name[0] == 's' )
+            {
+                std::string p, n, control, reference; words >> p >> n >> control >> reference;
+                if( !constantNodes.contains( control ) || !constantNodes.contains( reference ) ) return false;
+            }
+            else if( name[0] == 'r' && std::regex_search( line, function ) ) return false;
+            else if( name[0] != 'r' && name[0] != 'v' && name[0] != 'i'
+                     && name[0] != 'd' && name[0] != 's' ) return false;
+        }
+        return std::all_of( analogModels.begin(), analogModels.end(),
+                [&]( const auto& model ) { return pinModels.contains( model ); } );
+    }
+
+    void RefreshStatelessSources()
+    {
+        m_staticPulses.clear(); m_staticSourceNames.clear(); m_staticSine.reset(); m_staticSinePhases.clear(); m_staticSolutions.clear();
+        if( !m_statelessNetwork ) return;
+        std::istringstream lines( Lower( m_deck ) ); std::string line;
+        const std::regex pulse( R"(\bpulse\s*\()" );
+        const std::regex sine( R"(\bsin\s*\()" );
+        while( std::getline( lines, line ) )
+        {
+            std::istringstream words( line ); std::string name; words >> name;
+            if( name.empty() || ( name[0] != 'v' && name[0] != 'i' ) ) continue;
+            if( line.find( "pwl" ) != std::string::npos || line.find( "external" ) != std::string::npos )
+            { m_statelessNetwork = false; return; }
+            if(std::regex_search(line,sine))
+            {
+                // A single periodic source in a memoryless native-peripheral
+                // island can reuse the same electrical phase every cycle.
+                // Firmware, ramps/damping and mixed waveforms keep ngspice's
+                // transient solver and discontinuity scheduling.
+                if(m_hasClockedRuntime||m_staticSine||!m_staticPulses.empty())
+                {m_statelessNetwork=false;return;}
+                auto query="@"+name+"[sin]";const auto* data=ngGet_Vec_Info(query.data());
+                if(!data||!data->v_realdata||data->v_length<3||data->v_length>6)
+                {m_statelessNetwork=false;return;}
+                std::array<double,6> parameters{};std::copy_n(data->v_realdata,data->v_length,parameters.begin());
+                if(!std::all_of(parameters.begin(),parameters.end(),[](double x){return std::isfinite(x);})
+                    ||parameters[2]<=0||parameters[3]!=0||parameters[4]!=0)
+                {m_statelessNetwork=false;return;}
+                const double samples=4*std::ceil(std::max(24.,1/(parameters[2]*m_config.maxStep))/4);
+                const double ticks=m_config.horizon*parameters[2]*samples;
+                if(!std::isfinite(samples)||samples>512||!std::isfinite(ticks)||ticks>4503599627370496.)
+                {m_statelessNetwork=false;return;}
+                parameters[5]=std::remainder(parameters[5],360.);
+                m_staticSine=parameters;m_staticSineSamples=samples;m_staticSourceNames.push_back(name);
+                continue;
+            }
+            if( line.find( "sffm" ) != std::string::npos || line.find( "exp(" ) != std::string::npos
+                || line.find( "trnoise" ) != std::string::npos || line.find( "trrandom" ) != std::string::npos )
+            { m_statelessNetwork = false; return; }
+            if( !std::regex_search( line, pulse ) )
+            {
+                if( line.find( '(' ) != std::string::npos ) { m_statelessNetwork = false; return; }
+                continue;
+            }
+            std::string query = "@" + name + "[pulse]";
+            if(m_staticSine){m_statelessNetwork=false;return;}
+            const auto* data = ngGet_Vec_Info( query.data() );
+            if( !data || !data->v_realdata || data->v_length < 7 )
+            { m_statelessNetwork = false; return; }
+            std::array<double, 7> parameters;
+            std::copy_n( data->v_realdata, 7, parameters.begin() );
+            if( !std::all_of( parameters.begin(), parameters.end(), [](double x){return std::isfinite(x);} )
+                || parameters[3] < 0 || parameters[4] < 0 || parameters[6] <= 0
+                || ( data->v_length > 7 && data->v_realdata[7] > 0 ) )
+            { m_statelessNetwork = false; return; }
+            m_staticPulses.push_back( parameters );
+            m_staticSourceNames.push_back( name );
+        }
+    }
+
+    double StatelessSourceDeadline( double time ) const
+    {
+        double next = std::numeric_limits<double>::infinity();
+        const double roundoff = std::max( 1e-15, std::abs( time ) * 16 * std::numeric_limits<double>::epsilon() );
+        if(m_staticSine)
+        {
+            const double ticks=time*(*m_staticSine)[2]*m_staticSineSamples;
+            const double error=std::max(1e-12,std::abs(ticks)*32*std::numeric_limits<double>::epsilon());
+            next=(std::floor(ticks+error)+1)/((*m_staticSine)[2]*m_staticSineSamples);
+        }
+        for( const auto& p : m_staticPulses )
+        {
+            const double cycle = std::max( 0., std::floor( ( time - p[2] ) / p[6] ) );
+            for( int offset = 0; offset < 2; ++offset )
+            {
+                const double base = p[2] + ( cycle + offset ) * p[6];
+                for( const double edge : { 0., p[3], p[3] + p[5], p[3] + p[5] + p[4] } )
+                {
+                    const double at = base + edge;
+                    if( at > time + roundoff ) next = std::min( next, at );
+                }
+            }
+        }
+        return next;
+    }
+
+    void StatelessPoint( double time )
+    {
+        std::vector<double> sources;
+        std::string key;
+        sources.reserve( m_staticSourceNames.size() );
+        key.reserve( m_staticSourceNames.size() * sizeof( double ) + (m_programDrivers.size()+3)/4 );
+        if(m_staticSine)
+        {
+            const auto& p=*m_staticSine;const double ticks=time*p[2]*m_staticSineSamples;
+            const double nearest=std::round(ticks),error=std::max(1e-12,std::abs(ticks)*32*std::numeric_limits<double>::epsilon());
+            // Recover an exact grid phase from floating point timestamp
+            // roundoff, rather than assigning a different key each period.
+            double phase=std::abs(ticks-nearest)<=error?std::fmod(nearest,m_staticSineSamples)/m_staticSineSamples:std::fmod(time*p[2],1.);
+            // Native deadlines can recur between grid points. Their computed
+            // phase carries the timestamp's floating point roundoff too.
+            const double phaseError=std::max(1e-12,std::abs(time*p[2])*32*std::numeric_limits<double>::epsilon());
+            const auto next=m_staticSinePhases.lower_bound(phase);
+            if(next!=m_staticSinePhases.end()&&*next-phase<=phaseError)phase=*next;
+            else if(next!=m_staticSinePhases.begin()&&phase-*std::prev(next)<=phaseError)phase=*std::prev(next);
+            else if(m_staticSinePhases.size()<2048)m_staticSinePhases.insert(phase);
+            const double value=p[0]+p[1]*std::sin(6.2831853071795864769*std::remainder(phase+p[5]/360.,1.));
+            sources.push_back(value);key.append(reinterpret_cast<const char*>(&value),sizeof(value));
+        }
+        for( const auto& p : m_staticPulses )
+        {
+            double value = p[0];
+            if( time >= p[2] )
+            {
+                double phase = std::fmod( time - p[2], p[6] );
+                const double error = std::max( 1e-15, std::abs( time ) * 32 * std::numeric_limits<double>::epsilon() );
+                if( p[6] - phase <= error ) phase = 0;
+                for( const double edge : { 0., p[3], p[3] + p[5], p[3] + p[5] + p[4] } )
+                    if( std::abs( phase - edge ) <= error ) phase = edge;
+                if( phase < p[3] ) value = p[0] + ( p[1] - p[0] ) * phase / p[3];
+                else if( phase < p[3] + p[5] ) value = p[1];
+                else if( phase < p[3] + p[5] + p[4] )
+                    value = p[1] + ( p[0] - p[1] ) * ( phase - p[3] - p[5] ) / p[4];
+            }
+            sources.push_back( value );
+            key.append( reinterpret_cast<const char*>( &value ), sizeof( value ) );
+        }
+        unsigned packed=0,shift=0;
+        for( const auto& driver : m_programDrivers )
+        {
+            const auto next=std::upper_bound(driver.begin(),driver.end(),time,
+                [](double t,const EXTERNAL_VALUE& entry){return t<entry.time;});
+            const int mode=next==driver.begin()?0:int(std::prev(next)->value);
+            packed|=static_cast<unsigned>(mode)<<shift;shift+=2;
+            if(shift==8){key.push_back(static_cast<char>(packed));packed=shift=0;}
+        }
+        if(shift)key.push_back(static_cast<char>(packed));
+        ++m_statelessAttempts;
+        const auto found = m_staticSolutions.find( key );
+        if( found != m_staticSolutions.end() )
+        {
+            m_latest.values = found->second;
+            ++m_statelessExpansions;
+        }
+        else
+        {
+            for( std::size_t i = 0; i < sources.size(); ++i )
+                Command( "alter " + m_staticSourceNames[i] + " dc = " + Number( sources[i] ) );
+            m_indices.clear();
+            m_dcPointTime = time;
+            m_dcSolving = true;
+            try { Command( "op" ); CheckError(); }
+            catch( ... ) { m_dcSolving = false; throw; }
+            m_dcSolving = false;
+            if( m_staticSolutions.size() >= 2048 ) m_staticSolutions.clear();
+            m_staticSolutions.emplace( std::move( key ), m_latest.values );
+            Command( "destroy all" );
+        }
+        m_latest.time = time;
+        const auto& events = m_nativePeripherals.Observe( time, m_latest.values );
+        if( !events.empty() )
+        {
+            PruneProgrammableHistory( time );
+            ProgrammableEvents( events, time, time );
+            m_nativeSettleDeadline = time + 1e-9;
+        }
+        else if( time + 1e-12 >= m_nativeSettleDeadline )
+            m_nativeSettleDeadline = std::numeric_limits<double>::infinity();
+        while(!m_programTransitions.empty()&&*m_programTransitions.begin()<=time)m_programTransitions.erase(m_programTransitions.begin());
+        if(m_hasClockedRuntime&&(!m_programReady||time>=m_programBoundary))ScheduleProgrammable();
+        RecordAcceptedPoint();
+    }
+
+    void AdvanceStateless( double target )
+    {
+        if( !m_configured || !std::isfinite( target ) || target <= m_latest.time || target > m_config.horizon )
+            throw std::runtime_error( "Target must advance within the configured horizon" );
+        if( m_state != SIM_SESSION_STATE::STOPPED && m_state != SIM_SESSION_STATE::PAUSED )
+            throw std::runtime_error( "Cannot advance a completed/failed session" );
+        m_programTarget=target;
+        if( m_state == SIM_SESSION_STATE::STOPPED )
+        {
+            Load();
+            if( !m_statelessNetwork ) { AdvanceAnalog( target ); return; }
+            StatelessPoint( 0 );
+        }
+        else if(m_hasClockedRuntime)ScheduleProgrammable();
+        while( m_latest.time < target )
+        {
+            double edge=m_programTransitions.empty()?std::numeric_limits<double>::infinity():*m_programTransitions.begin();
+            // Preserve both sides of an ideal GPIO edge for the scope,
+            // activity monitors and integrated audio, without a recovery ramp.
+            double left=std::numeric_limits<double>::infinity();
+            if(std::isfinite(edge))
+            {
+                left=std::nextafter(edge,-std::numeric_limits<double>::infinity());
+                if(left>m_latest.time)edge=left;
+            }
+            // With only DC sources, voltages are constant between GPIO and
+            // peripheral events. A periodic analog grid adds identical cached
+            // samples; all real transitions (including both edge sides) and
+            // runtime input/deadline boundaries remain explicit below.
+            const double grid=m_staticPulses.empty()?target:m_latest.time+m_config.maxStep;
+            const double next = std::min( { target, grid, StatelessSourceDeadline( m_latest.time ),
+                    m_nativePeripherals.Deadline(), m_nativeSettleDeadline,edge,
+                    m_hasClockedRuntime&&m_programBoundary>m_latest.time?m_programBoundary:target } );
+            if( next <= m_latest.time ) throw std::runtime_error( "Stateless peripheral deadline did not advance: "
+                +Number(m_latest.time)+" next="+Number(next)+" firmware="+Number(m_programBoundary)+" edge="+Number(edge));
+            if(m_staticPulses.empty()&&!m_staticSine&&next==left&&next<target
+                &&next<m_nativePeripherals.Deadline()&&next<m_nativeSettleDeadline
+                &&(!m_hasClockedRuntime||next<m_programBoundary))
+            {
+                // The left side is the already solved constant interval.
+                // Preserve its timestamp for scopes/audio without repeating
+                // the driver lookup or observing an unchanged peripheral bus.
+                m_latest.time=next;RecordAcceptedPoint();
+            }
+            else StatelessPoint( next );
+        }
+        m_state = target >= m_config.horizon ? SIM_SESSION_STATE::COMPLETED : SIM_SESSION_STATE::PAUSED;
+    }
+
     void Configure( const JSON& aRequest )
     {
         if( m_state != SIM_SESSION_STATE::STOPPED )
@@ -168,6 +507,13 @@ private:
         for( const auto& element : cfg.mutableElements )
             if( !Token( element ) )
                 throw std::runtime_error( "Invalid mutable element token" );
+        for(const auto& c:aRequest.value("audio_channels",JSON::array()))
+        {
+            SIM_AUDIO_CHANNEL channel{c.at("signal"),c.at("full_scale"),c.at("volume")};
+            if(cfg.audioChannels.size()>=32||channel.signal>=cfg.signals.size()||!std::isfinite(channel.fullScale)||channel.fullScale<=0
+                ||!std::isfinite(channel.volume)||channel.volume<0||channel.volume>1)throw std::runtime_error("Invalid audio channel");
+            cfg.audioChannels.push_back(channel);
+        }
         const auto& devices = aRequest.value("programmable_devices",JSON::array());
         if( !devices.is_array() || devices.size()>32 )
             throw std::runtime_error("Too many programmable devices");
@@ -282,6 +628,7 @@ private:
             throw std::runtime_error( "A component deck with a title and .end is required" );
 
         COMPILED_EXPRESSIONS expressions;
+        const bool stateless = StatelessNetwork( deck );
         if( cfg.accelerateExpressions )
             deck = expressions.Configure( deck, cfg.signals, cfg.mutableElements );
 
@@ -314,6 +661,40 @@ private:
                           { MemoryUnhex( region.at( "data" ) ), MemoryUnhex( region.at( "known" ) ) } } );
         m_memory.Reset( cfg.memories );
         ConfigureProgrammable(cfg);
+        // Resistive circuits have no integration history to rebuild after a
+        // GPIO edge. Keep ngspice's nonlinear solve, but choose accepted points
+        // directly at firmware edges instead of a breakpoint recovery ramp.
+        // Other source waveforms keep ngspice's own discontinuity scheduler.
+        m_memorylessSteps=m_hasClockedRuntime&&stateless&&cfg.memories.empty()
+            &&aRequest.value("accelerate_stateless",true);
+        if(m_memorylessSteps)
+        {
+            std::istringstream lines(Lower(deck));std::string line;
+            while(std::getline(lines,line))
+            {
+                std::istringstream fields(line);std::string name;fields>>name;
+                if(name.empty()||(name[0]!='v'&&name[0]!='i'))continue;
+                if(line.find("external")!=std::string::npos||line.find('{')!=std::string::npos)m_memorylessSteps=false;
+                if(line.find('(')!=std::string::npos)
+                {
+                    std::smatch match;
+                    if(!std::regex_search(line,match,std::regex(R"(\bsin\s*\(([^()]*)\))")))m_memorylessSteps=false;
+                    else
+                    {
+                        std::istringstream values(match[1].str());std::string value;unsigned index=0;
+                        while(values>>value)
+                        {
+                            char* end=nullptr;const auto number=std::strtod(value.c_str(),&end);
+                            if(!end||*end||!std::isfinite(number)||index>5||(index==3&&number!=0))m_memorylessSteps=false;
+                            ++index;
+                        }
+                    }
+                }
+            }
+        }
+        m_statelessNetwork = ( !cfg.programmableDevices.empty() || aRequest.value("display_network",false) )
+                && cfg.memories.empty() && std::none_of(names.begin(),names.end(),[](const auto& name){return name=="time";})
+                && aRequest.value( "accelerate_stateless", true ) && stateless;
         m_expressions = std::move( expressions );
         m_config = std::move( cfg );
         m_names = std::move( names );
@@ -329,11 +710,19 @@ private:
     void Clear() // m_mutex held; never called while the solver is active.
     {
         m_latest = {};
+        m_historyMinimum.assign(m_config.signals.size(),0);m_historyMaximum=m_historyMinimum;
+        m_haveHistoryExtrema=false;m_retainedHistoryValid=false;++m_historyToken;
+        m_nativeSettleDeadline = std::numeric_limits<double>::infinity();
+        m_programTransitions.clear();
+        m_statelessAttempts = m_statelessExpansions = 0;
+        m_staticSolutions.clear();
+        m_staticSinePhases.clear();
         m_samples = m_overwritten = m_events = 0;
         m_eventTime = 0;
         m_head = m_size = 0;
         m_indices.clear();
         m_activity.assign( m_config.activityMonitors.size(), SIGNAL_ACTIVITY_TRACKER{} );
+        m_audio.Reset();
         m_error.clear();
         m_finished = true;
     }
@@ -380,6 +769,7 @@ private:
         }
         m_memory.Reset( m_config.memories );
         m_programmable.Reset();
+        m_nativePeripherals.Reset();
         ResetProgrammableSources();
         if( (!m_config.memories.empty() || !m_programDrivers.empty() || !m_expressions.Empty()) && !m_memoryModule )
         {
@@ -415,9 +805,11 @@ private:
             );
             if(!bindPins)throw std::runtime_error("Invalid programmable pin engine");
             const CA_PROGRAMMABLE_PIN_BACKEND pinBackend{1,this,[](void* user,unsigned slot,double time)->int {
-                const auto& drivers=static_cast<ENGINE*>(user)->m_programDrivers;
+                const auto* engine=static_cast<ENGINE*>(user);
+                const auto& drivers=engine->m_programDrivers;
                 if(slot>=drivers.size()||drivers[slot].empty())return 0;
                 const auto& history=drivers[slot];
+                if(engine->m_dcSolving)time=engine->m_dcPointTime;
                 if(time>=history.back().time)return int(history.back().value);
                 const auto next=std::upper_bound(history.begin(),history.end(),time,
                     [](double t,const EXTERNAL_VALUE& value){return t<value.time;});
@@ -454,6 +846,7 @@ private:
         }
         CheckError();
         Command( "esave none" ); // Event history is outside the analog stage-1 contract.
+        RefreshStatelessSources();
     }
 
     void Run( bool aFresh, bool aBackground = true )
@@ -488,12 +881,13 @@ private:
 
     void Play()
     {
-        if( !m_config.programmableDevices.empty() )
+        if( m_hasClockedRuntime || m_statelessNetwork )
         {
             if( m_programPlaying ) return;
             if( m_state!=SIM_SESSION_STATE::STOPPED && m_state!=SIM_SESSION_STATE::PAUSED )
                 throw std::runtime_error("Stop the completed/failed session before restarting");
-            AdvanceProgrammable(ProgrammablePollDeadline());
+            if( m_statelessNetwork ) AdvanceStateless( ProgrammablePollDeadline() );
+            else AdvanceProgrammable(ProgrammablePollDeadline());
             m_programPlaying=m_state!=SIM_SESSION_STATE::COMPLETED;
             if(m_programPlaying)m_state=SIM_SESSION_STATE::RUNNING;
             return;
@@ -568,7 +962,12 @@ private:
 
     void Advance( double aTime )
     {
-        if( !m_config.programmableDevices.empty() )
+        if( m_statelessNetwork )
+        {
+            if( m_programPlaying ) Pause();
+            AdvanceStateless( aTime ); return;
+        }
+        if( m_hasClockedRuntime )
         {
             if(m_programPlaying)Pause();
             AdvanceProgrammable(aTime);return;
@@ -629,11 +1028,18 @@ private:
     {
         m_programInputs.clear();m_programOutputs.clear();m_external.clear();m_externalCache.clear();m_programDrivers.clear();
         m_programPlaying=false;m_programReady=false;m_programInputRefresh=false;m_programBoundary=0;m_programQuantum=1e-3;
+        std::vector<PROGRAMMABLE_DEVICE_CONFIG> clocked;
+        std::set<std::string> deviceIds;
+        m_nativePeripherals.Configure( config.programmableDevices, config.signals );
         for( const auto& device : config.programmableDevices )
         {
+            if( device.id.empty() || device.id.size() > 256 || !deviceIds.insert( device.id ).second )
+                throw std::runtime_error( "Invalid or duplicate programmable device ID: " + device.id );
+            const bool native = device.engine == "native";
+            if( !native ) clocked.push_back( device );
             if(!std::isfinite(device.quantumSeconds)||device.quantumSeconds<1e-9||device.quantumSeconds>1e-3)
                 throw std::runtime_error("Programmable input sampling period must be between 1 ns and 1 ms");
-            m_programQuantum=std::min(m_programQuantum,device.quantumSeconds);
+            if( !native ) m_programQuantum=std::min(m_programQuantum,device.quantumSeconds);
             if(device.bindings.size()>512)throw std::runtime_error("Too many programmable pin bindings");
             std::set<std::string> ids;
             for( const auto& binding : device.bindings )
@@ -642,7 +1048,7 @@ private:
                     throw std::runtime_error("Duplicate programmable pin binding");
                 const auto signal=std::find(config.signals.begin(),config.signals.end(),binding.signal);
                 if(!binding.signal.empty()&&signal==config.signals.end())throw std::runtime_error("Programmable pin input signal is missing");
-                m_programInputs.push_back({device.id,binding.id,binding.signal.empty()
+                if( !native ) m_programInputs.push_back({device.id,binding.id,binding.signal.empty()
                     ? std::numeric_limits<std::size_t>::max() : std::size_t(signal-config.signals.begin())});
                 if(binding.driverSlot < -1 || binding.driverSlot >= 16384)throw std::runtime_error("Invalid programmable driver slot");
                 if(binding.driverSlot>=0) {
@@ -665,7 +1071,8 @@ private:
                 m_programOutputs[{device.id,binding.id}]=std::move(output);
             }
         }
-        m_programmable.Configure(config.programmableDevices);
+        m_hasClockedRuntime = !clocked.empty();
+        m_programmable.Configure( clocked );
     }
 
     void ResetProgrammableSources()
@@ -680,6 +1087,7 @@ private:
     {
         if(events.size()>100000)throw std::runtime_error("Too many programmable events in one sampling window");
         std::set<double> breaks;
+        bool immediate=false;
         for(const auto& event:events)
         {
             const auto output=m_programOutputs.find({event.device,event.pin});
@@ -694,6 +1102,7 @@ private:
                     if(time<history.back().time)throw std::runtime_error("Programmable events are not chronological");
                     history.push_back({time,double(int(event.drive))});
                     if(time>from)breaks.insert(time);
+                    else immediate=true;
                 }
                 continue;
             }
@@ -708,11 +1117,21 @@ private:
                     if(time<history.back().time)throw std::runtime_error("Programmable events are not chronological");
                     history.push_back({time,value});
                     if(time>from)breaks.insert(time);
+                    else immediate=true;
                 }
             }
         }
         for(double time:breaks)
-            if(!ngSpice_SetBkpt(time))throw std::runtime_error("Cannot schedule programmable pin transition");
+            if(m_memorylessSteps||m_statelessNetwork)m_programTransitions.insert(time);
+            else if(!ngSpice_SetBkpt(time))throw std::runtime_error("Cannot schedule programmable pin transition");
+        if(immediate)
+        {
+            // A write at the already accepted frontier still changes the
+            // electrical state. Resolve its right side before a later GPIO
+            // event can replace its data/enable level (notably LCD strobes).
+            const double settle=m_statelessNetwork?std::nextafter(from,std::numeric_limits<double>::infinity()):from+1e-9;
+            m_nativeSettleDeadline=std::min(m_nativeSettleDeadline,settle);
+        }
         m_events+=events.size();
     }
 
@@ -741,24 +1160,14 @@ private:
         if(m_programReady&&now>m_programBoundary+tolerance)
             throw std::runtime_error("Analog solver skipped a programmable input boundary: "
                 + Number(now) + " instead of " + Number(m_programBoundary));
-        for(auto& [source,history]:m_external)
-        {
-            const auto next=std::upper_bound(history.begin(),history.end(),now,
-                [](double time,const EXTERNAL_VALUE& entry){return time<entry.time;});
-            if(next!=history.begin())history.erase(history.begin(),std::prev(next));
-        }
-        for(auto& history:m_programDrivers) {
-            const auto next=std::upper_bound(history.begin(),history.end(),now,
-                [](double time,const EXTERNAL_VALUE& entry){return time<entry.time;});
-            if(next!=history.begin())history.erase(history.begin(),std::prev(next));
-        }
+        PruneProgrammableHistory( now );
         std::vector<PROGRAMMABLE_PIN_INPUT> inputs;
         for(const auto& binding:m_programInputs)
             inputs.push_back({binding.device,binding.pin,binding.signal==std::numeric_limits<std::size_t>::max()
                 ? 0. : m_latest.values.at(binding.signal)});
         double window=m_programQuantum;
         for(const auto& device:m_config.programmableDevices)
-            window=std::max(window,device.autonomousWindowSeconds);
+            if( device.engine != "native" ) window=std::max(window,device.autonomousWindowSeconds);
         // alter changes the solver, but m_latest still contains the previous
         // accepted voltages. Resolve one sampling interval before allowing
         // lookahead/prefetch from the new electrical input snapshot.
@@ -777,8 +1186,24 @@ private:
         m_programBoundary=boundary;m_programReady=true;
     }
 
+    void PruneProgrammableHistory( double now )
+    {
+        for(auto& [source,history]:m_external)
+        {
+            const auto next=std::upper_bound(history.begin(),history.end(),now,
+                [](double time,const EXTERNAL_VALUE& entry){return time<entry.time;});
+            if(next!=history.begin())history.erase(history.begin(),std::prev(next));
+        }
+        for(auto& history:m_programDrivers) {
+            const auto next=std::upper_bound(history.begin(),history.end(),now,
+                [](double time,const EXTERNAL_VALUE& entry){return time<entry.time;});
+            if(next!=history.begin())history.erase(history.begin(),std::prev(next));
+        }
+    }
+
     double ProgrammablePollDeadline() const
     {
+        if( m_statelessNetwork ) return std::min( m_config.horizon, m_latest.time + .008 );
         return std::min(m_config.horizon,m_latest.time+128*m_programQuantum);
     }
 
@@ -799,15 +1224,19 @@ private:
         return std::min( { target * 1e-9, ProgrammableTolerance() * .5, 1e-11 } );
     }
 
-    static int LimitProgrammableStep( double time, double* delta, void* user )
+    static int LimitProgrammableStep( double time, double* delta, void* user, bool fresh = false )
     {
         auto& self=*static_cast<ENGINE*>(user);
-        const bool programmable = !self.m_config.programmableDevices.empty();
+        const bool programmable = self.m_hasClockedRuntime;
+        if(fresh&&self.m_memorylessSteps&&self.m_programReady)*delta=self.m_config.maxStep;
         auto limit = [&]( double boundary, double tolerance )
         {
             const double remaining = boundary - time;
             if( remaining > tolerance && *delta > remaining ) *delta = remaining;
         };
+        limit( self.m_nativePeripherals.Deadline(), 1e-12 );
+        limit( self.m_nativeSettleDeadline, 1e-12 );
+        if(!self.m_programTransitions.empty())limit(*self.m_programTransitions.begin(),1e-15);
         // Stop and input boundaries have separate roles. The last CPU window
         // may end within its sampling tolerance before the requested stop;
         // reaching that window must not disable the stop's independent cap.
@@ -831,10 +1260,10 @@ private:
     // versions with a call-location argument and older versions without it.
     // Limit the next trial step without marking every input sample as a physical
     // discontinuity. Permanent breakpoints still preserve actual output edges.
-    static int OnSync( double time, double* delta, double, int, int, int, void* user )
-    { return LimitProgrammableStep(time,delta,user); }
-    static int OnSync( double time, double* delta, double, int, int, void* user )
-    { return LimitProgrammableStep(time,delta,user); }
+    static int OnSync( double time, double* delta, double, int redo, int, int location, void* user )
+    { return LimitProgrammableStep(time,delta,user,!redo&&location==0); }
+    static int OnSync( double time, double* delta, double oldDelta, int redo, int, void* user )
+    { return LimitProgrammableStep(time,delta,user,!redo&&oldDelta==0); }
 
     static int OnVoltage( double* value, double time, char* source, int, void* user )
     {
@@ -919,10 +1348,12 @@ private:
         Command( "alter " + aReference + " dc = " + Number( aValue ) );
         for( const auto& command : commands ) { Command( command ); CheckError(); }
         CheckError();
+        RefreshStatelessSources();
         std::lock_guard lock( m_mutex );
         ++m_events;
         m_eventTime = m_latest.time;
         m_programInputRefresh = true;
+        m_nativeSettleDeadline = m_latest.time + 1e-9;
     }
 
     JSON Memory( const JSON& request )
@@ -938,19 +1369,39 @@ private:
                 { "time", m_latest.time }, { "data", MemoryHex( image.data ) }, { "known", MemoryHex( image.known ) } };
     }
 
-    JSON Snapshot( bool aDrain )
+    JSON HistoryRows(std::size_t head,std::size_t size,
+            const std::optional<std::vector<std::size_t>>& columns={}) const
+    {
+        JSON rows=JSON::array();
+        if(columns&&columns->empty())return rows;
+        for(std::size_t i=0;i<size;++i)
+        {
+            const auto& sample=m_ring[(head+i)%m_ring.size()];
+            if(columns)
+            {
+                JSON values=JSON::array();for(auto column:*columns)values.push_back(sample.values.at(column));
+                rows.push_back({{"time",sample.time},{"values",std::move(values)}});
+            }
+            else rows.push_back({{"time",sample.time},{"values",sample.values}});
+        }
+        return rows;
+    }
+
+    JSON Snapshot( bool aDrain,const std::optional<std::vector<std::size_t>>& historySignals={} )
     {
         if(m_programPlaying)
         {
             m_programPlaying=false;m_state=SIM_SESSION_STATE::PAUSED;
-            AdvanceProgrammable(ProgrammablePollDeadline());
+            if( m_statelessNetwork ) AdvanceStateless( ProgrammablePollDeadline() );
+            else AdvanceProgrammable(ProgrammablePollDeadline());
             m_programPlaying=m_state!=SIM_SESSION_STATE::COMPLETED;
             if(m_programPlaying)m_state=SIM_SESSION_STATE::RUNNING;
         }
         // Never read a live ngspice vector. vecindex is an accepted-step counter,
         // not a portable measure of retained storage (ngspice versions differ).
         std::size_t retained = 0;
-        if( Finished() && m_samples )
+        if( m_statelessNetwork ) retained = m_samples ? 1 : 0;
+        else if( Finished() && m_samples )
         {
             char timeName[] = "time";
             if( auto* vector = ngGet_Vec_Info( timeName ) )
@@ -962,20 +1413,36 @@ private:
         const auto resident=ResidentMemoryBytes();
 
         std::lock_guard lock( m_mutex );
-        JSON history = JSON::array();
-        for( std::size_t i = 0; i < m_size; ++i )
+        std::optional<std::vector<std::size_t>> columns;
+        if(historySignals)
         {
-            const auto& sample = m_ring[( m_head + i ) % m_ring.size()];
-            history.push_back( { { "time", sample.time }, { "values", sample.values } } );
+            columns.emplace();std::set<std::size_t> seen;
+            for(const auto index:*historySignals)
+            {
+                if(index>=m_names.size()||!seen.insert(index).second)throw std::runtime_error("Invalid snapshot history signal");
+                if(m_config.historySignals)
+                {
+                    const auto found=std::find(m_config.historySignals->begin(),m_config.historySignals->end(),index);
+                    if(found==m_config.historySignals->end())throw std::runtime_error("Snapshot signal is not retained");
+                    columns->push_back(found-m_config.historySignals->begin());
+                }
+                else columns->push_back(index);
+            }
         }
+        JSON history=HistoryRows(m_head,m_size,columns);
         JSON result = { { "state", StateName( m_state ) }, { "generation", m_generation },
                         { "time", m_latest.time }, { "values", m_latest.values },
                         { "history", std::move( history ) }, { "samples", m_samples },
                         { "overwritten", m_overwritten }, { "events", m_events },
                         { "event_time", m_eventTime }, { "retained", retained },
                         { "resident_bytes", resident }, { "error", m_error } };
-        if( m_config.historySignals )
+        if(historySignals)result["history_signals"]=*historySignals;
+        else if( m_config.historySignals )
             result["history_signals"] = *m_config.historySignals;
+        if(m_config.historySignals&&!m_latest.values.empty())
+        {result["history_minimum"]=m_historyMinimum;result["history_maximum"]=m_historyMaximum;}
+        m_retainedHead=m_head;m_retainedSize=m_size;m_retainedHistoryValid=true;
+        result["history_token"]=++m_historyToken;
         result["activity"] = JSON::array();
         for( const auto& tracker : m_activity )
         {
@@ -983,9 +1450,71 @@ private:
             result["activity"].push_back( { { "period", activity.period },
                     { "last_transition", activity.lastTransition }, { "high_value", activity.highValue } } );
         }
+        auto presentation=m_programmable.Presentation();
+        for(const auto& [id,state]:m_nativePeripherals.Presentation())presentation[id]=state;
+        result["presentation"]=presentation;
+        result["stateless_network"] = m_statelessNetwork;
+        result["memoryless_steps"] = m_memorylessSteps;
+        result["stateless_points"] = m_statelessAttempts;
+        result["stateless_cache_hits"] = m_statelessExpansions;
+        result["stateless_dc_solves"] = m_statelessAttempts - m_statelessExpansions;
+        result["audio"]=m_audio.Samples();result["audio_overwritten"]=m_audio.Overwritten();
         if( aDrain )
-            m_head = m_size = 0;
+        {
+            m_head = m_size = 0; m_audio.Drain();
+            if(m_config.historySignals&&!m_latest.values.empty())
+                for(auto index:*m_config.historySignals)m_historyMinimum[index]=m_historyMaximum[index]=m_latest.values[index];
+        }
         return result;
+    }
+
+    void RecordAcceptedPoint()
+    {
+        m_retainedHistoryValid=false;
+        if(m_config.historySignals)
+        {
+            for(auto index:*m_config.historySignals)
+            {
+                const auto value=m_latest.values[index];
+                if(!m_haveHistoryExtrema)m_historyMinimum[index]=m_historyMaximum[index]=value;
+                else {m_historyMinimum[index]=std::min(m_historyMinimum[index],value);m_historyMaximum[index]=std::max(m_historyMaximum[index],value);}
+            }
+            m_haveHistoryExtrema=true;
+        }
+        m_audio.Observe(m_latest.time,m_latest.values,m_config.audioChannels);
+        ++m_samples;
+        for( std::size_t i = 0; i < m_activity.size(); ++i )
+            m_activity[i].Observe( m_config.activityMonitors[i], m_latest.time,
+                                       m_latest.values );
+        if(m_config.historySignals&&m_size>=2)
+        {
+            auto& last=m_ring[(m_head+m_size-1)%m_ring.size()];
+            const auto& previous=m_ring[(m_head+m_size-2)%m_ring.size()];
+            bool flat=last.values==previous.values;
+            for(std::size_t i=0;flat&&i<m_config.historySignals->size();++i)
+                flat=last.values[i]==m_latest.values[(*m_config.historySignals)[i]];
+            // Keep the beginning and end of every constant interval. Changing
+            // values, both sides of edges, activity and audio stay untouched.
+            if(flat){last.time=m_latest.time;return;}
+        }
+        const auto position = ( m_head + m_size ) % m_ring.size();
+        auto& stored = m_ring[position];
+        stored.time = m_latest.time;
+        if( m_config.historySignals )
+        {
+            // Only scope/warning channels need a historical copy at every
+            // solver step. Latest pin values and activity remain complete.
+            for( std::size_t i = 0; i < m_config.historySignals->size(); ++i )
+                stored.values[i] = m_latest.values[( *m_config.historySignals )[i]];
+        }
+        else stored.values = m_latest.values;
+        if( m_size == m_ring.size() )
+        {
+            m_head = ( m_head + 1 ) % m_ring.size();
+            ++m_overwritten;
+        }
+        else
+            ++m_size;
     }
 
     static int OnMessage( char* aMessage, int, void* aUser )
@@ -1062,45 +1591,56 @@ private:
             }
             self.m_latest.values[i] = value->creal;
         }
+        if( self.m_dcSolving ) { self.m_latest.time = self.m_dcPointTime; return 0; }
         try
         {
-            if(!self.m_config.programmableDevices.empty())self.ScheduleProgrammable();
+            while(!self.m_programTransitions.empty()&&*self.m_programTransitions.begin()<=self.m_latest.time+1e-15)
+                self.m_programTransitions.erase(self.m_programTransitions.begin());
+            const auto& events = self.m_nativePeripherals.Observe( self.m_latest.time, self.m_latest.values );
+            if( !events.empty() )
+            {
+                self.PruneProgrammableHistory( self.m_latest.time );
+                self.ProgrammableEvents( events, self.m_latest.time, self.m_latest.time );
+                self.m_nativeSettleDeadline = self.m_latest.time + 1e-9;
+            }
+            else if( self.m_latest.time + 1e-12 >= self.m_nativeSettleDeadline )
+                self.m_nativeSettleDeadline = std::numeric_limits<double>::infinity();
+            if(self.m_hasClockedRuntime)self.ScheduleProgrammable();
             if(!self.m_expressions.Error().empty())throw std::runtime_error(self.m_expressions.Error());
             self.m_memory.Commit(self.m_latest.time);
         }
         catch( const std::exception& e ) { self.m_error=e.what(); return 0; }
         if( !self.m_memory.Error().empty() ) { self.m_error=self.m_memory.Error(); return 0; }
-        ++self.m_samples;
-        for( std::size_t i = 0; i < self.m_activity.size(); ++i )
-            self.m_activity[i].Observe( self.m_config.activityMonitors[i], self.m_latest.time,
-                                       self.m_latest.values );
-        const auto position = ( self.m_head + self.m_size ) % self.m_ring.size();
-        auto& stored = self.m_ring[position];
-        stored.time = self.m_latest.time;
-        if( self.m_config.historySignals )
-        {
-            // Only scope/warning channels need a historical copy at every
-            // solver step. Latest pin values and activity remain complete.
-            for( std::size_t i = 0; i < self.m_config.historySignals->size(); ++i )
-                stored.values[i] = self.m_latest.values[( *self.m_config.historySignals )[i]];
-        }
-        else stored.values = self.m_latest.values;
-        if( self.m_size == self.m_ring.size() )
-        {
-            self.m_head = ( self.m_head + 1 ) % self.m_ring.size();
-            ++self.m_overwritten;
-        }
-        else
-            ++self.m_size;
+        self.RecordAcceptedPoint();
         return 0;
     }
 
     SIM_SESSION_STATE       m_state = SIM_SESSION_STATE::STOPPED; // Control thread only.
+    NATIVE_PERIPHERALS m_nativePeripherals;
+    bool m_hasClockedRuntime = false;
+    bool m_statelessNetwork = false;
+    bool m_memorylessSteps = false;
+    std::set<double> m_programTransitions;
+    std::uint64_t m_statelessAttempts = 0, m_statelessExpansions = 0;
+    std::vector<std::array<double, 7>> m_staticPulses;
+    std::optional<std::array<double,6>> m_staticSine;
+    std::set<double> m_staticSinePhases;
+    double m_staticSineSamples=24;
+    std::vector<std::string> m_staticSourceNames;
+    std::map<std::string, std::vector<double>> m_staticSolutions;
+    std::vector<double> m_historyMinimum,m_historyMaximum;
+    bool m_haveHistoryExtrema=false,m_retainedHistoryValid=false;
+    std::uint64_t m_historyToken=0;
+    std::size_t m_retainedHead=0,m_retainedSize=0;
+    bool m_dcSolving = false;
+    double m_dcPointTime = 0;
+    double m_nativeSettleDeadline = std::numeric_limits<double>::infinity();
     struct INPUT_BINDING { std::string device,pin;std::size_t signal; };
     struct OUTPUT_BINDING { std::string high,low,pullup; int slot=-1; };
     struct EXTERNAL_VALUE { double time,value; };
     std::vector<std::vector<EXTERNAL_VALUE>> m_programDrivers;
     PROGRAMMABLE_PIPELINE m_programmable;
+    AUDIO_SAMPLER m_audio;
     COMPILED_EXPRESSIONS m_expressions;
     std::vector<INPUT_BINDING> m_programInputs;
     std::map<std::pair<std::string,std::string>,OUTPUT_BINDING> m_programOutputs;

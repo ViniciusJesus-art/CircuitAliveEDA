@@ -5,6 +5,8 @@
 #include "circuit_snapshot.h"
 #include "model_i18n.h"
 #include "choice_controls.h"
+#include "model_preview_navigation.h"
+#include "numeric_value.h"
 #include <widgets/symbol_preview_widget.h>
 #include <dialog_shim.h>
 #include <lib_symbol.h>
@@ -76,7 +78,7 @@ public:
         auto* placement = new CLICK_CHOICE( this ); placement->Append( _( "Whole symbol" ) );
         placement->Append( _( "Positioned rectangle" ) ); placement->SetSelection( interaction.visual.custom ? 1 : 0 );
         fields->Add( placement, 1, wxEXPAND );
-        auto numberField = [&]( const wxString& name, double value ) { return field( name, wxString::Format( "%.10g", value ) ); };
+        auto numberField = [&]( const wxString& name, double value ) { return field( name, W( FormatSimulationNumber( value ) ) ); };
         auto* px = numberField( _( "Left (% of symbol width)" ), 100 * interaction.visual.x );
         auto* py = numberField( _( "Top (% of symbol height)" ), 100 * interaction.visual.y );
         auto* pw = numberField( _( "Width (%)" ), 100 * interaction.visual.width );
@@ -204,11 +206,12 @@ public:
         SYMBOL_PREVIEW_WIDGET( parent, kiway, true, EDA_DRAW_PANEL_GAL::GAL_TYPE_CAIRO ),
         m_design( design ), m_selected( selected ), m_changed( std::move( changed ) )
     {
+        ConfigureModelPreviewNavigation(GetCanvas());
         m_overlay = std::make_unique<KIGFX::VIEW_OVERLAY>(); GetCanvas()->GetView()->Add( m_overlay.get() );
         auto* canvas = GetCanvas();
         canvas->Bind( wxEVT_LEFT_DOWN, [this]( wxMouseEvent& e )
         {
-            if( !m_previewItem ) return;
+            if( !m_previewItem ) { e.Skip(); return; }
             const VECTOR2I pos( GetCanvas()->GetView()->ToWorld( VECTOR2D( e.GetX(), e.GetY() ) ) );
             for( int i = int( m_design.interactions.size() ) - 1; i >= 0; --i )
             {
@@ -227,9 +230,10 @@ public:
                     }
                     m_edges=edgesAt(box,pos);
                     m_start = pos; m_original = v; m_dragging = true;
-                    GetCanvas()->CaptureMouse(); UpdateControls(); m_changed(); break;
+                    GetCanvas()->CaptureMouse(); UpdateControls(); m_changed(); return;
                 }
             }
+            e.Skip();
         } );
         canvas->Bind( wxEVT_MOTION, [this]( wxMouseEvent& e )
         {
@@ -248,7 +252,7 @@ public:
                 else if(horizontal)GetCanvas()->SetCursor(wxCursor(wxCURSOR_SIZEWE));
                 else if(vertical)GetCanvas()->SetCursor(wxCursor(wxCURSOR_SIZENS));
                 else GetCanvas()->SetCursor(wxNullCursor);
-                return;
+                e.Skip(); return;
             }
             if( m_selected < 0 || m_selected >= int( m_design.interactions.size() ) ) return;
             auto& v = m_design.interactions[m_selected].visual;
@@ -257,8 +261,8 @@ public:
             v=DragControlVisual(m_original,m_edges,dx,dy);
             UpdateControls(); m_changed();
         } );
-        canvas->Bind( wxEVT_LEFT_UP, [this]( wxMouseEvent& ) { release(); } );
-        canvas->Bind( wxEVT_MOUSE_CAPTURE_LOST, [this]( wxMouseCaptureLostEvent& ) { m_dragging = false; } );
+        canvas->Bind( wxEVT_LEFT_UP, [this]( wxMouseEvent& e ) { if(m_dragging)release();else e.Skip(); } );
+        canvas->Bind( wxEVT_MOUSE_CAPTURE_LOST, [this]( wxMouseCaptureLostEvent& e ) { m_dragging = false;e.Skip(); } );
         Bind( wxEVT_SIZE, [this]( wxSizeEvent& e ) { e.Skip(); CallAfter( [this] { fit(); } ); } );
     }
     ~INTERACTION_PREVIEW() override
@@ -334,7 +338,7 @@ PANEL_MODEL_INTERACTIONS::PANEL_MODEL_INTERACTIONS( wxWindow* parent, KIWAY* kiw
 {
     auto* layout = new wxBoxSizer( wxVERTICAL );
     auto* hint = new wxStaticText( this, wxID_ANY,
-            _( "Expose a block's button or slider on the component. Drag its rectangle to position it, or its edges/corners to resize it. Edit control sets values and visibility.\n"
+            _( "Wheel: zoom at pointer. Middle drag: pan. Drag a control's rectangle to position it, or its edges/corners to resize it. Edit control sets values and visibility.\n"
                "Use #name in a block value to follow a control without wires. Voltage inputs also have Output/Return; switch buttons connect Input/Output when ON." ) );
     hint->Wrap( 1180 ); layout->Add( hint, 0, wxEXPAND | wxALL, 10 );
     auto* buttons = new wxBoxSizer( wxHORIZONTAL );

@@ -8,6 +8,7 @@
 #include "simulation_preferences.h"
 #include "led_appearance.h"
 #include "control_visual.h"
+#include "simulation_outputs.h"
 #include <map>
 #include <optional>
 #include <string>
@@ -33,6 +34,8 @@ struct CIRCUIT_COMPONENT
     std::map<std::string, std::string> pinNames = {}; // Physical number -> electrical pin name.
     std::map<std::string, RESOURCE_SELECTION> resources = {};
     std::optional<PROBE_KIND> sourceProbe = {};
+    std::string identity = {};
+    std::vector<std::string> linkedComponents = {};
 };
 
 struct CIRCUIT_INDICATOR
@@ -71,6 +74,12 @@ struct CIRCUIT_SNAPSHOT
     std::vector<CIRCUIT_INDICATOR> leds;
     std::vector<CIRCUIT_SWITCH> switches;
     std::vector<CIRCUIT_ADJUSTMENT> adjustments;
+    struct SEGMENT { std::size_t component, signal; MODEL_SEGMENT appearance; };
+    struct DISPLAY { std::size_t component; std::string reference; MODEL_DISPLAY appearance; };
+    struct LINK { std::size_t first, second; std::string medium; };
+    std::vector<SEGMENT> segments;
+    std::vector<DISPLAY> displays;
+    std::vector<LINK> links;
     std::map<std::size_t, PROBE_KIND> sourceProbes;
     struct LIVE_UPDATE { SIM_PARAMETER_CHANGE change; std::vector<std::string> sources; std::vector<double> initials; };
     std::vector<LIVE_UPDATE> liveUpdates;

@@ -96,7 +96,7 @@ INSTRUMENT_PANEL::INSTRUMENT_PANEL( wxWindow* parent, std::function<void( PROBE_
     contents->Add( new wxStaticText( tools, wxID_ANY, _( "Probe name (optional)" ) ), 0, wxLEFT | wxRIGHT | wxTOP, 8 );
     m_name = new wxTextCtrl( tools, wxID_ANY ); contents->Add( m_name, 0, wxEXPAND | wxALL, 8 );
     m_help = label( _( "Choose a probe. Click a connection to place directly, or empty space to preview; click again to place. Esc cancels." ), wxEXPAND | wxALL );
-    label( _( "V and scope use the circuit reference.\nA and W insert an ideal series sensor.\nCurrent: left → right or top → bottom.\nWire power: V(reference) × I.\n\nSources drive the connected wire relative to GND.\nDuring simulation: click 0/1 to toggle; click PWM/square to adjust duty cycle.\nEsc finishes placement before interacting.\nDouble-click a probe or press E to edit its settings.\n\nComponent V / I / P: Simulation model..." ), wxEXPAND | wxALL );
+    label( _( "V and scope use the circuit reference.\nA and W insert an ideal series sensor.\nCurrent: left → right or top → bottom.\nWire power: V(reference) × I.\n\nSources drive the connected wire relative to GND.\nDuring simulation: click 0/1 to toggle; click PWM to adjust duty cycle. CLK stays at 50%.\nEsc finishes placement before interacting.\nDouble-click a probe or press E to edit its settings.\n\nComponent V / I / P: Simulation model..." ), wxEXPAND | wxALL );
     tools->SetSizer( contents ); tools->FitInside(); m_tabs->AddPage( tools, _( "Probes" ), true );
     m_measurePage = new wxPanel( m_tabs );
     auto* measurements = new wxBoxSizer( wxVERTICAL );

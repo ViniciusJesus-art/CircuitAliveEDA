@@ -12,6 +12,24 @@
 
 namespace CIRCUITALIVE
 {
+SIM_SNAPSHOT_OBSERVATIONS ConfigureSessionHistory(CIRCUIT_SNAPSHOT& circuit)
+{
+    SIM_SNAPSHOT_OBSERVATIONS observations;
+    std::set<std::size_t> selected;
+    auto retain=[&](std::size_t signal){if(signal!=NO_SIGNAL)selected.insert(signal);};
+    for(const auto& channel:circuit.measurements)if(channel.scope)
+    {retain(channel.positive);retain(channel.negative);retain(channel.current);}
+    observations.history=selected;
+    auto warning=[&](std::size_t signal,double limit)
+    {
+        retain(signal);auto [found,inserted]=observations.warningLimits.emplace(signal,limit);
+        if(!inserted)found->second=std::min(found->second,limit);
+    };
+    for(const auto& item:circuit.currentWarnings)warning(item.signal,item.limit);
+    for(const auto& led:circuit.leds)if(led.ratedCurrent>0)warning(led.signal,led.ratedCurrent);
+    circuit.config.historySignals=std::vector<std::size_t>(selected.begin(),selected.end());
+    return observations;
+}
 std::chrono::steady_clock::time_point NextPlaybackDeadline(
         std::chrono::steady_clock::time_point previous,
         std::chrono::steady_clock::time_point now,
@@ -74,6 +92,7 @@ void SESSION_RUNNER::Start( CIRCUIT_SNAPSHOT aCircuit )
     m_commands.clear();
     m_commands.push_back( { COMMAND_TYPE::START, m_revision, std::move( aCircuit ), 0, m_speed, m_preferences } );
     m_view = {};
+    m_audioQueue.clear();
     m_view.sessionRevision = m_revision;
     m_view.state = EDITOR_SESSION_STATE::PREPARING;
     m_view.speed = m_speed;
@@ -89,6 +108,7 @@ void SESSION_RUNNER::enqueue( COMMAND_TYPE aType, std::size_t aIndex )
         ++m_revision;
         m_commands.clear();
         m_view = {};
+        m_audioQueue.clear();
         m_view.sessionRevision = m_revision;
         m_view.speed = m_speed;
         m_view.preferences = m_preferences;
@@ -165,10 +185,17 @@ EDITOR_SESSION_VIEW SESSION_RUNNER::View() const
     return m_view;
 }
 
+std::vector<std::int16_t> SESSION_RUNNER::TakeAudio()
+{
+    std::lock_guard lock(m_mutex);
+    std::vector<std::int16_t> audio(m_audioQueue.begin(),m_audioQueue.end());m_audioQueue.clear();return audio;
+}
+
 void SESSION_RUNNER::run()
 {
     std::unique_ptr<ANALOG_SIM_SESSION> session;
     CIRCUIT_SNAPSHOT circuit;
+    std::optional<SIM_SNAPSHOT_OBSERVATIONS> observations;
     std::map<std::string,double> controlValues;
     EDITOR_SESSION_VIEW view;
     SCOPE_HISTORY scopeHistory;
@@ -219,21 +246,7 @@ void SESSION_RUNNER::run()
                     // Latest values drive every indicator. Historical values
                     // only serve scope traces and peak-current warnings; sending
                     // every internal MCU/pin vector in every batch overwhelms IPC.
-                    {
-                        std::set<std::size_t> selected;
-                        auto retain = [&]( std::size_t signal )
-                        {
-                            if( signal != NO_SIGNAL ) selected.insert( signal );
-                        };
-                        for( const auto& channel : circuit.measurements ) if( channel.scope )
-                        {
-                            retain( channel.positive ); retain( channel.negative ); retain( channel.current );
-                        }
-                        for( const auto& warning : circuit.currentWarnings ) retain( warning.signal );
-                        for( const auto& led : circuit.leds )
-                            if( led.ratedCurrent > 0 ) retain( led.signal );
-                        circuit.config.historySignals = std::vector<std::size_t>( selected.begin(), selected.end() );
-                    }
+                    observations=ConfigureSessionHistory(circuit);
                     session = std::make_unique<ANALOG_SIM_SESSION>( m_worker,
                             std::chrono::milliseconds( std::lround( preferences.workerTimeoutSeconds * 1000 ) ) );
                     session->Configure( circuit.netlist, circuit.config );
@@ -257,7 +270,7 @@ void SESSION_RUNNER::run()
                     scopeHistory = SCOPE_HISTORY( std::min<std::size_t>( preferences.scopeHistorySamples,
                             65536 / std::max<std::size_t>( 1, view.scopeChannels.size() ) ), view.scopeChannels );
                     latchedWarnings.clear();
-                    view.sample = session->Snapshot( true );
+                    view.sample = session->Snapshot( true, observations );
                     for( const auto& control : circuit.switches )
                         view.switches.push_back( control.initiallyClosed );
                     for( const auto& control : circuit.adjustments )
@@ -296,7 +309,7 @@ void SESSION_RUNNER::run()
                         session->SetSourceValue( control.controlSource, closed ? control.on : control.off,
                             LiveParameterChanges(circuit,controlValues,control.controlSource) );
                         view.switches[command.index] = closed;
-                        view.sample = session->Snapshot( true );
+                        view.sample = session->Snapshot( true, observations );
                     }
                     break;
                 case COMMAND_TYPE::ADJUST:
@@ -310,7 +323,7 @@ void SESSION_RUNNER::run()
                             controlValues[control.source]=value;
                             session->SetSourceValue( control.source, value, LiveParameterChanges(circuit,controlValues,control.source) );
                             view.adjustments[command.index] = value;
-                            view.sample = session->Snapshot( true );
+                            view.sample = session->Snapshot( true, observations );
                         }
                     }
                     break;
@@ -373,7 +386,7 @@ void SESSION_RUNNER::run()
                     {
                         session->AdvanceTo( std::min( view.sample.latest.time + preferences.stepMs * .001 * speed,
                                                      circuit.config.horizon ) );
-                        view.sample = session->Snapshot( true );
+                        view.sample = session->Snapshot( true, observations );
                         ++view.pauseSequence;
                     }
                     break;
@@ -385,17 +398,21 @@ void SESSION_RUNNER::run()
                 const double frameSeconds = std::chrono::duration<double>( preferences.FrameInterval() ).count();
                 double advance = frameSeconds * speed;
                 double minimumBatch = circuit.config.step;
-                if( !circuit.config.programmableDevices.empty() )
+                const auto clockedCount = std::count_if( circuit.config.programmableDevices.begin(),
+                        circuit.config.programmableDevices.end(), []( const auto& d ) { return d.engine != "native"; } );
+                if( clockedCount )
                 {
                     double quantum = 1e-3;
                     for( const auto& device : circuit.config.programmableDevices )
-                        quantum = std::min( quantum, device.quantumSeconds );
+                        if( device.engine != "native" ) quantum = std::min( quantum, device.quantumSeconds );
                     // Bound firmware work per request so input, Pause and Stop
                     // are processed between batches even on a slow computer.
-                    double batch = quantum * 512 / circuit.config.programmableDevices.size();
-                    if( circuit.config.programmableDevices.size() == 1 )
+                    double batch = quantum * 512 / clockedCount;
+                    if( clockedCount == 1 )
                     {
-                        batch = std::max( batch, circuit.config.programmableDevices.front().autonomousWindowSeconds * 8 );
+                        const auto device = std::find_if( circuit.config.programmableDevices.begin(),
+                                circuit.config.programmableDevices.end(), []( const auto& d ) { return d.engine != "native"; } );
+                        batch = std::max( batch, device->autonomousWindowSeconds * 8 );
                         // Splitting a cooperative CPU window into many tiny
                         // pause/resume requests repeats its fixed runtime/solver
                         // overhead and can make the estimator shrink forever.
@@ -414,7 +431,7 @@ void SESSION_RUNNER::run()
                 session->AdvanceTo( std::min( view.sample.latest.time
                                              + advance,
                                              circuit.config.horizon ) );
-                view.sample = session->Snapshot( true );
+                view.sample = session->Snapshot( true, observations );
                 if( view.sample.state == SIM_SESSION_STATE::FAILED )
                     throw std::runtime_error( view.sample.error );
                 running = view.sample.state != SIM_SESSION_STATE::COMPLETED;
@@ -434,6 +451,7 @@ void SESSION_RUNNER::run()
                 auto warn = [&]( const std::string& name, double limit, std::size_t signal )
                 {
                     bool exceeded = std::abs( view.sample.latest.values.at( signal ) ) > limit;
+                    if(signal<view.sample.warningMaxima.size())exceeded|=view.sample.warningMaxima[signal]>limit;
                     for( const auto& sample : view.sample.history ) exceeded |= std::abs( sample.values.at( signal ) ) > limit;
                     if( exceeded ) latchedWarnings.try_emplace( name,
                         "Overcurrent: " + name + " (> " + FormatMeasurement( limit, MEASURE_QUANTITY::CURRENT ) + ")" );
@@ -494,7 +512,16 @@ void SESSION_RUNNER::run()
             view.sessionRevision = revision;
             view.preferences = preferences;
             if( revision == m_revision )
+            {
+                if(view.state==EDITOR_SESSION_STATE::RUNNING)
+                {
+                    m_audioQueue.insert(m_audioQueue.end(),view.sample.audio.begin(),view.sample.audio.end());
+                    if(m_audioQueue.size()>16384)m_audioQueue.erase(m_audioQueue.begin(),m_audioQueue.end()-16384);
+                }
+                else m_audioQueue.clear();
+                view.sample.audio.clear();
                 m_view = view;
+            }
         }
     }
 }

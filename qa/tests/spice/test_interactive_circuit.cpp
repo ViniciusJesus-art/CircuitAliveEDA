@@ -44,6 +44,12 @@ BOOST_AUTO_TEST_CASE( InteractiveValuesAndDisplayResponse )
     BOOST_CHECK_CLOSE( ParseComponentValue( "100 uF" ), 100e-6, 1e-9 );
     BOOST_CHECK_CLOSE( ParseComponentValue( "1kOhm" ), 1000, 1e-9 );
     BOOST_CHECK_CLOSE( ParseComponentValue( "2.2Meg" ), 2.2e6, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "2,5" ), 2.5, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "-2,5V" ), -2.5, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "1,5kHz" ), 1500, 1e-9 );
+    BOOST_CHECK_CLOSE( ParseComponentValue( "2,2e-6F" ), 2.2e-6, 1e-9 );
+    for( const auto* value : { "1,2,3", "1.234,5", "1,234.5" } )
+        BOOST_CHECK_THROW( ParseComponentValue( value ), std::runtime_error );
     BOOST_CHECK_CLOSE( ParseComponentValue( "1M" ), 1e6, 1e-9 );
     BOOST_CHECK_CLOSE( ParseComponentValue( "1m" ), 1e-3, 1e-9 );
     BOOST_CHECK_CLOSE( ParseComponentValue( "470R" ), 470, 1e-9 );

@@ -26,6 +26,7 @@ normal do componente no esquema.
 
 - [Como configurar firmware, pinagem e novos modelos](PROGRAMMABLE_MODEL_FILES.md).
 - [Contrato JavaScript e capacidades de cada motor](../../simulation/runtime/README.md).
+- [Extensão dos motores, perfis e periféricos compartilhados](MICROCONTROLLER_BACKENDS.md).
 - [Avaliação de threads, eventos e partições da simulação](SIMULATION_PARALLELISM.md).
 
 O instalador Windows e os pacotes Linux incluem interpretador, motores, modelos e

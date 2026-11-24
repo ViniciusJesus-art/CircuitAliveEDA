@@ -1,9 +1,12 @@
 /* Copyright (C) 2026 CircuitAliveEDA contributors. SPDX-License-Identifier: GPL-3.0-or-later */
 #include <boost/test/unit_test.hpp>
+#include <nlohmann/json.hpp>
 #include <circuitalive/source_probe.h>
 #include <circuitalive/control_references.h>
 #include <circuitalive/session_runner.h>
 #include <circuitalive/simulation_model.h>
+#include <circuitalive/numeric_value.h>
+#include <clocale>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -146,9 +149,25 @@ BOOST_AUTO_TEST_CASE( ClockProbeStartsAtConfiguredFrequencyBeforeAnyInteraction 
         for( int cycle = 0; cycle < 3; ++cycle )
         {
             BOOST_CHECK_GT( At( session, ( cycle + .1 ) * period ), 4.9 );
+            const double middle = At( session, ( cycle + .35 ) * period );
+            if( kind == PROBE_KIND::SQUARE ) BOOST_CHECK_GT( middle, 4.9 );
+            else BOOST_CHECK_SMALL( middle, 1e-6 );
             BOOST_CHECK_SMALL( At( session, ( cycle + .7 ) * period ), 1e-6 );
         }
     }
+}
+
+BOOST_AUTO_TEST_CASE( ClockProbeMigratesLegacyDutyAndHasNoLiveSlider )
+{
+    SOURCE_PROBE_SETTINGS settings; settings.duty = .1;
+    auto legacy = nlohmann::json::parse( SerializeSourceProbe( PROBE_KIND::PWM, settings ) );
+    const auto clock = ParseSourceProbe( PROBE_KIND::SQUARE, legacy.dump() );
+    BOOST_CHECK_EQUAL( clock.duty, .5 );
+    BOOST_CHECK_EQUAL( ParseSourceProbe( PROBE_KIND::PWM, legacy.dump() ).duty, .1 );
+    const auto c = Bench( PROBE_KIND::SQUARE, settings );
+    BOOST_CHECK( c.adjustments.empty() );
+    BOOST_CHECK( c.liveUpdates.empty() );
+    BOOST_CHECK( c.netlist.find( "Vduty" ) == std::string::npos );
 }
 
 BOOST_AUTO_TEST_CASE( ClockProbeHasNoExtraStartupTransitionsBetweenDisplayFrames )
@@ -249,4 +268,25 @@ BOOST_AUTO_TEST_CASE( SourceProbeControlsStandardLogicInputsWithoutFloatingDrive
     BOOST_CHECK_LT(At(session,2e-6),.2);
     session.SetSourceValue(c.switches[0].controlSource,0);
     BOOST_CHECK_GT(At(session,3e-6),4.8);
+}
+BOOST_AUTO_TEST_CASE( SourceProbeDecimalsRemainUsableInLocalizedUi )
+{
+    struct RESTORE_LOCALE
+    {
+        std::string previous=std::setlocale(LC_NUMERIC,nullptr);
+        ~RESTORE_LOCALE(){std::setlocale(LC_NUMERIC,previous.c_str());}
+    } restore;
+    for(const char* locale:{"C","pt_BR.UTF-8","de_DE.UTF-8"})
+    {
+        if(!std::setlocale(LC_NUMERIC,locale))continue;
+        SOURCE_PROBE_SETTINGS sine;
+        BOOST_CHECK_EQUAL(FormatSimulationNumber(sine.amplitude),"2.5");
+        BOOST_CHECK_EQUAL(FormatSimulationNumber(sine.offset),"2.5");
+        for(double value:{sine.amplitude,sine.offset,sine.frequency,sine.delay,sine.resistance,.00000125})
+            BOOST_CHECK_SMALL(ParseComponentValue(FormatSimulationNumber(value))-value,1e-12);
+        sine.amplitude=ParseComponentValue("2,5");sine.offset=ParseComponentValue("2,5");
+        ValidateSourceProbe(PROBE_KIND::SINE,sine);
+        const auto c=Bench(PROBE_KIND::SINE,sine);
+        BOOST_CHECK(c.netlist.find("2,5")==std::string::npos);
+    }
 }

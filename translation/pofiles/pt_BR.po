@@ -84627,3 +84627,51 @@ msgstr "O modelo tem %zu pinos, mas o símbolo tem %zu. Escolha um modelo com a 
 #. CircuitAliveEDA visual model pin mapping.
 msgid "Connect every model port to a distinct symbol pin in the Pin mapping tab."
 msgstr "Vincule cada porta do modelo a um pino diferente do símbolo na aba Vínculo dos pinos."
+
+
+#. CircuitAliveEDA model editor.
+msgid "Linked symbols"
+msgstr "Símbolos vinculados"
+
+
+#. CircuitAliveEDA model editor.
+msgid "Add symbol..."
+msgstr "Adicionar símbolo..."
+
+
+#. CircuitAliveEDA model editor.
+msgid "Remove link"
+msgstr "Remover vínculo"
+
+
+#. CircuitAliveEDA model editor.
+msgid "Use this model by default for all linked symbols"
+msgstr "Usar este modelo por padrão para todos os símbolos vinculados"
+
+
+#. CircuitAliveEDA model editor.
+msgid "Open model file...\tCtrl+Shift+O"
+msgstr "Abrir arquivo de modelo...\tCtrl+Shift+O"
+
+
+#. CircuitAliveEDA model editor.
+msgid "Default library symbols for this model. Select a symbol to edit its physical pin mapping, controls and luminous positions. The block diagram is shared."
+msgstr "Símbolos de biblioteca vinculados por padrão a este modelo. Selecione um símbolo para editar sua pinagem física e as posições dos controles e partes luminosas. O diagrama em blocos é compartilhado."
+
+
+#. CircuitAliveEDA explicit model defaults.
+msgid "Make default"
+msgstr "Tornar padrão"
+
+
+#. CircuitAliveEDA explicit model defaults.
+msgid "Save the selected model, parameter defaults, pin mapping and options in the model file for this library symbol."
+msgstr "Gravar o modelo selecionado, os valores padrão dos parâmetros, a pinagem e as opções no arquivo do modelo para este símbolo de biblioteca."
+
+
+#. CircuitAliveEDA explicit model defaults.
+msgid "Defaults saved in the model file."
+msgstr "Configurações padrão gravadas no arquivo do modelo."
+
+msgid "Default values apply to the selected symbol. Parameter definitions and the block diagram are shared."
+msgstr "Os valores padrão se aplicam ao símbolo selecionado. As definições dos parâmetros e o diagrama em blocos são compartilhados."

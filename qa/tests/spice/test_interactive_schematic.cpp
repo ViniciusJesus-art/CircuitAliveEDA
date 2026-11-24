@@ -5,6 +5,8 @@
 #include <circuitalive/schematic_adapter.h>
 #include <circuitalive/simulation_overlay.h>
 #include <circuitalive/control_geometry.h>
+#include <circuitalive/display_geometry.h>
+#include <circuitalive/display_presentation.h>
 #include <schematic.h>
 #include <sch_symbol.h>
 #include <sch_field.h>
@@ -156,6 +158,10 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
         { "signals", cfg.signals }, { "accelerate_expressions", cfg.accelerateExpressions },
         { "mutable_elements", cfg.mutableElements }, { "memories", JSON::array() },
         { "programmable_devices", JSON::array() }, { "components", JSON::array() } };
+    report["audio_channels"] = JSON::array();
+    for( const auto& channel : cfg.audioChannels )
+        report["audio_channels"].push_back( { { "signal", channel.signal },
+                { "full_scale", channel.fullScale }, { "volume", channel.volume } } );
     for( const auto& region : cfg.memories )
         report["memories"].push_back( { { "id", region.id }, { "label", region.label },
             { "word_bits", region.wordBits }, { "writable", region.writable },
@@ -170,6 +176,11 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
     for( std::size_t i = 0; i < snapshot.locations.size(); ++i )
         report["components"].push_back( { { "reference", snapshot.locations[i].reference.ToStdString() },
             { "sheet", snapshot.locations[i].sheet.ToStdString() }, { "nodes", circuit.pinNodes[i] } } );
+    report["measurements"] = JSON::array();
+    for( const auto& channel : circuit.measurements )
+        report["measurements"].push_back( { { "name", channel.name }, { "scope", channel.scope },
+                { "connected", channel.connected }, { "positive", channel.positive },
+                { "negative", channel.negative }, { "current", channel.current } } );
     auto save = [&] { std::ofstream output( std::filesystem::path( reinterpret_cast<const char8_t*>( destination ) ) );
                      BOOST_REQUIRE( output ); output << report.dump( 2 ) << '\n'; };
     save();
@@ -227,6 +238,8 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
         JSON changes = JSON::array();
         JSON rates = JSON::array();
         std::vector<LOGIC_LEVEL> previous;
+        double scopeTime = -1;
+        JSON scopeRanges = JSON::array();
         for( ;; )
         {
             const auto view = runner.View();
@@ -257,6 +270,27 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
                 }
                 previous = view.logicLevels;
             }
+            if( view.scopeHistory )
+                view.scopeHistory->ForEachAfter( scopeTime, [&]( const SIM_SAMPLE& sample )
+                {
+                    if( scopeRanges.empty() )
+                        for( const auto& channel : view.scopeChannels )
+                            scopeRanges.push_back( { { "name", channel.name }, { "minimum", nullptr },
+                                    { "maximum", nullptr }, { "samples", 0 } } );
+                    for( std::size_t i = 0; i < view.scopeChannels.size(); ++i )
+                    {
+                        const double value = MeasurementValue( view.scopeChannels[i], sample );
+                        if( !std::isfinite( value ) ) continue;
+                        auto& range = scopeRanges[i];
+                        range["minimum"] = range["minimum"].is_null() ? value
+                                : std::min( range["minimum"].get<double>(), value );
+                        range["maximum"] = range["maximum"].is_null() ? value
+                                : std::max( range["maximum"].get<double>(), value );
+                        range["samples"] = range["samples"].get<std::size_t>() + 1;
+                    }
+                    scopeTime = sample.time;
+                    return true;
+                } );
             if( lastTime >= until ) break;
             BOOST_REQUIRE( now - started < std::chrono::seconds( 60 ) );
             std::this_thread::sleep_for( std::chrono::milliseconds( 2 ) );
@@ -266,6 +300,7 @@ BOOST_FIXTURE_TEST_CASE( AuditSavedInteractiveCircuit, KI_TEST::SCHEMATIC_TEST_F
             { "steady_speed", ( lastTime - activeTime ) / std::chrono::duration<double>( lastUpdate - activeStarted ).count() },
             { "rate_windows", rates },
             { "updates", updates }, { "max_update_gap_ms", maxGap * 1000 }, { "pb5_changes", changes } };
+        report["scope_ranges"] = std::move( scopeRanges );
         save();
         return;
     }
@@ -1495,4 +1530,211 @@ BOOST_FIXTURE_TEST_CASE( DuplicatedSourceProbeReferencesAreRepairedAndTheirContr
     session.Configure( snapshot.circuit.netlist, snapshot.circuit.config ); session.AdvanceTo( 1e-6 );
     BOOST_CHECK_GT( session.Snapshot().latest.values.at( 0 ), 4.9 );
     BOOST_CHECK_SMALL( session.Snapshot().latest.values.at( 1 ), .01 );
+}
+
+BOOST_FIXTURE_TEST_CASE( LedGlowFollowsOffCenterJunctionAcrossRotationsAndMirrors, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file(CIRCUITALIVE_TEST_SCHEMATIC);file.AppendDir("outputs_ir_audio");
+    file.SetFullName("simulation_outputs_ir_audio.kicad_sch");LoadSchematic(file);
+    SCH_SYMBOL* led=nullptr;
+    auto& sheet=m_schematic->CurrentSheet();
+    for(auto* item:m_schematic->RootScreen()->Items().OfType(SCH_SYMBOL_T))
+    {
+        auto* symbol=static_cast<SCH_SYMBOL*>(item);
+        if(symbol->GetRef(&sheet)=="D1")led=symbol;
+    }
+    BOOST_REQUIRE(led);const auto pins=led->GetPins(&sheet);BOOST_REQUIRE_EQUAL(pins.size(),2u);
+    // Model an off-center library anchor like CQY99, without relying on an
+    // external symbol library. The emission arrows/bounding box are irrelevant.
+    const VECTOR2I offset(schIUScale.mmToIU(-1.27),0);
+    for(auto* pin:pins)
+    {
+        BOOST_REQUIRE(pin->GetLibPin());
+        auto* libPin=pin->GetLibPin();libPin->SetPosition(libPin->GetLocalPosition()+offset);
+    }
+    for(int orientation:std::array<int,6>{SYM_ORIENT_0,SYM_ORIENT_90,SYM_ORIENT_180,SYM_ORIENT_270,
+                         SYM_ORIENT_0+SYM_MIRROR_X,SYM_ORIENT_90+SYM_MIRROR_Y})
+    {
+        led->SetOrientation(orientation);
+        const auto snapshot=CaptureSchematic(*m_schematic);
+        const auto location=std::find_if(snapshot.locations.begin(),snapshot.locations.end(),
+                [](const auto& loc){return loc.reference=="D1";});
+        BOOST_REQUIRE(location!=snapshot.locations.end());
+        const auto expected=led->GetPosition()+led->GetTransform().TransformCoordinate(offset);
+        BOOST_CHECK(location->lightPosition==expected);
+        BOOST_CHECK(location->lightPosition!=location->position);
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE( NativeOutputDemoPreservesOpticalLinksAndRuns, KI_TEST::SCHEMATIC_TEST_FIXTURE )
+{
+    wxFileName file(CIRCUITALIVE_TEST_SCHEMATIC);file.AppendDir("outputs_ir_audio");file.SetFullName("simulation_outputs_ir_audio.kicad_sch");LoadSchematic(file);
+    auto snapshot=CaptureSchematic(*m_schematic);
+    BOOST_REQUIRE_EQUAL(snapshot.circuit.links.size(),1u);
+    BOOST_CHECK_EQUAL(snapshot.circuit.segments.size(),8u);
+    BOOST_CHECK_EQUAL(snapshot.circuit.config.audioChannels.size(),2u);
+    const auto& pair=snapshot.circuit.links[0];BOOST_CHECK_EQUAL(pair.medium,"ir");
+    std::set<wxString> references={snapshot.locations[pair.first].reference,snapshot.locations[pair.second].reference};
+    BOOST_CHECK(references==std::set<wxString>({"D1","U1"}));
+    INTERACTIVE_SIM_SESSION session(CIRCUITALIVE_TEST_WORKER);session.Configure(snapshot.circuit.netlist,snapshot.circuit.config);session.AdvanceTo(.0005);
+    const auto sample=session.Snapshot();BOOST_CHECK(!sample.audio.empty());
+    auto receiver=std::find_if(snapshot.locations.begin(),snapshot.locations.end(),[](const auto& loc){return loc.reference=="U1";})-snapshot.locations.begin();
+    const auto signal="v("+snapshot.circuit.pinNodes.at(receiver).at("1")+")";
+    const auto index=std::find(snapshot.circuit.config.signals.begin(),snapshot.circuit.config.signals.end(),signal)-snapshot.circuit.config.signals.begin();
+    BOOST_CHECK_LT(sample.latest.values.at(index),.15);
+    for(auto* item:m_schematic->RootScreen()->Items().OfType(SCH_SYMBOL_T))
+    {
+        auto* symbol=static_cast<SCH_SYMBOL*>(item);if(symbol->GetRef(&m_schematic->CurrentSheet())!="D1")continue;
+        auto settings=ReadSymbolModelSettings(*symbol,m_schematic->CurrentSheet(),"",file.GetPath().ToStdString());
+        BOOST_REQUIRE_EQUAL(settings.linkedComponents.size(),1u);
+        WriteSymbolModelSettings(*symbol,settings);BOOST_CHECK(!symbol->GetField("CA.Links")->IsVisible());
+        settings.linkedComponents.clear();WriteSymbolModelSettings(*symbol,settings);BOOST_CHECK(symbol->GetField("CA.Links")==nullptr);
+    }
+    BOOST_CHECK(CaptureSchematic(*m_schematic).circuit.links.empty());
+}
+
+BOOST_AUTO_TEST_CASE( DisplayPositionBelongsToTheInstanceAndPreservesModelSettings )
+{
+    const BOX2I body( VECTOR2I( schIUScale.mmToIU( 10 ), schIUScale.mmToIU( 20 ) ),
+                      VECTOR2I( schIUScale.mmToIU( 20 ), schIUScale.mmToIU( 10 ) ) );
+    CONTROL_VISUAL model; model.custom = true; model.x = 1.05; model.y = .1; model.width = 2.1; model.height = .3;
+    const VECTOR2I delta( schIUScale.mmToIU( 400 ), schIUScale.mmToIU( -160 ) );
+    const auto moved = MoveDisplayVisual( body, model, VECTOR2D( delta ) );
+    BOOST_CHECK( ControlBounds( body, moved ).GetOrigin() == ControlBounds( body, model ).GetOrigin() + delta );
+    BOOST_CHECK( ControlBounds( body, moved ).GetSize() == ControlBounds( body, model ).GetSize() );
+    SCH_SYMBOL symbol, peer;
+    WriteSymbolDisplayPosition( symbol, moved );
+    BOOST_REQUIRE( symbol.GetField( "CA.DisplayPosition" ) );
+    BOOST_CHECK( !symbol.GetField( "CA.DisplayPosition" )->IsVisible() );
+    BOOST_CHECK( peer.GetField( "CA.DisplayPosition" ) == nullptr );
+    const auto saved = symbol.GetField( "CA.DisplayPosition" )->GetText();
+    CIRCUIT_COMPONENT settings; settings.modelFile = "builtin:lcd1602_parallel"; settings.modelParameters["supply_min"] = "2.7";
+    WriteSymbolModelSettings( symbol, settings );
+    BOOST_CHECK_EQUAL( symbol.GetField( "CA.DisplayPosition" )->GetText(), saved );
+    SCH_SYMBOL reopened( symbol );
+    auto restored = model;
+    ApplySymbolDisplayPosition( reopened, body, restored );
+    BOOST_CHECK( restored == moved );
+    auto movedBody = body; const VECTOR2I symbolDelta( 1800, -2400 ); movedBody.Move( symbolDelta );
+    auto followsSymbol = model;
+    ApplySymbolDisplayPosition( reopened, movedBody, followsSymbol );
+    BOOST_CHECK( ControlBounds( movedBody, followsSymbol ).GetOrigin() == ControlBounds( body, moved ).GetOrigin() + symbolDelta );
+    CONTROL_VISUAL defaultVisual;
+    const auto defaultMoved = MoveDisplayVisual( body, defaultVisual, VECTOR2D( delta ) );
+    BOOST_CHECK( ControlBounds( body, defaultMoved ).GetSize() == ControlBounds( body, defaultVisual ).GetSize() );
+    for( const auto* invalid : { "broken json", "{\"x\":1e20,\"y\":0}", "{\"x\":0}" } )
+    {
+        reopened.GetField( "CA.DisplayPosition" )->SetText( invalid );
+        auto fallback = model;
+        BOOST_CHECK_NO_THROW( ApplySymbolDisplayPosition( reopened, body, fallback ) );
+        BOOST_CHECK( fallback == model );
+    }
+}
+
+BOOST_AUTO_TEST_CASE( DisplayPresentationCacheKeepsCharactersBacklightAndVisibleCursorChanges )
+{
+    nlohmann::json state = { { "cells", { 65, 66 } }, { "cgram", { 0, 1 } },
+        { "backlight", true }, { "cursor", false }, { "blink", false }, { "address", 0 } };
+    const auto key = DisplayPresentationKey( state.dump() );
+    state["address"] = 1;
+    BOOST_CHECK_EQUAL( key, DisplayPresentationKey( state.dump() ) );
+    for( const auto* property : { "cursor", "blink", "backlight" } )
+    {
+        auto changed = state; changed[property] = !changed[property].get<bool>();
+        BOOST_CHECK( key != DisplayPresentationKey( changed.dump() ) );
+    }
+    auto text = state; text["cells"][0] = 67;
+    BOOST_CHECK( key != DisplayPresentationKey( text.dump() ) );
+    auto glyph = state; glyph["cgram"][0] = 31;
+    BOOST_CHECK( key != DisplayPresentationKey( glyph.dump() ) );
+    state["cursor"] = true;
+    const auto cursor = DisplayPresentationKey( state.dump() ); state["address"] = 2;
+    BOOST_CHECK( cursor != DisplayPresentationKey( state.dump() ) );
+    BOOST_CHECK_EQUAL( DisplayPresentationKey( "invalid" ), "invalid" );
+}
+
+BOOST_AUTO_TEST_CASE( DisplayHitTestingUsesTheMovedScreenAndVisibleSheet )
+{
+    SCHEMATIC_SNAPSHOT circuit;
+    SYMBOL_LOCATION location; location.sheet = "/page";
+    location.body = BOX2I( VECTOR2I( 20000, 30000 ), VECTOR2I( 120000, 60000 ) );
+    circuit.locations.push_back( location );
+    MODEL_DISPLAY appearance; appearance.type = "hd44780";
+    circuit.circuit.displays.push_back( { 0, "DS1", appearance } );
+    circuit.circuit.displays.push_back( { 0, "DS2", appearance } );
+    EDITOR_SESSION_VIEW session; session.sample.presentation["DS1"] = "{}";
+    SIMULATION_OVERLAY overlay;
+    const VECTOR2I center = location.body.Centre();
+    BOOST_CHECK_EQUAL( overlay.DisplayAt( circuit, session, "/page", center ), 0 );
+    session.sample.presentation["DS2"] = "{}";
+    BOOST_CHECK_EQUAL( overlay.DisplayAt( circuit, session, "/page", center ), 1 );
+    circuit.circuit.displays[1].appearance.visual.visible = false;
+    BOOST_CHECK_EQUAL( overlay.DisplayAt( circuit, session, "/page", center ), 0 );
+    BOOST_CHECK_EQUAL( overlay.DisplayAt( circuit, session, "/other", center ), -1 );
+    auto& visual = circuit.circuit.displays[0].appearance.visual;
+    const VECTOR2I delta( 600000, -400000 );
+    visual = MoveDisplayVisual( location.body, visual, VECTOR2D( delta ) );
+    BOOST_CHECK_EQUAL( overlay.DisplayAt( circuit, session, "/page", center ), -1 );
+    BOOST_CHECK_EQUAL( overlay.DisplayAt( circuit, session, "/page", center + delta ), 0 );
+}
+
+BOOST_FIXTURE_TEST_CASE(AuditDisplayProjectThroughput,KI_TEST::SCHEMATIC_TEST_FIXTURE,*boost::unit_test::disabled())
+{
+    const char* file=std::getenv("CIRCUITALIVE_DISPLAY_SCHEMATIC");BOOST_REQUIRE(file);
+    LoadSchematic(wxFileName(wxString::FromUTF8(file)));auto circuit=CaptureSchematic(*m_schematic,true).circuit;
+    ConfigureVisualSignals(circuit);const std::optional<SIM_SNAPSHOT_OBSERVATIONS> observations=ConfigureSessionHistory(circuit);
+    nlohmann::json report=nlohmann::json::array();
+    if(const char* directory=std::getenv("CIRCUITALIVE_DISPLAY_AUDIT_PARTS"))
+    {
+        std::filesystem::create_directories(directory);unsigned index=0;
+        for(const auto& part:BuildAnalogPartitions(circuit.netlist,circuit.config))
+        {
+            const auto& config=part.config;
+            nlohmann::json request={{"op","configure"},{"netlist",part.netlist},{"step",config.step},{"max_step",config.maxStep},
+                {"horizon",2},{"capacity",config.historyCapacity},{"signals",config.signals},{"uic",config.useInitialConditions},
+                {"accelerate_expressions",config.accelerateExpressions},{"display_network",config.accelerateDisplayNetwork},
+                {"programmable_devices",nlohmann::json::array()}};
+            if(config.historySignals)request["history_signals"]=*config.historySignals;
+            for(const auto& device:config.programmableDevices)request["programmable_devices"].push_back(PROTOCOL::SerializeProgrammableDevice(device));
+            std::ofstream(std::filesystem::path(directory)/("part"+std::to_string(index++)+".json"))<<request.dump();
+        }
+    }
+    for(bool before:{true,false})
+    {
+        const char* previous=std::getenv("CIRCUITALIVE_DISPLAY_BEFORE_WORKER");if(before&&!previous)continue;
+        auto config=circuit.config;
+        if(before)for(auto& device:config.programmableDevices)if(device.engine=="native"&&device.device=="hd44780")
+        {
+            device.engine="javascript";device.autonomousWindowSeconds=.001;
+            const auto model=MODEL_REPOSITORY().SelectModel(CIRCUIT_COMPONENT{"DS1","Display_Character:HY1602E","HY1602E",{}});
+            std::ifstream input(model.file.parent_path().parent_path()/"runtime/simulation-devices.js");
+            device.source=std::string(std::istreambuf_iterator<char>(input),{});BOOST_REQUIRE(!device.source.empty());
+        }
+        ANALOG_SIM_SESSION session(before?previous:CIRCUITALIVE_TEST_WORKER);session.Configure(circuit.netlist,config);session.AdvanceTo(.02);
+        const auto initial=session.Snapshot(true,observations).latest.time;const auto begin=std::chrono::steady_clock::now();
+        unsigned frames=125;
+        std::size_t historyPoints=0;
+        if(const char* count=std::getenv("CIRCUITALIVE_DISPLAY_AUDIT_FRAMES"))frames=std::stoul(count);
+        BOOST_REQUIRE(frames>0&&frames<=10000);
+        for(unsigned frame=1;frame<=frames;++frame)
+        {session.AdvanceTo(initial+frame*.008);historyPoints+=session.Snapshot(true,observations).history.size();}
+        const double wall=std::chrono::duration<double>(std::chrono::steady_clock::now()-begin).count();
+        const auto snapshot=session.Snapshot();const auto simulated=snapshot.latest.time-initial;
+        report.push_back({{"phase",before?"before":"after"},{"simulated",simulated},{"wall",wall},{"speed",simulated/wall},
+            {"segments",circuit.segments.size()},{"lcds",circuit.displays.size()},{"signals",config.signals.size()},{"max_step",config.maxStep},
+            {"partitions",session.PartitionCount()},{"history_points",historyPoints}});
+        for(const auto& [index,limit]:observations->warningLimits)report.back()["warning_limits"][config.signals[index]]=limit;
+        report.back()["scope_signals"]=observations->history.size();
+        if(const char* expected=std::getenv("CIRCUITALIVE_DISPLAY_EXPECT_TEXT"))
+        {
+            BOOST_REQUIRE(!circuit.displays.empty());
+            const auto display=snapshot.presentation.find(circuit.displays.front().reference);
+            BOOST_REQUIRE(display!=snapshot.presentation.end());const auto state=nlohmann::json::parse(display->second);
+            BOOST_CHECK(state.at("powered").get<bool>());BOOST_CHECK(state.at("display").get<bool>());
+            std::string text;for(const auto& cell:state.at("cells"))text+=static_cast<char>(cell.get<unsigned>());
+            BOOST_CHECK_MESSAGE(text.starts_with(expected),"LCD state: "<<state.dump());
+        }
+        BOOST_TEST_MESSAGE(report.back().dump());
+    }
+    if(const char* output=std::getenv("CIRCUITALIVE_DISPLAY_AUDIT_REPORT"))std::ofstream(output)<<report.dump(2)<<'\n';
 }

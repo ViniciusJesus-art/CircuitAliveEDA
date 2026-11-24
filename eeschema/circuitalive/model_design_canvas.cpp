@@ -16,14 +16,25 @@ wxString W( const std::string& s ) { return wxString::FromUTF8( s ); }
 wxPoint P( DESIGN_POINT p ) { return { p.x, p.y }; }
 const wxColour BACKGROUND( 28, 32, 37 ), WIRE( 66, 169, 197 ), HIGHLIGHT( 255, 191, 70 );
 }
-DESIGN_CANVAS::DESIGN_CANVAS( wxWindow* parent, MODEL_DESIGN& doc ) : wxScrolledWindow( parent ), design( doc )
+DESIGN_CANVAS::DESIGN_CANVAS( wxWindow* parent, MODEL_DESIGN& doc ) : wxPanel( parent ), design( doc )
 {
-    SetBackgroundStyle( wxBG_STYLE_PAINT ); SetScrollRate( 16, 16 ); SetVirtualSize( 2800, 2400 );
+    SetBackgroundStyle( wxBG_STYLE_PAINT );
     Bind( wxEVT_PAINT, [this]( wxPaintEvent& ) { paint(); } );
     Bind( wxEVT_LEFT_DOWN, &DESIGN_CANVAS::down, this );
     Bind( wxEVT_MOTION, &DESIGN_CANVAS::motion, this );
-    Bind( wxEVT_LEFT_UP, [this]( wxMouseEvent& ) { release(); updateExtent(); } );
-    Bind( wxEVT_MOUSE_CAPTURE_LOST, [this]( wxMouseCaptureLostEvent& ) { m_drag = -1; m_dragWire.reset(); } );
+    Bind( wxEVT_LEFT_UP, [this]( wxMouseEvent& ) { if( !m_panning ) release(); } );
+    Bind( wxEVT_MOUSE_CAPTURE_LOST, [this]( wxMouseCaptureLostEvent& ) { m_panning=false; m_drag = -1; m_dragWire.reset(); } );
+    Bind( wxEVT_MOUSEWHEEL, [this]( wxMouseEvent& e )
+    {
+        if( e.GetWheelAxis() == wxMOUSE_WHEEL_VERTICAL && e.GetWheelDelta() )
+            zoomAt( std::pow( 1.2, double(e.GetWheelRotation()) / e.GetWheelDelta() ), e.GetPosition() );
+    } );
+    Bind( wxEVT_MIDDLE_DOWN, [this]( wxMouseEvent& e )
+    {
+        release(); SetFocus(); m_panning=true; m_panStart=e.GetPosition(); m_panOriginal=m_viewport.offset;
+        CaptureMouse(); SetCursor( wxCursor( wxCURSOR_HAND ) );
+    } );
+    Bind( wxEVT_MIDDLE_UP, [this]( wxMouseEvent& ) { release(); } );
     Bind( wxEVT_LEFT_DCLICK, [this]( wxMouseEvent& e )
     { down( e ); release(); if( selected >= 0 && edit ) edit(); } );
     Bind( wxEVT_RIGHT_DCLICK, &DESIGN_CANVAS::eraseAt, this );
@@ -50,12 +61,12 @@ void DESIGN_CANVAS::eraseAt( wxMouseEvent& event )
         selected=-1;m_selectedWire=-1;m_geometry.clear();
         if(changed)changed();
         if(selectionChanged)selectionChanged();
-        updateExtent();Refresh();
+        Refresh();
     }
 }
 void DESIGN_CANVAS::release()
 {
-    m_drag = -1; m_dragWire.reset(); if( HasCapture() ) ReleaseMouse(); SetCursor( wxNullCursor );
+    m_panning=false; m_drag = -1; m_dragWire.reset(); if( HasCapture() ) ReleaseMouse(); SetCursor( wxNullCursor );
 }
 void DESIGN_CANVAS::CancelConnection() { m_pending.reset(); m_selectedWire = -1; release(); Refresh(); }
 void DESIGN_CANVAS::ResetRoutes()
@@ -65,15 +76,18 @@ void DESIGN_CANVAS::ResetRoutes()
     Refresh();
 }
 void DESIGN_CANVAS::Zoom( double factor )
-{ m_zoom = std::clamp( m_zoom * factor, .3, 2.0 ); updateExtent(); Refresh(); }
+{ zoomAt( factor, wxPoint( GetClientSize().x/2, GetClientSize().y/2 ) ); }
+void DESIGN_CANVAS::zoomAt( double factor, wxPoint anchor )
+{ m_viewport.ZoomAt( factor, VECTOR2D(anchor.x,anchor.y) ); Refresh(); }
 void DESIGN_CANVAS::FitContent()
 {
     const auto size = contentSize(); const auto client = GetClientSize();
-    m_zoom = std::clamp( std::min( double( client.x - 24 ) / size.x, double( client.y - 24 ) / size.y ), .3, 1.0 );
-    updateExtent(); Scroll( 0, 0 ); Refresh();
+    m_viewport.scale = std::clamp( std::min( double( client.x - 24 ) / size.x, double( client.y - 24 ) / size.y ), .1, 1.0 );
+    m_viewport.offset = ( VECTOR2D(client.x,client.y) - VECTOR2D(size.x,size.y)*m_viewport.scale ) / 2.;
+    Refresh();
 }
 wxPoint DESIGN_CANVAS::logicalPosition( wxPoint p ) const
-{ p = CalcUnscrolledPosition( p ); return { int( p.x / m_zoom ), int( p.y / m_zoom ) }; }
+{ const auto world=m_viewport.ToWorld(VECTOR2D(p.x,p.y)); return { int(std::lround(world.x)),int(std::lround(world.y)) }; }
 int DESIGN_CANVAS::height( const DESIGN_BLOCK& b ) const { return 115 + int( visualModel( b ).pins.size() ) * 23; }
 wxSize DESIGN_CANVAS::contentSize() const
 {
@@ -82,11 +96,6 @@ wxSize DESIGN_CANVAS::contentSize() const
     for( const auto& r : design.wireRoutes ) for( const auto& p : r.bends )
     { size.x = std::max( size.x, p.x + 30 ); size.y = std::max( size.y, p.y + 30 ); }
     return size;
-}
-void DESIGN_CANVAS::updateExtent()
-{
-    const auto size = contentSize();
-    SetVirtualSize( int( std::max( 2800, size.x ) * m_zoom ), int( std::max( 2400, size.y ) * m_zoom ) );
 }
 const SIMULATION_MODEL& DESIGN_CANVAS::visualModel( const DESIGN_BLOCK& b ) const
 {
@@ -146,7 +155,7 @@ const std::vector<DESIGN_WIRE>& DESIGN_CANVAS::wires()
 }
 std::pair<int,int> DESIGN_CANVAS::hitWire( wxPoint point )
 {
-    const auto& routes = wires(); double best = 8 / m_zoom; std::pair<int,int> result{ -1, -1 };
+    const auto& routes = wires(); double best = 8 / m_viewport.scale; std::pair<int,int> result{ -1, -1 };
     for( std::size_t i = 0; i < routes.size(); ++i ) for( std::size_t k = 1; k < routes[i].points.size(); ++k )
     {
         const auto a = routes[i].points[k-1], b = routes[i].points[k];
@@ -200,6 +209,11 @@ void DESIGN_CANVAS::down( wxMouseEvent& e )
 }
 void DESIGN_CANVAS::motion( wxMouseEvent& e )
 {
+    if( m_panning )
+    {
+        const auto delta=e.GetPosition()-m_panStart;
+        m_viewport.offset=m_panOriginal+VECTOR2D(delta.x,delta.y); Refresh(); return;
+    }
     const auto point = logicalPosition( e.GetPosition() );
     if( m_drag >= 0 && e.LeftIsDown() )
     {
@@ -224,7 +238,9 @@ void DESIGN_CANVAS::motion( wxMouseEvent& e )
 }
 void DESIGN_CANVAS::paint()
 {
-    wxAutoBufferedPaintDC dc( this ); PrepareDC( dc ); dc.SetUserScale( m_zoom, m_zoom ); dc.SetBackground( wxBrush( BACKGROUND ) ); dc.Clear();
+    wxAutoBufferedPaintDC dc( this ); dc.SetBackground( wxBrush( BACKGROUND ) ); dc.Clear();
+    dc.SetDeviceOrigin( std::lround(m_viewport.offset.x),std::lround(m_viewport.offset.y) );
+    dc.SetUserScale( m_viewport.scale, m_viewport.scale );
     dc.SetTextForeground( wxColour( 225, 230, 235 ) );
     const auto points = terminals(); const auto& routes = wires(); std::set<std::string> highlighted;
     if( selected >= 0 && selected < int( design.blocks.size() ) )

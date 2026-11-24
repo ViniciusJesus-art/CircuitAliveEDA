@@ -17,6 +17,7 @@ struct SYMBOL_LOCATION
     BOX2I body;
     VECTOR2I position;
     VECTOR2I axisX = {1,0}, axisY = {0,1};
+    VECTOR2I lightPosition = position;
 };
 
 struct SCHEMATIC_SNAPSHOT
@@ -43,6 +44,9 @@ SCHEMATIC_SNAPSHOT CaptureSchematic( SCHEMATIC& aSchematic, bool aPinIndicators 
 CIRCUIT_COMPONENT ReadSymbolModelSettings( SCH_SYMBOL& aSymbol, SCH_SHEET_PATH& aSheet,
         const wxString& aVariant, const std::string& aProjectDirectory, bool aForEditing = false );
 void WriteSymbolModelSettings( SCH_SYMBOL& aSymbol, const CIRCUIT_COMPONENT& aSettings );
+void WriteSymbolDisplayPosition( SCH_SYMBOL& aSymbol, const CONTROL_VISUAL& aVisual );
+void ApplySymbolDisplayPosition( const SCH_SYMBOL& aSymbol, const BOX2I& aBody,
+                                 CONTROL_VISUAL& aVisual );
 void ApplySavedSymbolModelSettings( SCH_SYMBOL& aSymbol, SCH_SHEET_PATH& aSheet,
         const wxString& aVariant, const std::string& aProjectDirectory );
 }
