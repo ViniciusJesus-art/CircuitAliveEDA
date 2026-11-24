@@ -205,10 +205,10 @@ cp "{app}/share/icons/hicolor/128x128/apps/circuitaliveeda.png" %{{buildroot}}/u
  ''')
  temporary=rpm_alias/'tmp';temporary.mkdir(exist_ok=True)
  subprocess.run(['rpmbuild','-bb','--define',f'_topdir {rpmdir}','--define',f'_tmppath {temporary}',str(spec)],check=True)
- for file in (rpmdir/'RPMS').rglob('*.rpm'):shutil.copy2(file,out/f'CircuitAliveEDA-{args.version}-fedora44-x86_64.rpm')
+ for file in (rpmdir/'RPMS').rglob('*.rpm'):shutil.copy2(file,out/f'CircuitAliveEDA-{args.version}.rpm')
 if args.appimagetool:
  subprocess.run([sys.executable,str(root/'tools/circuitalive/release/create-appimage.py'),
-                 '--appdir',str(app),'--output',str(out/f'CircuitAliveEDA-{args.version}-linux-x86_64.AppImage'),
+                 '--appdir',str(app),'--output',str(out/f'CircuitAliveEDA-{args.version}.AppImage'),
                  '--version',args.version,'--tool',str(args.appimagetool.resolve()),
                  '--runtime',str(args.appimage_runtime.resolve())],check=True)
 if not args.skip_tar:

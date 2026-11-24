@@ -1,189 +1,117 @@
-# Releases: enviar de cada máquina
+# Releases locais, pelo Actions ou combinadas
 
-## Fluxo simples recomendado
+Os dois caminhos continuam disponíveis. Cada envio acrescenta os formatos
+selecionados à mesma release, identificada pelo nome/versão informado. Você pode
+enviar RPM/AppImage pelo Fedora e pedir o EXE ao Actions, ou fazer o contrário.
+Os commits podem ser diferentes; alterações locais sem commit entram no build
+local. Não é necessário reunir todos os instaladores em uma máquina.
 
-Cada máquina compila, testa, empacota e envia seus próprios instaladores para
-**a mesma release**, sem copiar arquivos entre computadores. O primeiro envio
-cria e publica a release; os seguintes acrescentam os pacotes daquela plataforma.
-A ordem é livre: Windows ou Fedora pode enviar primeiro.
+## Pelo GitHub Actions
 
-Nas duas máquinas, informe o mesmo nome/versão da release. Os commits podem
-ser diferentes, inclusive por mudanças no README. Alterações locais ainda sem
-commit também entram no build; não é necessário fazer commit ou push para enviar
-os instaladores. Instale Python **3.11+** e GitHub CLI e autentique uma vez com
-`gh auth login`. As ferramentas de compilação continuam sendo as descritas nos
-guias Windows/Fedora; no Linux é necessário Docker ou Podman funcional, e no
-Windows, PowerShell 7 e MSVC 2022.
+Depois de enviar estes workflows à `main`, abra **Actions → Release packages
+(all or individual) → Run workflow**:
 
-No Fedora, na raiz do projeto:
+1. Selecione `main`.
+2. Informe `version`, por exemplo `10.0.7-alpha.4.2.0`.
+3. Escolha `target`: `all`, `windows`/`exe`, `fedora`, `linux`, `rpm`, `appimage` ou `deb`.
+4. Marque `publish_release` para criar ou completar essa release. Desmarque para
+   gerar somente os arquivos para download nos artefatos da execução.
+
+`all` gera EXE, RPM, AppImage e DEB. `fedora` gera RPM e AppImage; `linux` inclui
+também DEB. Cada plataforma usa seu build nativo: Windows 2022/MSVC, Fedora 44
+em contêiner e Ubuntu 24.04. Os caches de compilação e de dependências permanecem.
+Só é executada a plataforma necessária para o alvo escolhido.
+
+O campo **version** alimenta o nome da release, os arquivos, os cabeçalhos de
+versão do programa, a janela Sobre e o instalador. Não há um segundo campo de
+versão que possa divergir. Use a mesma versão ao completar uma release existente;
+o envio preserva sua descrição, tag e os instaladores das outras plataformas.
+
+Exemplo: envie `10.0.7-alpha.4.2.0` pelo Fedora local. No Actions, informe essa
+mesma versão, escolha `windows` e marque `publish_release`. O EXE será adicionado
+à release já existente. Também funciona começando pelo Windows no Actions e
+completando pelo Fedora local.
+
+O workflow **Windows installer (MSVC)** também está disponível separadamente
+para compilar/testar e guardar artefatos. Seu campo `runtime_run_id` permite
+reempacotar um runtime preservado sem recompilar C++. Os workflows de auditoria,
+preparo de dependências e validação Windows também foram restaurados.
+
+Pushes e tags não iniciam releases automaticamente. O Actions usa o código já
+enviado ao GitHub; o comando local usa os arquivos presentes na máquina.
+
+## Comando local
+
+Instale Python **3.11+**, GitHub CLI e as ferramentas de compilação da plataforma.
+Autentique uma vez com `gh auth login`. No Fedora, instale `gh` com
+`sudo dnf install gh` e tenha Docker ou Podman funcional. No Windows, use MSVC
+2022 e PowerShell 7; veja [BUILD_WINDOWS.md](BUILD_WINDOWS.md).
+
+Na raiz do checkout Fedora:
 
 ```bash
-python3 tools/circuitalive/release/release.py 10.0.7-alpha.4.2
+python3 tools/circuitalive/release/release.py 10.0.7-alpha.4.2.0
 ```
 
-No Windows, na raiz do projeto:
+Na raiz do checkout Windows:
 
 ```powershell
-python tools/circuitalive/release/release.py 10.0.7-alpha.4.2
+python tools/circuitalive/release/release.py 10.0.7-alpha.4.2.0
 ```
 
-A versão acima é um exemplo: use o mesmo valor para reunir os pacotes na mesma release.
-O comando Fedora gera RPM e AppImage usando o contêiner Fedora 44. O comando
-Windows gera o instalador EXE. A release já fica disponível após o primeiro envio,
-e recebe os outros instaladores quando a outra máquina terminar. Os comandos
-não fazem commit nem push automaticamente.
+O comando compila, testa, empacota e envia os formatos daquela plataforma. No
+Fedora gera RPM/AppImage usando o contêiner Fedora 44; no Windows gera EXE.
+A primeira máquina cria e publica a release depois do upload; a seguinte a completa.
 
-Se o build terminou, mas a rede ou o upload falhou, repita o comando adicionando
-`--upload-only`: ele usa os pacotes já gerados. Um registro local confere a versão
-e os hashes antes de permitir esse reenvio, mesmo se o checkout já estiver em
-outro commit. O commit base fica registrado localmente como informação do
-build, que pode incluir alterações locais ainda sem commit. Execute o comando normal para recompilar: ele substitui somente os pacotes
-dessa plataforma na release informada.
-
-O envio identifica a release pelo nome/versão informado, sem comparar commits
-ou o destino da tag, e confere formato e checksum de cada instalador. Cada pacote recebe seu próprio `.sha256`, sem sobrescrever
-os checksums do outro sistema. O upload inicial fica como rascunho até terminar;
-se houver falha, o comando pode ser repetido. Releases antigas com a mesma tag
-também podem receber os pacotes, sem exigir metadados especiais na descrição.
-A tag existente é preservada; para uma release nova, o GitHub usa a branch padrão.
-Releases configuradas como imutáveis no GitHub não permitem acréscimos.
+Se o build terminou e somente o envio falhou, acrescente `--upload-only` para
+reutilizar `dist/`. Os hashes e a versão do registro local são verificados; o
+commit atual pode ser diferente daquele usado no build. Execute sem essa opção
+para recompilar e substituir somente os instaladores da plataforma atual.
 
 Use `--engine docker` ou `--engine podman` para escolher o contêiner Linux;
 `--repository dono/repositorio` muda o destino. O padrão é
-`ViniciusJesus-art/CircuitAliveEDA`. Nenhuma publicação é disparada apenas por push.
+`ViniciusJesus-art/CircuitAliveEDA`.
 
-O Ubuntu continua opcional pelo Actions, conforme descrito abaixo. O envio
-independente Fedora/Windows não exige gerar ou baixar o DEB.
+## Arquivos públicos
 
-## Fluxo manual e Ubuntu no Actions
+Para a versão de exemplo, a release completa contém:
 
+- `CircuitAliveEDA-10.0.7-alpha.4.2.0.exe`
+- `CircuitAliveEDA-10.0.7-alpha.4.2.0.rpm`
+- `CircuitAliveEDA-10.0.7-alpha.4.2.0.AppImage`
+- `CircuitAliveEDA-10.0.7-alpha.4.2.0.deb`
+- `CircuitAliveEDA-10.0.7-alpha.4.2.0-auxiliares.zip`
 
-O mesmo repositório e a branch `main` atendem às duas máquinas de desenvolvimento.
-A divisão de compilação é:
+O ZIP reúne `SHA256SUMS.txt`, o manifesto geral e os metadados/checksums de cada
+formato em sua própria pasta. Ao acrescentar uma plataforma, o arquivo anterior
+é baixado e atualizado, preservando os registros das demais. Não há checksums
+ou manifestos avulsos na lista principal. Logs de diagnóstico e checkpoints de
+runtime ficam nos artefatos da execução do Actions, separados dos downloads da release.
 
-| Ambiente | Pacotes | Execução |
-| --- | --- | --- |
-| Fedora 44 x86_64 | RPM e AppImage | Local, usando os scripts existentes |
-| Windows x64 / MSVC v143 | Instalador EXE | Local, com testes e execução nativos |
-| Ubuntu 24.04 amd64 | DEB | GitHub Actions, disparo manual |
+Os instaladores gerados localmente também usam esses nomes em `dist/`. Checksum
+local só é criado após as validações do empacotador. O envio aceita ainda os
+nomes internos antigos, para reaproveitar builds já concluídos, e publica com
+os nomes acima.
 
-Os workflows Windows foram removidos; os scripts e testes Windows continuam no
-repositório. Pushes e tags não iniciam compilações ou publicação. Alterações
-locais só alteram os Actions depois de enviadas à `main` do GitHub.
-
-## Fluxo manual antigo: uma versão e um commit para todos
-
-A exigência de commit comum abaixo pertence apenas ao empacotamento/publicação
-manual com `publish-release.py`. O fluxo simples com `release.py` agrupa pelo
-nome/versão e permite commits diferentes.
-
-Finalize, valide, faça commit e sincronize as mudanças entre as máquinas antes
-de gerar os pacotes. Use o mesmo SHA completo e a mesma versão técnica nos três
-ambientes. `git rev-parse HEAD` mostra o SHA. Não distribua builds com alterações
-locais pendentes como se fossem a revisão publicada.
-
-A versão tem o formato `KiCad-CircuitAlive`, por exemplo `10.0.7-alpha.4.1` ou
-`10.0.7-4.1`. A parte CircuitAlive tem de um a quatro números entre 0 e 65535.
-O nome público da release é independente dessa versão técnica.
-
-## Ubuntu pelo GitHub Actions
-
-Abra **Actions → Ubuntu DEB package → Run workflow**, selecione `main` e informe
-`version` (nome público) e `package_version` (versão técnica). Deixe
-`publish_release` desmarcado para reunir os quatro formatos depois. O workflow
-salva o DEB e o SHA-256 como artefatos, com os testes e caches nativos existentes.
-Não compila Fedora nem Windows. Se marcar publicação, cria uma release contendo
-somente o DEB; não use essa opção quando quiser os quatro pacotes juntos.
-
-Baixe o instalador e extraia o artefato de checksum para a pasta `dist/` usada
-para reunir os pacotes. Não misture artefatos de versões ou commits diferentes.
-O arquivo DEB deve manter seu nome interno, incluindo a versão técnica.
-
-## Windows local
-
-Em PowerShell 7, na raiz:
-
-```powershell
-./tools/circuitalive/dev-windows.ps1 -Phase prepare -Version 10.0.7-alpha.4.1
-./tools/circuitalive/dev-windows.ps1 -Phase build -Version 10.0.7-alpha.4.1
-./tools/circuitalive/dev-windows.ps1 -Phase libraries
-./tools/circuitalive/dev-windows.ps1 -Phase run
-./tools/circuitalive/dev-windows.ps1 -Phase package -Version 10.0.7-alpha.4.1
-```
-
-A geração do instalador testa o runtime instalado e só grava o `.sha256` após
-sucesso. O EXE e seu checksum ficam em `dist/`. Se apenas o empacotamento falhar,
-repita `package` com a mesma versão; não é necessário recompilar a aplicação.
-Veja [BUILD_WINDOWS.md](BUILD_WINDOWS.md) e
-[DEVELOPMENT_PLATFORMS.md](DEVELOPMENT_PLATFORMS.md).
-
-## Fedora local: RPM e AppImage
-
-O script de release exige Fedora 44, x86_64 e execução como root em contêiner.
-No checkout Fedora, execute com Docker instalado (ou o equivalente com Podman):
-
-```bash
-export RELEASE_VERSION=10.0.7-alpha.4.1
-export RELEASE_COMMIT=$(git rev-parse HEAD)
-export RELEASE_FORMATS=rpm,appimage
-docker run --rm \
-  -e RELEASE_VERSION -e RELEASE_COMMIT -e RELEASE_FORMATS -e CIRCUITALIVE_JOBS=2 \
-  -v "$PWD:/work" -w /work \
-  fedora:44 bash tools/circuitalive/release/build-linux.sh
-```
-
-Em hosts com SELinux, use um volume com rotulagem apropriada ao contêiner
-(por exemplo `:Z` para um checkout dedicado). O contêiner instala dependências,
-compila, executa os testes e gera os dois pacotes e checksums em `dist/`.
-`RELEASE_FORMATS=rpm` ou `appimage` gera só o formato escolhido. O desenvolvimento
-Fedora fora do contêiner continua em [BUILD_FEDORA.md](BUILD_FEDORA.md).
-
-## Reunir e publicar depois dos testes
-
-Copie para uma única `dist/` os quatro instaladores e seus quatro `.sha256`
-originais. Para `10.0.7-alpha.4.1`, os instaladores são:
-
-- `CircuitAliveEDA-10.0.7-alpha.4.1-fedora44-x86_64.rpm`
-- `CircuitAliveEDA-10.0.7-alpha.4.1-linux-x86_64.AppImage`
-- `CircuitAliveEDA-10.0.7-alpha.4.1-ubuntu24.04-amd64.deb`
-- `CircuitAliveEDA-10.0.7-alpha.4.1-windows-x86_64-setup.exe`
-
-Em uma máquina com Python 3.11+ e GitHub CLI autenticado, confira os pacotes antes
-sem publicar. Substitua `SHA_COMPLETO` pela revisão comum dos builds:
-
-```text
-python tools/circuitalive/release/publish-release.py --directory dist --version 10.0.7-alpha.4.1 --commit SHA_COMPLETO --formats all
-```
-
-O verificador exige todos os formatos, confere cabeçalhos e checksums e prepara
-nomes públicos estáveis e `SHA256SUMS.txt`. O SHA fornecido é uma declaração do
-operador: essa checagem não demonstra, sozinha, a origem interna de cada binário.
-Confira os registros de build e `PACKAGE-INFO.json` antes da publicação.
-
-Depois de testar as plataformas e revisar os arquivos, publique:
-
-```text
-python tools/circuitalive/release/publish-release.py --directory dist --version 10.0.7-alpha.4.1 --commit SHA_COMPLETO --formats all --repository ViniciusJesus-art/CircuitAliveEDA --publish
-```
-
-O script cria um rascunho, envia todos os arquivos e só então publica. Uma falha
-no upload mantém o rascunho para inspeção. Use uma tag inédita. `--formats deb`,
-`exe`, `rpm`, `appimage` ou uma lista separada por vírgulas permite publicar uma
-seleção. `all` continua significando os quatro formatos no script local.
-
-Os downloads públicos usam nomes sem a versão; ela permanece nos metadados.
-A release contém também `SHA256SUMS.txt`. Bibliotecas, traduções e runtimes
-continuam incluídos. A AppImage exige Fedora 44 / glibc 2.43 ou ambiente
+A versão técnica segue `KiCad-CircuitAlive`: `10.0.7-alpha.4.2.0` ou `10.0.7-4.2.0`,
+com um a quatro números CircuitAlive entre 0 e 65535. Bibliotecas, traduções e
+runtimes continuam incluídos. A AppImage exige Fedora 44 / glibc 2.43 ou runtime
 compatível mais novo; o DEB usa as dependências nativas do Ubuntu 24.04.
 
-## Verificações
+## Validação e uso avançado
 
-```text
-python qa/tests/cli/test_release_artifacts.py
-python qa/tests/cli/test_release_versions.py
-python qa/tests/cli/test_component_libraries.py
-python qa/tests/cli/test_windows_installer.py
-```
+`publish-release.py` continua disponível para conferir um diretório de pacotes
+ou enviar uma seleção, usando o mesmo publicador incremental. `--formats all`
+exige os quatro formatos; uma seleção como `exe` ou `rpm,appimage` exige somente
+os arquivos correspondentes. O SHA informado é metadado do build, não uma
+exigência de igualdade com os outros pacotes da release.
 
-Execute também as validações nativas e teste o aplicativo em cada plataforma.
-Os checks offline não substituem compilação, testes GUI nem medição de desempenho.
+O Actions envia os artefatos já compilados usando `release.py --from-artifacts
+--formats ...`; essa opção verifica os arquivos/checksums sem recompilar e sem
+exigir o registro de um build local. O token do job de publicação tem permissão
+`contents: write`. Releases imutáveis configuradas no GitHub não aceitam acréscimos.
+
+Os testes do módulo estão em `test_release_artifacts.py`, `test_incremental_release.py`,
+`test_release_workflow.py`, `test_release_versions.py` e `test_windows_installer.py`,
+em `qa/tests/cli/`. Eles não substituem os builds e testes nativos executados
+pelos empacotadores de cada plataforma.

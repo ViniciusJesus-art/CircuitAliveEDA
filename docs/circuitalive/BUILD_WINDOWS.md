@@ -42,9 +42,10 @@ O instalador Inno Setup x64 inclui Python/wxPython, DLLs MSVC redistribuíveis, 
 
 ## Desenvolvimento e publicação
 
-Os Actions agora compilam somente o Ubuntu. O EXE é compilado e testado no
-Windows local; RPM e AppImage são compilados no Fedora local. Os scripts MSVC
-e as validações nativas permanecem disponíveis neste repositório.
+O EXE pode ser compilado e testado no Windows local ou pelo GitHub Actions.
+O workflow `Release packages (all or individual)` também gera RPM, AppImage e
+DEB e permite completar a mesma release usada por builds locais. Os workflows
+Windows de dependências, auditoria e validação também estão disponíveis.
 
 O comando `tools/circuitalive/dev-windows.ps1` reúne o preparo, build e execução
 do runtime local para testar janelas e carregamento sem gerar um instalador a

@@ -1,27 +1,36 @@
-name: Ubuntu DEB package
-run-name: Ubuntu DEB ${{ inputs.version }}
+name: Release packages (all or individual)
+run-name: Packages ${{ inputs.version }} — ${{ inputs.target }}
 
 # Commits, pushes and tags do not start a release.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Public GitHub release name (independent of the application version)
+        description: Version used in release name, files, About dialog and installer (e.g. 10.0.7-alpha.4.2.0)
         required: true
-        default: 10.0.7-alpha.4.1
+        default: 10.0.7-alpha.4.2.0
         type: string
-      package_version:
-        description: Application/installer/About version — KiCad-CircuitAlive (e.g. 10.0.7-alpha.4.1 or 10.0.7-1.2.3)
+      target:
+        description: Packages to build (all = RPM + AppImage + DEB + EXE)
+        type: choice
         required: true
-        default: 10.0.7-alpha.4.1
-        type: string
+        default: all
+        options:
+          - all
+          - linux
+          - fedora
+          - windows
+          - exe
+          - rpm
+          - appimage
+          - deb
       publish_release:
-        description: Publish only the Ubuntu DEB (leave unchecked to assemble a cross-platform release locally)
+        description: Create or add packages to this version on GitHub (uncheck for downloadable build artifacts only)
         type: boolean
-        default: false
+        default: true
 
 concurrency:
-  group: publish-release-${{ github.ref }}
+  group: publish-release-${{ inputs.version }}
   cancel-in-progress: false
 
 permissions:
@@ -38,61 +47,131 @@ jobs:
       commit: ${{ steps.release.outputs.commit }}
       release_label: ${{ steps.release.outputs.release_label }}
       formats: ${{ steps.release.outputs.formats }}
+      fedora_formats: ${{ steps.release.outputs.fedora_formats }}
     steps:
       - uses: actions/checkout@v7
       - name: Check release publication guard
         run: |
           python3 qa/tests/cli/test_release_artifacts.py
           python3 qa/tests/cli/test_release_versions.py
-          python3 qa/tests/cli/test_component_libraries.py
+          python3 qa/tests/cli/test_incremental_release.py
+          python3 qa/tests/cli/test_release_workflow.py
       - uses: actions/github-script@v8
         id: release
         env:
-          RELEASE_LABEL: ${{ inputs.version }}
-          PACKAGE_VERSION: ${{ inputs.package_version }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_TARGET: ${{ inputs.target }}
           PUBLISH_RELEASE: ${{ inputs.publish_release }}
         with:
           script: |
             if (context.ref !== 'refs/heads/main') {
               throw new Error('Run this release workflow from main.');
             }
-            const label = process.env.RELEASE_LABEL.trim();
-            if (!label || label.length > 100 || /[\x00-\x1f\x7f]/.test(label)) {
-              throw new Error('Enter a nonempty release name of at most 100 printable characters.');
-            }
-            const slug = label.normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
-              .replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[._-]+|[._-]+$/g, '')
-              .replace(/\.{2,}/g, '.').slice(0, 80).replace(/[._-]+$/g, '');
-            if (!slug) throw new Error('Release name needs a letter or number for its filename.');
-            const tag = /^v[0-9]/.test(slug) ? slug : `v${slug}`;
-            // Public label and technical version are independent. Never infer an
-            // application version from the label or the CI run number.
-            const version = process.env.PACKAGE_VERSION.trim();
+            const version = process.env.RELEASE_VERSION.trim();
             const parsed = /^([0-9]+\.[0-9]+\.[0-9]+)-(alpha\.)?([0-9]+(?:\.[0-9]+){0,3})$/.exec(version);
             if (!parsed || parsed[3].split('.').some(part => Number(part) > 65535)) {
-              throw new Error('Enter KiCad-CircuitAlive version, e.g. 10.0.7-alpha.4.1 or 10.0.7-1.2.3 (1–4 CircuitAlive numbers, each 0–65535).');
+              throw new Error('Enter KiCad-CircuitAlive version, e.g. 10.0.7-alpha.4.2.0 (1–4 CircuitAlive numbers, each 0–65535).');
             }
-            const formats = ['deb'];
-            if (process.env.PUBLISH_RELEASE === 'true') for (const lookup of [
-              () => github.rest.git.getRef({...context.repo, ref: `tags/${tag}`}),
-              () => github.rest.repos.getReleaseByTag({...context.repo, tag})
-            ]) {
-              try { await lookup(); }
-              catch (error) {
-                if (error.status === 404) continue;
-                throw error;
-              }
-              throw new Error(`Tag or release ${tag} already exists. Choose an unused version.`);
-            }
+            const label = version;
+            const tag = `v${version}`;
+            const targets = {all: ['rpm', 'appimage', 'deb', 'exe'],
+              linux: ['rpm', 'appimage', 'deb'], fedora: ['rpm', 'appimage'],
+              windows: ['exe'], exe: ['exe'],
+              rpm: ['rpm'], appimage: ['appimage'], deb: ['deb']};
+            const formats = targets[process.env.RELEASE_TARGET];
+            if (!formats) throw new Error('Unknown package target.');
             core.setOutput('version', version);
             core.setOutput('release_label', label);
             core.setOutput('tag', tag);
             core.setOutput('commit', context.sha);
             core.setOutput('formats', formats.join(','));
+            core.setOutput('fedora_formats', formats.filter(f => ['rpm', 'appimage'].includes(f)).join(','));
             await core.summary.addHeading(`CircuitAliveEDA ${label}`)
               .addRaw(`Building ${formats.join(', ')} using package version ${version} from commit ${context.sha}. ` +
-                (process.env.PUBLISH_RELEASE === 'true' ? 'A stable release will be published after all selected jobs pass.' : 'Artifacts only; no release or tag will be created.'))
+                (process.env.PUBLISH_RELEASE === 'true' ? 'Selected packages will be added to this version after the builds pass; existing platform packages are preserved.' : 'Artifacts only; no release or tag will be created.'))
               .write();
+
+  windows:
+    name: Windows installer
+    needs: prepare
+    if: contains(needs.prepare.outputs.formats, 'exe')
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+
+  linux:
+    name: Fedora packages
+    needs: prepare
+    if: needs.prepare.outputs.fedora_formats != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+      RELEASE_FORMATS: ${{ needs.prepare.outputs.fedora_formats }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+      - name: Free hosted runner disk for builds and component libraries
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h .
+      - name: Restore Linux compiler cache
+        id: compiler-cache
+        continue-on-error: true
+        uses: actions/cache/restore@v5
+        with:
+          path: .circuitalive/ccache
+          key: linux-fedora44-release-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: linux-fedora44-release-v1-
+      - name: Compile, test and package selected formats in Fedora 44
+        run: |
+          docker run --rm \
+            -e RELEASE_VERSION -e RELEASE_COMMIT -e RELEASE_FORMATS -e CIRCUITALIVE_JOBS=2 \
+            -v "$GITHUB_WORKSPACE:/work" -w /work \
+            fedora:44 bash tools/circuitalive/release/build-linux.sh
+      - name: Preserve Linux compiler cache after success or failure
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v5
+        with:
+          path: .circuitalive/ccache
+          key: linux-fedora44-release-v1-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Downloadable Fedora RPM
+        if: contains(needs.prepare.outputs.formats, 'rpm')
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/CircuitAliveEDA-${{ env.RELEASE_VERSION }}.rpm
+          archive: false
+          if-no-files-found: error
+      - name: Downloadable Linux AppImage
+        if: contains(needs.prepare.outputs.formats, 'appimage')
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/CircuitAliveEDA-${{ env.RELEASE_VERSION }}.AppImage
+          archive: false
+          if-no-files-found: error
+      - name: Preserve Linux package checksums
+        uses: actions/upload-artifact@v7
+        with:
+          name: CircuitAliveEDA-${{ env.RELEASE_VERSION }}-linux-SHA256
+          path: |
+            dist/*.rpm.sha256
+            dist/*.AppImage.sha256
+          if-no-files-found: error
+      - name: Preserve Linux diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-release-diagnostics
+          path: |
+            .circuitalive/logs/linux-release.log
+            build/circuitalive/CMakeCache.txt
+            build/circuitalive/CMakeFiles/CMakeConfigureLog.yaml
+            build/circuitalive/Testing/Temporary/
+          if-no-files-found: warn
+          retention-days: 14
 
   deb:
     name: Ubuntu DEB package
@@ -155,14 +234,14 @@ jobs:
       - name: Downloadable Ubuntu DEB
         uses: actions/upload-artifact@v7
         with:
-          path: dist/CircuitAliveEDA-${{ env.RELEASE_VERSION }}-ubuntu24.04-amd64.deb
+          path: dist/CircuitAliveEDA-${{ env.RELEASE_VERSION }}.deb
           archive: false
           if-no-files-found: error
       - name: Preserve Ubuntu package checksum
         uses: actions/upload-artifact@v7
         with:
           name: CircuitAliveEDA-${{ env.RELEASE_VERSION }}-ubuntu24.04-SHA256
-          path: dist/*-ubuntu24.04-amd64.deb.sha256
+          path: dist/*.deb.sha256
           if-no-files-found: error
       - name: Preserve Ubuntu diagnostics
         if: always()
@@ -178,12 +257,15 @@ jobs:
           retention-days: 14
 
   publish:
-    name: Publish verified Ubuntu DEB
-    needs: [prepare, deb]
+    name: Assemble downloads and optionally complete release
+    needs: [prepare, windows, linux, deb]
+    # Optional platform jobs are deliberately skipped for individual builds.
     if: >-
-      always() && !cancelled() && inputs.publish_release &&
+      always() && !cancelled() &&
       needs.prepare.result == 'success' &&
-      needs.deb.result == 'success'
+      (needs.windows.result == 'success' || needs.windows.result == 'skipped') &&
+      (needs.linux.result == 'success' || needs.linux.result == 'skipped') &&
+      (needs.deb.result == 'success' || needs.deb.result == 'skipped')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -200,12 +282,23 @@ jobs:
       - name: Collect installers and checksums for this version
         uses: actions/download-artifact@v8
         with:
-          pattern: CircuitAliveEDA-${{ env.RELEASE_VERSION }}-*
+          pattern: CircuitAliveEDA-${{ env.RELEASE_VERSION }}*
           merge-multiple: true
           path: dist
-      - name: Verify formats and checksums, then publish the release
+      - name: Verify selected packages and group auxiliary files
         run: |
           python3 tools/circuitalive/release/publish-release.py \
             --version "$RELEASE_VERSION" --commit "$RELEASE_COMMIT" \
-            --release-label "$RELEASE_LABEL" \
-            --formats "$RELEASE_FORMATS" --repository "$GITHUB_REPOSITORY" --directory dist --publish
+            --formats "$RELEASE_FORMATS" --directory dist
+      - name: Downloadable auxiliary archive
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/CircuitAliveEDA-${{ env.RELEASE_VERSION }}-auxiliares.zip
+          archive: false
+          if-no-files-found: error
+      - name: Verify formats and checksums, then publish the release
+        if: inputs.publish_release
+        run: |
+          python3 tools/circuitalive/release/release.py "$RELEASE_VERSION" \
+            --from-artifacts --formats "$RELEASE_FORMATS" \
+            --repository "$GITHUB_REPOSITORY" --directory dist

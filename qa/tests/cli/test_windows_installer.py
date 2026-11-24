@@ -143,7 +143,7 @@ class WindowsInstallerTests(unittest.TestCase):
                 self.assertIn('VersionInfoVersion=4.1.0.0\n', script)
                 self.assertIn(f'VersionInfoTextVersion={version}\n', script)
                 self.assertIn(f'VersionInfoProductTextVersion={version}\n', script)
-                self.assertIn(f'OutputBaseFilename=CircuitAliveEDA-{version}-windows-x86_64-setup', script)
+                self.assertIn(f'OutputBaseFilename=CircuitAliveEDA-{version}', script)
 
     def test_inno_setup_paths_are_quoted_when_root_or_output_have_spaces(self):
         root = self.root / 'ci runner path with spaces'
@@ -153,7 +153,7 @@ class WindowsInstallerTests(unittest.TestCase):
         self.assertIn(f'OutputDir="{package.inno_quote(dist)}"', script)
 
     def test_failed_compilation_and_failed_installation_do_not_get_a_checksum(self):
-        installer = self.dist / f'CircuitAliveEDA-{self.version}-windows-x86_64-setup.exe'
+        installer = self.dist / f'CircuitAliveEDA-{self.version}.exe'
         installer.write_bytes(b'MZ partial installer')
         for compile_error in (True, False):
             with self.subTest(compile_error=compile_error):
@@ -168,7 +168,7 @@ class WindowsInstallerTests(unittest.TestCase):
                 self.assertTrue((self.dist / 'windows-package-report.json').is_file())
 
     def test_successful_installation_is_required_before_checksum_is_written(self):
-        installer = self.dist / f'CircuitAliveEDA-{self.version}-windows-x86_64-setup.exe'
+        installer = self.dist / f'CircuitAliveEDA-{self.version}.exe'
         installer.write_bytes(b'MZ verified installer')
         with patch.object(package.subprocess, 'run'), patch.object(package, 'verify_installer') as verify:
             package.package_runtime(self.stage, self.version, 'ISCC.exe', self.root)
@@ -220,7 +220,7 @@ class WindowsInstallerTests(unittest.TestCase):
         text = text.split('[Icons]')[0]
         script.write_text(text, encoding='utf-8-sig')
         subprocess.run([os.environ['INNO_ISCC'], '-Qp', str(script)], check=True, timeout=120)
-        installer = self.dist / f'CircuitAliveEDA-{self.version}-windows-x86_64-setup.exe'
+        installer = self.dist / f'CircuitAliveEDA-{self.version}.exe'
         subprocess.run([str(installer), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-',
                         f'/DIR={destination}', f'/LOG={self.dist / "fixture-install.log"}'], check=True, timeout=120)
         try:

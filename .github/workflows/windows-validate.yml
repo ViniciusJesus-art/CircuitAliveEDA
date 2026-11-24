@@ -1,0 +1,176 @@
+name: Validate Windows affected sources (MSVC)
+on:
+  workflow_dispatch:
+concurrency:
+  group: windows-msvc-${{ github.ref }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 150
+    env:
+      CA_WINDOWS_TOOLS: D:/ca-tools
+      CA_USE_SCCACHE: '1'
+      SCCACHE_GHA_ENABLED: 'true'
+      SCCACHE_GHA_VERSION: circuitalive-msvc-v1
+      SCCACHE_IGNORE_SERVER_IO_ERROR: '1'
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate dependency safety and toolchain initialization
+        run: |
+          ./qa/tests/cli/test_windows_toolchain.ps1
+          ./qa/tests/cli/test_windows_audit.ps1
+          ./qa/tests/cli/test_windows_dependencies.ps1
+      - name: Record actual runner resources
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase inventory -OutputDirectory build/windows-dependencies
+      - name: Identify compiler-tracked dependency profile
+        id: profile
+        run: |
+          . ./tools/circuitalive/release/windows-dependencies-data.ps1
+          "value=$(Get-WindowsDependencyProfile (Get-Location).Path)" | Add-Content $env:GITHUB_OUTPUT
+      - name: Restore compatible dependency cache
+        id: cache
+        uses: actions/cache/restore@v5
+        with:
+          path: D:/ca-tools/binary-cache
+          key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-validation
+          restore-keys: windows-msvc-v143-${{ steps.profile.outputs.value }}-
+      - name: Record actual cache restoration
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          CACHE_MATCHED_KEY: ${{ steps.cache.outputs.cache-matched-key }}
+          CACHE_PRIMARY_KEY: ${{ steps.cache.outputs.cache-primary-key }}
+        run: |
+          @{ cacheHit = $env:CACHE_HIT; matchedKey = $env:CACHE_MATCHED_KEY; primaryKey = $env:CACHE_PRIMARY_KEY } |
+            ConvertTo-Json | Tee-Object -FilePath build/windows-dependencies/actions-cache.json
+          if (!$env:CACHE_MATCHED_KEY) { throw 'Dependency cache unavailable; run dependency preparation separately.' }
+      - name: Prepare native tools
+        timeout-minutes: 10
+        run: ./tools/circuitalive/release/audit-windows.ps1 -Phase setup -OutputDirectory build/windows-dependencies
+      - name: Verify complete ABI cache without compiling library ports
+        timeout-minutes: 15
+        run: |
+          ./tools/circuitalive/release/audit-windows.ps1 -Phase probe-local -OutputDirectory build/windows-dependencies
+          $result = Get-Content build/windows-dependencies/probe-local-result.json -Raw | ConvertFrom-Json
+          if ($result.outcome -ne 'complete') { throw 'Compatible binary packages are missing; prepare dependencies separately.' }
+      - name: Install complete cached manifest and record completion proof
+        timeout-minutes: 20
+        run: ./tools/circuitalive/release/prepare-windows-dependencies.ps1 -Stage complete -Jobs 2
+      - name: Preserve dependency checkpoint before CMake
+        if: always()
+        uses: ./.github/actions/windows-dependency-checkpoint
+        with:
+          name: validation
+          cache-key: windows-msvc-v143-${{ steps.profile.outputs.value }}-${{ github.run_id }}-${{ github.run_attempt }}-validation
+      - name: Prepare persistent application compiler cache
+        id: compiler-cache
+        continue-on-error: true
+        uses: Mozilla-Actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        with:
+          version: v0.16.0
+      - name: Configure applications with dependency installation disabled
+        env:
+          CA_USE_SCCACHE: ${{ steps.compiler-cache.outcome == 'success' && '1' || '0' }}
+        timeout-minutes: 15
+        run: |
+          $output = (New-Item -ItemType Directory -Force build/windows-validation).FullName
+          Set-Content "$output/current-phase.txt" 'configure'
+          . ./tools/circuitalive/release/windows-monitor-control.ps1
+          Start-Transcript -Path "$output/configure-transcript.log"
+          try {
+            Start-ResourceMonitor
+            ./tools/circuitalive/release/build-windows.ps1 -Phase configure -Jobs 2 2>&1 |
+              Tee-Object -FilePath "$output/configure.log"
+          } finally {
+            Stop-ResourceMonitor
+            Stop-Transcript
+          }
+      - name: Check compiler cache and header invalidation with native MSVC
+        if: steps.compiler-cache.outcome == 'success'
+        run: |
+          ./tools/circuitalive/release/build-windows.ps1 -Phase environment
+          ./qa/tests/cli/test_windows_compiler_cache.ps1
+      - name: Preserve configuration before compiling affected sources
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-msvc-configure
+          retention-days: 14
+          path: |
+            build/windows-validation/
+            build/windows-msvc/CMakeCache.txt
+            build/windows-msvc/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: warn
+      - name: Check branding and Windows header order with MSVC before shared libraries
+        timeout-minutes: 2
+        run: |
+          ./tools/circuitalive/release/build-windows.ps1 -Phase environment -Jobs 2
+          $prefix = (Resolve-Path build/windows-msvc/vcpkg_installed/x64-windows).Path
+          $source = Join-Path (Resolve-Path build/windows-validation).Path 'branding-check.cpp'
+          @'
+          #include <circuitalive/branding.h>
+          #include <circuitalive/editor_simulation.h>
+          // Implement the declarations to reject accidental inline platform stubs.
+          namespace CIRCUITALIVE {
+          void RegisterEditorSimulation(TOOL_MANAGER*) {}
+          void InstallEditorSimulation(SCH_EDIT_FRAME*) {}
+          void ShutdownEditorSimulation(SCH_EDIT_FRAME*) {}
+          void InvalidateEditorSimulation(SCH_EDIT_FRAME*) {}
+          void RebindEditorSimulation(SCH_EDIT_FRAME*) {}
+          void ReloadEditorSimulationPreferences(SCH_EDIT_FRAME*) {}
+          }
+          '@ | Set-Content $source -Encoding utf8
+          & cl /nologo /std:c++20 /permissive- /EHsc /utf-8 /Zs /DUNICODE /D_UNICODE /DNOMINMAX `
+            /Iinclude /Ieeschema /Ithirdparty/nlohmann_json "/I$prefix/include" "/I$prefix/lib/mswu" `
+            $source qa/tests/spice/test_interactive_windows_headers.cpp 2>&1 |
+            Tee-Object -FilePath build/windows-validation/branding-check.log
+          if ($LASTEXITCODE -ne 0) { throw "MSVC branding header check failed ($LASTEXITCODE)." }
+      - name: Compile complete XSPICE memory module before shared libraries
+        timeout-minutes: 5
+        run: |
+          ./tools/circuitalive/release/build-windows.ps1 -Phase environment -Jobs 2
+          cmake --build build/windows-msvc --parallel 2 --verbose --target circuitalive-memory 2>&1 |
+            Tee-Object -FilePath build/windows-validation/memory-module.log
+          if ($LASTEXITCODE -ne 0) { throw "XSPICE memory module failed ($LASTEXITCODE)." }
+      - name: Preserve isolated memory module compilation log
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-msvc-memory-module
+          retention-days: 14
+          path: build/windows-validation/memory-module.log
+          if-no-files-found: error
+      - name: Compile CA interface and branding consumers, collect independent errors and test simulator
+        timeout-minutes: 80
+        run: |
+          $output = (Resolve-Path build/windows-validation).Path
+          Set-Content "$output/current-phase.txt" 'validate'
+          . ./tools/circuitalive/release/windows-monitor-control.ps1
+          Start-Transcript -Path "$output/validate-transcript.log"
+          try {
+            Start-ResourceMonitor
+            ./tools/circuitalive/release/validate-windows-sources.ps1 -Jobs 2 2>&1 |
+              Tee-Object -FilePath "$output/validate.log"
+          } finally {
+            Stop-ResourceMonitor
+            Stop-Transcript
+          }
+      - name: Preserve configuration, compilation and test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-msvc-validation
+          retention-days: 14
+          path: |
+            build/windows-validation/
+            build/windows-msvc/CMakeCache.txt
+            build/windows-msvc/CMakeFiles/CMakeConfigureLog.yaml
+            build/windows-msvc/compile_commands.json
+            build/windows-msvc/dependencies-complete.json
+            build/windows-msvc/eeschema/sim/ngspice-cm-support/
+            build/windows-msvc/Testing/Temporary/
+          if-no-files-found: warn

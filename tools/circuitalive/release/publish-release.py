@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import unicodedata
+import zipfile
 from release_version import parse_version
 
 
@@ -17,6 +18,53 @@ PACKAGE_SUFFIXES = {
     'deb': 'ubuntu24.04-amd64.deb',
     'exe': 'windows-x86_64-setup.exe',
 }
+
+
+def package_filename(version, kind):
+    return f'CircuitAliveEDA-{version}.' + PACKAGE_SUFFIXES[kind].rsplit('.', 1)[1]
+
+
+def package_source(directory, version, kind):
+    current = Path(directory) / package_filename(version, kind)
+    legacy = Path(directory) / f'CircuitAliveEDA-{version}-{PACKAGE_SUFFIXES[kind]}'
+    if current.exists() and current.with_suffix(current.suffix + '.sha256').exists():
+        return current
+    return legacy if legacy.exists() else current
+
+
+def auxiliary_filename(version):
+    return f'CircuitAliveEDA-{version}-auxiliares.zip'
+
+
+def read_auxiliary(path, version):
+    try:
+        with zipfile.ZipFile(path) as archive:
+            if len(archive.infolist()) > 64 or sum(info.file_size for info in archive.infolist()) > 16 * 1024 * 1024:
+                raise ValueError('Unexpectedly large auxiliary archive')
+            manifest = json.loads(archive.read('manifest.json'))
+    except (zipfile.BadZipFile, KeyError) as error:
+        raise ValueError('Invalid auxiliary archive; existing release was not modified') from error
+    if not isinstance(manifest, dict) or manifest.get('version') != version or not isinstance(manifest.get('packages'), dict):
+        raise ValueError('Auxiliary archive belongs to another version')
+    records = manifest['packages']
+    for kind, record in records.items():
+        if (kind not in PACKAGE_SUFFIXES or not isinstance(record, dict) or record.get('version') != version
+                or record.get('asset') != package_filename(version, kind)
+                or not re.fullmatch(r'[0-9a-f]{64}', record.get('sha256', ''))):
+            raise ValueError('Invalid auxiliary package metadata')
+    return records
+
+
+def write_auxiliary(directory, version, records):
+    path = Path(directory) / auxiliary_filename(version)
+    with zipfile.ZipFile(path, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr('manifest.json', json.dumps({'version': version, 'packages': records}, indent=2) + '\n')
+        archive.writestr('SHA256SUMS.txt', ''.join(
+            f"{record['sha256']}  {record['asset']}\n" for _, record in sorted(records.items())))
+        for kind, record in sorted(records.items()):
+            archive.writestr(f'{kind}/manifest.json', json.dumps(record, indent=2) + '\n')
+            archive.writestr(f"{kind}/{record['asset']}.sha256", f"{record['sha256']}  {record['asset']}\n")
+    return path
 
 
 def release_slug(label):
@@ -59,7 +107,7 @@ def verify_packages(directory, version, commit, formats='all', release_label=Non
     packages, checksums, sources = [], {}, {}
     for format in formats:
         suffix = PACKAGE_SUFFIXES[format]
-        package = directory / f'CircuitAliveEDA-{version}-{suffix}'
+        package = package_source(directory, version, format)
         checksum = package.with_suffix(package.suffix + '.sha256')
         with package.open('rb') as stream:
             header = stream.read(12)
@@ -74,8 +122,7 @@ def verify_packages(directory, version, commit, formats='all', release_label=Non
         fields = checksum.read_text().strip().split()
         if len(fields) != 2 or fields[0] != digest or fields[1].lstrip('*') != package.name:
             raise ValueError(f'Checksum mismatch: {package.name}')
-        # Release asset names stay constant across versions; version remains in package metadata.
-        public_name = f'CircuitAliveEDA-{suffix}'
+        public_name = package_filename(version, format)
         public_package = directory / public_name
         packages.append((package, public_package))
         checksums[public_name] = digest
@@ -102,28 +149,26 @@ def verify_packages(directory, version, commit, formats='all', release_label=Non
         'rpm': '- Fedora 44 x86_64: `.rpm`, installable with `sudo dnf install ./CircuitAliveEDA-*.rpm`.\n',
         'appimage': '- Linux x86_64: `.AppImage`; requires Fedora 44 / glibc 2.43 or newer compatible runtime.\n',
         'deb': '- Ubuntu 24.04 amd64: native `.deb`; install with `sudo apt install ./CircuitAliveEDA-*.deb`.\n',
-        'exe': '- Windows x86_64: `-setup.exe` installer (MSVC).\n',
+        'exe': '- Windows x86_64: `.exe` installer (MSVC).\n',
     }
     notes.write_text(
         f'CircuitAliveEDA {label}\n\nSource commit: `{commit}`. '
         f'Internal package version: `{version}`.\n\n'
         + ''.join(descriptions[f] for f in formats) + '\n'
-        'Only the selected formats are included in this release. All packages use the same source commit. '
-        'Package formats and SHA-256 checksums were verified before publication. '
-        'SHA-256 checksums are included in `SHA256SUMS.txt`.\n')
-    return [*assets, sums], notes
+        'Packages can be added independently from local builds or GitHub Actions. '
+        'Source commits are recorded per package and may differ between platforms. '
+        'Checksums and build metadata are grouped in the auxiliary ZIP.\n')
+    records = {kind: {'version': version, 'commit': commit, 'asset': package_filename(version, kind),
+                      'sha256': checksums[package_filename(version, kind)],
+                      'source_package': sources[package_filename(version, kind)]} for kind in formats}
+    auxiliary = write_auxiliary(directory, version, records)
+    return [*assets, auxiliary], notes
 
 
 def publish(directory, version, commit, repository, formats='all', release_label=None):
-    assets, notes = verify_packages(directory, version, commit, formats, release_label)
-    label = version if release_label is None else release_label
-    tag = release_tag(release_slug(label))
-    # Remain a draft until every asset has been uploaded successfully.
-    subprocess.run(['gh', 'release', 'create', tag, '--repo', repository, '--target', commit,
-                    '--title', 'CircuitAliveEDA ' + label, '--draft',
-                    '--notes-file', str(notes), *(str(asset) for asset in assets)], check=True)
-    subprocess.run(['gh', 'release', 'edit', tag, '--repo', repository,
-                    '--draft=false'], check=True)
+    # Use the same incremental upload as local builds, including existing releases.
+    from release import upload
+    return upload(directory, version, commit, repository, formats, release_label)
 
 
 if __name__ == '__main__':

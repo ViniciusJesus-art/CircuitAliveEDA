@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / 'tools/circuitalive/release'))
 SPEC = importlib.util.spec_from_file_location('publish_release', ROOT / 'tools/circuitalive/release/publish-release.py')
 release = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(release)
+import release as incremental
 DEB_SPEC = importlib.util.spec_from_file_location('package_deb', ROOT / 'tools/circuitalive/release/package-deb.py')
 deb = importlib.util.module_from_spec(DEB_SPEC)
 DEB_SPEC.loader.exec_module(deb)
@@ -26,6 +27,10 @@ class ReleaseArtifactsTests(unittest.TestCase):
     commit = 'a' * 40
 
     def setUp(self):
+        for name, value in [('remote_release', None), ('api', {'default_branch': 'main'})]:
+            mocked = patch.object(incremental, name, return_value=value)
+            mocked.start()
+            self.addCleanup(mocked.stop)
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.directory = Path(self.temporary.name)
@@ -50,10 +55,9 @@ class ReleaseArtifactsTests(unittest.TestCase):
         manifest = json.loads((self.directory / 'release-manifest.json').read_text())
         self.assertEqual(len(assets), 5)
         self.assertEqual(manifest['commit'], self.commit)
-        public_names = {f'CircuitAliveEDA-{suffix}'
-                        for suffix in release.PACKAGE_SUFFIXES.values()}
+        public_names = {release.package_filename(self.version, kind) for kind in release.PACKAGE_SUFFIXES}
         self.assertEqual(set(manifest['sha256']), public_names)
-        self.assertEqual({asset.name for asset in assets}, public_names | {'SHA256SUMS.txt'})
+        self.assertEqual({asset.name for asset in assets}, public_names | {release.auxiliary_filename(self.version)})
         self.assertFalse(any(asset.name.endswith('.sha256') for asset in assets))
         self.assertNotIn('release-manifest.json', [asset.name for asset in assets])
         sums = (self.directory / 'SHA256SUMS.txt').read_text()
@@ -73,7 +77,7 @@ class ReleaseArtifactsTests(unittest.TestCase):
                     (directory / source.name).write_bytes(source.read_bytes())
                 assets, notes = release.verify_packages(directory, self.version, self.commit, format)
                 self.assertEqual(len(assets), 2)
-                self.assertEqual(assets[0].name, f'CircuitAliveEDA-{suffix}')
+                self.assertEqual(assets[0].name, release.package_filename(self.version, format))
                 self.assertEqual(json.loads((directory / 'release-manifest.json').read_text())['formats'], [format])
                 if format == 'exe':
                     self.assertNotIn('Fedora 44', notes.read_text())
@@ -87,7 +91,7 @@ class ReleaseArtifactsTests(unittest.TestCase):
         label = 'October Preview 2026!'
         assets, notes = release.verify_packages(self.directory, self.version, self.commit, 'exe', label)
         self.assertEqual([asset.name for asset in assets],
-                         ['CircuitAliveEDA-windows-x86_64-setup.exe', 'SHA256SUMS.txt'])
+                         [f'CircuitAliveEDA-{self.version}.exe', release.auxiliary_filename(self.version)])
         manifest = json.loads((self.directory / 'release-manifest.json').read_text())
         self.assertEqual(manifest['tag'], 'vOctober-Preview-2026')
         self.assertEqual(manifest['version'], self.version)
@@ -121,44 +125,6 @@ class ReleaseArtifactsTests(unittest.TestCase):
             with self.subTest(label=label), self.assertRaises(ValueError):
                 release.release_slug(label)
 
-    @unittest.skipUnless(shutil.which('node'), 'Node is required to exercise the GitHub workflow script')
-    def test_workflow_uses_package_version_independently_of_public_name(self):
-        workflow = (ROOT / '.github/workflows/publish-release.yml').read_text()
-        source = workflow.split('          script: |\n', 1)[1].split('\n  deb:', 1)[0]
-        source = '\n'.join(line[12:] if line.startswith(' ' * 12) else line for line in source.splitlines())
-        harness = '''
-const outputs = {};
-const context = {ref: 'refs/heads/main', sha: 'abc123', repo: {}};
-const core = {setOutput: (key, value) => outputs[key] = value,
-    summary: {addHeading() {return this;}, addRaw() {return this;}, async write() {}}};
-const github = {};
-(async () => {
-''' + source + '''
-})().then(() => process.stdout.write(JSON.stringify(outputs)))
-    .catch(error => {process.stderr.write(error.message); process.exitCode = 1;});
-'''
-        for label, package_version, expected in (('Windows Preview', '10.0.7-alpha.1', '10.0.7-alpha.1'),
-                                                  ('10.0.7-alpha.3', '10.0.7-alpha.1', '10.0.7-alpha.1'),
-                                                  ('v10.0.7-alpha.3', '10.0.7-alpha.1', '10.0.7-alpha.1'),
-                                                  ('10.0.7-alpha.4.1', '10.0.7-alpha.4.1', '10.0.7-alpha.4.1'),
-                                                  ('Stable Preview', '10.0.7-1.2.3', '10.0.7-1.2.3')):
-            with self.subTest(label=label):
-                env = dict(os.environ, RELEASE_LABEL=label, PACKAGE_VERSION=package_version,
-                           RELEASE_TARGET='all', PUBLISH_RELEASE='false', GITHUB_RUN_NUMBER='24')
-                result = subprocess.run(['node', '-e', harness], env=env,
-                                        check=True, capture_output=True, text=True)
-                self.assertEqual(json.loads(result.stdout)['version'], expected)
-                self.assertEqual(json.loads(result.stdout)['formats'], 'deb')
-        for version in ('10.0.7', '10.0.7-alpha.', '10.0.7-alpha.1.2.3.4.5',
-                        '10.0.7-alpha.65536', '10.0.7-1..2', '10.0.7-beta.1'):
-            with self.subTest(invalid_version=version):
-                env = dict(os.environ, RELEASE_LABEL='Preview', PACKAGE_VERSION=version,
-                           RELEASE_TARGET='all', PUBLISH_RELEASE='false')
-                result = subprocess.run(['node', '-e', harness], env=env,
-                                        capture_output=True, text=True)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn('KiCad-CircuitAlive version', result.stderr)
-
     def test_all_selection_requires_deb_before_any_publication(self):
         self.packages[2].unlink()
         with patch.object(release.subprocess, 'run') as remote:
@@ -174,10 +140,10 @@ const github = {};
     def test_single_format_publication_uploads_only_selected_assets(self):
         with patch.object(release.subprocess, 'run') as remote:
             release.publish(self.directory, self.version, self.commit, 'owner/repo', 'deb')
-        command = remote.call_args_list[0].args[0]
+        command = remote.call_args_list[1].args[0]
         self.assertTrue(any(arg.endswith('.deb') for arg in command))
         self.assertFalse(any(arg.endswith(('.rpm', '.AppImage', '.exe')) for arg in command))
-        self.assertTrue(any(arg.endswith('SHA256SUMS.txt') for arg in command))
+        self.assertTrue(any(arg.endswith('-auxiliares.zip') for arg in command))
 
     def test_missing_installer_prevents_every_remote_action(self):
         self.packages[-1].unlink()
@@ -221,10 +187,11 @@ const github = {};
     def test_publication_follows_successful_draft_upload(self):
         with patch.object(release.subprocess, 'run') as remote:
             release.publish(self.directory, self.version, self.commit, 'owner/repo')
-        create, publish = (call.args[0] for call in remote.call_args_list)
+        create, upload, publish = (call.args[0] for call in remote.call_args_list)
+        self.assertEqual(upload[:4], ['gh', 'release', 'upload', 'v' + self.version])
         self.assertEqual(create[:4], ['gh', 'release', 'create', 'v' + self.version])
         self.assertIn('--draft', create)
-        self.assertEqual(create[create.index('--target') + 1], self.commit)
+        self.assertEqual(create[create.index('--target') + 1], 'main')
         self.assertEqual(publish[:4], ['gh', 'release', 'edit', 'v' + self.version])
         self.assertIn('--draft=false', publish)
         self.assertNotIn('--prerelease', create)

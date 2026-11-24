@@ -54,12 +54,13 @@ uma conveniência, não uma identificação automática de release.
 
 Veja [BUILD_WINDOWS.md](BUILD_WINDOWS.md) para as fases individuais e o toolchain.
 
-## Fedora local e Ubuntu no Actions
+## Builds locais e GitHub Actions
 
 O fluxo interativo Fedora continua em [BUILD_FEDORA.md](BUILD_FEDORA.md).
 Para RPM/AppImage, use o contêiner local documentado em
-[RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md). Os Actions compilam apenas o DEB
-Ubuntu. Os scripts de Fedora e Windows continuam versionados para uso local.
+[RELEASE_WORKFLOW.md](RELEASE_WORKFLOW.md). O Actions também gera EXE, RPM,
+AppImage e DEB, juntos ou separadamente. Os envios locais e pelo Actions podem
+completar a mesma release usando o mesmo nome/versão, mesmo com commits diferentes.
 
 ## Verificar desempenho e compatibilidade
 

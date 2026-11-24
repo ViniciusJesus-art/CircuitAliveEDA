@@ -63,42 +63,48 @@ def check_identity(existing, version):
         raise ValueError('This GitHub release is immutable; packages cannot be added. Use a new version.')
 
 
-def upload(directory, version, commit, repository, formats):
-    tag = packages.release_tag(packages.release_slug(version))
+def upload(directory, version, commit, repository, formats, release_label=None):
+    directory = Path(directory).resolve()
+    label = version if release_label is None else release_label
+    tag = packages.release_tag(packages.release_slug(label))
     # A fresh directory prevents stale aliases/checksum files from older builds.
     # Hardlinks avoid copying multi-GB packages and work on native NTFS too.
     with tempfile.TemporaryDirectory(prefix='.release-upload-', dir=directory) as temporary:
         staging = Path(temporary)
         for kind in packages.selected_formats(formats):
-            name = f'CircuitAliveEDA-{version}-{packages.PACKAGE_SUFFIXES[kind]}'
-            for filename in (name, name + '.sha256'):
-                os.link(Path(directory) / filename, staging / filename)
-        assets, _ = packages.verify_packages(staging, version, commit, formats)
-        selected = [asset for asset in assets if asset.name != 'SHA256SUMS.txt']
-        manifest = json.loads((staging / 'release-manifest.json').read_text())
-        sidecars = []
-        for asset in selected:
-            checksum = staging / (asset.name + '.sha256')
-            checksum.write_text(f"{manifest['sha256'][asset.name]}  {asset.name}\n")
-            sidecars.append(checksum)
+            source = packages.package_source(directory, version, kind)
+            for path in (source, source.with_suffix(source.suffix + '.sha256')):
+                os.link(path, staging / path.name)
+        assets, _ = packages.verify_packages(staging, version, commit, formats, label)
+        auxiliary = staging / packages.auxiliary_filename(version)
+        selected = [asset for asset in assets if asset != auxiliary]
+        records = packages.read_auxiliary(auxiliary, version)
         existing = remote_release(repository, tag)
         if existing:
-            check_identity(existing, version)
+            check_identity(existing, label)
+            if any(asset['name'] == auxiliary.name for asset in existing.get('assets', [])):
+                previous = staging / 'previous'
+                previous.mkdir()
+                run('gh', 'release', 'download', tag, '--repo', repository,
+                    '--pattern', auxiliary.name, '--dir', str(previous))
+                merged = packages.read_auxiliary(previous / auxiliary.name, version)
+                merged.update(records)
+                packages.write_auxiliary(staging, version, merged)
         else:
             notes = staging / 'notes.md'
             notes.write_text(
-                f'CircuitAliveEDA {version}\n\n'
+                f'CircuitAliveEDA {label}\n\nApplication/installer version: {version}.\n\n'
                 'Installers are added independently as each platform finishes its build and tests. '
                 'Builds are grouped by release version and may use different source commits. '
-                'Each installer has its own SHA-256 checksum file.\n\n'
+                'Checksums and build metadata are grouped in the auxiliary ZIP.\n\n'
                 + MARKER + json.dumps({'version': version}) + ' -->\n')
             branch = api(repository, '')['default_branch']
             run('gh', 'release', 'create', tag, '--repo', repository, '--target', branch,
-                '--title', 'CircuitAliveEDA ' + version, '--draft', '--notes-file', str(notes))
-        # Only this platform's assets are replaced. No shared checksum/index can
-        # overwrite the checksums or packages uploaded from another machine.
+                '--title', 'CircuitAliveEDA ' + label, '--draft', '--notes-file', str(notes))
+        # Replace this platform's installers and the merged auxiliary archive;
+        # packages and metadata from other platforms remain available.
         run('gh', 'release', 'upload', tag, '--repo', repository, '--clobber',
-            *(str(asset) for asset in [*selected, *sidecars]))
+            *(str(asset) for asset in [*selected, auxiliary]))
         if not existing or existing['draft']:
             run('gh', 'release', 'edit', tag, '--repo', repository, '--draft=false')
     print(f'https://github.com/{repository}/releases/tag/{tag}')
@@ -125,8 +131,9 @@ def receipt(directory, version, commit, formats, save=False):
     path = directory / ('build-source-windows.json' if formats == 'exe' else 'build-source-fedora.json')
     hashes = {}
     for kind in packages.selected_formats(formats):
-        name = f'CircuitAliveEDA-{version}-{packages.PACKAGE_SUFFIXES[kind]}'
-        with (directory / name).open('rb') as stream:
+        source = packages.package_source(directory, version, kind)
+        name = source.name
+        with source.open('rb') as stream:
             hashes[name] = hashlib.file_digest(stream, 'sha256').hexdigest()
     identity = {'version': version, 'commit': commit, 'sha256': hashes}
     if save:
@@ -142,11 +149,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('version', help='Same version on both machines, e.g. 10.0.7-alpha.4.2')
     parser.add_argument('--repository', default='ViniciusJesus-art/CircuitAliveEDA')
+    parser.add_argument('--from-artifacts', action='store_true', help='Verify and send CI packages without rebuilding or a local build receipt')
+    parser.add_argument('--formats', help='Package formats for --from-artifacts: all, linux, or rpm,appimage,deb,exe')
+    parser.add_argument('--directory', type=Path, default=ROOT / 'dist')
     parser.add_argument('--upload-only', action='store_true', help='Retry sending existing dist packages without building')
     parser.add_argument('--jobs', type=int, choices=(1, 2), default=2)
     parser.add_argument('--engine', choices=('docker', 'podman'))
     args = parser.parse_args()
     packages.parse_version(args.version)
+    if args.from_artifacts and (not args.formats or args.upload_only):
+        parser.error('--from-artifacts requires --formats and cannot be combined with --upload-only')
+    if args.formats and not args.from_artifacts:
+        parser.error('--formats is only used with --from-artifacts')
     if platform.system() not in ('Windows', 'Linux') or platform.machine().lower() not in ('amd64', 'x86_64'):
         parser.error('Run on Windows x64 or Linux x86_64.')
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repository):
@@ -157,15 +171,16 @@ def main():
     existing = remote_release(args.repository, tag)
     if existing:
         check_identity(existing, args.version)
-    directory = ROOT / 'dist'
+    directory = args.directory.resolve()
     directory.mkdir(exist_ok=True)
-    formats = 'exe' if platform.system() == 'Windows' else 'rpm,appimage'
-    if not args.upload_only:
+    formats = args.formats if args.from_artifacts else ('exe' if platform.system() == 'Windows' else 'rpm,appimage')
+    packages.selected_formats(formats)
+    if not args.upload_only and not args.from_artifacts:
         build(args.version, commit, args.jobs, args.engine)
     # Local edits are supported; only switching revisions mid-build is rejected.
-    if not args.upload_only and output('git', 'rev-parse', 'HEAD') != commit:
+    if not args.upload_only and not args.from_artifacts and output('git', 'rev-parse', 'HEAD') != commit:
         parser.error('Checkout changed during the build; nothing was uploaded.')
-    build_commit = receipt(directory, args.version, commit, formats, save=not args.upload_only)
+    build_commit = commit if args.from_artifacts else receipt(directory, args.version, commit, formats, save=not args.upload_only)
     upload(directory, args.version, build_commit, args.repository, formats)
 
 

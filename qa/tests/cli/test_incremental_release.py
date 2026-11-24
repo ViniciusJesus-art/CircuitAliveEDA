@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -56,7 +57,8 @@ class IncrementalReleaseTests(unittest.TestCase):
         self.assertIn('--target', commands[0])
         self.assertIn('--draft=false', commands[-1])
         upload = commands[1]
-        self.assertTrue(any(str(item).endswith('.exe.sha256') for item in upload))
+        self.assertTrue(any(str(item).endswith('-auxiliares.zip') for item in upload))
+        self.assertFalse(any(str(item).endswith('.sha256') for item in upload))
         self.assertFalse(any(str(item).endswith(('SHA256SUMS.txt', '.rpm')) for item in upload))
 
     def test_second_machine_only_adds_its_packages(self):
@@ -231,6 +233,79 @@ class IncrementalReleaseTests(unittest.TestCase):
         self.assertFalse(any(str(item).endswith('.exe') for item in fedora))
         self.assertTrue(any(str(item).endswith('.exe') for item in windows))
         self.assertFalse(any(str(item).endswith(('.rpm', '.AppImage')) for item in windows))
+
+    def test_auxiliary_archive_preserves_other_platform_metadata_and_checksums(self):
+        for previous_kind, current_kind in [('rpm', 'exe'), ('exe', 'rpm')]:
+            with self.subTest(previous=previous_kind):
+                previous_name = release.packages.package_filename(self.version, previous_kind)
+                previous_records = {previous_kind: {'version': self.version, 'commit': 'b' * 40,
+                    'asset': previous_name, 'sha256': '1' * 64}}
+                previous_zip = release.packages.write_auxiliary(self.directory, self.version, previous_records)
+                archived = previous_zip.read_bytes()
+                if current_kind == 'rpm':
+                    source = self.directory / release.packages.package_filename(self.version, 'rpm')
+                    source.write_bytes(b'\xed\xab\xee\xdb rpm fixture')
+                    source.with_suffix('.rpm.sha256').write_text(
+                        hashlib.sha256(source.read_bytes()).hexdigest() + '  ' + source.name + '\n')
+                captured = {}
+                def github(*args, **kwargs):
+                    if args[2] == 'download':
+                        target = Path(args[args.index('--dir') + 1]) / previous_zip.name
+                        target.write_bytes(archived)
+                    elif args[2] == 'upload':
+                        archive_path = Path(next(arg for arg in args if str(arg).endswith('-auxiliares.zip')))
+                        captured.update(release.packages.read_auxiliary(archive_path, self.version))
+                        with zipfile.ZipFile(archive_path) as archive:
+                            captured['sums'] = archive.read('SHA256SUMS.txt').decode()
+                existing = dict(self.existing, assets=[{'name': previous_zip.name}])
+                with patch.object(release, 'remote_release', return_value=existing), \
+                     patch.object(release, 'run', side_effect=github):
+                    release.upload(self.directory, self.version, self.commit, 'owner/repo', current_kind)
+                self.assertEqual(captured[previous_kind]['commit'], 'b' * 40)
+                self.assertEqual(captured[current_kind]['commit'], self.commit)
+                self.assertIn(previous_name, captured['sums'])
+                self.assertIn(release.packages.package_filename(self.version, current_kind), captured['sums'])
+
+    def test_corrupt_existing_auxiliary_archive_blocks_upload(self):
+        archive_name = release.packages.auxiliary_filename(self.version)
+        def github(*args, **kwargs):
+            if args[2] == 'download':
+                (Path(args[args.index('--dir') + 1]) / archive_name).write_bytes(b'not a zip')
+        with patch.object(release, 'remote_release', return_value=dict(self.existing, assets=[{'name': archive_name}])), \
+             patch.object(release, 'run', side_effect=github) as run:
+            with self.assertRaisesRegex(ValueError, 'Invalid auxiliary archive'):
+                self.upload()
+        self.assertEqual([call.args[2] for call in run.call_args_list], ['download'])
+
+    def test_relative_directory_uploads_each_installer_and_auxiliary_only_once(self):
+        import os
+        current = Path.cwd()
+        try:
+            os.chdir(self.directory.parent)
+            with patch.object(release, 'remote_release', return_value=None), \
+                 patch.object(release, 'api', return_value={'default_branch': 'main'}), \
+                 patch.object(release, 'run') as run:
+                release.upload(Path(self.directory.name), self.version, self.commit, 'owner/repo', 'exe')
+            command = run.call_args_list[1].args
+            archives = [arg for arg in command if str(arg).endswith('-auxiliares.zip')]
+            self.assertEqual(len(archives), 1)
+        finally:
+            os.chdir(current)
+
+    def test_ci_artifacts_can_publish_without_local_build_receipt(self):
+        with patch.object(sys, 'argv', ['release.py', self.version, '--from-artifacts', '--formats', 'exe']), \
+             patch.object(release, 'ROOT', self.directory), \
+             patch.object(release.platform, 'system', return_value='Linux'), \
+             patch.object(release.platform, 'machine', return_value='x86_64'), \
+             patch.object(release, 'output', return_value=self.commit), \
+             patch.object(release, 'run'), patch.object(release, 'remote_release', return_value=None), \
+             patch.object(release, 'receipt') as receipt, \
+             patch.object(release, 'build') as build, patch.object(release, 'upload') as upload:
+            release.main()
+        receipt.assert_not_called()
+        build.assert_not_called()
+        upload.assert_called_once_with(self.directory / 'dist', self.version, self.commit,
+                                       'ViniciusJesus-art/CircuitAliveEDA', 'exe')
 
     def test_retry_after_stale_public_alias_does_not_require_cleanup(self):
         (self.directory / 'CircuitAliveEDA-windows-x86_64-setup.exe').write_bytes(b'old build')

@@ -181,7 +181,7 @@ def package(stage, libraries, ngspice, version, commit, output):
         'Homepage: https://github.com/ViniciusJesus-art/CircuitAliveEDA\n'
         'Description: CircuitAliveEDA with interactive circuit simulation\n'
         ' Native Ubuntu 24.04 build with component libraries and ngspice 47.\n')
-    target = output / f'CircuitAliveEDA-{version}-ubuntu24.04-amd64.deb'
+    target = output / f'CircuitAliveEDA-{version}.deb'
     subprocess.run(['dpkg-deb', '--root-owner-group', '-Zxz', '-z6', '--build', str(stage), str(target)], check=True)
     subprocess.run(['dpkg-deb', '--info', str(target)], check=True)
     # Exercise the files actually shipped, in a fresh extraction without installing on the runner.

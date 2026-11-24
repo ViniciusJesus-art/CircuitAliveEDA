@@ -148,7 +148,7 @@ PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 LicenseFile="{inno_quote(root / 'LICENSE.GPLv3')}"
 OutputDir="{inno_quote(dist)}"
-OutputBaseFilename=CircuitAliveEDA-{version}-windows-x86_64-setup
+OutputBaseFilename=CircuitAliveEDA-{version}
 Compression=lzma2/max
 SolidCompression=yes
 CompressionThreads=2
@@ -228,7 +228,7 @@ def package_runtime(stage, version, compiler, root=ROOT):
         report['libraries'][folder] = {'files': len(sizes), 'bytes': sum(sizes)}
     (dist / 'windows-package-report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(report, indent=2), flush=True)
-    installer = dist / f'CircuitAliveEDA-{version}-windows-x86_64-setup.exe'
+    installer = dist / f'CircuitAliveEDA-{version}.exe'
     installer.with_suffix('.exe.sha256').unlink(missing_ok=True)
     subprocess.run([compiler, '-Qp', str(script)], check=True)
     verify_installer(installer, root, version)
