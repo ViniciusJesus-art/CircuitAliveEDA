@@ -1,4 +1,61 @@
-# Releases: builds locais e Ubuntu no Actions
+# Releases: enviar de cada máquina
+
+## Fluxo simples recomendado
+
+Cada máquina compila, testa, empacota e envia seus próprios instaladores para
+**a mesma release**, sem copiar arquivos entre computadores. O primeiro envio
+cria e publica a release; os seguintes acrescentam os pacotes daquela plataforma.
+A ordem é livre: Windows ou Fedora pode enviar primeiro.
+
+Nas duas máquinas, informe o mesmo nome/versão da release. Os commits podem
+ser diferentes, inclusive por mudanças no README. Faça commit das alterações
+locais antes de compilar. Instale Python **3.11+** e GitHub CLI e autentique uma vez com
+`gh auth login`. As ferramentas de compilação continuam sendo as descritas nos
+guias Windows/Fedora; no Linux é necessário Docker ou Podman funcional, e no
+Windows, PowerShell 7 e MSVC 2022.
+
+No Fedora, na raiz do projeto:
+
+```bash
+python3 tools/circuitalive/release/release.py 10.0.7-alpha.4.2
+```
+
+No Windows, na raiz do projeto:
+
+```powershell
+python tools/circuitalive/release/release.py 10.0.7-alpha.4.2
+```
+
+A versão acima é um exemplo: use o mesmo valor para reunir os pacotes na mesma release.
+O comando Fedora gera RPM e AppImage usando o contêiner Fedora 44. O comando
+Windows gera o instalador EXE. A release já fica disponível após o primeiro envio,
+e recebe os outros instaladores quando a outra máquina terminar. Os comandos
+não fazem commit nem push automaticamente.
+
+Se o build terminou, mas a rede ou o upload falhou, repita o comando adicionando
+`--upload-only`: ele usa os pacotes já gerados. Um registro local confere a versão
+e os hashes antes de permitir esse reenvio, mesmo se o checkout já estiver em
+outro commit. O commit original fica registrado localmente como informação do
+build. Execute o comando normal para recompilar: ele substitui somente os pacotes
+dessa plataforma na release informada.
+
+O envio identifica a release pelo nome/versão informado, sem comparar commits
+ou o destino da tag, e confere formato e checksum de cada instalador. Cada pacote recebe seu próprio `.sha256`, sem sobrescrever
+os checksums do outro sistema. O upload inicial fica como rascunho até terminar;
+se houver falha, o comando pode ser repetido. Releases antigas com a mesma tag
+também podem receber os pacotes, sem exigir metadados especiais na descrição.
+A tag existente é preservada; para uma release nova, o GitHub usa a branch padrão.
+Releases configuradas como imutáveis no GitHub não permitem acréscimos.
+
+Use `--engine docker` ou `--engine podman` para escolher o contêiner Linux;
+`--repository dono/repositorio` muda o destino. O padrão é
+`ViniciusJesus-art/CircuitAliveEDA`. Nenhuma publicação é disparada apenas por push.
+
+O Ubuntu continua opcional pelo Actions, conforme descrito abaixo. O envio
+independente Fedora/Windows não exige gerar ou baixar o DEB.
+
+## Fluxo manual e Ubuntu no Actions
+
 
 O mesmo repositório e a branch `main` atendem às duas máquinas de desenvolvimento.
 A divisão de compilação é:
@@ -13,7 +70,11 @@ Os workflows Windows foram removidos; os scripts e testes Windows continuam no
 repositório. Pushes e tags não iniciam compilações ou publicação. Alterações
 locais só alteram os Actions depois de enviadas à `main` do GitHub.
 
-## Uma versão e um commit para todos
+## Fluxo manual antigo: uma versão e um commit para todos
+
+A exigência de commit comum abaixo pertence apenas ao empacotamento/publicação
+manual com `publish-release.py`. O fluxo simples com `release.py` agrupa pelo
+nome/versão e permite commits diferentes.
 
 Finalize, valide, faça commit e sincronize as mudanças entre as máquinas antes
 de gerar os pacotes. Use o mesmo SHA completo e a mesma versão técnica nos três
