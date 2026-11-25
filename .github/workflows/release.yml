@@ -67,6 +67,7 @@ jobs:
       - name: Check toolchain initialization against Developer PowerShell overrides
         run: |
           ./qa/tests/cli/test_windows_toolchain.ps1
+          python qa/tests/cli/test_programmable_assets.py
           python qa/tests/cli/test_windows_installer.py
           python qa/tests/cli/test_component_libraries.py
       - name: Check real x64 installer before the expensive application build

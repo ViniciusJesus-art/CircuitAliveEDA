@@ -52,6 +52,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Check release publication guard
         run: |
+          python3 qa/tests/cli/test_programmable_assets.py
           python3 qa/tests/cli/test_release_artifacts.py
           python3 qa/tests/cli/test_release_versions.py
           python3 qa/tests/cli/test_incremental_release.py

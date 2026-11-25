@@ -32,7 +32,8 @@ class WindowsInstallerTests(unittest.TestCase):
         assets = self.stage / 'share/circuitalive'
         (assets / 'models').mkdir(parents=True)
         for name in ('mcu_arduino_uno_r3', 'mcu_atmega48p_p', 'mcu_atmega88p_p',
-                     'mcu_atmega168p_p', 'mcu_atmega328p_p', 'mcu_pic16f84a_p'):
+                     'mcu_atmega168p_p', 'mcu_atmega328p_p', 'mcu_pic16f84a_p',
+                     'ir_receiver_tsop', 'lcd1602_parallel'):
             shutil.copy2(ROOT / 'simulation/models' / (name + '.casim'), assets / 'models')
         shutil.copytree(ROOT / 'simulation/runtime', assets / 'runtime')
         shutil.copytree(ROOT / 'simulation/blocks', assets / 'blocks')
@@ -230,7 +231,7 @@ class WindowsInstallerTests(unittest.TestCase):
                 self.assertEqual((installed / 'data.txt').read_text(), 'library data')
                 self.assertFalse((installed / '.git').exists())
             self.assertFalse((destination / package.CHECKPOINT).exists())
-            self.assertEqual(package.validate_programmable_assets(destination), 6)
+            self.assertEqual(package.validate_programmable_assets(destination), 8)
         finally:
             subprocess.run([str(destination / 'unins000.exe'), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'],
                            check=True, timeout=120)

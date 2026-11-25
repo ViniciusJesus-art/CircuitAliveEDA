@@ -17,7 +17,20 @@ def validate_programmable_assets(stage):
         if 'runtime' not in model:
             continue
         count += 1
-        for module in model['runtime']['modules']:
+        runtime = model['runtime']
+        engine = runtime.get('engine')
+        if engine not in ('javascript', 'native'):
+            raise ValueError(f'Unknown runtime engine for {file.name}: {engine}')
+        # Native peripherals live in the worker and do not ship script modules.
+        # JavaScript models still require a nonempty list of bundled modules.
+        modules = runtime.get('modules', [])
+        if (not isinstance(modules, list)
+                or (engine == 'javascript' and not modules)
+                or (engine == 'native' and modules)):
+            raise ValueError(f'Invalid runtime modules for {file.name}: {engine}')
+        for module in modules:
+            if not isinstance(module, str) or not module:
+                raise ValueError(f'Invalid runtime module path for {file.name}: {module}')
             path = (file.parent / module).resolve()
             if not path.is_relative_to(stage) or not path.is_file() or not path.stat().st_size:
                 raise FileNotFoundError(f'Missing bundled runtime for {file.name}: {module}')
