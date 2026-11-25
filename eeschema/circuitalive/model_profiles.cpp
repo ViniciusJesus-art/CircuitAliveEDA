@@ -113,7 +113,8 @@ void MODEL_PROFILES::MakeDefault(const CIRCUIT_COMPONENT& component,const SIMULA
     const auto file=fs::absolute(selected.file).lexically_normal();
     const auto current=MODEL_REPOSITORY::Load(file);
     if(current.id!=selected.id)throw std::runtime_error("The model changed on disk; reload it before saving defaults");
-    std::ifstream input(file);auto json=JSON::parse(input);
+    // Release the read handle before atomically replacing the model on Windows.
+    auto json=[&]{std::ifstream input(file);return JSON::parse(input);}();
     auto model=current.ForSymbol(component.libraryId);std::set<std::string> used;
     std::map<std::string,std::string> pins;
     std::map<std::string,std::string> defaults;

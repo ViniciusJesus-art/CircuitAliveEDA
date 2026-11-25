@@ -1872,6 +1872,9 @@ BOOST_FIXTURE_TEST_CASE( ProgrammablePicWorkerUsesItsPhysicalPinsAndFirmwareCont
 BOOST_FIXTURE_TEST_CASE( ProgrammablePlayPauseAndStopKeepFirmwareLifecycleConsistent, PROGRAM_FILES )
 {
     auto circuit = AvrCircuit( AvrSymbol( Firmware( "lifecycle", DigitalOutput( true ) ) ) );
+    // Play and Snapshot each advance a cooperative batch. Keep this lifecycle
+    // test away from the finite horizon, which is covered by completion tests.
+    circuit.config.horizon = 10;
     INTERACTIVE_SIM_SESSION session( CIRCUITALIVE_TEST_WORKER );
     session.Configure( circuit.netlist, circuit.config );
     session.Play();
@@ -1893,6 +1896,8 @@ BOOST_FIXTURE_TEST_CASE( ProgrammablePlayPauseAndStopKeepFirmwareLifecycleConsis
 BOOST_FIXTURE_TEST_CASE( ProgrammableEditorRunnerRemainsResponsiveToPauseAndStop, PROGRAM_FILES )
 {
     auto circuit = AvrCircuit( AvrSymbol( Firmware( "runner", BlinkOutput() ) ) );
+    // A frame can consume the helper's entire 10 ms horizon before Pause arrives.
+    circuit.config.horizon = 10;
     SESSION_RUNNER runner( CIRCUITALIVE_TEST_WORKER );
     auto wait = [&]( auto condition )
     {

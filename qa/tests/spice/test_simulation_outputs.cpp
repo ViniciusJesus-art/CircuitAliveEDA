@@ -86,7 +86,9 @@ BOOST_AUTO_TEST_CASE(LuminousEndpointsKeepArbitraryAnglesThicknessAndModelRoundT
     const auto roundTrip=ReadLuminousSegment(WriteLuminousSegment(s));
     BOOST_CHECK_EQUAL(WriteLuminousSegment(s).dump(),WriteLuminousSegment(roundTrip).dump());
     auto r=Output("resistor","R1");std::ifstream in(MODEL_REPOSITORY().SelectModel(r).file);
-    auto json=nlohmann::json::parse(in);json["segments"]={WriteLuminousSegment(s)};
+    auto json=nlohmann::json::parse(in);
+    json["segments"]=nlohmann::json::array({WriteLuminousSegment(s)});
+    BOOST_REQUIRE(json["segments"][0].is_object());
     const auto exported=MODEL_DESIGN::Open(json.dump()).Export();
     const auto model=MODEL_REPOSITORY::LoadText(exported);
     BOOST_REQUIRE(model.segments[0].geometry);BOOST_CHECK_EQUAL(model.segments[0].shape,"line");
